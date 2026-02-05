@@ -51,6 +51,17 @@ async def get_current_user(
         )
 
     token = credentials.credentials
+
+    # Dev mode: skip JWT validation for local testing
+    if token == "dev-mode":
+        dev_mode = os.environ.get("DEV_MODE", "false").lower() in ("true", "1", "yes")
+        if dev_mode:
+            return {"id": "dev-user", "hasActiveSubscription": True}
+        raise HTTPException(
+            status_code=401,
+            detail="Dev mode not enabled on server. Set DEV_MODE=true in .env",
+        )
+
     secret = _get_jwt_secret()
 
     try:

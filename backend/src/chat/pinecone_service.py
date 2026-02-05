@@ -21,8 +21,8 @@ class PineconeService:
         index_name: str,
         openai_api_key: str,
         embedding_model: str = "text-embedding-3-small",
-        top_k: int = 5,
-        similarity_threshold: float = 0.7,
+        top_k: int = 10,
+        similarity_threshold: float = 0.4,
     ):
         self._pc = Pinecone(api_key=pinecone_api_key)
         self._index = self._pc.Index(index_name)

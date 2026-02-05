@@ -1,24 +1,42 @@
 /**
  * Unified input orchestrator hook.
  *
- * Composes useChat and useAnalyzer to provide a single submit() function
+ * Composes useChat to provide a single submit() function
  * that auto-routes based on what the user provides:
  * - Text only → chat
- * - Files + context → analysis
- * - Files + question → hybrid
+ * - Files + context → analysis (with estimate preview + progress)
+ * - Files without context → conversational context gathering first
  */
 
 import { useState, useCallback, useMemo } from 'react';
-import { ChatMessage, ContentType, UserContext } from '../api/types';
+import { ChatMessage, ContentType, UserContext, EstimateResponse, UnifiedAskResponse } from '../api/types';
 import { useChat } from './useChat';
-import { unifiedAsk } from '../api/client';
+import { useElapsedTime } from './useElapsedTime';
+import { unifiedAsk, getEstimate } from '../api/client';
 
 interface UseUnifiedInputOptions {
   apiEndpoint: string;
   token: string;
+  onAnalysisComplete?: (result: UnifiedAskResponse, fileNames: string[]) => void;
 }
 
 type DetectedMode = 'chat' | 'analysis' | 'hybrid' | 'idle';
+
+/** Phases for conversational context gathering */
+type ContextGatheringPhase =
+  | 'idle'
+  | 'asking_users'
+  | 'asking_tasks'
+  | 'asking_format'
+  | 'complete';
+
+/** Phases for the analysis pipeline */
+type AnalysisPhase =
+  | 'idle'
+  | 'estimating'
+  | 'previewing'
+  | 'analyzing'
+  | 'complete';
 
 interface UseUnifiedInputReturn {
   // Input state
@@ -41,6 +59,16 @@ interface UseUnifiedInputReturn {
 
   // Mode detection
   detectedMode: DetectedMode;
+
+  // Context gathering
+  contextGatheringPhase: ContextGatheringPhase;
+
+  // Analysis pipeline
+  analysisPhase: AnalysisPhase;
+  estimate: EstimateResponse | null;
+  elapsedTime: number;
+  confirmAnalysis: () => Promise<void>;
+  cancelAnalysis: () => void;
 
   // Conversation
   messages: ChatMessage[];
@@ -70,12 +98,20 @@ function detectMode(
   if (!hasText && !hasFiles) return 'idle';
   if (hasFiles && hasContext) return 'analysis';
   if (hasFiles && hasText && !hasContext) return 'hybrid';
-  if (hasFiles && !hasText && !hasContext) return 'analysis'; // Will prompt for context
+  if (hasFiles && !hasText && !hasContext) return 'analysis';
   return 'chat';
 }
 
+function hasFullContext(users: string, tasks: string, format: string): boolean {
+  return (
+    users.trim().length >= 10 &&
+    tasks.trim().length >= 10 &&
+    format.trim().length >= 10
+  );
+}
+
 export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInputReturn {
-  const { apiEndpoint, token } = options;
+  const { apiEndpoint, token, onAnalysisComplete } = options;
 
   // Input state
   const [inputText, setInputText] = useState('');
@@ -87,6 +123,15 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
   const [format, setFormat] = useState('');
   const [contentType, setContentType] = useState<ContentType>('website');
   const [contextExpanded, setContextExpanded] = useState(false);
+
+  // Conversational context gathering
+  const [contextGatheringPhase, setContextGatheringPhase] = useState<ContextGatheringPhase>('idle');
+  const [pendingQuestion, setPendingQuestion] = useState('');
+
+  // Analysis pipeline
+  const [analysisPhase, setAnalysisPhase] = useState<AnalysisPhase>('idle');
+  const [estimate, setEstimate] = useState<EstimateResponse | null>(null);
+  const elapsed = useElapsedTime();
 
   // Loading state for unified requests
   const [isUnifiedLoading, setIsUnifiedLoading] = useState(false);
@@ -100,29 +145,18 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
     [inputText, files, users, tasks, format],
   );
 
-  const submit = useCallback(async () => {
-    if (detectedMode === 'idle' || !token) return;
-
-    if (detectedMode === 'chat') {
-      // Pure chat — delegate to useChat
-      const text = inputText.trim();
-      setInputText('');
-      await chat.sendMessage(text);
-      return;
-    }
-
-    // Analysis or hybrid — use unified endpoint
+  /** Run the actual analysis API call (called after estimate confirmation) */
+  const runAnalysis = useCallback(async () => {
+    setAnalysisPhase('analyzing');
+    elapsed.start();
     setIsUnifiedLoading(true);
 
-    // Add a placeholder user message into the conversation via chat hook
-    chat.addAnalysisMessage('', undefined); // placeholder, we'll replace with real results
-
-    const context: UserContext | undefined = (users && tasks && format) ? {
+    const context: UserContext = {
       users,
       tasks,
       format,
       contentType,
-    } : undefined;
+    };
 
     const conversationHistory = chat.messages
       .filter(m => m.role === 'user' || (m.role === 'assistant' && !m.reportHtml))
@@ -133,38 +167,190 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
       const result = await unifiedAsk({
         apiEndpoint,
         token,
-        message: inputText.trim() || undefined,
+        message: pendingQuestion || undefined,
         files,
         context,
         conversationHistory: JSON.stringify(conversationHistory),
       });
 
-      // Clear inputs after successful submission
+      elapsed.stop();
+      setAnalysisPhase('complete');
+
+      // Notify parent (App) so it can switch to report view
+      const fileNames = files.map(f => f.name);
+      if ((result.mode === 'analysis' || result.mode === 'hybrid') && onAnalysisComplete) {
+        onAnalysisComplete(result, fileNames);
+      }
+      chat.addSystemPrompt(`Analysis completed for ${fileNames.join(', ')}. View the full report above.`);
+
+      // Clear inputs
       setInputText('');
       setFiles([]);
-
-      if (result.mode === 'analysis' || result.mode === 'hybrid') {
-        // Remove placeholder and add real messages
-        if (result.report_html) {
-          chat.addAnalysisMessage(
-            result.report_html,
-            result.statistics as Record<string, unknown> | undefined,
-          );
-        }
-        if (result.response) {
-          // Hybrid: also got a chat response
-          // Already handled by addAnalysisMessage for report,
-          // add chat response separately
-        }
-      }
+      setPendingQuestion('');
+      setAnalysisPhase('idle');
+      setEstimate(null);
     } catch (err) {
+      elapsed.stop();
       const msg = err instanceof Error ? err.message : 'Request failed';
-      // Show error in conversation
-      chat.addAnalysisMessage(`<p>Error: ${msg}</p>`, undefined);
+      chat.addSystemPrompt(`Analysis failed: ${msg}`);
+      setAnalysisPhase('idle');
+      setEstimate(null);
     } finally {
       setIsUnifiedLoading(false);
     }
-  }, [detectedMode, inputText, files, users, tasks, format, contentType, token, apiEndpoint, chat]);
+  }, [users, tasks, format, contentType, files, pendingQuestion, apiEndpoint, token, chat, elapsed, onAnalysisComplete]);
+
+  /** User confirms the estimate → start analysis */
+  const confirmAnalysis = useCallback(async () => {
+    await runAnalysis();
+  }, [runAnalysis]);
+
+  /** User cancels from estimate preview or progress */
+  const cancelAnalysis = useCallback(() => {
+    elapsed.reset();
+    setAnalysisPhase('idle');
+    setEstimate(null);
+    setIsUnifiedLoading(false);
+  }, [elapsed]);
+
+  /** Start the estimation step (called after context is complete) */
+  const startEstimation = useCallback(async () => {
+    setAnalysisPhase('estimating');
+    setIsUnifiedLoading(true);
+
+    try {
+      const est = await getEstimate({ apiEndpoint, files });
+      setEstimate(est);
+      setAnalysisPhase('previewing');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      chat.addSystemPrompt(
+        `Could not get estimate: ${msg}. ` +
+        'Please click **Start Analysis** below to proceed without an estimate.'
+      );
+      // Create a fallback estimate so the user can still proceed
+      setEstimate({
+        success: true,
+        input_type: files.length > 1 ? 'multi_image' : 'single_image',
+        file_count: files.length,
+        total_size_mb: 0,
+        time_estimate: {
+          min_seconds: 30,
+          max_seconds: 120,
+          min_formatted: '30 seconds',
+          max_formatted: '2 minutes',
+        },
+        cost_estimate: { min_credits: 1, max_credits: 1, min_dollars: 0.1, max_dollars: 0.3 },
+        ffmpeg_available: false,
+      });
+      setAnalysisPhase('previewing');
+    } finally {
+      setIsUnifiedLoading(false);
+    }
+  }, [apiEndpoint, files, chat]);
+
+  const submit = useCallback(async () => {
+    if (!token) return;
+
+    // ── Handle conversational context gathering ──
+    if (contextGatheringPhase !== 'idle') {
+      const answer = inputText.trim();
+      if (!answer) return;
+
+      // Show user's answer in chat
+      chat.addUserMessage(answer, 'analysis');
+      setInputText('');
+
+      if (contextGatheringPhase === 'asking_users') {
+        setUsers(answer);
+        setContextGatheringPhase('asking_tasks');
+        chat.addSystemPrompt(
+          'Got it. Now, **what tasks are these users trying to accomplish?**\n\n' +
+          '*(e.g., "Find and play a movie", "Sign up for an account", "Complete a purchase")*'
+        );
+        return;
+      }
+
+      if (contextGatheringPhase === 'asking_tasks') {
+        setTasks(answer);
+        setContextGatheringPhase('asking_format');
+        chat.addSystemPrompt(
+          'Thanks. Finally, **what format is this design?**\n\n' +
+          '*(e.g., "Mobile app screenshot", "Desktop website", "Tablet app")*'
+        );
+        return;
+      }
+
+      if (contextGatheringPhase === 'asking_format') {
+        setFormat(answer);
+        setContextGatheringPhase('idle');
+
+        // Auto-detect content type from format answer
+        const lowerAnswer = answer.toLowerCase();
+        if (lowerAnswer.includes('mobile') || lowerAnswer.includes('ios') || lowerAnswer.includes('android')) {
+          setContentType('mobile_app');
+        } else if (lowerAnswer.includes('desktop') || lowerAnswer.includes('windows') || lowerAnswer.includes('mac')) {
+          setContentType('desktop_app');
+        } else if (lowerAnswer.includes('game')) {
+          setContentType('game');
+        } else if (lowerAnswer.includes('web') || lowerAnswer.includes('site')) {
+          setContentType('website');
+        }
+
+        chat.addSystemPrompt(
+          'All set! Let me estimate how long this analysis will take...'
+        );
+
+        // Context is now complete — proceed to estimation
+        await startEstimation();
+        return;
+      }
+
+      return;
+    }
+
+    if (detectedMode === 'idle') return;
+
+    // ── Pure chat mode ──
+    if (detectedMode === 'chat') {
+      const text = inputText.trim();
+      setInputText('');
+      await chat.sendMessage(text);
+      return;
+    }
+
+    // ── Analysis or hybrid — files are present ──
+    const fileNames = files.map(f => f.name).join(', ');
+    const userText = inputText.trim();
+    const userContent = userText
+      ? `${userText}\n\n*Attached: ${fileNames}*`
+      : `*Attached for analysis: ${fileNames}*`;
+
+    // Show user message in chat
+    chat.addUserMessage(userContent, 'analysis');
+
+    // Store the question for later use in the API call
+    setPendingQuestion(userText);
+    setInputText('');
+
+    // Check if we already have full context
+    if (hasFullContext(users, tasks, format)) {
+      // Context is ready — go straight to estimation
+      await startEstimation();
+      return;
+    }
+
+    // Context is missing — start conversational gathering
+    setContextGatheringPhase('asking_users');
+    chat.addSystemPrompt(
+      "I'd be happy to analyze this for UI traps! First, I need a bit of context.\n\n" +
+      '**Who are the intended users** of this interface?\n\n' +
+      '*(e.g., "Adults ages 25-45 looking to stream movies", "Enterprise software developers")*'
+    );
+  }, [
+    token, contextGatheringPhase, detectedMode, inputText, files,
+    users, tasks, format, chat, startEstimation,
+  ]);
 
   return {
     inputText,
@@ -182,6 +368,12 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
     contextExpanded,
     setContextExpanded,
     detectedMode,
+    contextGatheringPhase,
+    analysisPhase,
+    estimate,
+    elapsedTime: elapsed.elapsedTime,
+    confirmAnalysis,
+    cancelAnalysis,
     messages: chat.messages,
     isLoading: chat.isLoading || isUnifiedLoading,
     error: chat.error,

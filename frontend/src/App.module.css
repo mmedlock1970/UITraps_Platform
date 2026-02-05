@@ -114,3 +114,46 @@
   color: var(--uitraps-text-muted);
   max-width: 500px;
 }
+
+/* Centered welcome layout — shown when no messages */
+.centeredLayout {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  padding: var(--uitraps-spacing-xl) var(--uitraps-spacing-md);
+  text-align: center;
+  gap: var(--uitraps-spacing-sm);
+}
+
+.welcomeTitle {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--uitraps-text);
+  margin-bottom: var(--uitraps-spacing-xs);
+}
+
+.welcomeSubtitle {
+  font-size: var(--uitraps-font-size-base);
+  color: var(--uitraps-text-secondary);
+  max-width: 500px;
+  line-height: 1.6;
+  margin-bottom: var(--uitraps-spacing-lg);
+}
+
+/* Overlay container for estimate/progress screens */
+.overlayContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  padding: var(--uitraps-spacing-xl);
+}
+
+/* Report container — full height scrollable */
+.reportContainer {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--uitraps-spacing-md);
+}

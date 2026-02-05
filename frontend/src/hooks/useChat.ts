@@ -21,6 +21,8 @@ interface UseChatReturn {
   isLoading: boolean;
   error: string | null;
   sendMessage: (message: string) => Promise<void>;
+  addUserMessage: (content: string, mode?: MessageMode) => void;
+  addSystemPrompt: (content: string) => void;
   addAnalysisMessage: (reportHtml: string, statistics?: Record<string, unknown>) => void;
   clearHistory: () => void;
 }
@@ -101,6 +103,28 @@ export function useChat(options: UseChatOptions): UseChatReturn {
     }
   }, [apiEndpoint, token, messages, maxHistory]);
 
+  const addUserMessage = useCallback((content: string, mode: MessageMode = 'chat') => {
+    const userMsg: ChatMessage = {
+      id: generateId(),
+      role: 'user',
+      content,
+      mode,
+      timestamp: new Date(),
+    };
+    setMessages(prev => [...prev, userMsg]);
+  }, []);
+
+  const addSystemPrompt = useCallback((content: string) => {
+    const msg: ChatMessage = {
+      id: generateId(),
+      role: 'assistant',
+      content,
+      mode: 'chat',
+      timestamp: new Date(),
+    };
+    setMessages(prev => [...prev, msg]);
+  }, []);
+
   const addAnalysisMessage = useCallback((
     reportHtml: string,
     statistics?: Record<string, unknown>,
@@ -108,9 +132,9 @@ export function useChat(options: UseChatOptions): UseChatReturn {
     const analysisMsg: ChatMessage = {
       id: generateId(),
       role: 'assistant',
-      content: 'Analysis complete. Here are the results:',
+      content: reportHtml ? 'Analysis complete. Here are the results:' : '',
       mode: 'analysis',
-      reportHtml,
+      reportHtml: reportHtml || undefined,
       statistics: statistics as ChatMessage['statistics'],
       timestamp: new Date(),
     };
@@ -128,6 +152,8 @@ export function useChat(options: UseChatOptions): UseChatReturn {
     isLoading,
     error,
     sendMessage,
+    addUserMessage,
+    addSystemPrompt,
     addAnalysisMessage,
     clearHistory,
   };

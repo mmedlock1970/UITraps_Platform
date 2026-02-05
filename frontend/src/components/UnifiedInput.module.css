@@ -195,6 +195,26 @@
   display: none;
 }
 
+/* Centered variant — used on the welcome screen */
+.centered {
+  border-top: none;
+  width: 100%;
+  max-width: 700px;
+  padding: var(--uitraps-spacing-md) 0;
+}
+
+.centered .textarea {
+  min-height: 56px;
+  font-size: var(--uitraps-font-size-base);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.centered .sendButton {
+  width: 52px;
+  height: 52px;
+  font-size: var(--uitraps-font-size-xl);
+}
+
 @media (max-width: 600px) {
   .contextGrid {
     grid-template-columns: 1fr;

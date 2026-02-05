@@ -2,7 +2,8 @@
 Chat service orchestrator for the RAG pipeline.
 
 Combines Pinecone retrieval, system prompt building, and AI response generation
-into a single handle_chat() method.
+into a single handle_chat() method. Falls back to direct Claude conversation
+when RAG retrieval fails (e.g., OpenAI quota exceeded).
 
 Port of: Traps Chat/backend-api/src/routes/chat.js (handleChatRequest logic)
 """
@@ -15,9 +16,15 @@ from .system_prompt import build_chat_system_prompt
 
 logger = logging.getLogger(__name__)
 
-NO_RESULTS_MESSAGE = (
-    "I couldn't find any relevant information in the UITraps content library "
-    "to answer your question. Could you rephrase or ask about a different topic?"
+FALLBACK_SYSTEM_PROMPT = (
+    "You are the UITraps AI assistant, an expert in UI/UX design, dark patterns, "
+    "deceptive design, and ethical interface practices. You help users understand "
+    "UI traps — manipulative design patterns that trick users into unintended actions.\n\n"
+    "You are knowledgeable about the 27 UI Traps framework and the 9 Tenets of "
+    "user-respecting design. Answer questions clearly and helpfully.\n\n"
+    "Note: The content knowledge base is currently unavailable, so you are answering "
+    "from your general knowledge. Your responses may not include specific UITraps "
+    "articles or sources."
 )
 
 
@@ -45,19 +52,18 @@ class ChatService:
         Returns:
             Dict with: response, sources, usage, mode
         """
-        # Step 1: Get relevant content from vector database
-        relevant_content = self._pinecone.get_relevant_content(message)
+        # Step 1: Try to get relevant content from vector database
+        relevant_content = []
+        try:
+            relevant_content = self._pinecone.get_relevant_content(message)
+        except Exception as e:
+            logger.warning(f"RAG retrieval failed, falling back to direct chat: {e}")
 
-        if not relevant_content:
-            return {
-                "response": NO_RESULTS_MESSAGE,
-                "sources": [],
-                "usage": None,
-                "mode": "chat",
-            }
-
-        # Step 2: Build system prompt with retrieved context
-        system_prompt = build_chat_system_prompt(relevant_content)
+        # Step 2: Build system prompt (with or without RAG context)
+        if relevant_content:
+            system_prompt = build_chat_system_prompt(relevant_content)
+        else:
+            system_prompt = FALLBACK_SYSTEM_PROMPT
 
         # Step 3: Generate AI response
         result = self._ai.generate_response(

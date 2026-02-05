@@ -1,6 +1,7 @@
 /* UI Traps Analyzer - CSS Custom Properties */
 
-.uitraps-analyzer {
+.uitraps-analyzer,
+.uitraps-platform {
   /* Colors - Light Theme (default) */
   --uitraps-primary: #3498db;
   --uitraps-primary-hover: #2980b9;
@@ -62,7 +63,8 @@
 }
 
 /* Dark Theme */
-.uitraps-analyzer[data-theme="dark"] {
+.uitraps-analyzer[data-theme="dark"],
+.uitraps-platform[data-theme="dark"] {
   --uitraps-primary: #5dade2;
   --uitraps-primary-hover: #3498db;
   --uitraps-secondary: #adb5bd;
@@ -88,6 +90,9 @@
 /* Reset box-sizing for all children */
 .uitraps-analyzer *,
 .uitraps-analyzer *::before,
-.uitraps-analyzer *::after {
+.uitraps-analyzer *::after,
+.uitraps-platform *,
+.uitraps-platform *::before,
+.uitraps-platform *::after {
   box-sizing: border-box;
 }

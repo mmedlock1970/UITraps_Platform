@@ -29,6 +29,7 @@ interface UnifiedInputProps {
   detectedMode: 'chat' | 'analysis' | 'hybrid' | 'idle';
   isLoading: boolean;
   onSubmit: () => void;
+  centered?: boolean;
 }
 
 const ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/jpg'];
@@ -51,6 +52,7 @@ export const UnifiedInput: React.FC<UnifiedInputProps> = ({
   detectedMode,
   isLoading,
   onSubmit,
+  centered = false,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -108,7 +110,7 @@ export const UnifiedInput: React.FC<UnifiedInputProps> = ({
   }, [onInputTextChange]);
 
   return (
-    <div className={styles.container}>
+    <div className={`${styles.container} ${centered ? styles.centered : ''}`}>
       {/* File previews */}
       {files.length > 0 && (
         <div className={styles.filePreviews}>
