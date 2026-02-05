@@ -1,0 +1,25 @@
+# Core dependencies
+anthropic>=0.40.0
+python-dotenv>=1.0.0
+
+# Web API (simple deployment)
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+python-multipart>=0.0.6  # Required for file uploads
+
+# Database (usage tracking)
+sqlmodel>=0.0.14
+
+# RAG chat pipeline
+openai>=1.12.0              # For embedding generation (text-embedding-3-small)
+pinecone>=6.0.0              # Pinecone vector database queries
+PyJWT>=2.8.0                # JWT token verification (WordPress auth)
+slowapi>=0.1.9              # FastAPI-compatible rate limiting
+
+# Optional: For future features (not needed for MVP)
+# requests>=2.32.0  # For Figma API integration
+# playwright>=1.40.0  # For web crawler and screenshot capture
+
+# Development/testing (optional)
+# pytest>=7.4.0
+# pytest-asyncio>=0.21.0

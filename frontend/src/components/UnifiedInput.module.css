@@ -1,0 +1,202 @@
+.container {
+  border-top: 1px solid var(--uitraps-border);
+  background: var(--uitraps-bg);
+  padding: var(--uitraps-spacing-md);
+}
+
+.inputRow {
+  display: flex;
+  gap: var(--uitraps-spacing-sm);
+  align-items: flex-end;
+}
+
+.textareaWrapper {
+  flex: 1;
+  position: relative;
+}
+
+.textarea {
+  width: 100%;
+  min-height: 44px;
+  max-height: 200px;
+  padding: var(--uitraps-spacing-sm) var(--uitraps-spacing-md);
+  border: 1px solid var(--uitraps-border);
+  border-radius: var(--uitraps-border-radius-lg);
+  font-family: var(--uitraps-font-family);
+  font-size: var(--uitraps-font-size-sm);
+  line-height: var(--uitraps-line-height);
+  color: var(--uitraps-text);
+  background: var(--uitraps-bg);
+  resize: none;
+  outline: none;
+  transition: border-color var(--uitraps-transition);
+}
+
+.textarea:focus {
+  border-color: var(--uitraps-border-focus);
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.15);
+}
+
+.textarea::placeholder {
+  color: var(--uitraps-text-muted);
+}
+
+.textarea.dragging {
+  border-color: var(--uitraps-primary);
+  border-style: dashed;
+  background: rgba(52, 152, 219, 0.05);
+}
+
+.sendButton {
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 50%;
+  background: var(--uitraps-primary);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--uitraps-font-size-lg);
+  transition: background var(--uitraps-transition), transform var(--uitraps-transition);
+  flex-shrink: 0;
+}
+
+.sendButton:hover:not(:disabled) {
+  background: var(--uitraps-primary-hover);
+  transform: scale(1.05);
+}
+
+.sendButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--uitraps-spacing-sm);
+  margin-top: var(--uitraps-spacing-xs);
+  padding: 0 var(--uitraps-spacing-xs);
+}
+
+.toolbarButton {
+  padding: 2px var(--uitraps-spacing-sm);
+  border: 1px solid var(--uitraps-border);
+  border-radius: var(--uitraps-border-radius-sm);
+  background: var(--uitraps-bg);
+  color: var(--uitraps-text-secondary);
+  font-size: var(--uitraps-font-size-xs);
+  cursor: pointer;
+  transition: all var(--uitraps-transition);
+}
+
+.toolbarButton:hover {
+  background: var(--uitraps-bg-hover);
+  color: var(--uitraps-text);
+}
+
+.toolbarButton.active {
+  background: var(--uitraps-primary);
+  color: #fff;
+  border-color: var(--uitraps-primary);
+}
+
+.toolbarSpacer {
+  flex: 1;
+}
+
+.filePreviews {
+  display: flex;
+  gap: var(--uitraps-spacing-xs);
+  margin-top: var(--uitraps-spacing-sm);
+  flex-wrap: wrap;
+}
+
+.fileChip {
+  display: flex;
+  align-items: center;
+  gap: var(--uitraps-spacing-xs);
+  padding: 2px var(--uitraps-spacing-sm);
+  background: var(--uitraps-bg-secondary);
+  border: 1px solid var(--uitraps-border);
+  border-radius: var(--uitraps-border-radius-sm);
+  font-size: var(--uitraps-font-size-xs);
+  color: var(--uitraps-text-secondary);
+}
+
+.fileChipRemove {
+  cursor: pointer;
+  color: var(--uitraps-text-muted);
+  font-size: 14px;
+  line-height: 1;
+}
+
+.fileChipRemove:hover {
+  color: var(--uitraps-error);
+}
+
+.contextPanel {
+  margin-top: var(--uitraps-spacing-sm);
+  padding: var(--uitraps-spacing-md);
+  border: 1px solid var(--uitraps-border);
+  border-radius: var(--uitraps-border-radius);
+  background: var(--uitraps-bg-secondary);
+}
+
+.contextTitle {
+  font-size: var(--uitraps-font-size-sm);
+  font-weight: 600;
+  margin-bottom: var(--uitraps-spacing-sm);
+  color: var(--uitraps-text);
+}
+
+.contextGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--uitraps-spacing-sm);
+}
+
+.contextField {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.contextField.fullWidth {
+  grid-column: 1 / -1;
+}
+
+.contextLabel {
+  font-size: var(--uitraps-font-size-xs);
+  font-weight: 600;
+  color: var(--uitraps-text-secondary);
+}
+
+.contextInput {
+  padding: var(--uitraps-spacing-xs) var(--uitraps-spacing-sm);
+  border: 1px solid var(--uitraps-border);
+  border-radius: var(--uitraps-border-radius-sm);
+  font-family: var(--uitraps-font-family);
+  font-size: var(--uitraps-font-size-xs);
+  color: var(--uitraps-text);
+  background: var(--uitraps-bg);
+  resize: vertical;
+  min-height: 32px;
+}
+
+.contextInput:focus {
+  outline: none;
+  border-color: var(--uitraps-border-focus);
+}
+
+.hiddenInput {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .contextGrid {
+    grid-template-columns: 1fr;
+  }
+}

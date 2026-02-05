@@ -1,0 +1,77 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--uitraps-spacing-xl);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--uitraps-spacing-md);
+}
+
+.sectionTitle {
+  font-size: var(--uitraps-font-size-lg);
+  font-weight: 600;
+  color: var(--uitraps-text);
+  margin: 0;
+}
+
+.submitButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--uitraps-spacing-sm);
+  width: 100%;
+  height: var(--uitraps-button-height);
+  padding: 0 var(--uitraps-spacing-lg);
+  font-size: var(--uitraps-font-size-base);
+  font-weight: 600;
+  font-family: var(--uitraps-font-family);
+  color: white;
+  background-color: var(--uitraps-primary);
+  border: none;
+  border-radius: var(--uitraps-border-radius);
+  cursor: pointer;
+  transition: background-color var(--uitraps-transition), transform var(--uitraps-transition);
+}
+
+.submitButton:hover:not(:disabled) {
+  background-color: var(--uitraps-primary-hover);
+}
+
+.submitButton:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.submitButton:disabled {
+  background-color: var(--uitraps-secondary);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.buttonIcon {
+  flex-shrink: 0;
+}
+
+.disclaimer {
+  text-align: center;
+  font-size: var(--uitraps-font-size-sm);
+  color: var(--uitraps-text-muted);
+  margin: 0;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

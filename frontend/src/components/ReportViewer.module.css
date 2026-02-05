@@ -1,0 +1,191 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--uitraps-spacing-lg);
+}
+
+/* Statistics Grid */
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--uitraps-spacing-md);
+}
+
+@media (max-width: 600px) {
+  .statsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.statCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--uitraps-spacing-md);
+  border-radius: var(--uitraps-border-radius);
+  background-color: var(--uitraps-bg-secondary);
+  border: 1px solid var(--uitraps-border);
+}
+
+.statCard.critical {
+  border-color: var(--uitraps-critical);
+  background-color: rgba(192, 57, 43, 0.1);
+}
+
+.statCard.moderate {
+  border-color: var(--uitraps-warning);
+  background-color: rgba(243, 156, 18, 0.1);
+}
+
+.statCard.minor {
+  border-color: var(--uitraps-primary);
+  background-color: rgba(52, 152, 219, 0.1);
+}
+
+.statCard.positive {
+  border-color: var(--uitraps-success);
+  background-color: rgba(39, 174, 96, 0.1);
+}
+
+.statValue {
+  font-size: var(--uitraps-font-size-xl);
+  font-weight: 700;
+  color: var(--uitraps-text);
+}
+
+.statCard.critical .statValue {
+  color: var(--uitraps-critical);
+}
+
+.statCard.moderate .statValue {
+  color: var(--uitraps-warning);
+}
+
+.statCard.minor .statValue {
+  color: var(--uitraps-primary);
+}
+
+.statCard.positive .statValue {
+  color: var(--uitraps-success);
+}
+
+.statLabel {
+  font-size: var(--uitraps-font-size-sm);
+  color: var(--uitraps-text-secondary);
+  margin-top: var(--uitraps-spacing-xs);
+}
+
+/* Usage Info */
+.usageInfo {
+  display: flex;
+  justify-content: center;
+  padding: var(--uitraps-spacing-sm) var(--uitraps-spacing-md);
+  background-color: var(--uitraps-bg-secondary);
+  border-radius: var(--uitraps-border-radius-sm);
+  font-size: var(--uitraps-font-size-sm);
+  color: var(--uitraps-text-secondary);
+}
+
+/* Report Content */
+.reportContent {
+  padding: var(--uitraps-spacing-lg);
+  background-color: var(--uitraps-bg);
+  border: 1px solid var(--uitraps-border);
+  border-radius: var(--uitraps-border-radius);
+  /* Report flows naturally with the page - no separate scroll area */
+}
+
+.reportContent h1,
+.reportContent h2,
+.reportContent h3,
+.reportContent h4 {
+  color: var(--uitraps-text);
+  margin-top: var(--uitraps-spacing-lg);
+  margin-bottom: var(--uitraps-spacing-sm);
+}
+
+.reportContent h1:first-child,
+.reportContent h2:first-child {
+  margin-top: 0;
+}
+
+.reportContent p {
+  color: var(--uitraps-text);
+  margin-bottom: var(--uitraps-spacing-md);
+}
+
+.reportContent ul,
+.reportContent ol {
+  margin-bottom: var(--uitraps-spacing-md);
+  padding-left: var(--uitraps-spacing-lg);
+}
+
+.reportContent li {
+  margin-bottom: var(--uitraps-spacing-sm);
+}
+
+.reportContent a {
+  color: var(--uitraps-primary);
+}
+
+.reportContent table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: var(--uitraps-spacing-md);
+}
+
+.reportContent th,
+.reportContent td {
+  padding: var(--uitraps-spacing-sm);
+  border: 1px solid var(--uitraps-border);
+  text-align: left;
+}
+
+.reportContent th {
+  background-color: var(--uitraps-bg-secondary);
+  font-weight: 600;
+}
+
+/* Actions */
+.actions {
+  display: flex;
+  gap: var(--uitraps-spacing-md);
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.primaryButton,
+.secondaryButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--uitraps-spacing-sm);
+  padding: var(--uitraps-spacing-sm) var(--uitraps-spacing-lg);
+  font-size: var(--uitraps-font-size-base);
+  font-weight: 500;
+  font-family: var(--uitraps-font-family);
+  border-radius: var(--uitraps-border-radius);
+  cursor: pointer;
+  transition: background-color var(--uitraps-transition), border-color var(--uitraps-transition);
+}
+
+.primaryButton {
+  color: white;
+  background-color: var(--uitraps-primary);
+  border: none;
+}
+
+.primaryButton:hover {
+  background-color: var(--uitraps-primary-hover);
+}
+
+.secondaryButton {
+  color: var(--uitraps-text);
+  background-color: var(--uitraps-bg);
+  border: 1px solid var(--uitraps-border);
+}
+
+.secondaryButton:hover {
+  background-color: var(--uitraps-bg-secondary);
+  border-color: var(--uitraps-primary);
+}

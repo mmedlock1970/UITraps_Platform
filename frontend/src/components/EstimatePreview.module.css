@@ -1,0 +1,168 @@
+.container {
+  background: var(--uitraps-bg-secondary);
+  border-radius: var(--uitraps-border-radius);
+  padding: var(--uitraps-spacing-xl);
+  text-align: center;
+}
+
+.header {
+  margin-bottom: var(--uitraps-spacing-lg);
+}
+
+.icon {
+  color: var(--uitraps-primary);
+  margin-bottom: var(--uitraps-spacing-md);
+}
+
+.title {
+  font-size: var(--uitraps-font-size-lg);
+  font-weight: 600;
+  color: var(--uitraps-text);
+  margin: 0 0 var(--uitraps-spacing-xs) 0;
+}
+
+.subtitle {
+  font-size: var(--uitraps-font-size-md);
+  color: var(--uitraps-text-secondary);
+  margin: 0;
+}
+
+.estimates {
+  display: flex;
+  flex-direction: column;
+  gap: var(--uitraps-spacing-md);
+  margin-bottom: var(--uitraps-spacing-lg);
+}
+
+.estimateCard {
+  display: flex;
+  align-items: center;
+  gap: var(--uitraps-spacing-md);
+  background: var(--uitraps-bg);
+  padding: var(--uitraps-spacing-md);
+  border-radius: var(--uitraps-border-radius-sm);
+  border: 1px solid var(--uitraps-border);
+}
+
+.estimateIcon {
+  color: var(--uitraps-primary);
+  flex-shrink: 0;
+}
+
+.estimateContent {
+  text-align: left;
+  flex: 1;
+}
+
+.estimateLabel {
+  display: block;
+  font-size: var(--uitraps-font-size-xs);
+  color: var(--uitraps-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+
+.estimateValue {
+  display: block;
+  font-size: var(--uitraps-font-size-md);
+  font-weight: 600;
+  color: var(--uitraps-text);
+}
+
+.estimateDollars {
+  display: block;
+  font-size: var(--uitraps-font-size-xs);
+  color: var(--uitraps-text-muted);
+}
+
+.warning {
+  display: flex;
+  align-items: center;
+  gap: var(--uitraps-spacing-sm);
+  background: #fef3c7;
+  color: #92400e;
+  padding: var(--uitraps-spacing-md);
+  border-radius: var(--uitraps-border-radius-sm);
+  font-size: var(--uitraps-font-size-sm);
+}
+
+[data-theme="dark"] .warning {
+  background: #451a03;
+  color: #fcd34d;
+}
+
+.sizeInfo {
+  font-size: var(--uitraps-font-size-xs);
+  color: var(--uitraps-text-muted);
+  margin: 0 0 var(--uitraps-spacing-lg) 0;
+}
+
+.actions {
+  display: flex;
+  gap: var(--uitraps-spacing-md);
+  justify-content: center;
+}
+
+.backButton {
+  padding: var(--uitraps-spacing-sm) var(--uitraps-spacing-lg);
+  border-radius: var(--uitraps-border-radius-sm);
+  font-size: var(--uitraps-font-size-md);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--uitraps-transition);
+  background: transparent;
+  border: 1px solid var(--uitraps-border);
+  color: var(--uitraps-text-secondary);
+}
+
+.backButton:hover:not(:disabled) {
+  border-color: var(--uitraps-text-secondary);
+  color: var(--uitraps-text);
+}
+
+.backButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.confirmButton {
+  padding: var(--uitraps-spacing-sm) var(--uitraps-spacing-xl);
+  border-radius: var(--uitraps-border-radius-sm);
+  font-size: var(--uitraps-font-size-md);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--uitraps-transition);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: var(--uitraps-spacing-sm);
+}
+
+.confirmButton:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.confirmButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

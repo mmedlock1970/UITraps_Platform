@@ -1,0 +1,75 @@
+.panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--uitraps-spacing-md) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--uitraps-spacing-sm);
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  color: var(--uitraps-text-muted);
+  text-align: center;
+  padding: var(--uitraps-spacing-xl);
+}
+
+.emptyTitle {
+  font-size: var(--uitraps-font-size-lg);
+  font-weight: 600;
+  color: var(--uitraps-text-secondary);
+  margin-bottom: var(--uitraps-spacing-sm);
+}
+
+.emptySubtitle {
+  font-size: var(--uitraps-font-size-sm);
+  max-width: 400px;
+  line-height: 1.6;
+}
+
+.typingIndicator {
+  display: flex;
+  gap: var(--uitraps-spacing-sm);
+  padding: var(--uitraps-spacing-sm) var(--uitraps-spacing-md);
+  align-items: center;
+}
+
+.typingDots {
+  display: flex;
+  gap: 4px;
+  padding: var(--uitraps-spacing-sm) var(--uitraps-spacing-md);
+  background: var(--uitraps-bg-secondary);
+  border-radius: var(--uitraps-border-radius-lg);
+  border: 1px solid var(--uitraps-border);
+}
+
+.typingDots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--uitraps-text-muted);
+  animation: typingBounce 1.4s infinite both;
+}
+
+.typingDots span:nth-child(2) {
+  animation-delay: 0.16s;
+}
+
+.typingDots span:nth-child(3) {
+  animation-delay: 0.32s;
+}
+
+@keyframes typingBounce {
+  0%, 80%, 100% {
+    transform: scale(0.6);
+    opacity: 0.4;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}

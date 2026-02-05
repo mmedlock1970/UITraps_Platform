@@ -1,0 +1,116 @@
+.platform {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  font-family: var(--uitraps-font-family);
+  font-size: var(--uitraps-font-size-base);
+  line-height: var(--uitraps-line-height);
+  color: var(--uitraps-text);
+  background: var(--uitraps-bg);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--uitraps-spacing-sm) var(--uitraps-spacing-md);
+  border-bottom: 1px solid var(--uitraps-border);
+  background: var(--uitraps-bg);
+  flex-shrink: 0;
+}
+
+.logo {
+  font-size: var(--uitraps-font-size-lg);
+  font-weight: 700;
+  color: var(--uitraps-text);
+}
+
+.logoAccent {
+  color: var(--uitraps-primary);
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--uitraps-spacing-sm);
+}
+
+.headerButton {
+  padding: var(--uitraps-spacing-xs) var(--uitraps-spacing-sm);
+  border: 1px solid var(--uitraps-border);
+  border-radius: var(--uitraps-border-radius-sm);
+  background: var(--uitraps-bg);
+  color: var(--uitraps-text-secondary);
+  font-size: var(--uitraps-font-size-xs);
+  cursor: pointer;
+  transition: all var(--uitraps-transition);
+}
+
+.headerButton:hover {
+  background: var(--uitraps-bg-hover);
+  color: var(--uitraps-text);
+}
+
+.authPrompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: var(--uitraps-spacing-md);
+  padding: var(--uitraps-spacing-xl);
+  text-align: center;
+}
+
+.authTitle {
+  font-size: var(--uitraps-font-size-xl);
+  font-weight: 700;
+  color: var(--uitraps-text);
+}
+
+.authSubtitle {
+  color: var(--uitraps-text-secondary);
+  max-width: 400px;
+}
+
+.tokenInput {
+  width: 100%;
+  max-width: 500px;
+  padding: var(--uitraps-spacing-sm) var(--uitraps-spacing-md);
+  border: 1px solid var(--uitraps-border);
+  border-radius: var(--uitraps-border-radius);
+  font-family: monospace;
+  font-size: var(--uitraps-font-size-sm);
+  color: var(--uitraps-text);
+  background: var(--uitraps-bg-secondary);
+}
+
+.tokenInput:focus {
+  outline: none;
+  border-color: var(--uitraps-border-focus);
+}
+
+.connectButton {
+  padding: var(--uitraps-spacing-sm) var(--uitraps-spacing-lg);
+  border: none;
+  border-radius: var(--uitraps-border-radius);
+  background: var(--uitraps-primary);
+  color: #fff;
+  font-size: var(--uitraps-font-size-base);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--uitraps-transition);
+}
+
+.connectButton:hover {
+  background: var(--uitraps-primary-hover);
+}
+
+.devNote {
+  font-size: var(--uitraps-font-size-xs);
+  color: var(--uitraps-text-muted);
+  max-width: 500px;
+}

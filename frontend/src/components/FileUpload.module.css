@@ -1,0 +1,201 @@
+.container {
+  width: 100%;
+}
+
+.dropzone {
+  border: 2px dashed var(--uitraps-border);
+  border-radius: var(--uitraps-border-radius);
+  padding: var(--uitraps-spacing-lg);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color var(--uitraps-transition), background-color var(--uitraps-transition);
+  background-color: var(--uitraps-bg-secondary);
+  min-height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dropzone:hover:not(.disabled),
+.dropzone:focus:not(.disabled) {
+  border-color: var(--uitraps-primary);
+  background-color: var(--uitraps-bg-hover);
+  outline: none;
+}
+
+.dropzone.dragging {
+  border-color: var(--uitraps-primary);
+  background-color: var(--uitraps-bg-hover);
+  border-style: solid;
+}
+
+.dropzone.hasFile {
+  border-style: solid;
+  border-color: var(--uitraps-success);
+  padding: var(--uitraps-spacing-md);
+}
+
+.dropzone.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.dropzone.error {
+  border-color: var(--uitraps-error);
+}
+
+.input {
+  display: none;
+}
+
+.placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--uitraps-spacing-sm);
+}
+
+.icon {
+  color: var(--uitraps-text-muted);
+  margin-bottom: var(--uitraps-spacing-sm);
+}
+
+.text {
+  color: var(--uitraps-text-secondary);
+  font-size: var(--uitraps-font-size-sm);
+  margin: 0;
+}
+
+.highlight {
+  color: var(--uitraps-primary);
+  font-weight: 500;
+}
+
+.hint {
+  color: var(--uitraps-text-muted);
+  font-size: var(--uitraps-font-size-xs);
+  margin: 0;
+}
+
+.subHint {
+  font-size: var(--uitraps-font-size-xs);
+  opacity: 0.8;
+}
+
+.preview {
+  display: flex;
+  align-items: center;
+  gap: var(--uitraps-spacing-md);
+  width: 100%;
+}
+
+.thumbnails {
+  display: flex;
+  gap: var(--uitraps-spacing-sm);
+  flex-shrink: 0;
+}
+
+.thumbnailWrapper {
+  position: relative;
+  width: 60px;
+  height: 60px;
+}
+
+.thumbnailRemove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--uitraps-error);
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity var(--uitraps-transition);
+}
+
+.thumbnailWrapper:hover .thumbnailRemove {
+  opacity: 1;
+}
+
+.moreFiles {
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--uitraps-bg-secondary);
+  border-radius: var(--uitraps-border-radius-sm);
+  border: 1px solid var(--uitraps-border);
+  font-size: var(--uitraps-font-size-xs);
+  color: var(--uitraps-text-muted);
+}
+
+.videoPlaceholder {
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: var(--uitraps-border-radius-sm);
+  color: white;
+}
+
+.previewImage {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: var(--uitraps-border-radius-sm);
+  border: 1px solid var(--uitraps-border);
+}
+
+.fileInfo {
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+}
+
+.fileName {
+  display: block;
+  font-weight: 500;
+  color: var(--uitraps-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fileSize {
+  display: block;
+  font-size: var(--uitraps-font-size-xs);
+  color: var(--uitraps-text-muted);
+  margin-top: var(--uitraps-spacing-xs);
+}
+
+.removeButton {
+  background: none;
+  border: none;
+  color: var(--uitraps-text-muted);
+  cursor: pointer;
+  padding: var(--uitraps-spacing-sm);
+  border-radius: var(--uitraps-border-radius-sm);
+  transition: color var(--uitraps-transition), background-color var(--uitraps-transition);
+}
+
+.removeButton:hover {
+  color: var(--uitraps-error);
+  background-color: var(--uitraps-bg-hover);
+}
+
+.errorMessage {
+  color: var(--uitraps-error);
+  font-size: var(--uitraps-font-size-sm);
+  margin: var(--uitraps-spacing-sm) 0 0 0;
+}

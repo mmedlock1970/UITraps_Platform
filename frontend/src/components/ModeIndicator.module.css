@@ -1,0 +1,48 @@
+.indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--uitraps-spacing-xs);
+  padding: 2px var(--uitraps-spacing-sm);
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all var(--uitraps-transition);
+}
+
+.chat {
+  background: #e8f4fd;
+  color: #1976d2;
+}
+
+.analysis {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.hybrid {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.idle {
+  background: var(--uitraps-bg-secondary);
+  color: var(--uitraps-text-muted);
+}
+
+/* Dark theme overrides */
+:global(.uitraps-platform[data-theme="dark"]) .chat {
+  background: #1a3a5c;
+  color: #90caf9;
+}
+
+:global(.uitraps-platform[data-theme="dark"]) .analysis {
+  background: #1b3a2a;
+  color: #81c784;
+}
+
+:global(.uitraps-platform[data-theme="dark"]) .hybrid {
+  background: #3a2a1b;
+  color: #ffb74d;
+}
