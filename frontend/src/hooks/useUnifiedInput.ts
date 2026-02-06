@@ -26,6 +26,7 @@ type DetectedMode = 'chat' | 'analysis' | 'hybrid' | 'idle';
 type ContextGatheringPhase =
   | 'idle'
   | 'asking_users'
+  | 'asking_expertise'
   | 'asking_tasks'
   | 'asking_format'
   | 'complete';
@@ -48,6 +49,8 @@ interface UseUnifiedInputReturn {
   // Context fields (for analysis mode)
   users: string;
   setUsers: (v: string) => void;
+  expertise: string;
+  setExpertise: (v: string) => void;
   tasks: string;
   setTasks: (v: string) => void;
   format: string;
@@ -84,6 +87,7 @@ function detectMode(
   inputText: string,
   files: File[],
   users: string,
+  expertise: string,
   tasks: string,
   format: string,
 ): DetectedMode {
@@ -91,6 +95,7 @@ function detectMode(
   const hasFiles = files.length > 0;
   const hasContext = (
     users.trim().length >= 10 &&
+    expertise.trim().length >= 5 &&
     tasks.trim().length >= 10 &&
     format.trim().length >= 10
   );
@@ -102,9 +107,10 @@ function detectMode(
   return 'chat';
 }
 
-function hasFullContext(users: string, tasks: string, format: string): boolean {
+function hasFullContext(users: string, expertise: string, tasks: string, format: string): boolean {
   return (
     users.trim().length >= 10 &&
+    expertise.trim().length >= 5 &&
     tasks.trim().length >= 10 &&
     format.trim().length >= 10
   );
@@ -119,6 +125,7 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
 
   // Context fields
   const [users, setUsers] = useState('');
+  const [expertise, setExpertise] = useState('');
   const [tasks, setTasks] = useState('');
   const [format, setFormat] = useState('');
   const [contentType, setContentType] = useState<ContentType>('website');
@@ -141,8 +148,8 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
 
   // Mode detection
   const detectedMode = useMemo(
-    () => detectMode(inputText, files, users, tasks, format),
-    [inputText, files, users, tasks, format],
+    () => detectMode(inputText, files, users, expertise, tasks, format),
+    [inputText, files, users, expertise, tasks, format],
   );
 
   /** Run the actual analysis API call (called after estimate confirmation) */
@@ -153,6 +160,7 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
 
     const context: UserContext = {
       users,
+      expertise,
       tasks,
       format,
       contentType,
@@ -198,7 +206,7 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
     } finally {
       setIsUnifiedLoading(false);
     }
-  }, [users, tasks, format, contentType, files, pendingQuestion, apiEndpoint, token, chat, elapsed, onAnalysisComplete]);
+  }, [users, expertise, tasks, format, contentType, files, pendingQuestion, apiEndpoint, token, chat, elapsed, onAnalysisComplete]);
 
   /** User confirms the estimate → start analysis */
   const confirmAnalysis = useCallback(async () => {
@@ -263,9 +271,19 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
 
       if (contextGatheringPhase === 'asking_users') {
         setUsers(answer);
+        setContextGatheringPhase('asking_expertise');
+        chat.addSystemPrompt(
+          'Got it. **What level of expertise will these users have** with this product?\n\n' +
+          '*(e.g., "First-time users unfamiliar with the domain", "Intermediate users with some experience", "Power users with years of experience")*'
+        );
+        return;
+      }
+
+      if (contextGatheringPhase === 'asking_expertise') {
+        setExpertise(answer);
         setContextGatheringPhase('asking_tasks');
         chat.addSystemPrompt(
-          'Got it. Now, **what tasks are these users trying to accomplish?**\n\n' +
+          'Thanks. Now, **what tasks are these users trying to accomplish?**\n\n' +
           '*(e.g., "Find and play a movie", "Sign up for an account", "Complete a purchase")*'
         );
         return;
@@ -334,7 +352,7 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
     setInputText('');
 
     // Check if we already have full context
-    if (hasFullContext(users, tasks, format)) {
+    if (hasFullContext(users, expertise, tasks, format)) {
       // Context is ready — go straight to estimation
       await startEstimation();
       return;
@@ -349,7 +367,7 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
     );
   }, [
     token, contextGatheringPhase, detectedMode, inputText, files,
-    users, tasks, format, chat, startEstimation,
+    users, expertise, tasks, format, chat, startEstimation,
   ]);
 
   return {
@@ -359,6 +377,8 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
     setFiles,
     users,
     setUsers,
+    expertise,
+    setExpertise,
     tasks,
     setTasks,
     format,

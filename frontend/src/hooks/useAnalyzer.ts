@@ -17,6 +17,7 @@ const initialState: AnalyzerState = {
   file: null,
   inputType: null,
   users: '',
+  expertise: '',
   tasks: '',
   format: '',
   contentType: 'website',
@@ -58,6 +59,8 @@ function analyzerReducer(state: AnalyzerState, action: AnalyzerAction): Analyzer
       };
     case 'SET_USERS':
       return { ...state, users: action.payload };
+    case 'SET_EXPERTISE':
+      return { ...state, expertise: action.payload };
     case 'SET_TASKS':
       return { ...state, tasks: action.payload };
     case 'SET_FORMAT':
@@ -152,6 +155,7 @@ export interface UseAnalyzerReturn {
   setFiles: (files: File[]) => void;
   setFile: (file: File | null) => void;
   setUsers: (value: string) => void;
+  setExpertise: (value: string) => void;
   setTasks: (value: string) => void;
   setFormat: (value: string) => void;
   setContentType: (value: ContentType) => void;
@@ -197,6 +201,10 @@ export function useAnalyzer(options: UseAnalyzerOptions): UseAnalyzerReturn {
     dispatch({ type: 'SET_USERS', payload: value });
   }, []);
 
+  const setExpertise = useCallback((value: string) => {
+    dispatch({ type: 'SET_EXPERTISE', payload: value });
+  }, []);
+
   const setTasks = useCallback((value: string) => {
     dispatch({ type: 'SET_TASKS', payload: value });
   }, []);
@@ -237,6 +245,7 @@ export function useAnalyzer(options: UseAnalyzerOptions): UseAnalyzerReturn {
 
     const context: UserContext = {
       users: state.users,
+      expertise: state.expertise,
       tasks: state.tasks,
       format: state.format,
       contentType: state.contentType,
@@ -345,6 +354,7 @@ export function useAnalyzer(options: UseAnalyzerOptions): UseAnalyzerReturn {
     setFiles,
     setFile,
     setUsers,
+    setExpertise,
     setTasks,
     setFormat,
     setContentType,

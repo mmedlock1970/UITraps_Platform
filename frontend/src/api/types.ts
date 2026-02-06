@@ -5,6 +5,7 @@ export type ContentType = 'website' | 'mobile_app' | 'desktop_app' | 'game' | 'o
 
 export interface UserContext {
   users: string;
+  expertise: string;
   tasks: string;
   format: string;
   contentType?: ContentType;
@@ -195,6 +196,7 @@ export interface AnalyzerState {
   files: File[];
   inputType: InputType | null;
   users: string;
+  expertise: string;
   tasks: string;
   format: string;
   contentType: ContentType;
@@ -215,6 +217,7 @@ export type AnalyzerAction =
   | { type: 'SET_FILES'; payload: File[] }
   | { type: 'SET_FILE'; payload: File | null }
   | { type: 'SET_USERS'; payload: string }
+  | { type: 'SET_EXPERTISE'; payload: string }
   | { type: 'SET_TASKS'; payload: string }
   | { type: 'SET_FORMAT'; payload: string }
   | { type: 'SET_CONTENT_TYPE'; payload: ContentType }

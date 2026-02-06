@@ -414,7 +414,7 @@ def build_user_message(
     Build the user message with context and design file.
 
     Args:
-        user_context: Dict with 'users', 'tasks', 'format', and optionally 'content_type' keys
+        user_context: Dict with 'users', 'tasks', 'format', and optionally 'expertise', 'content_type' keys
         image_data: Optional dict with 'type', 'source' for image (for Claude vision)
         page_context: Optional dict with page role info for multi-page analysis
         is_video_analysis: Whether this is part of a video analysis
@@ -425,13 +425,19 @@ def build_user_message(
     Returns:
         List of message content blocks
     """
+    # Check for expertise (optional, for backwards compatibility)
+    has_expertise = bool(user_context.get('expertise'))
+    # Numbering shifts by 1 if expertise is present
+    content_type_num = 5 if has_expertise else 4
+    page_context_num = 6 if has_expertise else 5
+
     # Get content type guidance
     content_type = user_context.get('content_type', 'other')
     content_guidance = CONTENT_TYPE_GUIDANCE.get(content_type, CONTENT_TYPE_GUIDANCE['other'])
 
     # Build content type section
     content_type_section = f"""
-4. CONTENT TYPE: {content_guidance['name'].upper()}
+{content_type_num}. CONTENT TYPE: {content_guidance['name'].upper()}
    {content_guidance['description']}
 
    **Analysis Focus:** {content_guidance['analysis_focus']}
@@ -443,7 +449,7 @@ def build_user_message(
     page_context_section = ""
     if page_context:
         page_context_section = f"""
-5. PAGE CONTEXT (IMPORTANT - Read Before Analyzing):
+{page_context_num}. PAGE CONTEXT (IMPORTANT - Read Before Analyzing):
 
    Page Role: {page_context.get('page_role', 'Unknown').upper()}
    Page Title: {page_context.get('page_title', 'Unknown')}
@@ -475,17 +481,25 @@ def build_user_message(
 ---
 """
 
+    # Build expertise section if present
+    expertise_section = ""
+    if has_expertise:
+        expertise_section = f"""
+2. WHAT IS THEIR EXPERTISE LEVEL?
+{user_context['expertise']}
+"""
+
     context_text = f"""Please analyze this UI design using the UI Tenets & Traps framework.
 
 CONTEXT PROVIDED BY USER:
 
 1. WHO ARE THE USERS?
 {user_context['users']}
-
-2. WHAT ARE THE KEY USER TASKS?
+{expertise_section}
+{"3" if has_expertise else "2"}. WHAT ARE THE KEY USER TASKS?
 {user_context['tasks']}
 
-3. DESIGN FORMAT:
+{"4" if has_expertise else "3"}. DESIGN FORMAT:
 {user_context['format']}
 {content_type_section}
 {page_context_section}
