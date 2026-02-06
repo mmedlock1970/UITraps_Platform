@@ -82,8 +82,21 @@ class SiteAnalyzer:
                 - page_analyses: Individual page analysis results
                 - statistics: Aggregate statistics
                 - recommendations: Prioritized recommendations
+
+        Raises:
+            ValueError: If user_context is missing required fields or has invalid values
         """
         start_time = time.time()
+
+        # Validate context upfront to provide clear error before analyzing pages
+        required_fields = ['users', 'tasks', 'format']
+        for field in required_fields:
+            value = user_context.get(field, "")
+            if isinstance(value, str) and len(value.strip()) < 10:
+                raise ValueError(
+                    f"Field '{field}' is too short. Please provide more detail "
+                    f"(at least 10 characters). Current value: '{value}'"
+                )
 
         # Parse tasks into list if string
         tasks = self._parse_tasks(user_context.get("tasks", []))

@@ -528,7 +528,8 @@ export interface AnalyzeFigmaOptions {
 }
 
 export async function analyzeFigma(options: AnalyzeFigmaOptions): Promise<SiteAnalysisResponse> {
-  const { apiEndpoint, apiKey, figmaUrl, context, maxFrames = 10, timeout = 600000, signal } = options;
+  // Increased timeout: 30 minutes to handle large Figma files with many frames
+  const { apiEndpoint, apiKey, figmaUrl, context, maxFrames = 10, timeout = 1800000, signal } = options;
 
   const formData = new FormData();
   formData.append('figma_url', figmaUrl);

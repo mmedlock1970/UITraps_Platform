@@ -408,6 +408,14 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
       setInputText('');
 
       if (contextGatheringPhase === 'asking_users') {
+        // Validate minimum length (10 chars required by backend)
+        if (answer.trim().length < 10) {
+          chat.addSystemPrompt(
+            'That response is a bit too short. Please provide more detail (at least 10 characters) about who the users are.\n\n' +
+            '*(e.g., "Adults ages 25-45 looking to stream movies", "Enterprise software developers")*'
+          );
+          return;
+        }
         setUsers(answer);
         setContextGatheringPhase('asking_expertise');
         chat.addSystemPrompt(
@@ -418,6 +426,14 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
       }
 
       if (contextGatheringPhase === 'asking_expertise') {
+        // Validate minimum length (5 chars required)
+        if (answer.trim().length < 5) {
+          chat.addSystemPrompt(
+            'Please provide a bit more detail about the users\' expertise level (at least 5 characters).\n\n' +
+            '*(e.g., "First-time users", "Intermediate", "Power users")*'
+          );
+          return;
+        }
         setExpertise(answer);
         setContextGatheringPhase('asking_tasks');
         chat.addSystemPrompt(
@@ -428,6 +444,14 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
       }
 
       if (contextGatheringPhase === 'asking_tasks') {
+        // Validate minimum length (10 chars required by backend)
+        if (answer.trim().length < 10) {
+          chat.addSystemPrompt(
+            'That response is a bit too short. Please provide more detail (at least 10 characters) about the tasks.\n\n' +
+            '*(e.g., "Find and play a movie", "Sign up for an account and complete a purchase")*'
+          );
+          return;
+        }
         setTasks(answer);
         setContextGatheringPhase('asking_format');
         chat.addSystemPrompt(
@@ -438,6 +462,14 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
       }
 
       if (contextGatheringPhase === 'asking_format') {
+        // Validate minimum length (10 chars required by backend)
+        if (answer.trim().length < 10) {
+          chat.addSystemPrompt(
+            'Please provide more detail about the format (at least 10 characters).\n\n' +
+            '*(e.g., "Mobile app screenshot", "Desktop website layout", "Tablet application UI")*'
+          );
+          return;
+        }
         setFormat(answer);
         setContextGatheringPhase('idle');
 

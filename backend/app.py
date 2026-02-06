@@ -917,12 +917,17 @@ async def analyze_figma(
             # Create temp directory for exports
             with tempfile.TemporaryDirectory() as tmp_dir:
                 # Export frames from Figma (use cached file data if available)
+                # Pass max_frames to limit exports and speed up analysis
                 figma = FigmaAnalyzer()
                 file_key, _ = figma.parse_figma_url(figma_url)
                 cached_data = get_cached_figma_data(file_key)
-                figma_result = figma.analyze_figma_file(figma_url, tmp_dir, cached_file_data=cached_data)
+                figma_result = figma.analyze_figma_file(
+                    figma_url, tmp_dir,
+                    cached_file_data=cached_data,
+                    max_frames=max_frames
+                )
 
-                frames = figma_result["frames"][:max_frames]
+                frames = figma_result["frames"]
                 frame_count = len(frames)
 
                 # Check quota
