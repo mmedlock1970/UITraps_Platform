@@ -8,7 +8,6 @@
 
 import React, { useRef, useState, useCallback } from 'react';
 import { ContentType } from '../api/types';
-import { ModeIndicator } from './ModeIndicator';
 import styles from './UnifiedInput.module.css';
 
 interface UnifiedInputProps {
@@ -30,6 +29,7 @@ interface UnifiedInputProps {
   isLoading: boolean;
   onSubmit: () => void;
   centered?: boolean;
+  placeholder?: string;
 }
 
 const ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/jpg'];
@@ -53,6 +53,7 @@ export const UnifiedInput: React.FC<UnifiedInputProps> = ({
   isLoading,
   onSubmit,
   centered = false,
+  placeholder,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -128,13 +129,24 @@ export const UnifiedInput: React.FC<UnifiedInputProps> = ({
       {/* Main input row */}
       <div className={styles.inputRow}>
         <div className={styles.textareaWrapper}>
+          <button
+            className={styles.addButton}
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isLoading}
+            data-tooltip="Upload images or videos"
+            type="button"
+          >
+            +
+          </button>
           <textarea
             ref={textareaRef}
             className={`${styles.textarea} ${isDragging ? styles.dragging : ''}`}
             placeholder={
-              files.length > 0
-                ? 'Add context for analysis, or ask a question about these files...'
-                : 'Ask a question about UI traps, or drop screenshots for analysis...'
+              placeholder !== undefined
+                ? placeholder
+                : files.length > 0
+                  ? 'Add context for analysis, or ask a question about these files...'
+                  : 'Ask a question about UI traps, or drop screenshots for analysis...'
             }
             value={inputText}
             onChange={handleTextChange}
@@ -157,28 +169,6 @@ export const UnifiedInput: React.FC<UnifiedInputProps> = ({
         </button>
       </div>
 
-      {/* Toolbar */}
-      <div className={styles.toolbar}>
-        <button
-          className={styles.toolbarButton}
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isLoading}
-        >
-          Attach Files
-        </button>
-
-        <button
-          className={`${styles.toolbarButton} ${contextExpanded ? styles.active : ''}`}
-          onClick={() => onContextExpandedChange(!contextExpanded)}
-          disabled={isLoading}
-        >
-          Context Settings
-        </button>
-
-        <div className={styles.toolbarSpacer} />
-
-        <ModeIndicator mode={detectedMode} />
-      </div>
 
       {/* Hidden file input */}
       <input

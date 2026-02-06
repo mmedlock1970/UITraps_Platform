@@ -28,7 +28,7 @@
   --uitraps-spacing-xl: 32px;
 
   /* Typography */
-  --uitraps-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --uitraps-font-family: 'Montserrat', sans-serif;
   --uitraps-font-size-xs: 12px;
   --uitraps-font-size-sm: 14px;
   --uitraps-font-size-base: 16px;

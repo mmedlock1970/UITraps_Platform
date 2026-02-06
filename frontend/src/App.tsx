@@ -19,6 +19,7 @@ import { saveAnalysis, getAnalysisHistory, StoredAnalysis } from './services/ana
 import { ReportStatistics, UsageInfo, UnifiedAskResponse } from './api/types';
 import './styles/variables.css';
 import styles from './App.module.css';
+import cardsImage from './assets/cards.png';
 
 // Default API endpoint for development
 const DEFAULT_API_ENDPOINT = 'http://localhost:8000';
@@ -96,7 +97,7 @@ export const App: React.FC = () => {
       <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
         <div className={styles.authPrompt}>
           <div className={styles.authTitle}>
-            UI<span className={styles.logoAccent}>Traps</span> Platform
+            UI Traps <span className={styles.logoAccent}>Helper</span>
           </div>
           <div className={styles.authSubtitle}>
             Enter your JWT token to connect, or use dev mode for local testing.
@@ -133,14 +134,14 @@ export const App: React.FC = () => {
       <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
         <header className={styles.header}>
           <div className={styles.logo}>
-            UI<span className={styles.logoAccent}>Traps</span>
+            UI Traps <span className={styles.logoAccent}>Helper</span>
           </div>
           <div className={styles.headerActions}>
             <button className={styles.headerButton} onClick={() => setView('chat')}>
               Back to Chat
             </button>
             <button className={styles.headerButton} onClick={toggleTheme}>
-              {theme === 'light' ? 'Dark' : 'Light'}
+              {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
             </button>
           </div>
         </header>
@@ -166,14 +167,14 @@ export const App: React.FC = () => {
       <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
         <header className={styles.header}>
           <div className={styles.logo}>
-            UI<span className={styles.logoAccent}>Traps</span>
+            UI Traps <span className={styles.logoAccent}>Helper</span>
           </div>
           <div className={styles.headerActions}>
             <button className={styles.headerButton} onClick={() => setView('chat')}>
               Back to Chat
             </button>
             <button className={styles.headerButton} onClick={toggleTheme}>
-              {theme === 'light' ? 'Dark' : 'Light'}
+              {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
             </button>
           </div>
         </header>
@@ -191,7 +192,7 @@ export const App: React.FC = () => {
       <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
         <header className={styles.header}>
           <div className={styles.logo}>
-            UI<span className={styles.logoAccent}>Traps</span>
+            UI Traps <span className={styles.logoAccent}>Helper</span>
           </div>
           <div className={styles.headerActions}>
             <button className={styles.headerButton} onClick={unified.cancelAnalysis}>
@@ -216,7 +217,7 @@ export const App: React.FC = () => {
       <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
         <header className={styles.header}>
           <div className={styles.logo}>
-            UI<span className={styles.logoAccent}>Traps</span>
+            UI Traps <span className={styles.logoAccent}>Helper</span>
           </div>
         </header>
         <div className={styles.overlayContainer}>
@@ -239,7 +240,7 @@ export const App: React.FC = () => {
     <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
       <header className={styles.header}>
         <div className={styles.logo}>
-          UI<span className={styles.logoAccent}>Traps</span>
+          UI Traps <span className={styles.logoAccent}>Helper</span>
         </div>
         <div className={styles.headerActions}>
           <button className={styles.headerButton} onClick={() => unified.clearHistory()}>
@@ -251,22 +252,32 @@ export const App: React.FC = () => {
             </button>
           )}
           <button className={styles.headerButton} onClick={toggleTheme}>
-            {theme === 'light' ? 'Dark' : 'Light'}
+            {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
           </button>
         </div>
       </header>
 
       {isEmpty ? (
         <div className={styles.centeredLayout}>
+          <img
+            src={cardsImage}
+            alt="UI Tenets & Traps Cards"
+            className={styles.welcomeImage}
+          />
           <div className={styles.welcomeTitle}>
-            UI<span className={styles.logoAccent}>Traps</span> Assistant
+            UI Traps <span className={styles.logoAccent}>Helper</span>
           </div>
           <div className={styles.welcomeSubtitle}>
-            Ask about UI design traps and best practices,
-            or drop screenshots for a full trap analysis.
+            You can:
+            <ul>
+              <li>Ask any question about UI Tenets & Traps</li>
+              <li>Describe an interface issue, it will identify Traps for you</li>
+              <li>Do a Trap analysis with screenshots or video</li>
+            </ul>
           </div>
           <UnifiedInput
             centered
+            placeholder=""
             inputText={unified.inputText}
             onInputTextChange={unified.setInputText}
             files={unified.files}
