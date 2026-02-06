@@ -262,9 +262,9 @@ class SiteAnalyzer:
             if not page_result.get("success"):
                 continue
 
-            analysis = page_result.get("analysis", {})
-            stats = analysis.get("statistics", {})
-            report = analysis.get("report", {})
+            analysis = page_result.get("analysis") or {}
+            stats = analysis.get("statistics") or {}
+            report = analysis.get("report") or {}
 
             total_critical += stats.get("critical_count", 0)
             total_moderate += stats.get("moderate_count", 0)
@@ -302,8 +302,9 @@ class SiteAnalyzer:
             if not page_result.get("success"):
                 continue
 
-            page_title = page_result.get("page", {}).get("title", "Unknown")
-            report = page_result.get("analysis", {}).get("report", {})
+            page_title = (page_result.get("page") or {}).get("title", "Unknown")
+            analysis = page_result.get("analysis") or {}
+            report = analysis.get("report") or {}
 
             for severity, issue_list in [
                 ("critical", "critical_issues"),

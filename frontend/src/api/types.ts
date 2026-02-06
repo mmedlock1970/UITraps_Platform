@@ -66,12 +66,68 @@ export interface EstimateResponse {
 
 export interface CapabilitiesResponse {
   video_analysis: boolean;
+  figma_analysis: boolean;
+  url_analysis: boolean;
   max_images: number;
   max_video_frames: number;
+  max_crawl_pages: number;
   max_image_size_mb: number;
   max_video_size_mb: number;
   supported_image_types: string[];
   supported_video_types: string[];
+}
+
+// Figma Analysis Types
+export interface FigmaEstimateResponse {
+  success: boolean;
+  file_name: string;
+  frame_count: number;
+  has_prototype_flows: boolean;
+  flow_count: number;
+  time_estimate: {
+    min_seconds: number;
+    max_seconds: number;
+    description: string;
+  };
+  cost_estimate: {
+    credits: number;
+    description: string;
+  };
+  figma_available: boolean;
+}
+
+export interface SiteAnalysisResponse {
+  success: boolean;
+  report_html?: string;
+  report_markdown?: string;
+  statistics?: ReportStatistics;
+  site_summary?: {
+    overall_assessment: string;
+    critical_count: number;
+    moderate_count: number;
+    minor_count: number;
+    total_issues: number;
+  };
+  pages_analyzed: number;
+  analysis_type: 'figma' | 'url';
+  error?: string;
+}
+
+// URL Analysis Types
+export interface UrlEstimateResponse {
+  success: boolean;
+  url: string;
+  estimated_pages: number;
+  time_estimate: {
+    min_seconds: number;
+    max_seconds: number;
+    description: string;
+  };
+  cost_estimate: {
+    credits: number;
+    description: string;
+  };
+  playwright_available: boolean;
 }
 
 export interface Issue {
@@ -169,8 +225,24 @@ export interface AnalysisProgressProps {
   estimatedTime?: TimeEstimate;
 }
 
+/** Union type for all estimate responses */
+export type UnifiedEstimate = EstimateResponse | FigmaEstimateResponse | UrlEstimateResponse;
+
+/** Type guards for estimates */
+export function isFigmaEstimate(estimate: UnifiedEstimate): estimate is FigmaEstimateResponse {
+  return 'file_name' in estimate && 'frame_count' in estimate;
+}
+
+export function isUrlEstimate(estimate: UnifiedEstimate): estimate is UrlEstimateResponse {
+  return 'url' in estimate && 'estimated_pages' in estimate;
+}
+
+export function isFileEstimate(estimate: UnifiedEstimate): estimate is EstimateResponse {
+  return 'input_type' in estimate && 'file_count' in estimate;
+}
+
 export interface EstimatePreviewProps {
-  estimate: EstimateResponse;
+  estimate: UnifiedEstimate;
   onConfirm: () => void;
   onBack: () => void;
   isLoading?: boolean;
@@ -189,7 +261,7 @@ export interface ReportViewerProps {
 
 export type AnalyzerView = 'form' | 'preview' | 'loading' | 'report' | 'error';
 
-export type InputType = 'single_image' | 'multi_image' | 'video';
+export type InputType = 'single_image' | 'multi_image' | 'video' | 'figma' | 'url';
 
 export interface AnalyzerState {
   view: AnalyzerView;

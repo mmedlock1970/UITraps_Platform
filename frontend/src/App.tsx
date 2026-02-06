@@ -16,13 +16,34 @@ import { AnalysisProgress } from './components/AnalysisProgress';
 import { ReportViewer } from './components/ReportViewer';
 import { PastAnalyses } from './components/PastAnalyses';
 import { saveAnalysis, getAnalysisHistory, StoredAnalysis } from './services/analysisHistory';
-import { ReportStatistics, UsageInfo, UnifiedAskResponse } from './api/types';
+import { ReportStatistics, UsageInfo, UnifiedAskResponse, TimeEstimate, isFigmaEstimate, isUrlEstimate, isFileEstimate, UnifiedEstimate } from './api/types';
 import './styles/variables.css';
 import styles from './App.module.css';
 import cardsImage from './assets/cards.png';
 
 // Default API endpoint for development
 const DEFAULT_API_ENDPOINT = 'http://localhost:8000';
+
+/** Helper to normalize time estimates from different sources */
+function normalizeTimeEstimate(estimate: UnifiedEstimate | null): TimeEstimate | undefined {
+  if (!estimate) return undefined;
+
+  if (isFileEstimate(estimate)) {
+    return estimate.time_estimate;
+  }
+
+  if (isFigmaEstimate(estimate) || isUrlEstimate(estimate)) {
+    const { min_seconds, max_seconds, description } = estimate.time_estimate;
+    return {
+      min_seconds,
+      max_seconds,
+      min_formatted: description.split('-')[0]?.trim() || `${Math.round(min_seconds / 60)} min`,
+      max_formatted: description.split('-')[1]?.trim() || `${Math.round(max_seconds / 60)} min`,
+    };
+  }
+
+  return undefined;
+}
 
 type AppView = 'chat' | 'report' | 'history';
 
@@ -224,9 +245,9 @@ export const App: React.FC = () => {
           <AnalysisProgress
             elapsedTime={unified.elapsedTime}
             onCancel={unified.cancelAnalysis}
-            inputType={unified.files.length > 1 ? 'multi_image' : 'single_image'}
+            inputType={unified.detectedUrl ? (unified.detectedMode === 'figma' ? 'figma' : 'url') : (unified.files.length > 1 ? 'multi_image' : 'single_image')}
             fileCount={unified.files.length}
-            estimatedTime={unified.estimate?.time_estimate}
+            estimatedTime={normalizeTimeEstimate(unified.estimate)}
           />
         </div>
       </div>

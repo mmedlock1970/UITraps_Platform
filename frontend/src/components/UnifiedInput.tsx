@@ -10,6 +10,8 @@ import React, { useRef, useState, useCallback } from 'react';
 import { ContentType } from '../api/types';
 import styles from './UnifiedInput.module.css';
 
+type DetectedMode = 'chat' | 'analysis' | 'hybrid' | 'idle' | 'figma' | 'url';
+
 interface UnifiedInputProps {
   inputText: string;
   onInputTextChange: (text: string) => void;
@@ -24,8 +26,8 @@ interface UnifiedInputProps {
   contentType: ContentType;
   onContentTypeChange: (v: ContentType) => void;
   contextExpanded: boolean;
-  onContextExpandedChange: (v: boolean) => void;
-  detectedMode: 'chat' | 'analysis' | 'hybrid' | 'idle';
+  onContextExpandedChange?: (v: boolean) => void;
+  detectedMode: DetectedMode;
   isLoading: boolean;
   onSubmit: () => void;
   centered?: boolean;
@@ -48,7 +50,7 @@ export const UnifiedInput: React.FC<UnifiedInputProps> = ({
   contentType,
   onContentTypeChange,
   contextExpanded,
-  onContextExpandedChange,
+  // onContextExpandedChange is available for future use
   detectedMode,
   isLoading,
   onSubmit,

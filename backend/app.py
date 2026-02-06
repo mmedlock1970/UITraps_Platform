@@ -37,6 +37,11 @@ from src.estimator import (
 )
 from src.video_processor import is_ffmpeg_available, VideoProcessor
 
+# Figma, Web Crawler, and Site Analyzer
+from src.figma_analyzer import FigmaAnalyzer
+from src.web_crawler import WebCrawler
+from src.site_analyzer import SiteAnalyzer
+
 # Database persistence for usage tracking
 from sqlmodel import Session
 from src.database import init_db, engine
@@ -72,6 +77,29 @@ ALLOWED_ORIGINS = os.environ.get(
 
 # Monthly analysis limit per API key
 MONTHLY_LIMIT = int(os.environ.get("MONTHLY_LIMIT", "20"))
+
+# Simple in-memory cache for Figma file data (avoids hitting API twice for estimate + analyze)
+# Key: file_key, Value: {"data": file_data, "timestamp": time.time()}
+_figma_cache = {}
+FIGMA_CACHE_TTL = 300  # 5 minutes
+
+def get_cached_figma_data(file_key: str):
+    """Get Figma file data from cache if still valid."""
+    if file_key in _figma_cache:
+        cached = _figma_cache[file_key]
+        if time.time() - cached["timestamp"] < FIGMA_CACHE_TTL:
+            return cached["data"]
+        else:
+            del _figma_cache[file_key]
+    return None
+
+def set_cached_figma_data(file_key: str, data: dict):
+    """Cache Figma file data."""
+    _figma_cache[file_key] = {"data": data, "timestamp": time.time()}
+    # Cleanup old entries (keep max 20)
+    if len(_figma_cache) > 20:
+        oldest_key = min(_figma_cache.keys(), key=lambda k: _figma_cache[k]["timestamp"])
+        del _figma_cache[oldest_key]
 
 # --- Initialize Database ---
 init_db()  # Create tables if they don't exist
@@ -168,6 +196,52 @@ class MultiAnalysisResponse(BaseModel):
     analysis_type: str = "multi_image"
     frame_count: int = 0
     error: Optional[str] = None
+
+
+class FigmaEstimateResponse(BaseModel):
+    success: bool
+    file_name: str
+    frame_count: int
+    has_prototype_flows: bool
+    time_estimate: dict
+    cost_estimate: dict
+    figma_available: bool = True
+
+
+class UrlEstimateResponse(BaseModel):
+    success: bool
+    url: str
+    estimated_pages: int
+    time_estimate: dict
+    cost_estimate: dict
+    playwright_available: bool = True
+
+
+class SiteAnalysisResponse(BaseModel):
+    success: bool
+    report_html: Optional[str] = None
+    report_markdown: Optional[str] = None
+    statistics: Optional[dict] = None
+    site_summary: Optional[dict] = None
+    pages_analyzed: int = 0
+    analysis_type: str = "site"
+    error: Optional[str] = None
+
+
+# --- Capability Checks ---
+
+def is_figma_available() -> bool:
+    """Check if Figma API is configured."""
+    return bool(os.environ.get("FIGMA_TOKEN"))
+
+
+def is_playwright_available() -> bool:
+    """Check if Playwright is installed."""
+    try:
+        from playwright.sync_api import sync_playwright
+        return True
+    except ImportError:
+        return False
 
 
 # --- Multi-analyzer instance ---
@@ -691,13 +765,330 @@ async def get_capabilities():
     """
     return {
         "video_analysis": is_ffmpeg_available(),
+        "figma_analysis": is_figma_available(),
+        "url_analysis": is_playwright_available(),
         "max_images": EstimationConstants.MAX_IMAGES,
         "max_video_frames": EstimationConstants.MAX_VIDEO_FRAMES,
+        "max_crawl_pages": 10,
         "max_image_size_mb": 10,
         "max_video_size_mb": 100,
         "supported_image_types": ["image/png", "image/jpeg"],
         "supported_video_types": ["video/mp4", "video/quicktime", "video/webm"]
     }
+
+
+# ===========================================================
+# URL-Based Analysis Endpoints (Figma and Website Crawl)
+# ===========================================================
+
+@app.post("/estimate-figma")
+async def estimate_figma(
+    figma_url: str = Form(..., description="Figma file URL")
+):
+    """
+    Get estimate for Figma file analysis.
+
+    Fetches file metadata without exporting images to provide time/cost estimate.
+    """
+    if not is_figma_available():
+        raise HTTPException(
+            status_code=503,
+            detail="Figma analysis not available. FIGMA_TOKEN not configured."
+        )
+
+    try:
+        figma = FigmaAnalyzer()
+        file_key, _ = figma.parse_figma_url(figma_url)
+
+        # Check cache first to avoid hitting Figma API twice
+        file_data = get_cached_figma_data(file_key)
+        if not file_data:
+            file_data = figma.get_file_data(file_key)
+            set_cached_figma_data(file_key, file_data)
+
+        # Get frame count
+        frames = figma.get_all_frames(file_data)
+        frame_count = len(frames)
+
+        # Get prototype flows
+        flows = figma.get_prototype_flows(file_data)
+
+        # Estimate time: ~30 seconds per frame for export + analysis
+        time_min = frame_count * 25
+        time_max = frame_count * 45
+
+        return {
+            "success": True,
+            "file_name": file_data.get("name", "Untitled"),
+            "frame_count": frame_count,
+            "has_prototype_flows": len(flows) > 0,
+            "flow_count": len(flows),
+            "time_estimate": {
+                "min_seconds": time_min,
+                "max_seconds": time_max,
+                "description": f"{time_min // 60}-{time_max // 60} minutes"
+            },
+            "cost_estimate": {
+                "credits": frame_count,
+                "description": f"{frame_count} credits (1 per frame)"
+            },
+            "figma_available": True
+        }
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch Figma file: {str(e)}")
+
+
+@app.post("/estimate-url")
+async def estimate_url(
+    url: str = Form(..., description="Website URL to analyze"),
+    max_pages: int = Form(10, description="Maximum pages to crawl (1-10)")
+):
+    """
+    Get estimate for website crawl and analysis.
+
+    Returns estimated time and cost based on max pages setting.
+    """
+    if not is_playwright_available():
+        raise HTTPException(
+            status_code=503,
+            detail="URL analysis not available. Playwright not installed."
+        )
+
+    # Validate max_pages
+    max_pages = max(1, min(10, max_pages))
+
+    # Estimate: ~20 seconds per page for crawl, ~30 seconds per page for analysis
+    time_per_page = 50  # seconds
+    time_min = max_pages * 40
+    time_max = max_pages * 60
+
+    return {
+        "success": True,
+        "url": url,
+        "estimated_pages": max_pages,
+        "time_estimate": {
+            "min_seconds": time_min,
+            "max_seconds": time_max,
+            "description": f"{time_min // 60}-{time_max // 60} minutes (up to {max_pages} pages)"
+        },
+        "cost_estimate": {
+            "credits": max_pages,
+            "description": f"Up to {max_pages} credits (1 per page)"
+        },
+        "playwright_available": True
+    }
+
+
+@app.post("/analyze-figma", response_model=SiteAnalysisResponse)
+async def analyze_figma(
+    figma_url: str = Form(..., description="Figma file URL"),
+    users: str = Form(..., description="Who are the users?"),
+    tasks: str = Form(..., description="What are they trying to do?"),
+    format: str = Form("Figma design", description="Format description"),
+    content_type: str = Form("website", description="Content type"),
+    api_key: str = Form(..., description="Your API key"),
+    max_frames: int = Form(10, description="Maximum frames to analyze (1-20)")
+):
+    """
+    Analyze a Figma file for UI Traps.
+
+    Exports frames from Figma and analyzes each for usability issues.
+    Includes prototype flow analysis for multi-screen traps.
+    """
+    if not is_figma_available():
+        raise HTTPException(
+            status_code=503,
+            detail="Figma analysis not available. FIGMA_TOKEN not configured."
+        )
+
+    with Session(engine) as session:
+        # Verify API key
+        if not verify_api_key(api_key, session):
+            log_analysis(session, api_key, "/analyze-figma", "figma", 0, "failed_auth")
+            raise HTTPException(status_code=403, detail="Invalid API key")
+
+        # Validate max_frames
+        max_frames = max(1, min(20, max_frames))
+
+        try:
+            # Create temp directory for exports
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                # Export frames from Figma (use cached file data if available)
+                figma = FigmaAnalyzer()
+                file_key, _ = figma.parse_figma_url(figma_url)
+                cached_data = get_cached_figma_data(file_key)
+                figma_result = figma.analyze_figma_file(figma_url, tmp_dir, cached_file_data=cached_data)
+
+                frames = figma_result["frames"][:max_frames]
+                frame_count = len(frames)
+
+                # Check quota
+                limit = get_monthly_limit(session, api_key, MONTHLY_LIMIT)
+                current_usage = get_usage(session, api_key)
+                if current_usage + frame_count > limit:
+                    log_analysis(session, api_key, "/analyze-figma", "figma", 0, "quota_exceeded")
+                    raise HTTPException(
+                        status_code=402,
+                        detail=f"Not enough credits. You have {limit - current_usage} remaining, "
+                               f"but this analysis requires {frame_count} credits."
+                    )
+
+                # Prepare pages for SiteAnalyzer
+                pages = []
+                for frame in frames:
+                    if frame.get("image_path"):
+                        pages.append({
+                            "url": f"figma://{figma_result['file_info']['key']}/{frame['id']}",
+                            "title": frame["name"],
+                            "screenshot_path": frame["image_path"]
+                        })
+
+                if not pages:
+                    raise HTTPException(status_code=400, detail="No frames could be exported from Figma file")
+
+                # Run site analysis
+                site_analyzer = SiteAnalyzer()
+                user_context = {
+                    "users": users,
+                    "tasks": tasks,
+                    "format": format,
+                    "content_type": content_type
+                }
+
+                result = site_analyzer.analyze_site(pages, user_context)
+
+                # Generate HTML report from results
+                from src.report_generator import generate_site_report
+                html_report = generate_site_report(result, figma_result["file_info"]["name"])
+
+                # Increment usage
+                new_usage = increment_usage(session, api_key, frame_count, MONTHLY_LIMIT)
+                log_analysis(session, api_key, "/analyze-figma", "figma", frame_count, "success",
+                            {"frame_count": frame_count, "file_name": figma_result["file_info"]["name"]})
+
+                return {
+                    "success": True,
+                    "report_html": html_report,
+                    "statistics": result.get("statistics"),
+                    "site_summary": result.get("site_summary"),
+                    "pages_analyzed": frame_count,
+                    "analysis_type": "figma"
+                }
+
+        except HTTPException:
+            raise
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            logger.error(f"Figma analysis error: {e}")
+            raise HTTPException(status_code=500, detail=f"Figma analysis failed: {str(e)}")
+
+
+@app.post("/analyze-url", response_model=SiteAnalysisResponse)
+async def analyze_url(
+    url: str = Form(..., description="Website URL to analyze"),
+    users: str = Form(..., description="Who are the users?"),
+    tasks: str = Form(..., description="What are they trying to do?"),
+    format: str = Form("Website", description="Format description"),
+    content_type: str = Form("website", description="Content type"),
+    api_key: str = Form(..., description="Your API key"),
+    max_pages: int = Form(10, description="Maximum pages to crawl (1-10)")
+):
+    """
+    Crawl and analyze a website for UI Traps.
+
+    Crawls the website starting from the given URL, captures screenshots,
+    and analyzes each page for usability issues.
+    """
+    if not is_playwright_available():
+        raise HTTPException(
+            status_code=503,
+            detail="URL analysis not available. Playwright not installed. "
+                   "Install with: pip install playwright && playwright install chromium"
+        )
+
+    with Session(engine) as session:
+        # Verify API key
+        if not verify_api_key(api_key, session):
+            log_analysis(session, api_key, "/analyze-url", "url", 0, "failed_auth")
+            raise HTTPException(status_code=403, detail="Invalid API key")
+
+        # Validate max_pages
+        max_pages = max(1, min(10, max_pages))
+
+        # Check quota upfront (estimate)
+        limit = get_monthly_limit(session, api_key, MONTHLY_LIMIT)
+        current_usage = get_usage(session, api_key)
+        if current_usage + max_pages > limit:
+            log_analysis(session, api_key, "/analyze-url", "url", 0, "quota_exceeded")
+            raise HTTPException(
+                status_code=402,
+                detail=f"Not enough credits. You have {limit - current_usage} remaining, "
+                       f"but this analysis may require up to {max_pages} credits."
+            )
+
+        try:
+            # Create temp directory for screenshots
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                # Crawl website
+                crawler = WebCrawler(max_pages=max_pages, max_depth=2)
+                crawl_result = crawler.crawl(url, tmp_dir)
+
+                pages = crawl_result.get("pages", [])
+                if not pages:
+                    raise HTTPException(status_code=400, detail="No pages could be crawled from the URL")
+
+                # Prepare pages for SiteAnalyzer
+                site_pages = []
+                for page in pages:
+                    if page.get("screenshot_path") and os.path.exists(page["screenshot_path"]):
+                        site_pages.append({
+                            "url": page["url"],
+                            "title": page["title"],
+                            "screenshot_path": page["screenshot_path"]
+                        })
+
+                if not site_pages:
+                    raise HTTPException(status_code=400, detail="No screenshots captured during crawl")
+
+                # Run site analysis
+                site_analyzer = SiteAnalyzer()
+                user_context = {
+                    "users": users,
+                    "tasks": tasks,
+                    "format": format,
+                    "content_type": content_type
+                }
+
+                result = site_analyzer.analyze_site(site_pages, user_context)
+
+                # Generate HTML report
+                from src.report_generator import generate_site_report
+                html_report = generate_site_report(result, url)
+
+                # Increment usage based on actual pages analyzed
+                pages_analyzed = len(site_pages)
+                new_usage = increment_usage(session, api_key, pages_analyzed, MONTHLY_LIMIT)
+                log_analysis(session, api_key, "/analyze-url", "url", pages_analyzed, "success",
+                            {"pages_analyzed": pages_analyzed, "url": url})
+
+                return {
+                    "success": True,
+                    "report_html": html_report,
+                    "statistics": result.get("statistics"),
+                    "site_summary": result.get("site_summary"),
+                    "pages_analyzed": pages_analyzed,
+                    "analysis_type": "url"
+                }
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"URL analysis error: {e}")
+            raise HTTPException(status_code=500, detail=f"URL analysis failed: {str(e)}")
 
 
 # ===========================================================

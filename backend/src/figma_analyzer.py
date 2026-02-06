@@ -92,24 +92,38 @@ class FigmaAnalyzer:
 
         return file_key, node_id
 
-    def get_file_data(self, file_key: str) -> Dict:
+    def get_file_data(self, file_key: str, max_retries: int = 3) -> Dict:
         """
-        Fetch file data from Figma API.
+        Fetch file data from Figma API with retry on rate limits.
 
         Args:
             file_key: Figma file key
+            max_retries: Maximum number of retries on rate limit (429)
 
         Returns:
             Dictionary containing file metadata and structure
 
         Raises:
-            requests.HTTPError: If API request fails
+            requests.HTTPError: If API request fails after retries
         """
+        import time as time_module
         url = f"{self.base_url}/files/{file_key}"
 
-        response = requests.get(url, headers=self.headers)
-        response.raise_for_status()
+        for attempt in range(max_retries + 1):
+            response = requests.get(url, headers=self.headers)
 
+            if response.status_code == 429:  # Rate limited
+                if attempt < max_retries:
+                    wait_time = (2 ** attempt) * 10  # 10s, 20s, 40s
+                    print(f"Rate limited by Figma API. Waiting {wait_time}s before retry...")
+                    time_module.sleep(wait_time)
+                    continue
+
+            response.raise_for_status()
+            return response.json()
+
+        # Should not reach here, but just in case
+        response.raise_for_status()
         return response.json()
 
     def get_all_frames(self, file_data: Dict) -> List[Dict]:
@@ -126,26 +140,29 @@ class FigmaAnalyzer:
 
         def traverse_node(node, page_name=""):
             """Recursively traverse node tree to find frames."""
+            if not node:
+                return
             node_type = node.get('type', '')
 
             # Frames are the top-level containers for designs
             if node_type == 'FRAME':
+                bounding_box = node.get('absoluteBoundingBox') or {}
                 frames.append({
-                    'id': node['id'],
-                    'name': node['name'],
+                    'id': node.get('id', ''),
+                    'name': node.get('name', 'Unnamed'),
                     'page': page_name,
-                    'width': node.get('absoluteBoundingBox', {}).get('width', 0),
-                    'height': node.get('absoluteBoundingBox', {}).get('height', 0)
+                    'width': bounding_box.get('width', 0),
+                    'height': bounding_box.get('height', 0)
                 })
 
             # Recurse into children
-            for child in node.get('children', []):
+            for child in node.get('children') or []:
                 traverse_node(child, page_name)
 
         # Traverse all pages
-        document = file_data.get('document', {})
-        for page in document.get('children', []):
-            page_name = page.get('name', 'Unnamed Page')
+        document = file_data.get('document') or {}
+        for page in document.get('children') or []:
+            page_name = page.get('name', 'Unnamed Page') if page else 'Unnamed Page'
             traverse_node(page, page_name)
 
         return frames
@@ -155,23 +172,27 @@ class FigmaAnalyzer:
         file_key: str,
         node_id: str,
         scale: int = 2,
-        format: str = 'png'
+        format: str = 'png',
+        max_retries: int = 3
     ) -> bytes:
         """
-        Export a specific frame as an image.
+        Export a specific frame as an image with retry on rate limits.
 
         Args:
             file_key: Figma file key
             node_id: Node ID to export
             scale: Export scale (1-4). 2 = 2x resolution
             format: Image format ('png', 'jpg', 'svg', 'pdf')
+            max_retries: Maximum number of retries on rate limit (429)
 
         Returns:
             Image data as bytes
 
         Raises:
-            requests.HTTPError: If API request fails
+            requests.HTTPError: If API request fails after retries
         """
+        import time as time_module
+
         # Request image export URL
         url = f"{self.base_url}/images/{file_key}"
         params = {
@@ -180,13 +201,24 @@ class FigmaAnalyzer:
             'format': format
         }
 
-        response = requests.get(url, headers=self.headers, params=params)
-        response.raise_for_status()
+        for attempt in range(max_retries + 1):
+            response = requests.get(url, headers=self.headers, params=params)
+
+            if response.status_code == 429:  # Rate limited
+                if attempt < max_retries:
+                    wait_time = (2 ** attempt) * 5  # 5s, 10s, 20s
+                    print(f"Rate limited by Figma API. Waiting {wait_time}s...")
+                    time_module.sleep(wait_time)
+                    continue
+
+            response.raise_for_status()
+            break
 
         result = response.json()
 
         # Get the image URL
-        image_url = result.get('images', {}).get(node_id)
+        images = result.get('images') or {}
+        image_url = images.get(node_id)
         if not image_url:
             raise ValueError(f"Failed to get image URL for node {node_id}")
 
@@ -213,27 +245,35 @@ class FigmaAnalyzer:
 
         def traverse_for_interactions(node):
             """Find all prototype interactions in the node tree."""
+            if not node:
+                return
             # Check for interactions on this node
-            interactions = node.get('interactions', [])
+            interactions = node.get('interactions') or []
             for interaction in interactions:
-                action = interaction.get('actions', [{}])[0]
+                if not interaction:
+                    continue
+                actions = interaction.get('actions') or [{}]
+                action = actions[0] if actions else {}
+                if not action:
+                    action = {}
                 destination_id = action.get('destinationId')
 
                 if destination_id:
+                    trigger = interaction.get('trigger') or {}
                     flows.append({
-                        'from_node': node['id'],
+                        'from_node': node.get('id', ''),
                         'from_name': node.get('name', 'Unnamed'),
                         'to_node': destination_id,
-                        'trigger': interaction.get('trigger', {}).get('type', 'UNKNOWN')
+                        'trigger': trigger.get('type', 'UNKNOWN')
                     })
 
             # Recurse into children
-            for child in node.get('children', []):
+            for child in node.get('children') or []:
                 traverse_for_interactions(child)
 
         # Traverse all pages
-        document = file_data.get('document', {})
-        for page in document.get('children', []):
+        document = file_data.get('document') or {}
+        for page in document.get('children') or []:
             traverse_for_interactions(page)
 
         return flows
@@ -241,13 +281,14 @@ class FigmaAnalyzer:
     def analyze_figma_file(
         self,
         figma_url: str,
-        output_dir: Optional[str] = None
+        output_dir: Optional[str] = None,
+        cached_file_data: Optional[Dict] = None
     ) -> Dict:
         """
         Complete analysis workflow for a Figma file.
 
         1. Parse URL to get file_key
-        2. Fetch file data
+        2. Fetch file data (or use cached)
         3. Export all frames as images
         4. Detect prototype flows
         5. Prepare for UI Traps analysis
@@ -255,6 +296,7 @@ class FigmaAnalyzer:
         Args:
             figma_url: Figma file URL
             output_dir: Directory to save exported images (optional)
+            cached_file_data: Pre-fetched file data to avoid API call (optional)
 
         Returns:
             Dictionary containing:
@@ -265,8 +307,12 @@ class FigmaAnalyzer:
         print(f"Parsing Figma URL...")
         file_key, node_id = self.parse_figma_url(figma_url)
 
-        print(f"Fetching file data from Figma API...")
-        file_data = self.get_file_data(file_key)
+        if cached_file_data:
+            print(f"Using cached file data...")
+            file_data = cached_file_data
+        else:
+            print(f"Fetching file data from Figma API...")
+            file_data = self.get_file_data(file_key)
 
         # Extract file info
         file_info = {

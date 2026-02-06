@@ -9,10 +9,10 @@
  */
 
 import { useState, useCallback, useMemo } from 'react';
-import { ChatMessage, ContentType, UserContext, EstimateResponse, UnifiedAskResponse } from '../api/types';
+import { ChatMessage, ContentType, UserContext, EstimateResponse, UnifiedAskResponse, FigmaEstimateResponse, UrlEstimateResponse } from '../api/types';
 import { useChat } from './useChat';
 import { useElapsedTime } from './useElapsedTime';
-import { unifiedAsk, getEstimate } from '../api/client';
+import { unifiedAsk, getEstimate, getFigmaEstimate, getUrlEstimate, analyzeFigma, analyzeUrl } from '../api/client';
 
 interface UseUnifiedInputOptions {
   apiEndpoint: string;
@@ -20,7 +20,29 @@ interface UseUnifiedInputOptions {
   onAnalysisComplete?: (result: UnifiedAskResponse, fileNames: string[]) => void;
 }
 
-type DetectedMode = 'chat' | 'analysis' | 'hybrid' | 'idle';
+type DetectedMode = 'chat' | 'analysis' | 'hybrid' | 'idle' | 'figma' | 'url';
+
+/** URL detection helpers */
+const FIGMA_URL_PATTERN = /https?:\/\/(www\.)?figma\.com\/(file|design|proto)\/[a-zA-Z0-9]+/i;
+const WEBSITE_URL_PATTERN = /^https?:\/\/[^\s]+$/i;
+
+function detectUrlType(text: string): 'figma' | 'url' | null {
+  const trimmed = text.trim();
+  if (FIGMA_URL_PATTERN.test(trimmed)) return 'figma';
+  if (WEBSITE_URL_PATTERN.test(trimmed) && !trimmed.includes(' ')) return 'url';
+  return null;
+}
+
+function extractUrl(text: string): string | null {
+  const trimmed = text.trim();
+  // Check for Figma URL first
+  const figmaMatch = trimmed.match(FIGMA_URL_PATTERN);
+  if (figmaMatch) return figmaMatch[0];
+  // Check for any URL
+  const urlMatch = trimmed.match(WEBSITE_URL_PATTERN);
+  if (urlMatch) return urlMatch[0];
+  return null;
+}
 
 /** Phases for conversational context gathering */
 type ContextGatheringPhase =
@@ -39,12 +61,18 @@ type AnalysisPhase =
   | 'analyzing'
   | 'complete';
 
+/** Unified estimate that works for files, Figma, or URL */
+type UnifiedEstimate = EstimateResponse | FigmaEstimateResponse | UrlEstimateResponse;
+
 interface UseUnifiedInputReturn {
   // Input state
   inputText: string;
   setInputText: (text: string) => void;
   files: File[];
   setFiles: (files: File[]) => void;
+
+  // URL detection
+  detectedUrl: string | null;
 
   // Context fields (for analysis mode)
   users: string;
@@ -68,7 +96,7 @@ interface UseUnifiedInputReturn {
 
   // Analysis pipeline
   analysisPhase: AnalysisPhase;
-  estimate: EstimateResponse | null;
+  estimate: UnifiedEstimate | null;
   elapsedTime: number;
   confirmAnalysis: () => Promise<void>;
   cancelAnalysis: () => void;
@@ -90,6 +118,7 @@ function detectMode(
   expertise: string,
   tasks: string,
   format: string,
+  detectedUrl: string | null,
 ): DetectedMode {
   const hasText = inputText.trim().length > 0;
   const hasFiles = files.length > 0;
@@ -99,6 +128,13 @@ function detectMode(
     tasks.trim().length >= 10 &&
     format.trim().length >= 10
   );
+
+  // URL-based analysis modes
+  if (detectedUrl) {
+    const urlType = detectUrlType(detectedUrl);
+    if (urlType === 'figma') return 'figma';
+    if (urlType === 'url') return 'url';
+  }
 
   if (!hasText && !hasFiles) return 'idle';
   if (hasFiles && hasContext) return 'analysis';
@@ -123,6 +159,9 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
   const [inputText, setInputText] = useState('');
   const [files, setFiles] = useState<File[]>([]);
 
+  // URL detection (derived from inputText)
+  const detectedUrl = useMemo(() => extractUrl(inputText), [inputText]);
+
   // Context fields
   const [users, setUsers] = useState('');
   const [expertise, setExpertise] = useState('');
@@ -137,7 +176,8 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
 
   // Analysis pipeline
   const [analysisPhase, setAnalysisPhase] = useState<AnalysisPhase>('idle');
-  const [estimate, setEstimate] = useState<EstimateResponse | null>(null);
+  const [estimate, setEstimate] = useState<UnifiedEstimate | null>(null);
+  const [pendingUrl, setPendingUrl] = useState<string | null>(null);
   const elapsed = useElapsedTime();
 
   // Loading state for unified requests
@@ -148,8 +188,8 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
 
   // Mode detection
   const detectedMode = useMemo(
-    () => detectMode(inputText, files, users, expertise, tasks, format),
-    [inputText, files, users, expertise, tasks, format],
+    () => detectMode(inputText, files, users, expertise, tasks, format, detectedUrl),
+    [inputText, files, users, expertise, tasks, format, detectedUrl],
   );
 
   /** Run the actual analysis API call (called after estimate confirmation) */
@@ -166,35 +206,91 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
       contentType,
     };
 
-    const conversationHistory = chat.messages
-      .filter(m => m.role === 'user' || (m.role === 'assistant' && !m.reportHtml))
-      .slice(-10)
-      .map(m => ({ role: m.role, content: m.content }));
-
     try {
-      const result = await unifiedAsk({
-        apiEndpoint,
-        token,
-        message: pendingQuestion || undefined,
-        files,
-        context,
-        conversationHistory: JSON.stringify(conversationHistory),
-      });
+      let analysisName: string;
 
-      elapsed.stop();
-      setAnalysisPhase('complete');
+      // Handle URL-based analysis (Figma or website)
+      if (pendingUrl) {
+        const urlType = detectUrlType(pendingUrl);
 
-      // Notify parent (App) so it can switch to report view
-      const fileNames = files.map(f => f.name);
-      if ((result.mode === 'analysis' || result.mode === 'hybrid') && onAnalysisComplete) {
-        onAnalysisComplete(result, fileNames);
+        if (urlType === 'figma') {
+          analysisName = `Figma file`;
+          const result = await analyzeFigma({
+            apiEndpoint,
+            apiKey: token,
+            figmaUrl: pendingUrl,
+            context,
+            maxFrames: 10,
+          });
+
+          elapsed.stop();
+          setAnalysisPhase('complete');
+
+          if (result.success && onAnalysisComplete) {
+            onAnalysisComplete({
+              success: true,
+              mode: 'analysis',
+              report_html: result.report_html,
+              statistics: result.statistics,
+            }, [analysisName]);
+          }
+        } else {
+          // Website URL analysis
+          analysisName = new URL(pendingUrl).hostname;
+          const result = await analyzeUrl({
+            apiEndpoint,
+            apiKey: token,
+            url: pendingUrl,
+            context,
+            maxPages: 10,
+          });
+
+          elapsed.stop();
+          setAnalysisPhase('complete');
+
+          if (result.success && onAnalysisComplete) {
+            onAnalysisComplete({
+              success: true,
+              mode: 'analysis',
+              report_html: result.report_html,
+              statistics: result.statistics,
+            }, [analysisName]);
+          }
+        }
+
+        chat.addSystemPrompt(`Analysis completed for ${analysisName}. View the full report above.`);
+      } else {
+        // File-based analysis
+        const conversationHistory = chat.messages
+          .filter(m => m.role === 'user' || (m.role === 'assistant' && !m.reportHtml))
+          .slice(-10)
+          .map(m => ({ role: m.role, content: m.content }));
+
+        const result = await unifiedAsk({
+          apiEndpoint,
+          token,
+          message: pendingQuestion || undefined,
+          files,
+          context,
+          conversationHistory: JSON.stringify(conversationHistory),
+        });
+
+        elapsed.stop();
+        setAnalysisPhase('complete');
+
+        // Notify parent (App) so it can switch to report view
+        const fileNames = files.map(f => f.name);
+        if ((result.mode === 'analysis' || result.mode === 'hybrid') && onAnalysisComplete) {
+          onAnalysisComplete(result, fileNames);
+        }
+        chat.addSystemPrompt(`Analysis completed for ${fileNames.join(', ')}. View the full report above.`);
       }
-      chat.addSystemPrompt(`Analysis completed for ${fileNames.join(', ')}. View the full report above.`);
 
       // Clear inputs
       setInputText('');
       setFiles([]);
       setPendingQuestion('');
+      setPendingUrl(null);
       setAnalysisPhase('idle');
       setEstimate(null);
     } catch (err) {
@@ -203,10 +299,11 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
       chat.addSystemPrompt(`Analysis failed: ${msg}`);
       setAnalysisPhase('idle');
       setEstimate(null);
+      setPendingUrl(null);
     } finally {
       setIsUnifiedLoading(false);
     }
-  }, [users, expertise, tasks, format, contentType, files, pendingQuestion, apiEndpoint, token, chat, elapsed, onAnalysisComplete]);
+  }, [users, expertise, tasks, format, contentType, files, pendingQuestion, pendingUrl, apiEndpoint, token, chat, elapsed, onAnalysisComplete]);
 
   /** User confirms the estimate → start analysis */
   const confirmAnalysis = useCallback(async () => {
@@ -222,12 +319,27 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
   }, [elapsed]);
 
   /** Start the estimation step (called after context is complete) */
-  const startEstimation = useCallback(async () => {
+  const startEstimation = useCallback(async (urlToAnalyze?: string) => {
     setAnalysisPhase('estimating');
     setIsUnifiedLoading(true);
 
     try {
-      const est = await getEstimate({ apiEndpoint, files });
+      let est: UnifiedEstimate;
+
+      if (urlToAnalyze) {
+        // URL-based estimate
+        const urlType = detectUrlType(urlToAnalyze);
+        if (urlType === 'figma') {
+          est = await getFigmaEstimate({ apiEndpoint, figmaUrl: urlToAnalyze });
+        } else {
+          est = await getUrlEstimate({ apiEndpoint, url: urlToAnalyze, maxPages: 10 });
+        }
+        setPendingUrl(urlToAnalyze);
+      } else {
+        // File-based estimate
+        est = await getEstimate({ apiEndpoint, files });
+      }
+
       setEstimate(est);
       setAnalysisPhase('previewing');
     } catch (err) {
@@ -237,20 +349,46 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
         'Please click **Start Analysis** below to proceed without an estimate.'
       );
       // Create a fallback estimate so the user can still proceed
-      setEstimate({
-        success: true,
-        input_type: files.length > 1 ? 'multi_image' : 'single_image',
-        file_count: files.length,
-        total_size_mb: 0,
-        time_estimate: {
-          min_seconds: 30,
-          max_seconds: 120,
-          min_formatted: '30 seconds',
-          max_formatted: '2 minutes',
-        },
-        cost_estimate: { min_credits: 1, max_credits: 1, min_dollars: 0.1, max_dollars: 0.3 },
-        ffmpeg_available: false,
-      });
+      if (urlToAnalyze) {
+        const urlType = detectUrlType(urlToAnalyze);
+        setPendingUrl(urlToAnalyze);
+        if (urlType === 'figma') {
+          setEstimate({
+            success: true,
+            file_name: 'Figma file',
+            frame_count: 5,
+            has_prototype_flows: false,
+            flow_count: 0,
+            time_estimate: { min_seconds: 120, max_seconds: 300, description: '2-5 minutes' },
+            cost_estimate: { credits: 5, description: '~5 credits' },
+            figma_available: true,
+          });
+        } else {
+          setEstimate({
+            success: true,
+            url: urlToAnalyze,
+            estimated_pages: 5,
+            time_estimate: { min_seconds: 200, max_seconds: 400, description: '3-7 minutes' },
+            cost_estimate: { credits: 5, description: '~5 credits' },
+            playwright_available: true,
+          });
+        }
+      } else {
+        setEstimate({
+          success: true,
+          input_type: files.length > 1 ? 'multi_image' : 'single_image',
+          file_count: files.length,
+          total_size_mb: 0,
+          time_estimate: {
+            min_seconds: 30,
+            max_seconds: 120,
+            min_formatted: '30 seconds',
+            max_formatted: '2 minutes',
+          },
+          cost_estimate: { min_credits: 1, max_credits: 1, min_dollars: 0.1, max_dollars: 0.3 },
+          ffmpeg_available: false,
+        });
+      }
       setAnalysisPhase('previewing');
     } finally {
       setIsUnifiedLoading(false);
@@ -320,7 +458,8 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
         );
 
         // Context is now complete — proceed to estimation
-        await startEstimation();
+        // Pass pendingUrl if this was a URL analysis
+        await startEstimation(pendingUrl || undefined);
         return;
       }
 
@@ -334,6 +473,37 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
       const text = inputText.trim();
       setInputText('');
       await chat.sendMessage(text);
+      return;
+    }
+
+    // ── Figma or URL analysis modes ──
+    if (detectedMode === 'figma' || detectedMode === 'url') {
+      const url = detectedUrl!;
+      const urlLabel = detectedMode === 'figma'
+        ? 'Figma file'
+        : new URL(url).hostname;
+
+      // Store URL for later use after context gathering
+      setPendingUrl(url);
+
+      // Show user message in chat
+      chat.addUserMessage(`Analyze this ${detectedMode === 'figma' ? 'Figma design' : 'website'}: ${url}`, 'analysis');
+      setInputText('');
+
+      // Check if we already have full context
+      if (hasFullContext(users, expertise, tasks, format)) {
+        chat.addSystemPrompt(`Starting analysis of ${urlLabel}...`);
+        await startEstimation(url);
+        return;
+      }
+
+      // Context is missing — start conversational gathering
+      setContextGatheringPhase('asking_users');
+      chat.addSystemPrompt(
+        `I'll analyze **${urlLabel}** for UI traps! First, I need a bit of context.\n\n` +
+        '**Who are the intended users** of this interface?\n\n' +
+        '*(e.g., "Adults ages 25-45 looking to stream movies", "Enterprise software developers")*'
+      );
       return;
     }
 
@@ -366,7 +536,7 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
       '*(e.g., "Adults ages 25-45 looking to stream movies", "Enterprise software developers")*'
     );
   }, [
-    token, contextGatheringPhase, detectedMode, inputText, files,
+    token, contextGatheringPhase, detectedMode, inputText, files, detectedUrl, pendingUrl,
     users, expertise, tasks, format, chat, startEstimation,
   ]);
 
@@ -375,6 +545,7 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
     setInputText,
     files,
     setFiles,
+    detectedUrl,
     users,
     setUsers,
     expertise,

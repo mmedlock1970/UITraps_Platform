@@ -11,6 +11,23 @@ from datetime import datetime
 from urllib.parse import urlparse
 
 
+def generate_site_report(analysis_result: Dict[str, Any], url: str, format: str = "html") -> str:
+    """
+    Generate a site analysis report in the specified format.
+
+    Args:
+        analysis_result: Complete result from SiteAnalyzer.analyze_site()
+        url: Starting URL or identifier of the site
+        format: Output format ("html" or "markdown")
+
+    Returns:
+        Complete report as string
+    """
+    if format == "markdown":
+        return generate_site_report_markdown(analysis_result, url)
+    return generate_site_report_html(analysis_result, url)
+
+
 def generate_site_report_markdown(analysis_result: Dict[str, Any], url: str) -> str:
     """
     Generate a cohesive markdown report for entire site analysis.
@@ -174,15 +191,15 @@ Prioritized list of improvements:
             report += f"*Error analyzing this page: {page_result.get('error', 'Unknown error')}*\n\n"
             continue
 
-        analysis = page_result.get("analysis", {})
-        page_stats = analysis.get("statistics", {})
+        analysis = page_result.get("analysis") or {}
+        page_stats = analysis.get("statistics") or {}
 
         report += f"**Issues:** {page_stats.get('critical_count', 0)} critical, "
         report += f"{page_stats.get('moderate_count', 0)} moderate, "
         report += f"{page_stats.get('minor_count', 0)} minor\n\n"
 
         # List issues for this page
-        page_report = analysis.get("report", {})
+        page_report = analysis.get("report") or {}
         for issue in page_report.get("critical_issues", []):
             report += f"- 🔴 **{issue.get('trap_name')}**: {issue.get('problem', '')[:100]}...\n"
         for issue in page_report.get("moderate_issues", []):
@@ -571,8 +588,8 @@ def generate_site_report_html(analysis_result: Dict[str, Any], url: str) -> str:
             <p><a href="{page.get('url', '#')}" target="_blank">{page.get('url', '')}</a></p>
 """
         if page_result.get("success"):
-            analysis = page_result.get("analysis", {})
-            page_stats = analysis.get("statistics", {})
+            analysis = page_result.get("analysis") or {}
+            page_stats = analysis.get("statistics") or {}
 
             html += f"""
             <div class="issue-badges">
@@ -582,7 +599,7 @@ def generate_site_report_html(analysis_result: Dict[str, Any], url: str) -> str:
             </div>
 """
             # List key issues
-            page_report = analysis.get("report", {})
+            page_report = analysis.get("report") or {}
             issues = page_report.get("critical_issues", []) + page_report.get("moderate_issues", [])[:2]
             if issues:
                 html += "            <ul style='margin-top: 10px;'>\n"
