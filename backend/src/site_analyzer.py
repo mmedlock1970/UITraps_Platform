@@ -2,11 +2,12 @@
 Site Analyzer - Multi-Page Analysis Orchestration
 
 Coordinates analysis across multiple pages with context awareness,
-page role classification, and task flow evaluation.
+page role classification, task flow evaluation, and interaction analysis.
 
 Copyright © 2009-present UI Traps LLC. All Rights Reserved.
 """
 
+import base64
 import os
 import time
 from typing import Dict, List, Any, Optional
@@ -20,6 +21,7 @@ try:
         get_relevant_tasks,
         generate_flow_analysis
     )
+    from .navigation_graph import NavigationGraph, NavigationGraphBuilder
 except ImportError:
     # Fallback for direct script execution
     from analyzer import UITrapsAnalyzer
@@ -29,6 +31,7 @@ except ImportError:
         get_relevant_tasks,
         generate_flow_analysis
     )
+    from navigation_graph import NavigationGraph, NavigationGraphBuilder
 
 
 class SiteAnalyzer:
@@ -53,6 +56,23 @@ class SiteAnalyzer:
         self.page_classifications = {}
         self.page_analyses = []
         self.flow_analyses = []
+        self.interaction_analyses = []  # Stores interaction analysis results
+        self.navigation_graph: Optional[NavigationGraph] = None  # Site navigation structure
+
+    def set_navigation_graph(self, graph: NavigationGraph):
+        """
+        Set the navigation graph for flow-aware analysis.
+
+        When a navigation graph is set, page analysis will include:
+        - Entry point status (is this a landing page?)
+        - Path from homepage (how did users get here?)
+        - CTAs already seen (what have users encountered?)
+        - Verified CTA destinations (what do buttons actually do?)
+
+        Args:
+            graph: NavigationGraph built during crawl
+        """
+        self.navigation_graph = graph
 
     def analyze_site(
         self,
@@ -193,6 +213,12 @@ class SiteAnalyzer:
             "site_pages": site_page_titles,
             "relevant_tasks": relevant_tasks.get("full", []) + relevant_tasks.get("partial", [])
         }
+
+        # Add navigation context if available (critical for flow-aware analysis)
+        if self.navigation_graph:
+            nav_context = self.navigation_graph.get_page_context(url)
+            if nav_context and "error" not in nav_context:
+                page_context["navigation_context"] = nav_context
 
         # Build modified user context
         modified_context = {
@@ -378,3 +404,275 @@ class SiteAnalyzer:
             "sitewide_issues": sitewide_issues,
             "tasks_evaluated": tasks
         }
+
+    def analyze_site_with_interactions(
+        self,
+        pages: List[Dict],
+        user_context: Dict[str, Any],
+        progress_callback: Optional[callable] = None,
+        analyze_interactions: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Analyze website with both static and interaction analysis.
+
+        This extends analyze_site() by also processing interaction captures
+        from pages that have them.
+
+        Args:
+            pages: List of page dicts from crawler, each with:
+                - url: Page URL
+                - title: Page title
+                - screenshot_path: Path to screenshot image
+                - interactions: Optional list of interaction captures
+            user_context: Dict with users, tasks, format
+            progress_callback: Optional progress callback
+            analyze_interactions: Whether to analyze interactions (default True)
+
+        Returns:
+            Complete analysis including:
+                - All fields from analyze_site()
+                - interaction_analysis: Aggregated interaction findings
+        """
+        # First, run standard site analysis
+        result = self.analyze_site(pages, user_context, progress_callback)
+
+        # Check if any pages have interactions
+        pages_with_interactions = [p for p in pages if p.get('interactions')]
+
+        if not analyze_interactions or not pages_with_interactions:
+            result['interaction_analysis'] = {
+                'enabled': False,
+                'message': 'No interaction data available'
+            }
+            return result
+
+        # Analyze interactions for each page
+        self.interaction_analyses = []
+        total_interactions = sum(len(p.get('interactions', [])) for p in pages_with_interactions)
+        current_interaction = 0
+
+        for page in pages_with_interactions:
+            page_title = page.get('title', 'Unknown')
+            interactions = page.get('interactions', [])
+
+            for interaction in interactions:
+                current_interaction += 1
+                if progress_callback:
+                    progress_callback(
+                        current_interaction,
+                        total_interactions,
+                        f"Analyzing interaction: {interaction.get('interaction_type', 'unknown')} on {page_title}"
+                    )
+
+                try:
+                    # Convert interaction data to Claude format
+                    images = self._convert_interaction_to_images(interaction)
+                    if not images:
+                        continue
+
+                    analysis_result = self.analyzer.analyze_interaction_sequence(
+                        images=images,
+                        interaction_type=interaction.get('interaction_type', 'click'),
+                        element_description=interaction.get('element_description', 'Unknown'),
+                        labels=interaction.get('labels', []),
+                        user_context=user_context
+                    )
+
+                    self.interaction_analyses.append({
+                        'page_title': page_title,
+                        'page_url': page.get('url', ''),
+                        'interaction': interaction,
+                        'analysis': analysis_result.get('analysis'),
+                        'metadata': analysis_result.get('metadata'),
+                        'success': True
+                    })
+
+                except Exception as e:
+                    self.interaction_analyses.append({
+                        'page_title': page_title,
+                        'page_url': page.get('url', ''),
+                        'interaction': interaction,
+                        'error': str(e),
+                        'success': False
+                    })
+
+        # Generate interaction summary
+        interaction_summary = self._generate_interaction_summary()
+
+        # Merge interaction findings into main result
+        result['interaction_analysis'] = {
+            'enabled': True,
+            'summary': interaction_summary,
+            'individual_analyses': self.interaction_analyses,
+            'statistics': self._calculate_interaction_statistics()
+        }
+
+        # Add interaction issues to main recommendations
+        interaction_recommendations = self._get_interaction_recommendations()
+        result['recommendations'] = interaction_recommendations + result.get('recommendations', [])
+
+        return result
+
+    def _convert_interaction_to_images(self, interaction: Dict) -> List[Dict]:
+        """
+        Convert interaction capture data to Claude image format.
+
+        Args:
+            interaction: Interaction dict with screenshots_base64
+
+        Returns:
+            List of image dicts for Claude API
+        """
+        images = []
+        screenshots_b64 = interaction.get('screenshots_base64', [])
+
+        for screenshot_b64 in screenshots_b64:
+            images.append({
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": "image/png",
+                    "data": screenshot_b64
+                }
+            })
+
+        return images
+
+    def _calculate_interaction_statistics(self) -> Dict[str, Any]:
+        """Calculate statistics from interaction analyses."""
+        stats = {
+            'total_analyzed': len(self.interaction_analyses),
+            'successful': 0,
+            'failed': 0,
+            'by_type': {},
+            'issues_by_severity': {
+                'critical': 0,
+                'moderate': 0,
+                'minor': 0
+            },
+            'feedback_quality': {
+                'good': 0,
+                'acceptable': 0,
+                'needs_improvement': 0,
+                'poor': 0
+            }
+        }
+
+        for ia in self.interaction_analyses:
+            if ia.get('success'):
+                stats['successful'] += 1
+                analysis = ia.get('analysis', {})
+
+                # Count by type
+                itype = analysis.get('interaction_type', 'unknown')
+                if itype not in stats['by_type']:
+                    stats['by_type'][itype] = {'count': 0, 'issues': 0}
+                stats['by_type'][itype]['count'] += 1
+
+                # Count issues
+                for trap in analysis.get('traps_detected', []):
+                    severity = trap.get('severity', 'minor')
+                    stats['issues_by_severity'][severity] = stats['issues_by_severity'].get(severity, 0) + 1
+                    stats['by_type'][itype]['issues'] += 1
+
+                # Track feedback quality
+                assessment = analysis.get('overall_assessment', 'acceptable')
+                stats['feedback_quality'][assessment] = stats['feedback_quality'].get(assessment, 0) + 1
+            else:
+                stats['failed'] += 1
+
+        return stats
+
+    def _generate_interaction_summary(self) -> Dict[str, Any]:
+        """Generate summary of all interaction analyses."""
+        successful = [ia for ia in self.interaction_analyses if ia.get('success')]
+
+        if not successful:
+            return {
+                'overall_quality': 'unknown',
+                'message': 'No successful interaction analyses'
+            }
+
+        # Collect all traps
+        all_traps = []
+        for ia in successful:
+            analysis = ia.get('analysis', {})
+            for trap in analysis.get('traps_detected', []):
+                all_traps.append({
+                    **trap,
+                    'page': ia.get('page_title'),
+                    'interaction_type': analysis.get('interaction_type')
+                })
+
+        # Determine overall quality
+        critical_count = sum(1 for t in all_traps if t.get('severity') == 'critical')
+        moderate_count = sum(1 for t in all_traps if t.get('severity') == 'moderate')
+
+        if critical_count > 0:
+            overall_quality = 'poor'
+        elif moderate_count > 2:
+            overall_quality = 'needs_improvement'
+        elif moderate_count > 0:
+            overall_quality = 'acceptable'
+        else:
+            overall_quality = 'good'
+
+        return {
+            'overall_quality': overall_quality,
+            'total_interactions_analyzed': len(successful),
+            'total_issues_found': len(all_traps),
+            'critical_issues': [t for t in all_traps if t.get('severity') == 'critical'],
+            'common_interaction_issues': self._get_common_interaction_issues(all_traps),
+            'pages_with_issues': list(set(t.get('page') for t in all_traps))
+        }
+
+    def _get_common_interaction_issues(self, traps: List[Dict]) -> List[Dict]:
+        """Get most common interaction issues."""
+        trap_counts = {}
+        for trap in traps:
+            name = trap.get('trap_name', 'Unknown')
+            if name not in trap_counts:
+                trap_counts[name] = {'count': 0, 'trap_name': name, 'examples': []}
+            trap_counts[name]['count'] += 1
+            if len(trap_counts[name]['examples']) < 2:
+                trap_counts[name]['examples'].append({
+                    'page': trap.get('page'),
+                    'observation': trap.get('observation', '')[:100]
+                })
+
+        sorted_traps = sorted(trap_counts.values(), key=lambda x: x['count'], reverse=True)
+        return sorted_traps[:5]
+
+    def _get_interaction_recommendations(self) -> List[Dict[str, Any]]:
+        """Generate recommendations from interaction analyses."""
+        recommendations = []
+        seen = set()
+
+        for ia in self.interaction_analyses:
+            if not ia.get('success'):
+                continue
+
+            analysis = ia.get('analysis', {})
+            page_title = ia.get('page_title', 'Unknown')
+
+            for trap in analysis.get('traps_detected', []):
+                key = f"interaction:{trap.get('trap_name')}:{trap.get('recommendation', '')[:30]}"
+                if key in seen:
+                    continue
+                seen.add(key)
+
+                recommendations.append({
+                    'severity': trap.get('severity', 'minor'),
+                    'trap_name': trap.get('trap_name'),
+                    'recommendation': trap.get('recommendation'),
+                    'page': page_title,
+                    'location': f"Interaction: {analysis.get('interaction_type', 'unknown')}",
+                    'problem': trap.get('observation'),
+                    'source': 'interaction_analysis'
+                })
+
+        # Sort by severity
+        severity_order = {'critical': 0, 'moderate': 1, 'minor': 2}
+        recommendations.sort(key=lambda x: severity_order.get(x['severity'], 3))
+
+        return recommendations

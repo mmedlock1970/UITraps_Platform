@@ -985,3 +985,350 @@ def get_report_statistics(report: Dict[str, Any]) -> Dict[str, Any]:
         'traps_not_found_count': len(report['traps_checked_not_found']),
         'summary_length': len(report['summary'])
     }
+
+
+# ============================================================================
+# Interaction Analysis Formatting
+# ============================================================================
+
+def format_interaction_analysis_markdown(
+    analysis: Dict[str, Any],
+    element_description: str = None,
+    page_title: str = None
+) -> str:
+    """
+    Format a single interaction analysis result as markdown.
+
+    Args:
+        analysis: Interaction analysis result from Claude
+        element_description: Description of the element analyzed
+        page_title: Page where interaction was captured
+
+    Returns:
+        Formatted markdown string
+    """
+    md = []
+
+    interaction_type = analysis.get('interaction_type', 'unknown')
+    element = element_description or analysis.get('element_analyzed', 'Unknown element')
+    overall = analysis.get('overall_assessment', 'unknown')
+
+    # Assessment emoji
+    assessment_emoji = {
+        'good': '✅',
+        'acceptable': '🟡',
+        'needs_improvement': '⚠️',
+        'poor': '🔴'
+    }.get(overall, '❓')
+
+    # Header
+    md.append(f"### {interaction_type.title()} Interaction {assessment_emoji}")
+    md.append("")
+    if page_title:
+        md.append(f"**Page:** {page_title}")
+    md.append(f"**Element:** {element}")
+    md.append(f"**Overall Assessment:** {overall.replace('_', ' ').title()}")
+    md.append("")
+
+    # Summary
+    if analysis.get('summary'):
+        md.append(f"*{analysis['summary']}*")
+        md.append("")
+
+    # Feedback Quality
+    feedback = analysis.get('feedback_quality', {})
+    md.append("**Feedback Quality:**")
+    md.append(f"- Visual feedback: {'Yes' if feedback.get('has_visual_feedback') else 'No'}")
+    md.append(f"- Timing: {feedback.get('feedback_timing', 'unknown')}")
+    md.append(f"- Clarity: {feedback.get('feedback_clarity', 'unknown')}")
+    if feedback.get('feedback_description'):
+        md.append(f"- Details: {feedback['feedback_description']}")
+    md.append("")
+
+    # State Transition
+    transition = analysis.get('state_transition', {})
+    md.append("**State Transition:**")
+    md.append(f"- Predictable: {'Yes' if transition.get('is_predictable') else 'No'}")
+    md.append(f"- Reversible: {'Yes' if transition.get('is_reversible') else 'No'}")
+    md.append(f"- Maintains context: {'Yes' if transition.get('maintains_context') else 'No'}")
+    if transition.get('transition_description'):
+        md.append(f"- Details: {transition['transition_description']}")
+    md.append("")
+
+    # Traps Detected
+    traps = analysis.get('traps_detected', [])
+    if traps:
+        md.append("**Issues Found:**")
+        for trap in traps:
+            severity_emoji = {'critical': '🔴', 'moderate': '🟡', 'minor': '🟢'}.get(trap.get('severity'), '⚪')
+            md.append(f"- {severity_emoji} **{trap.get('trap_name', 'UNKNOWN')}**")
+            md.append(f"  - Observation: {trap.get('observation', 'N/A')}")
+            md.append(f"  - Recommendation: {trap.get('recommendation', 'N/A')}")
+        md.append("")
+
+    # Accessibility Concerns
+    accessibility = analysis.get('accessibility_concerns', [])
+    if accessibility:
+        md.append("**Accessibility Concerns:**")
+        for concern in accessibility:
+            md.append(f"- {concern.get('concern', 'N/A')}")
+            md.append(f"  - Affected: {concern.get('affected_users', 'N/A')}")
+            md.append(f"  - Fix: {concern.get('recommendation', 'N/A')}")
+        md.append("")
+
+    # Positive Observations
+    positives = analysis.get('positive_observations', [])
+    if positives:
+        md.append("**What Works Well:**")
+        for pos in positives:
+            md.append(f"- {pos}")
+        md.append("")
+
+    return "\n".join(md)
+
+
+def format_interaction_summary_markdown(
+    interaction_analysis: Dict[str, Any],
+    include_individual: bool = False
+) -> str:
+    """
+    Format complete interaction analysis section as markdown.
+
+    Args:
+        interaction_analysis: Full interaction analysis dict from SiteAnalyzer
+        include_individual: Whether to include individual interaction details
+
+    Returns:
+        Formatted markdown string
+    """
+    md = []
+
+    if not interaction_analysis.get('enabled'):
+        return ""
+
+    md.append("# Interaction Analysis")
+    md.append("")
+    md.append("*Analysis of moment-by-moment UI interactions including hover states, click feedback, form validation, scroll behavior, and responsive layout.*")
+    md.append("")
+
+    summary = interaction_analysis.get('summary', {})
+    stats = interaction_analysis.get('statistics', {})
+
+    # Overall Quality
+    quality = summary.get('overall_quality', 'unknown')
+    quality_emoji = {
+        'good': '✅',
+        'acceptable': '🟡',
+        'needs_improvement': '⚠️',
+        'poor': '🔴',
+        'unknown': '❓'
+    }.get(quality, '❓')
+
+    md.append(f"## Overall Interaction Quality: {quality.replace('_', ' ').title()} {quality_emoji}")
+    md.append("")
+
+    # Statistics
+    md.append("### Statistics")
+    md.append("")
+    md.append(f"- **Interactions Analyzed:** {stats.get('total_analyzed', 0)}")
+    md.append(f"- **Successful:** {stats.get('successful', 0)}")
+    md.append(f"- **Failed:** {stats.get('failed', 0)}")
+    md.append("")
+
+    # Issues by severity
+    issues = stats.get('issues_by_severity', {})
+    if any(issues.values()):
+        md.append("**Issues Found:**")
+        if issues.get('critical', 0) > 0:
+            md.append(f"- 🔴 Critical: {issues['critical']}")
+        if issues.get('moderate', 0) > 0:
+            md.append(f"- 🟡 Moderate: {issues['moderate']}")
+        if issues.get('minor', 0) > 0:
+            md.append(f"- 🟢 Minor: {issues['minor']}")
+        md.append("")
+
+    # By Type
+    by_type = stats.get('by_type', {})
+    if by_type:
+        md.append("### By Interaction Type")
+        md.append("")
+        md.append("| Type | Analyzed | Issues |")
+        md.append("|------|----------|--------|")
+        for itype, data in by_type.items():
+            md.append(f"| {itype.title()} | {data.get('count', 0)} | {data.get('issues', 0)} |")
+        md.append("")
+
+    # Critical Findings
+    critical = summary.get('critical_issues', [])
+    if critical:
+        md.append("### Critical Interaction Issues")
+        md.append("")
+        for issue in critical:
+            md.append(f"**{issue.get('trap_name', 'UNKNOWN')}** on {issue.get('page', 'Unknown page')}")
+            md.append(f"- {issue.get('observation', 'N/A')}")
+            md.append(f"- Recommendation: {issue.get('recommendation', 'N/A')}")
+            md.append("")
+
+    # Common Issues
+    common = summary.get('common_interaction_issues', [])
+    if common:
+        md.append("### Common Issues Across Interactions")
+        md.append("")
+        for issue in common:
+            md.append(f"- **{issue.get('trap_name', 'UNKNOWN')}** (found {issue.get('count', 0)} times)")
+            for ex in issue.get('examples', []):
+                md.append(f"  - {ex.get('page', 'Unknown')}: {ex.get('observation', '')[:80]}...")
+        md.append("")
+
+    # Individual Analyses
+    if include_individual:
+        individual = interaction_analysis.get('individual_analyses', [])
+        if individual:
+            md.append("### Individual Interaction Details")
+            md.append("")
+            for ia in individual:
+                if ia.get('success'):
+                    md.append(format_interaction_analysis_markdown(
+                        ia.get('analysis', {}),
+                        ia.get('element'),
+                        ia.get('page_title')
+                    ))
+                    md.append("---")
+                    md.append("")
+
+    return "\n".join(md)
+
+
+def format_interaction_summary_html(
+    interaction_analysis: Dict[str, Any],
+    include_individual: bool = False
+) -> str:
+    """
+    Format interaction analysis section as HTML.
+
+    Args:
+        interaction_analysis: Full interaction analysis dict from SiteAnalyzer
+        include_individual: Whether to include individual interaction details
+
+    Returns:
+        Formatted HTML string
+    """
+    if not interaction_analysis.get('enabled'):
+        return ""
+
+    html = []
+    summary = interaction_analysis.get('summary', {})
+    stats = interaction_analysis.get('statistics', {})
+
+    # Container
+    html.append("<div class='interaction-analysis-section' style='margin-top: 40px;'>")
+    html.append("<h1 style='color: #2c3e50; border-bottom: 3px solid #9b59b6; padding-bottom: 10px;'>Interaction Analysis</h1>")
+    html.append("<p style='color: #7f8c8d; font-style: italic;'>Analysis of moment-by-moment UI interactions including hover states, click feedback, form validation, scroll behavior, and responsive layout.</p>")
+
+    # Overall Quality Card
+    quality = summary.get('overall_quality', 'unknown')
+    quality_colors = {
+        'good': '#27ae60',
+        'acceptable': '#f39c12',
+        'needs_improvement': '#e67e22',
+        'poor': '#e74c3c',
+        'unknown': '#95a5a6'
+    }
+    quality_color = quality_colors.get(quality, '#95a5a6')
+
+    html.append(f"""
+        <div style='background: linear-gradient(135deg, {quality_color}22, {quality_color}11);
+                    border-left: 4px solid {quality_color};
+                    padding: 20px;
+                    border-radius: 8px;
+                    margin: 20px 0;'>
+            <h2 style='margin: 0; color: {quality_color};'>
+                Overall Interaction Quality: {quality.replace('_', ' ').title()}
+            </h2>
+        </div>
+    """)
+
+    # Statistics Grid
+    html.append("""
+        <div style='display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin: 20px 0;'>
+    """)
+
+    # Stat cards
+    stat_items = [
+        ('Total Analyzed', stats.get('total_analyzed', 0), '#3498db'),
+        ('Successful', stats.get('successful', 0), '#27ae60'),
+        ('Failed', stats.get('failed', 0), '#e74c3c'),
+    ]
+
+    issues = stats.get('issues_by_severity', {})
+    if issues.get('critical', 0) > 0:
+        stat_items.append(('Critical Issues', issues['critical'], '#e74c3c'))
+    if issues.get('moderate', 0) > 0:
+        stat_items.append(('Moderate Issues', issues['moderate'], '#f39c12'))
+    if issues.get('minor', 0) > 0:
+        stat_items.append(('Minor Issues', issues['minor'], '#3498db'))
+
+    for label, value, color in stat_items:
+        html.append(f"""
+            <div style='background: white; border: 1px solid #e0e0e0; border-radius: 8px;
+                        padding: 15px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05);'>
+                <div style='font-size: 24px; font-weight: bold; color: {color};'>{value}</div>
+                <div style='font-size: 12px; color: #7f8c8d; margin-top: 5px;'>{label}</div>
+            </div>
+        """)
+
+    html.append("</div>")
+
+    # By Type Table
+    by_type = stats.get('by_type', {})
+    if by_type:
+        html.append("<h3>By Interaction Type</h3>")
+        html.append("""
+            <table style='width: 100%; border-collapse: collapse; margin: 15px 0;'>
+                <thead>
+                    <tr style='background: #f8f9fa;'>
+                        <th style='padding: 12px; text-align: left; border-bottom: 2px solid #e0e0e0;'>Type</th>
+                        <th style='padding: 12px; text-align: center; border-bottom: 2px solid #e0e0e0;'>Analyzed</th>
+                        <th style='padding: 12px; text-align: center; border-bottom: 2px solid #e0e0e0;'>Issues</th>
+                    </tr>
+                </thead>
+                <tbody>
+        """)
+
+        type_icons = {
+            'hover': '👆',
+            'click': '👇',
+            'form': '📝',
+            'scroll': '📜',
+            'responsive': '📱'
+        }
+
+        for itype, data in by_type.items():
+            icon = type_icons.get(itype, '🔹')
+            html.append(f"""
+                <tr style='border-bottom: 1px solid #e0e0e0;'>
+                    <td style='padding: 12px;'>{icon} {itype.title()}</td>
+                    <td style='padding: 12px; text-align: center;'>{data.get('count', 0)}</td>
+                    <td style='padding: 12px; text-align: center;'>{data.get('issues', 0)}</td>
+                </tr>
+            """)
+
+        html.append("</tbody></table>")
+
+    # Critical Findings
+    critical = summary.get('critical_issues', [])
+    if critical:
+        html.append("<h3>🔴 Critical Interaction Issues</h3>")
+        for issue in critical:
+            html.append(f"""
+                <div class='issue-card critical' style='background: #fef5f5; border-left: 4px solid #e74c3c;
+                            padding: 15px; margin: 10px 0; border-radius: 4px;'>
+                    <strong>{issue.get('trap_name', 'UNKNOWN')}</strong> on {issue.get('page', 'Unknown page')}
+                    <p style='margin: 10px 0 5px 0;'>{issue.get('observation', 'N/A')}</p>
+                    <p style='margin: 0; color: #27ae60;'><strong>Recommendation:</strong> {issue.get('recommendation', 'N/A')}</p>
+                </div>
+            """)
+
+    html.append("</div>")
+
+    return "\n".join(html)

@@ -9,10 +9,10 @@
  */
 
 import { useState, useCallback, useMemo } from 'react';
-import { ChatMessage, ContentType, UserContext, EstimateResponse, UnifiedAskResponse, FigmaEstimateResponse, UrlEstimateResponse } from '../api/types';
+import { ChatMessage, ContentType, UserContext, EstimateResponse, UnifiedAskResponse, FigmaEstimateResponse, UrlEstimateResponse, PdfEstimateResponse } from '../api/types';
 import { useChat } from './useChat';
 import { useElapsedTime } from './useElapsedTime';
-import { unifiedAsk, getEstimate, getFigmaEstimate, getUrlEstimate, analyzeFigma, analyzeUrl } from '../api/client';
+import { unifiedAsk, getEstimate, getFigmaEstimate, getUrlEstimate, analyzeFigma, analyzeUrl, getPdfEstimate, analyzePdf } from '../api/client';
 
 interface UseUnifiedInputOptions {
   apiEndpoint: string;
@@ -20,27 +20,64 @@ interface UseUnifiedInputOptions {
   onAnalysisComplete?: (result: UnifiedAskResponse, fileNames: string[]) => void;
 }
 
-type DetectedMode = 'chat' | 'analysis' | 'hybrid' | 'idle' | 'figma' | 'url';
+type DetectedMode = 'chat' | 'analysis' | 'hybrid' | 'idle' | 'figma' | 'url' | 'pdf' | 'video';
+
+/** File type detection helpers */
+const VIDEO_TYPES = ['video/mp4', 'video/quicktime', 'video/webm'];
+const PDF_TYPE = 'application/pdf';
+
+function isPdfFile(file: File): boolean {
+  return file.type === PDF_TYPE || file.name.toLowerCase().endsWith('.pdf');
+}
+
+function isVideoFile(file: File): boolean {
+  return VIDEO_TYPES.includes(file.type);
+}
+
+function detectFileType(files: File[]): 'pdf' | 'video' | 'image' | 'mixed' | null {
+  if (files.length === 0) return null;
+
+  const hasPdf = files.some(isPdfFile);
+  const hasVideo = files.some(isVideoFile);
+  const hasImage = files.some(f => !isPdfFile(f) && !isVideoFile(f));
+
+  // PDF takes precedence (only one PDF allowed)
+  if (hasPdf && files.length === 1) return 'pdf';
+  // Video takes precedence
+  if (hasVideo && files.length === 1) return 'video';
+  // All images
+  if (hasImage && !hasPdf && !hasVideo) return 'image';
+  // Mixed types
+  return 'mixed';
+}
 
 /** URL detection helpers */
-const FIGMA_URL_PATTERN = /https?:\/\/(www\.)?figma\.com\/(file|design|proto)\/[a-zA-Z0-9]+/i;
-const WEBSITE_URL_PATTERN = /^https?:\/\/[^\s]+$/i;
+const FIGMA_URL_PATTERN = /https?:\/\/(www\.)?figma\.com\/(file|design|proto)\/[a-zA-Z0-9]+[^\s]*/i;
+// Match URLs anywhere in text (not just at start/end)
+const WEBSITE_URL_PATTERN_EXTRACT = /https?:\/\/[^\s]+/i;
 
-function detectUrlType(text: string): 'figma' | 'url' | null {
-  const trimmed = text.trim();
-  if (FIGMA_URL_PATTERN.test(trimmed)) return 'figma';
-  if (WEBSITE_URL_PATTERN.test(trimmed) && !trimmed.includes(' ')) return 'url';
+function detectUrlType(url: string): 'figma' | 'url' | null {
+  if (!url) return null;
+  if (FIGMA_URL_PATTERN.test(url)) return 'figma';
+  // Any http/https URL that's not Figma is a website
+  if (WEBSITE_URL_PATTERN_EXTRACT.test(url)) return 'url';
   return null;
 }
 
 function extractUrl(text: string): string | null {
   const trimmed = text.trim();
-  // Check for Figma URL first
+  // Check for Figma URL first (can be anywhere in text)
   const figmaMatch = trimmed.match(FIGMA_URL_PATTERN);
   if (figmaMatch) return figmaMatch[0];
-  // Check for any URL
-  const urlMatch = trimmed.match(WEBSITE_URL_PATTERN);
-  if (urlMatch) return urlMatch[0];
+  // Check for any URL anywhere in text
+  const urlMatch = trimmed.match(WEBSITE_URL_PATTERN_EXTRACT);
+  if (urlMatch) {
+    // Clean up any trailing punctuation that might have been captured
+    let url = urlMatch[0];
+    // Remove trailing punctuation that's likely not part of the URL
+    url = url.replace(/[.,;:!?)>\]]+$/, '');
+    return url;
+  }
   return null;
 }
 
@@ -61,8 +98,8 @@ type AnalysisPhase =
   | 'analyzing'
   | 'complete';
 
-/** Unified estimate that works for files, Figma, or URL */
-type UnifiedEstimate = EstimateResponse | FigmaEstimateResponse | UrlEstimateResponse;
+/** Unified estimate that works for files, Figma, URL, or PDF */
+type UnifiedEstimate = EstimateResponse | FigmaEstimateResponse | UrlEstimateResponse | PdfEstimateResponse;
 
 interface UseUnifiedInputReturn {
   // Input state
@@ -134,6 +171,13 @@ function detectMode(
     const urlType = detectUrlType(detectedUrl);
     if (urlType === 'figma') return 'figma';
     if (urlType === 'url') return 'url';
+  }
+
+  // File-based analysis modes
+  if (hasFiles) {
+    const fileType = detectFileType(files);
+    if (fileType === 'pdf') return 'pdf';
+    if (fileType === 'video') return 'video';
   }
 
   if (!hasText && !hasFiles) return 'idle';
@@ -259,8 +303,31 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
         }
 
         chat.addSystemPrompt(`Analysis completed for ${analysisName}. View the full report above.`);
+      } else if (files.length === 1 && isPdfFile(files[0])) {
+        // PDF analysis
+        const pdfFile = files[0];
+        const result = await analyzePdf({
+          apiEndpoint,
+          apiKey: token,
+          file: pdfFile,
+          context,
+          maxPages: 20,
+        });
+
+        elapsed.stop();
+        setAnalysisPhase('complete');
+
+        if (result.success && onAnalysisComplete) {
+          onAnalysisComplete({
+            success: true,
+            mode: 'analysis',
+            report_html: result.report_html,
+            statistics: result.statistics,
+          }, [pdfFile.name]);
+        }
+        chat.addSystemPrompt(`Analysis completed for ${pdfFile.name}. View the full report above.`);
       } else {
-        // File-based analysis
+        // File-based analysis (images or video)
         const conversationHistory = chat.messages
           .filter(m => m.role === 'user' || (m.role === 'assistant' && !m.reportHtml))
           .slice(-10)
@@ -335,8 +402,11 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
           est = await getUrlEstimate({ apiEndpoint, url: urlToAnalyze, maxPages: 10 });
         }
         setPendingUrl(urlToAnalyze);
+      } else if (files.length === 1 && isPdfFile(files[0])) {
+        // PDF estimate
+        est = await getPdfEstimate({ apiEndpoint, file: files[0] });
       } else {
-        // File-based estimate
+        // File-based estimate (images or video)
         est = await getEstimate({ apiEndpoint, files });
       }
 
@@ -373,6 +443,18 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
             playwright_available: true,
           });
         }
+      } else if (files.length === 1 && isPdfFile(files[0])) {
+        // PDF fallback estimate
+        setEstimate({
+          success: true,
+          file_name: files[0].name,
+          page_count: 10,
+          pages_to_analyze: 10,
+          pdf_info: { title: '', author: '' },
+          time_estimate: { min_seconds: 150, max_seconds: 300, description: '2-5 minutes' },
+          cost_estimate: { credits: 10, description: '~10 credits' },
+          pymupdf_available: true,
+        });
       } else {
         setEstimate({
           success: true,
@@ -473,6 +555,32 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
       const text = inputText.trim();
       setInputText('');
       await chat.sendMessage(text);
+      return;
+    }
+
+    // ── PDF or Video analysis modes ──
+    if (detectedMode === 'pdf' || detectedMode === 'video') {
+      const fileType = detectedMode === 'pdf' ? 'PDF document' : 'video';
+      const fileNames = files.map(f => f.name).join(', ');
+
+      // Show user message in chat
+      chat.addUserMessage(`Analyze this ${fileType}: ${fileNames}`, 'analysis');
+      setInputText('');
+
+      // Check if we already have full context
+      if (hasFullContext(users, expertise, tasks, format)) {
+        chat.addSystemPrompt(`Starting ${fileType} analysis...`);
+        await startEstimation();
+        return;
+      }
+
+      // Context is missing — start conversational gathering
+      setContextGatheringPhase('asking_users');
+      chat.addSystemPrompt(
+        `I'll analyze this **${fileType}** for UI traps! First, I need a bit of context.\n\n` +
+        '**Who are the intended users** of this interface?\n\n' +
+        '*(e.g., "Adults ages 25-45 looking to stream movies", "Enterprise software developers")*'
+      );
       return;
     }
 

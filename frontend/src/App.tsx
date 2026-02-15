@@ -289,11 +289,11 @@ export const App: React.FC = () => {
             UI Traps <span className={styles.logoAccent}>Helper</span>
           </div>
           <div className={styles.welcomeSubtitle}>
-            You can:
             <ul>
               <li>Ask any question about UI Tenets & Traps</li>
               <li>Describe an interface issue, it will identify Traps for you</li>
-              <li>Do a Trap analysis with screenshots or video</li>
+              <li>Analyze screenshots, Figma designs, or websites</li>
+              <li>Get detailed reports with findings and recommendations</li>
             </ul>
           </div>
           <UnifiedInput

@@ -1,7 +1,111 @@
 // API Request/Response Types
 
 // Content types for analysis mode selection
+// Basic content types (backwards compatible)
 export type ContentType = 'website' | 'mobile_app' | 'desktop_app' | 'game' | 'other';
+
+// Extended platform types for more specific analysis guidance
+export type PlatformType =
+  | 'web'
+  | 'ios_native'
+  | 'android_native'
+  | 'desktop_windows'
+  | 'desktop_macos'
+  | 'desktop_linux'
+  | 'mobile_app'
+  | 'desktop_app'
+  | 'game'
+  | 'pdf_document'
+  | 'other';
+
+// Platform options for UI dropdown
+export interface PlatformOption {
+  value: PlatformType;
+  label: string;
+  description: string;
+  acceptsVideo: boolean;
+  acceptsImages: boolean;
+  acceptsPdf: boolean;
+}
+
+export const PLATFORM_OPTIONS: PlatformOption[] = [
+  {
+    value: 'web',
+    label: 'Web Application',
+    description: 'Website or web app',
+    acceptsVideo: true,
+    acceptsImages: true,
+    acceptsPdf: false,
+  },
+  {
+    value: 'ios_native',
+    label: 'iOS App',
+    description: 'iPhone or iPad app (Apple HIG)',
+    acceptsVideo: true,
+    acceptsImages: true,
+    acceptsPdf: false,
+  },
+  {
+    value: 'android_native',
+    label: 'Android App',
+    description: 'Android app (Material Design)',
+    acceptsVideo: true,
+    acceptsImages: true,
+    acceptsPdf: false,
+  },
+  {
+    value: 'desktop_windows',
+    label: 'Windows App',
+    description: 'Windows desktop application',
+    acceptsVideo: true,
+    acceptsImages: true,
+    acceptsPdf: false,
+  },
+  {
+    value: 'desktop_macos',
+    label: 'macOS App',
+    description: 'Mac desktop application',
+    acceptsVideo: true,
+    acceptsImages: true,
+    acceptsPdf: false,
+  },
+  {
+    value: 'game',
+    label: 'Video Game',
+    description: 'Game UI (menus, HUD, settings)',
+    acceptsVideo: true,
+    acceptsImages: true,
+    acceptsPdf: false,
+  },
+  {
+    value: 'pdf_document',
+    label: 'PDF Document',
+    description: 'PDF, form, or document interface',
+    acceptsVideo: false,
+    acceptsImages: true,
+    acceptsPdf: true,
+  },
+  {
+    value: 'other',
+    label: 'Other',
+    description: 'Other interface type',
+    acceptsVideo: true,
+    acceptsImages: true,
+    acceptsPdf: true,
+  },
+];
+
+// Map ContentType to PlatformType for backwards compatibility
+export function contentTypeToPlatform(contentType: ContentType): PlatformType {
+  const mapping: Record<ContentType, PlatformType> = {
+    website: 'web',
+    mobile_app: 'mobile_app',
+    desktop_app: 'desktop_app',
+    game: 'game',
+    other: 'other',
+  };
+  return mapping[contentType] || 'other';
+}
 
 export interface UserContext {
   users: string;
@@ -68,13 +172,39 @@ export interface CapabilitiesResponse {
   video_analysis: boolean;
   figma_analysis: boolean;
   url_analysis: boolean;
+  pdf_analysis: boolean;
   max_images: number;
   max_video_frames: number;
+  max_pdf_pages: number;
   max_crawl_pages: number;
   max_image_size_mb: number;
   max_video_size_mb: number;
+  max_pdf_size_mb: number;
   supported_image_types: string[];
   supported_video_types: string[];
+  supported_document_types: string[];
+}
+
+// PDF Analysis Types
+export interface PdfEstimateResponse {
+  success: boolean;
+  file_name: string;
+  page_count: number;
+  pages_to_analyze: number;
+  pdf_info: {
+    title: string;
+    author: string;
+  };
+  time_estimate: {
+    min_seconds: number;
+    max_seconds: number;
+    description: string;
+  };
+  cost_estimate: {
+    credits: number;
+    description: string;
+  };
+  pymupdf_available: boolean;
 }
 
 // Figma Analysis Types
@@ -226,11 +356,11 @@ export interface AnalysisProgressProps {
 }
 
 /** Union type for all estimate responses */
-export type UnifiedEstimate = EstimateResponse | FigmaEstimateResponse | UrlEstimateResponse;
+export type UnifiedEstimate = EstimateResponse | FigmaEstimateResponse | UrlEstimateResponse | PdfEstimateResponse;
 
 /** Type guards for estimates */
 export function isFigmaEstimate(estimate: UnifiedEstimate): estimate is FigmaEstimateResponse {
-  return 'file_name' in estimate && 'frame_count' in estimate;
+  return 'file_name' in estimate && 'frame_count' in estimate && !('page_count' in estimate);
 }
 
 export function isUrlEstimate(estimate: UnifiedEstimate): estimate is UrlEstimateResponse {
@@ -239,6 +369,10 @@ export function isUrlEstimate(estimate: UnifiedEstimate): estimate is UrlEstimat
 
 export function isFileEstimate(estimate: UnifiedEstimate): estimate is EstimateResponse {
   return 'input_type' in estimate && 'file_count' in estimate;
+}
+
+export function isPdfEstimate(estimate: UnifiedEstimate): estimate is PdfEstimateResponse {
+  return 'page_count' in estimate && 'pages_to_analyze' in estimate;
 }
 
 export interface EstimatePreviewProps {
@@ -261,7 +395,7 @@ export interface ReportViewerProps {
 
 export type AnalyzerView = 'form' | 'preview' | 'loading' | 'report' | 'error';
 
-export type InputType = 'single_image' | 'multi_image' | 'video' | 'figma' | 'url';
+export type InputType = 'single_image' | 'multi_image' | 'video' | 'figma' | 'url' | 'pdf';
 
 export interface AnalyzerState {
   view: AnalyzerView;

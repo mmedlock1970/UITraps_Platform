@@ -7,6 +7,7 @@ import {
   UnifiedAskResponse,
   FigmaEstimateResponse,
   UrlEstimateResponse,
+  PdfEstimateResponse,
   SiteAnalysisResponse,
 } from './types';
 
@@ -635,6 +636,119 @@ export async function analyzeUrl(options: AnalyzeUrlOptions): Promise<SiteAnalys
     if (error instanceof Error) {
       if (error.name === 'AbortError') {
         throw new Error('URL analysis timed out. Please try again.');
+      }
+      throw error;
+    }
+
+    throw new Error('Unknown error occurred');
+  }
+}
+
+
+// ===========================================================
+// PDF Analysis API
+// ===========================================================
+
+export interface PdfEstimateOptions {
+  apiEndpoint: string;
+  file: File;
+  timeout?: number;
+}
+
+export async function getPdfEstimate(options: PdfEstimateOptions): Promise<PdfEstimateResponse> {
+  const { apiEndpoint, file, timeout = 30000 } = options;
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const response = await fetch(`${apiEndpoint}/estimate-pdf`, {
+      method: 'POST',
+      body: formData,
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || data.detail || `HTTP ${response.status}: PDF estimation failed`);
+    }
+
+    return data as PdfEstimateResponse;
+  } catch (error) {
+    clearTimeout(timeoutId);
+
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        throw new Error('PDF estimation timed out');
+      }
+      throw error;
+    }
+
+    throw new Error('Unknown error occurred');
+  }
+}
+
+export interface AnalyzePdfOptions {
+  apiEndpoint: string;
+  apiKey: string;
+  file: File;
+  context: UserContext;
+  maxPages?: number;
+  timeout?: number;
+  signal?: AbortSignal;
+}
+
+export async function analyzePdf(options: AnalyzePdfOptions): Promise<SiteAnalysisResponse> {
+  const { apiEndpoint, apiKey, file, context, maxPages = 20, timeout = 600000, signal } = options;
+
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('users', context.users);
+  formData.append('tasks', context.tasks);
+  formData.append('format', context.format || 'PDF document');
+  formData.append('content_type', context.contentType || 'pdf_document');
+  formData.append('api_key', apiKey);
+  formData.append('max_pages', maxPages.toString());
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+  const combinedSignal = signal
+    ? anySignal([signal, controller.signal])
+    : controller.signal;
+
+  try {
+    const response = await fetch(`${apiEndpoint}/analyze-pdf`, {
+      method: 'POST',
+      body: formData,
+      signal: combinedSignal,
+    });
+
+    clearTimeout(timeoutId);
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || data.detail || `HTTP ${response.status}: PDF analysis failed`);
+    }
+
+    if (!data.success) {
+      throw new Error(data.error || 'PDF analysis failed');
+    }
+
+    return data as SiteAnalysisResponse;
+  } catch (error) {
+    clearTimeout(timeoutId);
+
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        throw new Error('PDF analysis timed out. Please try again.');
       }
       throw error;
     }

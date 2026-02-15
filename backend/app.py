@@ -37,10 +37,11 @@ from src.estimator import (
 )
 from src.video_processor import is_ffmpeg_available, VideoProcessor
 
-# Figma, Web Crawler, and Site Analyzer
+# Figma, Web Crawler, Site Analyzer, and PDF Analyzer
 from src.figma_analyzer import FigmaAnalyzer
 from src.web_crawler import WebCrawler
 from src.site_analyzer import SiteAnalyzer
+from src.pdf_analyzer import PdfAnalyzer, is_pymupdf_available
 
 # Database persistence for usage tracking
 from sqlmodel import Session
@@ -767,13 +768,17 @@ async def get_capabilities():
         "video_analysis": is_ffmpeg_available(),
         "figma_analysis": is_figma_available(),
         "url_analysis": is_playwright_available(),
+        "pdf_analysis": is_pymupdf_available(),
         "max_images": EstimationConstants.MAX_IMAGES,
         "max_video_frames": EstimationConstants.MAX_VIDEO_FRAMES,
+        "max_pdf_pages": 20,
         "max_crawl_pages": 10,
         "max_image_size_mb": 10,
         "max_video_size_mb": 100,
+        "max_pdf_size_mb": 50,
         "supported_image_types": ["image/png", "image/jpeg"],
-        "supported_video_types": ["video/mp4", "video/quicktime", "video/webm"]
+        "supported_video_types": ["video/mp4", "video/quicktime", "video/webm"],
+        "supported_document_types": ["application/pdf"]
     }
 
 
@@ -995,13 +1000,20 @@ async def analyze_url(
     format: str = Form("Website", description="Format description"),
     content_type: str = Form("website", description="Content type"),
     api_key: str = Form(..., description="Your API key"),
-    max_pages: int = Form(10, description="Maximum pages to crawl (1-10)")
+    max_pages: int = Form(10, description="Maximum pages to crawl (1-10)"),
+    capture_interactions: bool = Form(False, description="Enable interaction capture (hover, click, form states)")
 ):
     """
     Crawl and analyze a website for UI Traps.
 
     Crawls the website starting from the given URL, captures screenshots,
     and analyzes each page for usability issues.
+
+    With capture_interactions=True, also captures and analyzes:
+    - Hover states on interactive elements
+    - Click feedback on buttons and links
+    - Form validation states
+    - Responsive behavior at different viewport sizes
     """
     if not is_playwright_available():
         raise HTTPException(
@@ -1033,9 +1045,26 @@ async def analyze_url(
         try:
             # Create temp directory for screenshots
             with tempfile.TemporaryDirectory() as tmp_dir:
-                # Crawl website
-                crawler = WebCrawler(max_pages=max_pages, max_depth=2)
-                crawl_result = crawler.crawl(url, tmp_dir)
+                # Crawl website (with optional interaction capture)
+                # Run in thread pool to avoid Playwright sync API conflict with asyncio
+                import asyncio
+                import concurrent.futures
+
+                def run_crawl():
+                    crawler = WebCrawler(
+                        max_pages=max_pages,
+                        max_depth=2,
+                        enable_interaction_capture=capture_interactions,
+                        enable_navigation_graph=True,  # Explicitly enable navigation graph
+                        verify_ctas=True  # Verify CTA destinations
+                    )
+                    crawl_result = crawler.crawl(url, tmp_dir)
+                    # Return both crawl result AND the navigation graph
+                    return crawl_result, crawler.get_navigation_graph()
+
+                loop = asyncio.get_event_loop()
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    crawl_result, navigation_graph = await loop.run_in_executor(executor, run_crawl)
 
                 pages = crawl_result.get("pages", [])
                 if not pages:
@@ -1045,17 +1074,27 @@ async def analyze_url(
                 site_pages = []
                 for page in pages:
                     if page.get("screenshot_path") and os.path.exists(page["screenshot_path"]):
-                        site_pages.append({
+                        page_data = {
                             "url": page["url"],
                             "title": page["title"],
                             "screenshot_path": page["screenshot_path"]
-                        })
+                        }
+                        # Include interactions if captured
+                        if page.get("interactions"):
+                            page_data["interactions"] = page["interactions"]
+                        site_pages.append(page_data)
 
                 if not site_pages:
                     raise HTTPException(status_code=400, detail="No screenshots captured during crawl")
 
                 # Run site analysis
                 site_analyzer = SiteAnalyzer()
+
+                # CRITICAL: Set navigation graph for flow-aware analysis
+                if navigation_graph:
+                    site_analyzer.set_navigation_graph(navigation_graph)
+                    logger.info(f"Navigation graph set with {len(navigation_graph.pages)} pages")
+
                 user_context = {
                     "users": users,
                     "tasks": tasks,
@@ -1063,7 +1102,15 @@ async def analyze_url(
                     "content_type": content_type
                 }
 
-                result = site_analyzer.analyze_site(site_pages, user_context)
+                # Use interaction-aware analysis if interactions were captured
+                if capture_interactions:
+                    result = site_analyzer.analyze_site_with_interactions(
+                        site_pages,
+                        user_context,
+                        analyze_interactions=True
+                    )
+                else:
+                    result = site_analyzer.analyze_site(site_pages, user_context)
 
                 # Generate HTML report
                 from src.report_generator import generate_site_report
@@ -1075,7 +1122,7 @@ async def analyze_url(
                 log_analysis(session, api_key, "/analyze-url", "url", pages_analyzed, "success",
                             {"pages_analyzed": pages_analyzed, "url": url})
 
-                return {
+                response_data = {
                     "success": True,
                     "report_html": html_report,
                     "statistics": result.get("statistics"),
@@ -1084,11 +1131,204 @@ async def analyze_url(
                     "analysis_type": "url"
                 }
 
+                # Include interaction analysis if available
+                if capture_interactions and result.get("interaction_analysis"):
+                    response_data["interaction_analysis"] = result["interaction_analysis"]
+
+                return response_data
+
         except HTTPException:
             raise
         except Exception as e:
             logger.error(f"URL analysis error: {e}")
             raise HTTPException(status_code=500, detail=f"URL analysis failed: {str(e)}")
+
+
+# ===========================================================
+# PDF Analysis Endpoints
+# ===========================================================
+
+@app.post("/estimate-pdf")
+async def estimate_pdf(
+    file: UploadFile = File(..., description="PDF file to analyze")
+):
+    """
+    Get estimate for PDF document analysis.
+
+    Returns page count and estimated time/cost.
+    """
+    if not is_pymupdf_available():
+        raise HTTPException(
+            status_code=503,
+            detail="PDF analysis not available. PyMuPDF not installed. "
+                   "Install with: pip install pymupdf"
+        )
+
+    # Validate file type
+    if not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="File must be a PDF")
+
+    # Save to temp file to read metadata
+    content = await file.read()
+    if len(content) > 50 * 1024 * 1024:  # 50MB limit
+        raise HTTPException(status_code=400, detail="PDF too large (max 50MB)")
+
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+
+        pdf_analyzer = PdfAnalyzer()
+        pdf_info = pdf_analyzer.get_pdf_info(tmp_path)
+        page_count = pdf_info['page_count']
+
+        # Cap at max pages
+        pages_to_analyze = min(page_count, pdf_analyzer.MAX_PAGES)
+
+        # Estimate: ~20 seconds per page for conversion + analysis
+        time_min = pages_to_analyze * 15
+        time_max = pages_to_analyze * 30
+
+        return {
+            "success": True,
+            "file_name": file.filename,
+            "page_count": page_count,
+            "pages_to_analyze": pages_to_analyze,
+            "pdf_info": {
+                "title": pdf_info.get('title', ''),
+                "author": pdf_info.get('author', ''),
+            },
+            "time_estimate": {
+                "min_seconds": time_min,
+                "max_seconds": time_max,
+                "description": f"{time_min // 60}-{time_max // 60} minutes"
+            },
+            "cost_estimate": {
+                "credits": pages_to_analyze,
+                "description": f"{pages_to_analyze} credits (1 per page)"
+            },
+            "pymupdf_available": True
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read PDF: {str(e)}")
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
+
+
+@app.post("/analyze-pdf")
+async def analyze_pdf(
+    file: UploadFile = File(..., description="PDF file to analyze"),
+    users: str = Form(..., description="Who are the users?"),
+    tasks: str = Form(..., description="What are they trying to do?"),
+    format: str = Form("PDF document", description="Format description"),
+    content_type: str = Form("pdf_document", description="Content type"),
+    api_key: str = Form(..., description="Your API key"),
+    max_pages: int = Form(20, description="Maximum pages to analyze (1-20)")
+):
+    """
+    Analyze a PDF document for UI/document usability issues.
+
+    Converts PDF pages to images and analyzes each for usability problems.
+    Works well for forms, reports, presentations, and document-based interfaces.
+    """
+    if not is_pymupdf_available():
+        raise HTTPException(
+            status_code=503,
+            detail="PDF analysis not available. PyMuPDF not installed. "
+                   "Install with: pip install pymupdf"
+        )
+
+    with Session(engine) as session:
+        # Verify API key
+        if not verify_api_key(api_key, session):
+            log_analysis(session, api_key, "/analyze-pdf", "pdf", 0, "failed_auth")
+            raise HTTPException(status_code=403, detail="Invalid API key")
+
+        # Validate file type
+        if not file.filename.lower().endswith('.pdf'):
+            raise HTTPException(status_code=400, detail="File must be a PDF")
+
+        # Validate max_pages
+        max_pages = max(1, min(20, max_pages))
+
+        # Save to temp file
+        content = await file.read()
+        if len(content) > 50 * 1024 * 1024:  # 50MB limit
+            raise HTTPException(status_code=400, detail="PDF too large (max 50MB)")
+
+        tmp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
+                tmp.write(content)
+                tmp_path = tmp.name
+
+            # Get page count for quota check
+            pdf_analyzer = PdfAnalyzer()
+            pdf_info = pdf_analyzer.get_pdf_info(tmp_path)
+            pages_to_analyze = min(pdf_info['page_count'], max_pages)
+
+            # Check quota
+            limit = get_monthly_limit(session, api_key, MONTHLY_LIMIT)
+            current_usage = get_usage(session, api_key)
+            if current_usage + pages_to_analyze > limit:
+                log_analysis(session, api_key, "/analyze-pdf", "pdf", 0, "quota_exceeded")
+                raise HTTPException(
+                    status_code=402,
+                    detail=f"Not enough credits. You have {limit - current_usage} remaining, "
+                           f"but this analysis requires {pages_to_analyze} credits."
+                )
+
+            # Build user context
+            user_context = {
+                "users": users,
+                "tasks": tasks,
+                "format": format,
+                "content_type": content_type
+            }
+
+            # Run PDF analysis
+            result = pdf_analyzer.analyze(tmp_path, user_context, max_pages=max_pages)
+
+            # Generate HTML report
+            from src.report_generator import generate_site_report
+            html_report = generate_site_report(result, file.filename)
+
+            # Increment usage
+            actual_pages = result.get('pages_analyzed', pages_to_analyze)
+            new_usage = increment_usage(session, api_key, actual_pages, MONTHLY_LIMIT)
+            log_analysis(session, api_key, "/analyze-pdf", "pdf", actual_pages, "success",
+                        {"pages_analyzed": actual_pages, "file_name": file.filename})
+
+            return {
+                "success": True,
+                "report_html": html_report,
+                "report_markdown": result.get("markdown"),
+                "statistics": result.get("statistics"),
+                "pdf_info": result.get("pdf_info"),
+                "pages_analyzed": actual_pages,
+                "analysis_type": "pdf",
+                "usage": {
+                    "used_this_month": new_usage,
+                    "limit": limit,
+                    "remaining": limit - new_usage
+                }
+            }
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"PDF analysis error: {e}")
+            raise HTTPException(status_code=500, detail=f"PDF analysis failed: {str(e)}")
+        finally:
+            if tmp_path:
+                try:
+                    os.unlink(tmp_path)
+                except Exception:
+                    pass
 
 
 # ===========================================================

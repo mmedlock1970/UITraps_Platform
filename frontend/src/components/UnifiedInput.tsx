@@ -6,11 +6,11 @@
  * - Drop files + type question → hybrid mode
  */
 
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { ContentType } from '../api/types';
 import styles from './UnifiedInput.module.css';
 
-type DetectedMode = 'chat' | 'analysis' | 'hybrid' | 'idle' | 'figma' | 'url';
+type DetectedMode = 'chat' | 'analysis' | 'hybrid' | 'idle' | 'figma' | 'url' | 'pdf' | 'video';
 
 interface UnifiedInputProps {
   inputText: string;
@@ -34,7 +34,29 @@ interface UnifiedInputProps {
   placeholder?: string;
 }
 
-const ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/jpg'];
+// Accepted file types for analysis
+const ACCEPTED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/jpg'];
+const ACCEPTED_VIDEO_TYPES = ['video/mp4', 'video/quicktime', 'video/webm'];
+const ACCEPTED_DOCUMENT_TYPES = ['application/pdf'];
+const ACCEPTED_TYPES = [...ACCEPTED_IMAGE_TYPES, ...ACCEPTED_VIDEO_TYPES, ...ACCEPTED_DOCUMENT_TYPES];
+
+// Helper to categorize file type
+function getFileCategory(file: File): 'image' | 'video' | 'pdf' | 'unknown' {
+  if (ACCEPTED_IMAGE_TYPES.includes(file.type)) return 'image';
+  if (ACCEPTED_VIDEO_TYPES.includes(file.type)) return 'video';
+  if (ACCEPTED_DOCUMENT_TYPES.includes(file.type) || file.name.toLowerCase().endsWith('.pdf')) return 'pdf';
+  return 'unknown';
+}
+
+// Get file icon based on type
+function getFileIcon(file: File): string {
+  const category = getFileCategory(file);
+  switch (category) {
+    case 'video': return '🎬';
+    case 'pdf': return '📄';
+    default: return '📷';
+  }
+}
 
 export const UnifiedInput: React.FC<UnifiedInputProps> = ({
   inputText,
@@ -61,6 +83,11 @@ export const UnifiedInput: React.FC<UnifiedInputProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
 
+  // Auto-focus the textarea when component mounts
+  useEffect(() => {
+    textareaRef.current?.focus();
+  }, []);
+
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -83,7 +110,7 @@ export const UnifiedInput: React.FC<UnifiedInputProps> = ({
     e.preventDefault();
     setIsDragging(false);
     const dropped = Array.from(e.dataTransfer.files).filter(
-      f => ACCEPTED_TYPES.includes(f.type),
+      f => ACCEPTED_TYPES.includes(f.type) || f.name.toLowerCase().endsWith('.pdf'),
     );
     if (dropped.length > 0) {
       onFilesChange([...files, ...dropped].slice(0, 10));
@@ -92,7 +119,7 @@ export const UnifiedInput: React.FC<UnifiedInputProps> = ({
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(e.target.files || []).filter(
-      f => ACCEPTED_TYPES.includes(f.type),
+      f => ACCEPTED_TYPES.includes(f.type) || f.name.toLowerCase().endsWith('.pdf'),
     );
     if (selected.length > 0) {
       onFilesChange([...files, ...selected].slice(0, 10));
@@ -119,6 +146,7 @@ export const UnifiedInput: React.FC<UnifiedInputProps> = ({
         <div className={styles.filePreviews}>
           {files.map((f, i) => (
             <div key={i} className={styles.fileChip}>
+              <span className={styles.fileIcon}>{getFileIcon(f)}</span>
               {f.name.length > 20 ? f.name.slice(0, 17) + '...' : f.name}
               <span className={styles.fileChipRemove} onClick={() => removeFile(i)}>
                 ×
@@ -148,7 +176,7 @@ export const UnifiedInput: React.FC<UnifiedInputProps> = ({
                 ? placeholder
                 : files.length > 0
                   ? 'Add context for analysis, or ask a question about these files...'
-                  : 'Ask a question about UI traps, or drop screenshots for analysis...'
+                  : 'Ask about UI traps, or drop images/video/PDF for analysis...'
             }
             value={inputText}
             onChange={handleTextChange}
@@ -177,7 +205,7 @@ export const UnifiedInput: React.FC<UnifiedInputProps> = ({
         ref={fileInputRef}
         type="file"
         className={styles.hiddenInput}
-        accept=".png,.jpg,.jpeg"
+        accept=".png,.jpg,.jpeg,.mp4,.mov,.webm,.pdf"
         multiple
         onChange={handleFileSelect}
       />

@@ -1,0 +1,20 @@
+# Testing dependencies for UI Traps Analyzer
+
+# Core testing framework
+pytest>=7.4.0
+pytest-cov>=4.1.0  # Coverage reporting
+
+# Mocking and fixtures
+pytest-mock>=3.11.0
+
+# For colored test output
+pytest-sugar>=0.9.7
+
+# For parallel test execution (optional - speeds up large test suites)
+pytest-xdist>=3.3.0
+
+# Environment management
+python-dotenv>=1.0.0
+
+# Already in main requirements but needed for tests
+anthropic>=0.40.0

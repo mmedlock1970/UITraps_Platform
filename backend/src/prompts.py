@@ -6,6 +6,10 @@ PROPRIETARY & CONFIDENTIAL - UI Tenets & Traps Framework
 """
 import os
 from pathlib import Path
+from typing import Optional
+
+# Import platform-specific context
+from .platform_context import get_platform_prompt_section, SUPPORTED_PLATFORMS
 
 # Content type definitions for analysis mode
 CONTENT_TYPE_GUIDANCE = {
@@ -109,6 +113,56 @@ VIDEO_ANALYSIS_GUIDANCE = '''
    - Missing elements early in flow might appear later
 '''
 
+# Navigation flow guidance - prevents false positives from isolated page analysis
+NAVIGATION_FLOW_GUIDANCE = '''
+🧭 NAVIGATION FLOW AWARENESS (CRITICAL - READ BEFORE ANALYZING):
+
+You are analyzing a page that is part of a larger website. To avoid false positives,
+you MUST understand this page's position in the user journey.
+
+**WHAT THIS MEANS:**
+
+1. **ENTRY POINT vs SECONDARY PAGE:**
+   - Entry points (homepage, landing pages): Users arrive here first. MUST have clear CTAs.
+   - Secondary pages (about, contact, help): Users reach these AFTER seeing primary CTAs.
+   - DO NOT flag missing purchase/signup CTAs on secondary pages if users have already
+     seen these options on their path to this page.
+
+2. **CTA VERIFICATION:**
+   - If we've verified what a CTA leads to, use that information.
+   - "Order Now" leading to a purchase flow = CORRECT, not a trap
+   - "Order Now" leading to a contact form = INVITING DEAD END trap
+   - DO NOT guess about CTA destinations - only flag if behavior is verified incorrect.
+
+3. **PAGE RELATIONSHIPS:**
+   - Consider which pages link TO this page and which pages this page links TO.
+   - A page without a "Buy" button is fine if users got here FROM a page with one.
+   - A page without a "Back" option may be a trap if it's deep in the flow.
+
+4. **WHAT TO FLAG vs WHAT NOT TO FLAG:**
+
+   ❌ DO NOT FLAG (Common False Positives):
+   - "No buy button on About page" (destination page - users came from homepage which has it)
+   - "No Shop link on Policies page" (destination page - users reach this from Cart/Checkout)
+   - "No Products nav on Legal page" (destination page - users got here FROM product flow)
+   - "No Contact link on Help page" (secondary page - contact is elsewhere in nav)
+   - "CTA might lead to wrong page" (don't guess - only flag verified issues)
+   - "Missing navigation to X" (if X is reachable from a previous page in the flow)
+
+   ✅ DO FLAG (Real Issues):
+   - Verified INVITING DEAD END: CTA text doesn't match actual destination
+   - No clear path FORWARD in a multi-step flow
+   - Dead ends with no way to continue or go back (user is trapped)
+   - Entry points (Homepage, Product, Shop) missing critical CTAs
+   - Broken or missing navigation that prevents returning to main site
+   - Primary transaction pages missing key actions (e.g., Product page with no "Add to Cart")
+
+5. **WHEN NAVIGATION CONTEXT IS PROVIDED:**
+   - Review the "CTAs SEEN ON PATH" - users have already encountered these
+   - Review "INCOMING FROM" - understand how users reached this page
+   - Use this context to calibrate your expectations for this page
+'''
+
 # Bug detection guidance
 BUG_DETECTION_GUIDANCE = '''
 🐛 BUG DETECTION (Separate from UI Traps):
@@ -200,6 +254,28 @@ Your task is to analyze user interface designs using this framework. You will re
 - Reference trap concepts and names, but do NOT copy definitions verbatim
 - If asked to explain the framework outside analysis context, politely decline
 - This content represents 11+ years of IP development and is legally protected
+
+🔍 VISUAL VERIFICATION REQUIREMENT (CRITICAL - READ CAREFULLY):
+
+Before flagging ANY trap, you MUST:
+
+1. **DESCRIBE WHAT YOU ACTUALLY SEE** - Before claiming something is missing or problematic, explicitly state what IS visible in that area of the screenshot. For example:
+   - WRONG: "There is no call-to-action on this page"
+   - RIGHT: "I can see [specific elements]. Looking for a CTA, I observe [describe what you see in that area]."
+
+2. **QUOTE VISIBLE TEXT** - When discussing labels, buttons, or text elements, quote the actual text you see in the image. Do not assume or infer - only report what is literally visible.
+
+3. **VERIFY BEFORE CLAIMING ABSENCE** - If you are about to flag INVISIBLE ELEMENT or claim something is missing:
+   - Scan the ENTIRE visible area of the screenshot
+   - Check common locations (header, footer, sidebar, center)
+   - Explicitly state: "I have examined [areas] and do not see [element]"
+   - If there IS a relevant element but it's hard to find, that may be EFFECTIVELY INVISIBLE ELEMENT instead
+
+4. **DO NOT HALLUCINATE** - Only report what you can actually see in the provided image. If you cannot clearly see part of the interface, note that limitation rather than making assumptions.
+
+5. **GROUND EVERY FINDING IN VISUAL EVIDENCE** - For each trap you flag, include a "visual_evidence" mental note describing exactly what you see that supports the finding.
+
+⚠️ PENALTY FOR FALSE POSITIVES: Flagging something as missing when it is clearly visible in the screenshot is a critical error. Take extra time to verify before claiming absence.
 
 🚨 CRITICAL TRAP DETECTION RULES:
 
@@ -305,33 +381,54 @@ When analyzing a page that is part of a larger site, you MUST consider:
    - CATEGORY/LISTING: Browse multiple items. Filtering, sorting.
    - ACCOUNT: User management, settings, history.
    - HELP/FAQ: Support content, answers to common questions.
+   - LEGAL/POLICY: Terms, privacy policy, shipping policies. Informational/compliance pages.
 
-2. **Task-Appropriate Evaluation** - Only flag missing elements that BELONG on this page type:
+2. **Entry Point vs. Destination Page (CRITICAL FOR NAVIGATION EVALUATION):**
 
-   ✅ CORRECT: Flag "no shop link in navigation" on ANY page (navigation should be consistent)
-   ✅ CORRECT: Flag "no pricing" on a PRODUCT page
-   ✅ CORRECT: Flag "no contact form" on a CONTACT page
-   ✅ CORRECT: Flag "no clear CTA to next step" on a HOMEPAGE
+   **Entry Point Pages** (users may land here first):
+   - Homepage, Landing pages, Product pages, Category/Shop pages
+   - These SHOULD have primary navigation including shop/products/services links
+   - Flag missing primary navigation as CRITICAL if it blocks task initiation
 
-   ❌ INCORRECT: Flag "no pricing" on a HOMEPAGE (pricing belongs on product page)
-   ❌ INCORRECT: Flag "no contact form" on a PRODUCT page (contact is separate)
-   ❌ INCORRECT: Flag "no product details" on an ABOUT page
+   **Destination Pages** (users arrive AFTER starting elsewhere):
+   - About, Contact, Help/FAQ, Legal/Policy, Checkout confirmation
+   - These are reached FROM other pages (e.g., Policies linked from Cart during checkout)
+   - Users have ALREADY SEEN primary CTAs on their path to these pages
+   - DO NOT flag missing "Shop" or "Products" navigation on these pages
+   - Only flag if there's NO WAY to return to main site (broken navigation)
 
-3. **Task Flow Perspective** - Consider how tasks span multiple pages:
-   - "Buy a product" = Homepage → Product → Cart → Checkout (FLOW)
-   - Evaluate: Does THIS page provide a clear PATH to the next step?
+3. **Task-Appropriate Evaluation** - Only flag missing elements that BELONG on this page type:
+
+   ✅ CORRECT Examples:
+   - Flag "no pricing" on a PRODUCT page (belongs there)
+   - Flag "no contact form" on a CONTACT page (belongs there)
+   - Flag "no clear CTA to next step" on a HOMEPAGE (belongs there)
+   - Flag "broken navigation - no way back" on a LEGAL page (users are stuck)
+
+   ❌ INCORRECT Examples:
+   - Flag "no Shop link in nav" on POLICIES page (destination page - users came FROM shop)
+   - Flag "no pricing" on HOMEPAGE (pricing belongs on product page)
+   - Flag "no contact form" on PRODUCT page (contact is separate)
+   - Flag "no product details" on ABOUT page (wrong page type)
+   - Flag "no Shop nav" on LEGAL/ABOUT/CONTACT pages (destination pages, not entry points)
+
+4. **Task Flow Perspective** - Consider how tasks span multiple pages:
+   - "Buy a product" = Homepage → Product → Cart → **Policies (during checkout)** → Checkout
+   - The Policies page is a SIDE TRIP in the flow, users return to checkout after
+   - Evaluate: Does THIS page provide a clear PATH to the next step **in its specific context**?
    - Don't expect all steps on one page
+   - Don't expect entry-point navigation on destination pages
 
-4. **What to Evaluate on EVERY Page:**
-   - Navigation: Can users find their way to accomplish tasks?
-   - Consistency: Does this page match site patterns?
-   - Clear next step: Is there an obvious path forward?
+5. **What to Evaluate on PRIMARY/ENTRY-POINT Pages:**
+   - Clear navigation to key site areas (Shop, Products, Services)
+   - Primary CTAs for main user tasks
+   - Value proposition and next steps
 
-5. **What to Evaluate ONLY on Relevant Pages:**
-   - Pricing → Product pages
-   - Contact form → Contact page
-   - Checkout flow → Cart/Checkout pages
-   - Company background → About page
+6. **What to Evaluate on DESTINATION/SECONDARY Pages:**
+   - Can users GO BACK or RETURN to main flow?
+   - Is the content clear for why they're here?
+   - Does it fulfill its specific purpose (policies info, contact form, about info)?
+   - DO NOT require primary shopping/product CTAs on these pages
 
 **What to Focus On:**
 - Systematically check for all 27 Traps (but respect limitations above)
@@ -367,6 +464,19 @@ EXAMPLE 3 - MODERATE vs CRITICAL Severity:
 - Analysis: Flag as Moderate (not Critical) - Acronym is defined in the section heading. Users who need CDL info will see the definition. Not blocking general users' tasks.
 - Recommendation: Move to Moderate severity, suggest defining on first use in body text too
 
+EXAMPLE 4 - CORRECT NON-DETECTION on Destination Page (Do Not Flag):
+- Scenario: Policies page on e-commerce site (URL: /policies/), navigation shows: About, Contact Us, Cart (0 items)
+- User Context: UX professionals wanting to "buy a deck of cards"
+- Page Role: LEGAL/POLICY (destination page)
+- User Journey: Typical path is Homepage → Shop → Product → Cart → **Policies link (from cart)** → back to Cart → Checkout
+- Analysis: ❌ DO NOT flag "no Shop link in navigation" - This is a DESTINATION page that users reach AFTER they've already been to the shop. The cart icon is visible, indicating they're in a shopping flow. Users accessed policies to review shipping/return info before completing purchase. They will return to cart to continue checkout.
+- Reasoning: Policies pages are NOT entry points. Users don't start shopping from a policies page. Missing "Shop" nav is not a trap here because:
+  1. This is a secondary/destination page in the checkout flow
+  2. Users have already seen and used the Shop functionality to get here
+  3. The cart indicator shows users are mid-transaction
+  4. There IS a way back (cart, presumably breadcrumbs or back button)
+- Conclusion: No INVISIBLE ELEMENT trap. Page is fulfilling its role (displaying policies). Navigation is adequate for its context.
+
 OUTPUT REQUIREMENTS:
 - Provide 5-9 summary bullet points
 - For confirmed issues (Critical/Moderate/Minor), specify: trap name (in ALL CAPS), tenet violated, exact location, detailed problem explanation, actionable recommendation, and confidence level
@@ -374,6 +484,15 @@ OUTPUT REQUIREMENTS:
 - Use confidence levels: "high", "medium", or "low"
 - List traps you specifically looked for but did not find OR could not evaluate from static design
 - Note positive design elements
+
+⚠️ TRAP NAME VALIDATION (CRITICAL):
+You may ONLY use these 27 trap names - do NOT invent new names:
+INVISIBLE ELEMENT, EFFECTIVELY INVISIBLE ELEMENT, DISTRACTION, UNCOMPREHENDED ELEMENT, INVITING DEAD END, POOR GROUPING, FORCED SYNTAX, MEMORY CHALLENGE, FEEDBACK FAILURE, PHYSICAL CHALLENGE, ACCIDENTAL ACTIVATION, SLOW OR NO RESPONSE, CAPTIVE WAIT, UNNECESSARY STEP, INFORMATION OVERLOAD, SYSTEM AMNESIA, BAD PREDICTION, INCORRECT INFO, IRREVERSIBLE ACTION, UNWANTED DISCLOSURE, DATA LOSS, GRATUITOUS REDUNDANCY, VARIABLE OUTCOME, WANDERING ELEMENT, INCONSISTENT APPEARANCE, AMBIGUOUS HOME, POOR AESTHETIC
+
+If an issue doesn't fit one of these 27 traps, it is NOT a UI Trap - do not report it as one.
+
+⚠️ VISUAL VERIFICATION REMINDER:
+Before submitting, verify each finding against what you actually see in the image. Do NOT flag elements as missing if they are visible in the screenshot.
 
 You will submit your analysis using the ui_analysis_report tool with all required fields including potential_issues."""
 
@@ -445,16 +564,82 @@ def build_user_message(
     if content_guidance.get('limitations'):
         content_type_section += f"\n{content_guidance['limitations']}\n"
 
+    # Add platform-specific guidance if available
+    # Maps content_type to more detailed platform guidance
+    platform_mapping = {
+        'mobile_app': 'mobile_app',  # Generic mobile, user can specify ios/android
+        'desktop_app': 'desktop_app',  # Generic desktop
+        'game': 'game',
+        'website': 'web',
+        'pdf_document': 'pdf_document',
+        'other': 'other',
+    }
+    # Check if user specified a more specific platform in content_type
+    platform_key = content_type if content_type in SUPPORTED_PLATFORMS else platform_mapping.get(content_type, '')
+    platform_section = get_platform_prompt_section(platform_key)
+    if platform_section:
+        content_type_section += platform_section
+
     # Build page context section if provided
     page_context_section = ""
     if page_context:
+        # Check if we have navigation graph context
+        nav_context = page_context.get('navigation_context', {})
+        has_nav_context = bool(nav_context)
+
+        # Build navigation context section
+        nav_section = ""
+        if has_nav_context:
+            # Entry point status
+            is_entry = nav_context.get('is_entry_point', False)
+            depth = nav_context.get('depth_from_home', -1)
+
+            entry_text = "YES - users may land here directly" if is_entry else f"NO - {depth} click(s) from homepage"
+
+            # Path from home
+            path_from_home = nav_context.get('path_from_home', [])
+            path_text = ""
+            if len(path_from_home) > 1:
+                path_steps = [f"{p.get('title', 'Unknown')}" for p in path_from_home]
+                path_text = f"\n   Path to this page: {' → '.join(path_steps)}"
+
+            # CTAs already seen
+            ctas_seen = nav_context.get('ctas_seen_on_path', [])
+            ctas_text = ""
+            if ctas_seen:
+                ctas_list = [f'"{c.get("text", "")}" on {c.get("on_page", "")}' for c in ctas_seen]
+                ctas_text = f"\n   CTAs users have ALREADY SEEN: {'; '.join(ctas_list)}"
+
+            # Incoming pages
+            incoming = nav_context.get('incoming_from', [])
+            incoming_text = ""
+            if incoming:
+                incoming_list = [f"{p.get('title', '')} ({p.get('role', '')})" for p in incoming]
+                incoming_text = f"\n   Pages linking HERE: {', '.join(incoming_list)}"
+
+            # Verified CTAs on this page
+            outgoing_ctas = nav_context.get('outgoing_ctas', [])
+            outgoing_text = ""
+            if outgoing_ctas:
+                outgoing_list = [f'"{c.get("text", "")}" → {c.get("verified_destination", c.get("href", "unknown"))}' for c in outgoing_ctas]
+                outgoing_text = f"\n   Verified CTAs on this page: {'; '.join(outgoing_list)}"
+
+            nav_section = f"""
+   === NAVIGATION FLOW CONTEXT (CRITICAL) ===
+   Entry Point: {entry_text}{path_text}{ctas_text}{incoming_text}{outgoing_text}
+
+   ⚠️ DO NOT flag missing CTAs that users have already seen on their path here.
+   ⚠️ ONLY flag CTA destination issues if verified (see "Verified CTAs" above).
+   === END NAVIGATION CONTEXT ===
+"""
+
         page_context_section = f"""
 {page_context_num}. PAGE CONTEXT (IMPORTANT - Read Before Analyzing):
 
    Page Role: {page_context.get('page_role', 'Unknown').upper()}
    Page Title: {page_context.get('page_title', 'Unknown')}
    Page URL: {page_context.get('page_url', 'Unknown')}
-
+{nav_section}
    Tasks RELEVANT to this page type:
    {chr(10).join('   - ' + task for task in page_context.get('relevant_tasks', []))}
 
@@ -573,3 +758,455 @@ Please explain how I should export this Figma file for analysis:
 After I export and provide the image, you'll perform the full UI Tenets & Traps analysis."""
 
     return [{"type": "text", "text": message}]
+
+
+# Interaction Analysis Prompts
+# These are used for moment-by-moment UI interaction analysis
+
+INTERACTION_ANALYSIS_SYSTEM_PROMPT = """You are an expert UI analyst specializing in interaction feedback and state transitions.
+
+Your task is to analyze UI interaction sequences - a series of screenshots captured before, during, and after user interactions. You will evaluate:
+
+1. **Visual Feedback Quality** - Does the UI provide clear, immediate feedback for user actions?
+2. **State Transitions** - Are changes between states clear, predictable, and reversible?
+3. **Interaction Patterns** - Do interactions follow established UX patterns?
+4. **Accessibility** - Are interaction states perceivable by all users?
+
+You are trained on the UI Tenets & Traps framework. When analyzing interactions, focus on traps that are specifically detectable through interaction sequences:
+
+**Traps Detectable Through Interaction Analysis:**
+- FEEDBACK FAILURE - No visual response to user action
+- ACCIDENTAL ACTIVATION - Easy to trigger unintended actions
+- INVISIBLE ELEMENT - Interactive elements not visually distinct
+- EFFECTIVELY INVISIBLE ELEMENT - Elements visible but not noticed due to poor visual hierarchy
+- DATA LOSS - Interactions that might lose user data without warning
+- SLOW OR NO RESPONSE - Delayed or missing feedback (visible in timing between screenshots)
+
+**What You CANNOT Detect (do not flag these):**
+- SYSTEM AMNESIA - Requires multiple sessions
+- BAD PREDICTION - Requires seeing predictions in use
+- Traps requiring broader page context (these are handled by static analysis)
+
+Submit your findings using the interaction_analysis_report tool."""
+
+
+INTERACTION_TYPE_GUIDANCE = {
+    'hover': {
+        'name': 'Hover State Analysis',
+        'description': 'Analyzing hover/focus states on interactive elements',
+        'what_to_check': [
+            'Does the element have a visible hover state?',
+            'Is the hover state visually distinct from the default state?',
+            'Does the hover state indicate interactivity (cursor change, color shift, etc.)?',
+            'Is the hover state accessible (not relying solely on color)?',
+            'Are tooltips or additional information revealed on hover?',
+        ],
+        'common_issues': [
+            'No visual change on hover (FEEDBACK FAILURE)',
+            'Hover state too subtle to notice (EFFECTIVELY INVISIBLE ELEMENT)',
+            'Inconsistent hover behavior across similar elements',
+        ]
+    },
+    'click': {
+        'name': 'Click Feedback Analysis',
+        'description': 'Analyzing click/tap feedback and resulting state changes',
+        'what_to_check': [
+            'Is there immediate visual feedback when clicked?',
+            'Is there a loading indicator if the action takes time?',
+            'Is the resulting state change clear and expected?',
+            'Can the user understand what happened?',
+            'Is there a way to undo or go back if needed?',
+        ],
+        'common_issues': [
+            'No immediate feedback on click (FEEDBACK FAILURE)',
+            'Unexpected state change (ACCIDENTAL ACTIVATION)',
+            'No loading indicator for slow operations (SLOW OR NO RESPONSE)',
+            'Destructive action without confirmation (DATA LOSS risk)',
+        ]
+    },
+    'form': {
+        'name': 'Form Validation Analysis',
+        'description': 'Analyzing form validation feedback and error states',
+        'what_to_check': [
+            'Are validation errors shown inline near the problematic field?',
+            'Are error messages clear and actionable?',
+            'Is there visual distinction between valid and invalid states?',
+            'Are required fields clearly marked?',
+            'Does validation happen at appropriate times (on blur, on submit)?',
+        ],
+        'common_issues': [
+            'Errors only shown after submit (delayed FEEDBACK FAILURE)',
+            'Unclear error messages (UNCOMPREHENDED ELEMENT)',
+            'Form clears on error (DATA LOSS)',
+            'Error styling too subtle (EFFECTIVELY INVISIBLE ELEMENT)',
+        ]
+    },
+    'scroll': {
+        'name': 'Scroll Behavior Analysis',
+        'description': 'Analyzing scroll-triggered UI changes and sticky elements',
+        'what_to_check': [
+            'Are sticky headers/navigation consistent?',
+            'Does important content remain accessible while scrolling?',
+            'Are scroll position indicators present for long pages?',
+            'Do scroll-triggered animations enhance understanding?',
+            'Is there any content obscured by sticky elements?',
+        ],
+        'common_issues': [
+            'Navigation disappears on scroll (INVISIBLE ELEMENT)',
+            'Sticky element obscures content (PHYSICAL CHALLENGE)',
+            'Jarring scroll-triggered changes (poor transition)',
+            'Important CTAs scroll out of view (EFFECTIVELY INVISIBLE ELEMENT)',
+        ]
+    },
+    'responsive': {
+        'name': 'Responsive Layout Analysis',
+        'description': 'Analyzing layout changes across viewport sizes',
+        'what_to_check': [
+            'Does layout adapt appropriately to viewport size?',
+            'Are touch targets large enough on mobile?',
+            'Is text readable without zooming?',
+            'Are important elements accessible on all sizes?',
+            'Does navigation transform appropriately (hamburger menu)?',
+        ],
+        'common_issues': [
+            'Touch targets too small on mobile (PHYSICAL CHALLENGE)',
+            'Content cut off or overlapping (INFORMATION OVERLOAD variant)',
+            'Important actions hidden in mobile menu (EFFECTIVELY INVISIBLE ELEMENT)',
+            'Text too small to read (PHYSICAL CHALLENGE)',
+        ]
+    }
+}
+
+
+def build_interaction_analysis_prompt(
+    interaction_type: str,
+    element_description: str,
+    labels: list,
+    user_context: dict = None
+) -> str:
+    """
+    Build prompt for analyzing a specific interaction sequence.
+
+    Args:
+        interaction_type: Type of interaction ("hover", "click", "form", "scroll", "responsive")
+        element_description: Description of the element being interacted with
+        labels: List of labels for each screenshot in sequence
+        user_context: Optional user context dict
+
+    Returns:
+        Prompt string for interaction analysis
+    """
+    guidance = INTERACTION_TYPE_GUIDANCE.get(interaction_type, {})
+    type_name = guidance.get('name', f'{interaction_type.title()} Analysis')
+    type_desc = guidance.get('description', f'Analyzing {interaction_type} interaction')
+    checks = guidance.get('what_to_check', [])
+    issues = guidance.get('common_issues', [])
+
+    checks_text = '\n'.join(f'- {check}' for check in checks)
+    issues_text = '\n'.join(f'- {issue}' for issue in issues)
+
+    user_context_text = ""
+    if user_context:
+        user_context_text = f"""
+USER CONTEXT:
+- Users: {user_context.get('users', 'Unknown')}
+- Tasks: {user_context.get('tasks', 'Unknown')}
+"""
+
+    return f"""## {type_name}
+
+{type_desc}
+
+**Element:** {element_description}
+
+**Screenshot Sequence:** {', '.join(labels)}
+
+You are viewing {len(labels)} screenshots captured during this interaction.
+{user_context_text}
+**What to Check:**
+{checks_text}
+
+**Common Issues to Look For:**
+{issues_text}
+
+Analyze this interaction sequence and report:
+1. Whether adequate visual feedback is provided
+2. Whether state transitions are clear and predictable
+3. Any UI Traps detected (use trap names in ALL CAPS)
+4. Accessibility concerns
+5. Specific recommendations for improvement
+
+Submit your analysis using the interaction_analysis_report tool."""
+
+
+def build_interaction_message(
+    images: list,
+    interaction_type: str,
+    element_description: str,
+    labels: list,
+    user_context: dict = None
+) -> list:
+    """
+    Build complete message with images for interaction analysis.
+
+    Args:
+        images: List of image dicts (base64 encoded) for Claude vision
+        interaction_type: Type of interaction
+        element_description: Description of element
+        labels: Screenshot labels
+        user_context: Optional user context
+
+    Returns:
+        List of message content blocks (images + text)
+    """
+    content = []
+
+    # Add images first (Claude processes images before text)
+    for i, image in enumerate(images):
+        # Add label as text before each image for context
+        if i < len(labels):
+            content.append({
+                "type": "text",
+                "text": f"**[{labels[i]}]**"
+            })
+        content.append(image)
+
+    # Add analysis prompt
+    prompt = build_interaction_analysis_prompt(
+        interaction_type=interaction_type,
+        element_description=element_description,
+        labels=labels,
+        user_context=user_context
+    )
+    content.append({
+        "type": "text",
+        "text": prompt
+    })
+
+    return content
+
+
+def build_batch_interaction_summary_prompt(
+    interaction_summaries: list,
+    user_context: dict = None
+) -> str:
+    """
+    Build prompt for summarizing all interaction findings.
+
+    Args:
+        interaction_summaries: List of individual interaction analysis results
+        user_context: Optional user context
+
+    Returns:
+        Prompt for generating summary
+    """
+    summaries_text = ""
+    for i, summary in enumerate(interaction_summaries, 1):
+        summaries_text += f"""
+### Interaction {i}: {summary.get('interaction_type', 'Unknown')} - {summary.get('element', 'Unknown')}
+- Feedback Quality: {summary.get('feedback_quality', 'Unknown')}
+- Issues Found: {', '.join(summary.get('traps_detected', [])) or 'None'}
+- Severity: {summary.get('max_severity', 'None')}
+"""
+
+    return f"""## Interaction Analysis Summary
+
+You have analyzed {len(interaction_summaries)} interactions on this page.
+
+{summaries_text}
+
+Synthesize these findings into:
+1. Overall interaction quality assessment
+2. Most critical issues requiring attention
+3. Patterns across multiple interactions
+4. Prioritized recommendations
+
+Focus on issues that would most impact user experience during moment-to-moment use."""
+
+
+# Navigation Flow Analysis Prompts
+# These are used for analyzing CTA destinations and cross-page flows
+
+NAVIGATION_FLOW_SYSTEM_PROMPT = """You are an expert UI analyst specializing in user flow and navigation patterns.
+
+Your task is to analyze navigation flows - a sequence of screenshots showing a source page with a CTA and the destination page after clicking. You will evaluate:
+
+1. **CTA Promise vs Delivery** - Does clicking the CTA lead where users expect?
+2. **Flow Continuity** - Is the transition logical and predictable?
+3. **Task Progress** - Does the destination advance the user's task?
+4. **Recovery Options** - Can users go back or correct mistakes?
+
+You are trained on the UI Tenets & Traps framework. When analyzing navigation flows, focus on:
+
+**Traps Detectable Through Navigation Analysis:**
+- INVITING DEAD END - CTA suggests one destination but leads somewhere else
+- UNNECESSARY STEP - Extra pages between user and their goal
+- IRREVERSIBLE ACTION - No way to go back from destination
+- INVISIBLE ELEMENT - Important navigation not visible at destination
+- AMBIGUOUS HOME - Multiple competing "home" options across pages
+
+Submit your findings using the navigation_flow_report tool."""
+
+
+NAVIGATION_TYPE_GUIDANCE = {
+    'cta_verification': {
+        'name': 'CTA Destination Verification',
+        'description': 'Verifying that CTAs lead where users expect',
+        'what_to_check': [
+            'Does the CTA text accurately describe the destination?',
+            'Is the destination page what users would expect?',
+            'Does clicking advance the user toward their goal?',
+            'Is the transition between pages smooth and logical?',
+            'Can users understand where they are after the transition?',
+        ],
+        'common_issues': [
+            '"Order Now" leads to contact form, not checkout (INVITING DEAD END)',
+            '"Learn More" leads to unrelated content (INVITING DEAD END)',
+            'CTA leads to error page or broken link',
+            'Destination lacks clear path forward',
+        ]
+    },
+    'flow_continuity': {
+        'name': 'Flow Continuity Analysis',
+        'description': 'Analyzing whether page sequences form coherent user journeys',
+        'what_to_check': [
+            'Is there a clear narrative from source to destination?',
+            'Does the destination acknowledge the user came from somewhere?',
+            'Are navigation patterns consistent between pages?',
+            'Can users easily return to previous step if needed?',
+            'Is progress in a multi-step flow clearly indicated?',
+        ],
+        'common_issues': [
+            'Destination page has no back option (potential IRREVERSIBLE ACTION)',
+            'User loses context of where they were (AMBIGUOUS HOME)',
+            'Navigation structure changes unexpectedly (WANDERING ELEMENT)',
+            'Multi-step flow lacks progress indicators',
+        ]
+    }
+}
+
+
+def build_navigation_flow_prompt(
+    source_page: dict,
+    destination_page: dict,
+    cta_info: dict,
+    user_context: dict = None
+) -> str:
+    """
+    Build prompt for analyzing a navigation flow (source → CTA → destination).
+
+    Args:
+        source_page: Dict with url, title, role of source page
+        destination_page: Dict with url, title of destination page
+        cta_info: Dict with text, element_type of the CTA clicked
+        user_context: Optional user context dict
+
+    Returns:
+        Prompt string for navigation flow analysis
+    """
+    user_context_text = ""
+    if user_context:
+        user_context_text = f"""
+USER CONTEXT:
+- Users: {user_context.get('users', 'Unknown')}
+- Tasks: {user_context.get('tasks', 'Unknown')}
+"""
+
+    return f"""## Navigation Flow Analysis
+
+**SOURCE PAGE:**
+- Title: {source_page.get('title', 'Unknown')}
+- URL: {source_page.get('url', 'Unknown')}
+- Role: {source_page.get('role', 'Unknown')}
+
+**CTA CLICKED:**
+- Text: "{cta_info.get('text', 'Unknown')}"
+- Type: {cta_info.get('element_type', 'Unknown')}
+
+**DESTINATION PAGE:**
+- Title: {destination_page.get('title', 'Unknown')}
+- URL: {destination_page.get('url', 'Unknown')}
+{user_context_text}
+You are viewing 2 screenshots:
+1. **[source_page]** - The page with the CTA before clicking
+2. **[destination_page]** - The page shown after clicking the CTA
+
+**Analyze this navigation flow for:**
+
+1. **CTA Promise vs Delivery:**
+   - Does "{cta_info.get('text', 'the CTA')}" accurately describe what users get?
+   - Would a typical user expect this destination based on the CTA text?
+   - If there's a mismatch, this is an INVITING DEAD END trap.
+
+2. **Task Progress:**
+   - Does this navigation advance users toward their goal?
+   - Is the destination relevant to the likely user task?
+   - Are there unnecessary steps between the user and their goal?
+
+3. **Flow Continuity:**
+   - Is the transition logical and easy to follow?
+   - Does the destination page acknowledge where users came from?
+   - Can users easily go back if they clicked by mistake?
+
+4. **Navigation Consistency:**
+   - Is the site navigation consistent between pages?
+   - Can users find their way around from the destination?
+
+Submit your analysis using the navigation_flow_report tool with:
+- Whether this is a valid flow or contains a trap
+- Specific trap name if applicable (INVITING DEAD END, etc.)
+- Severity assessment
+- Recommendation for improvement"""
+
+
+def build_navigation_flow_message(
+    source_image: dict,
+    destination_image: dict,
+    source_page: dict,
+    destination_page: dict,
+    cta_info: dict,
+    user_context: dict = None
+) -> list:
+    """
+    Build complete message with images for navigation flow analysis.
+
+    Args:
+        source_image: Image dict (base64) of source page
+        destination_image: Image dict (base64) of destination page
+        source_page: Source page info dict
+        destination_page: Destination page info dict
+        cta_info: CTA info dict
+        user_context: Optional user context
+
+    Returns:
+        List of message content blocks
+    """
+    content = []
+
+    # Add source page image with label
+    content.append({
+        "type": "text",
+        "text": f"**[source_page]** - {source_page.get('title', 'Source Page')}"
+    })
+    content.append(source_image)
+
+    # Add destination page image with label
+    content.append({
+        "type": "text",
+        "text": f"**[destination_page]** - After clicking \"{cta_info.get('text', 'CTA')}\""
+    })
+    content.append(destination_image)
+
+    # Add analysis prompt
+    prompt = build_navigation_flow_prompt(
+        source_page=source_page,
+        destination_page=destination_page,
+        cta_info=cta_info,
+        user_context=user_context
+    )
+    content.append({
+        "type": "text",
+        "text": prompt
+    })
+
+    return content

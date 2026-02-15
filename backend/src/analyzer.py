@@ -16,15 +16,21 @@ from anthropic import Anthropic
 
 try:
     from .validators import validate_file_format, validate_context, is_figma_url
-    from .prompts import build_system_prompt, build_user_message, build_figma_message
+    from .prompts import (
+        build_system_prompt, build_user_message, build_figma_message,
+        INTERACTION_ANALYSIS_SYSTEM_PROMPT, build_interaction_message
+    )
     from .formatters import parse_claude_response, format_report_as_markdown, format_report_as_html, get_report_statistics
-    from .schema import get_ui_analysis_schema
+    from .schema import get_ui_analysis_schema, get_interaction_analysis_schema
 except ImportError:
     # Fallback for direct script execution
     from validators import validate_file_format, validate_context, is_figma_url
-    from prompts import build_system_prompt, build_user_message, build_figma_message
+    from prompts import (
+        build_system_prompt, build_user_message, build_figma_message,
+        INTERACTION_ANALYSIS_SYSTEM_PROMPT, build_interaction_message
+    )
     from formatters import parse_claude_response, format_report_as_markdown, format_report_as_html, get_report_statistics
-    from schema import get_ui_analysis_schema
+    from schema import get_ui_analysis_schema, get_interaction_analysis_schema
 
 
 class UITrapsAnalyzer:
@@ -328,6 +334,286 @@ class UITrapsAnalyzer:
             "Streaming analysis not yet implemented. "
             "Use analyze_design() for now."
         )
+
+    def analyze_interaction_sequence(
+        self,
+        images: list,
+        interaction_type: str,
+        element_description: str,
+        labels: list,
+        user_context: Optional[Dict[str, str]] = None,
+        timeout: int = 60
+    ) -> Dict[str, Any]:
+        """
+        Analyze a UI interaction sequence using multi-image analysis.
+
+        This method analyzes screenshot sequences captured during user interactions
+        (hover, click, form validation, scroll, responsive) to detect interaction-specific
+        UI Traps like FEEDBACK FAILURE, ACCIDENTAL ACTIVATION, etc.
+
+        Args:
+            images: List of image dicts (base64 encoded) in sequence order
+                   Each dict should have: {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "..."}}
+            interaction_type: Type of interaction ("hover", "click", "form", "scroll", "responsive")
+            element_description: Description of the element being interacted with
+            labels: List of labels for each screenshot (e.g., ["before_hover", "during_hover"])
+            user_context: Optional user context dict with 'users', 'tasks' keys
+            timeout: Maximum time to wait for response (seconds)
+
+        Returns:
+            Dictionary containing:
+                - analysis: Structured interaction analysis result
+                - metadata: Analysis metadata (tokens, cost, duration)
+
+        Raises:
+            ValueError: If inputs are invalid
+            Exception: If API call fails
+        """
+        start_time = time.time()
+
+        # Validate inputs
+        if not images:
+            raise ValueError("At least one image is required")
+        if len(images) != len(labels):
+            raise ValueError(f"Number of images ({len(images)}) must match number of labels ({len(labels)})")
+        if interaction_type not in ["hover", "click", "form", "scroll", "responsive"]:
+            raise ValueError(f"Invalid interaction type: {interaction_type}")
+
+        # Build message with images
+        user_message = build_interaction_message(
+            images=images,
+            interaction_type=interaction_type,
+            element_description=element_description,
+            labels=labels,
+            user_context=user_context
+        )
+
+        # Get interaction analysis schema
+        schema = get_interaction_analysis_schema()
+
+        # Build system prompt for interaction analysis
+        system_prompt = [
+            {
+                "type": "text",
+                "text": INTERACTION_ANALYSIS_SYSTEM_PROMPT
+            }
+        ]
+
+        try:
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=4096,
+                system=system_prompt,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": user_message
+                    }
+                ],
+                tools=[
+                    {
+                        "name": "interaction_analysis_report",
+                        "description": "Submit the interaction analysis report",
+                        "input_schema": schema
+                    }
+                ],
+                tool_choice={"type": "tool", "name": "interaction_analysis_report"},
+                timeout=timeout
+            )
+        except Exception as e:
+            raise Exception(f"Claude API call failed: {e}")
+
+        # Parse response
+        try:
+            tool_use_block = next(
+                (block for block in response.content if block.type == "tool_use"),
+                None
+            )
+
+            if not tool_use_block:
+                raise ValueError("No tool use found in response")
+
+            analysis = tool_use_block.input
+
+            # Validate required fields
+            required_fields = [
+                'interaction_type', 'element_analyzed', 'feedback_quality',
+                'state_transition', 'traps_detected', 'overall_assessment', 'summary'
+            ]
+            for field in required_fields:
+                if field not in analysis:
+                    raise ValueError(f"Missing required field: {field}")
+
+            # Ensure arrays are arrays
+            if not isinstance(analysis.get('traps_detected'), list):
+                analysis['traps_detected'] = []
+            if not isinstance(analysis.get('accessibility_concerns'), list):
+                analysis['accessibility_concerns'] = []
+            if not isinstance(analysis.get('positive_observations'), list):
+                analysis['positive_observations'] = []
+
+        except Exception as e:
+            raise ValueError(f"Failed to parse response: {e}")
+
+        # Calculate metadata
+        duration = time.time() - start_time
+
+        metadata = {
+            "model": self.model,
+            "input_tokens": response.usage.input_tokens,
+            "output_tokens": response.usage.output_tokens,
+            "total_tokens": response.usage.input_tokens + response.usage.output_tokens,
+            "duration_seconds": round(duration, 2),
+            "estimated_cost": self._estimate_cost(response.usage),
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "interaction_type": interaction_type,
+            "image_count": len(images)
+        }
+
+        return {
+            "analysis": analysis,
+            "metadata": metadata,
+            "status": "success"
+        }
+
+    def analyze_all_interactions(
+        self,
+        interactions: list,
+        user_context: Optional[Dict[str, str]] = None,
+        progress_callback: Optional[callable] = None
+    ) -> Dict[str, Any]:
+        """
+        Analyze multiple interaction sequences and aggregate results.
+
+        Args:
+            interactions: List of interaction dicts, each containing:
+                - images: List of base64 image dicts
+                - interaction_type: Type of interaction
+                - element_description: Description of element
+                - labels: List of labels for screenshots
+            user_context: Optional user context
+            progress_callback: Optional callback(current, total, message)
+
+        Returns:
+            Dictionary containing:
+                - individual_analyses: List of individual analysis results
+                - summary: Aggregated summary of all interactions
+                - statistics: Aggregate statistics
+                - metadata: Combined metadata
+        """
+        if not interactions:
+            return {
+                "individual_analyses": [],
+                "summary": {"message": "No interactions to analyze"},
+                "statistics": {},
+                "metadata": {}
+            }
+
+        start_time = time.time()
+        individual_analyses = []
+        total_cost = 0
+        total_tokens = 0
+
+        for i, interaction in enumerate(interactions):
+            if progress_callback:
+                progress_callback(
+                    i + 1,
+                    len(interactions),
+                    f"Analyzing {interaction.get('interaction_type', 'unknown')} interaction..."
+                )
+
+            try:
+                result = self.analyze_interaction_sequence(
+                    images=interaction.get('images', []),
+                    interaction_type=interaction.get('interaction_type', 'click'),
+                    element_description=interaction.get('element_description', 'Unknown element'),
+                    labels=interaction.get('labels', []),
+                    user_context=user_context
+                )
+                individual_analyses.append({
+                    "success": True,
+                    "interaction_type": interaction.get('interaction_type'),
+                    "element": interaction.get('element_description'),
+                    "analysis": result.get('analysis'),
+                    "metadata": result.get('metadata')
+                })
+                total_cost += result.get('metadata', {}).get('estimated_cost', 0)
+                total_tokens += result.get('metadata', {}).get('total_tokens', 0)
+
+            except Exception as e:
+                individual_analyses.append({
+                    "success": False,
+                    "interaction_type": interaction.get('interaction_type'),
+                    "element": interaction.get('element_description'),
+                    "error": str(e)
+                })
+
+        # Generate aggregate statistics
+        successful = [a for a in individual_analyses if a.get('success')]
+        statistics = {
+            "total_analyzed": len(interactions),
+            "successful": len(successful),
+            "failed": len(interactions) - len(successful),
+            "by_type": {},
+            "issues_found": {
+                "critical": 0,
+                "moderate": 0,
+                "minor": 0
+            }
+        }
+
+        # Count by type and collect issues
+        all_traps = []
+        for analysis in successful:
+            itype = analysis.get('interaction_type', 'unknown')
+            if itype not in statistics['by_type']:
+                statistics['by_type'][itype] = {"count": 0, "issues": 0}
+            statistics['by_type'][itype]['count'] += 1
+
+            traps = analysis.get('analysis', {}).get('traps_detected', [])
+            for trap in traps:
+                severity = trap.get('severity', 'minor')
+                statistics['issues_found'][severity] = statistics['issues_found'].get(severity, 0) + 1
+                statistics['by_type'][itype]['issues'] += 1
+                all_traps.append({
+                    **trap,
+                    'interaction_type': itype,
+                    'element': analysis.get('element')
+                })
+
+        # Generate summary
+        summary = {
+            "total_interactions": len(interactions),
+            "overall_assessment": self._determine_overall_assessment(statistics),
+            "critical_findings": [t for t in all_traps if t.get('severity') == 'critical'],
+            "all_issues": all_traps
+        }
+
+        duration = time.time() - start_time
+
+        return {
+            "individual_analyses": individual_analyses,
+            "summary": summary,
+            "statistics": statistics,
+            "metadata": {
+                "total_duration_seconds": round(duration, 2),
+                "total_estimated_cost": round(total_cost, 4),
+                "total_tokens": total_tokens,
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+            }
+        }
+
+    def _determine_overall_assessment(self, statistics: dict) -> str:
+        """Determine overall assessment based on issues found."""
+        issues = statistics.get('issues_found', {})
+        if issues.get('critical', 0) > 0:
+            return "poor"
+        elif issues.get('moderate', 0) > 2:
+            return "needs_improvement"
+        elif issues.get('moderate', 0) > 0 or issues.get('minor', 0) > 3:
+            return "acceptable"
+        else:
+            return "good"
 
 
 # Convenience function for simple usage

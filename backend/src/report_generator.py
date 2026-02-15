@@ -2,6 +2,7 @@
 Report Generator for Site-Wide Analysis
 
 Generates cohesive, rolled-up reports from multi-page site analysis.
+Page-centric format: shows all issues organized by page with full details.
 
 Copyright © 2009-present UI Traps LLC. All Rights Reserved.
 """
@@ -31,6 +32,7 @@ def generate_site_report(analysis_result: Dict[str, Any], url: str, format: str 
 def generate_site_report_markdown(analysis_result: Dict[str, Any], url: str) -> str:
     """
     Generate a cohesive markdown report for entire site analysis.
+    Page-centric format with all issues shown per page.
 
     Args:
         analysis_result: Complete result from SiteAnalyzer.analyze_site()
@@ -41,9 +43,6 @@ def generate_site_report_markdown(analysis_result: Dict[str, Any], url: str) -> 
     """
     domain = urlparse(url).netloc
     summary = analysis_result.get("site_summary", {})
-    stats = analysis_result.get("statistics", {})
-    flow_analyses = analysis_result.get("flow_analyses", [])
-    recommendations = analysis_result.get("recommendations", [])
     page_analyses = analysis_result.get("page_analyses", [])
     metadata = analysis_result.get("metadata", {})
 
@@ -51,7 +50,6 @@ def generate_site_report_markdown(analysis_result: Dict[str, Any], url: str) -> 
 
 **Analysis Date:** {metadata.get('timestamp', datetime.now().strftime('%Y-%m-%d %H:%M'))}
 **Pages Analyzed:** {metadata.get('pages_analyzed', 0)}
-**Analysis Duration:** {metadata.get('duration_seconds', 0)} seconds
 
 ---
 
@@ -64,161 +62,82 @@ def generate_site_report_markdown(analysis_result: Dict[str, Any], url: str) -> 
 | Critical Issues | {summary.get('critical_count', 0)} |
 | Moderate Issues | {summary.get('moderate_count', 0)} |
 | Minor Issues | {summary.get('minor_count', 0)} |
-| Positive Observations | {summary.get('positive_count', 0)} |
 | **Total Issues** | **{summary.get('total_issues', 0)}** |
 
-### Page Roles Identified
-
-"""
-    # List page roles
-    for page_result in page_analyses:
-        if page_result.get("success"):
-            page = page_result.get("page", {})
-            role = page_result.get("page_role", "unknown")
-            report += f"- **{page.get('title', 'Unknown')}**: {role.upper()}\n"
-
-    report += """
 ---
 
-## Task Flow Analysis
-
-This section evaluates whether users can complete their goals across the site.
+## Page-by-Page Analysis
 
 """
-    # Task flows
-    tasks = summary.get("tasks_evaluated", [])
-    for flow in flow_analyses:
-        task = flow.get("task", "Unknown task")
-        complete = flow.get("complete", False)
-        status = "✅ Complete" if complete else "⚠️ Incomplete"
-
-        report += f"### {task}\n\n"
-        report += f"**Status:** {status}\n\n"
-
-        if not complete:
-            missing = flow.get("missing_page_types", [])
-            report += f"**Missing page types:** {', '.join(missing)}\n\n"
-            report += f"**Assessment:** {flow.get('assessment', '')}\n\n"
-        else:
-            report += "Users have a clear path to complete this task.\n\n"
-
-    # Site-wide issues
-    sitewide = summary.get("sitewide_issues", [])
-    if sitewide:
-        report += """---
-
-## Site-Wide Patterns
-
-These issues appear across multiple pages and should be prioritized for fixing:
-
-"""
-        for issue in sitewide:
-            report += f"- **{issue['trap']}**: Found on {issue['count']} pages\n"
-        report += "\n"
-
-    # Critical issues
-    critical_recs = [r for r in recommendations if r.get("severity") == "critical"]
-    if critical_recs:
-        report += """---
-
-## 🔴 Critical Issues
-
-These issues block core user tasks and require immediate attention:
-
-"""
-        for rec in critical_recs:
-            report += f"""### {rec.get('trap_name', 'Unknown')}
-
-**Page:** {rec.get('page', 'Unknown')}
-**Location:** {rec.get('location', 'Unknown')}
-
-**Problem:** {rec.get('problem', 'No description')}
-
-**Recommendation:** {rec.get('recommendation', 'No recommendation')}
-
-"""
-
-    # Moderate issues
-    moderate_recs = [r for r in recommendations if r.get("severity") == "moderate"]
-    if moderate_recs:
-        report += """---
-
-## 🟡 Moderate Issues
-
-These issues slow users down or cause frustration:
-
-"""
-        for rec in moderate_recs[:10]:  # Limit to top 10
-            report += f"""### {rec.get('trap_name', 'Unknown')}
-
-**Page:** {rec.get('page', 'Unknown')}
-**Location:** {rec.get('location', 'Unknown')}
-
-**Problem:** {rec.get('problem', 'No description')}
-
-**Recommendation:** {rec.get('recommendation', 'No recommendation')}
-
-"""
-        if len(moderate_recs) > 10:
-            report += f"*...and {len(moderate_recs) - 10} more moderate issues. See page details below.*\n\n"
-
-    # Top recommendations summary
-    report += """---
-
-## Top Recommendations
-
-Prioritized list of improvements:
-
-"""
-    for i, rec in enumerate(recommendations[:10], 1):
-        severity_icon = {"critical": "🔴", "moderate": "🟡", "minor": "🟢"}.get(rec.get("severity"), "⚪")
-        report += f"{i}. {severity_icon} **{rec.get('trap_name')}** ({rec.get('page')}): {rec.get('recommendation', '')}\n\n"
-
-    # Page-by-page summary
-    report += """---
-
-## Page-by-Page Summary
-
-"""
+    # Page-by-page with ALL issues
     for page_result in page_analyses:
         page = page_result.get("page", {})
         role = page_result.get("page_role", "unknown")
+        page_url = page.get('url', 'Unknown')
+        title = page.get('title', 'Unknown')
 
-        report += f"### {page.get('title', 'Unknown')} ({role.upper()})\n\n"
-        report += f"**URL:** {page.get('url', 'Unknown')}\n\n"
+        report += f"### {title}\n\n"
+        report += f"**Role:** {role.upper()}\n"
+        report += f"**URL:** [{page_url}]({page_url})\n\n"
 
         if not page_result.get("success"):
             report += f"*Error analyzing this page: {page_result.get('error', 'Unknown error')}*\n\n"
+            report += "---\n\n"
             continue
 
         analysis = page_result.get("analysis") or {}
         page_stats = analysis.get("statistics") or {}
-
-        report += f"**Issues:** {page_stats.get('critical_count', 0)} critical, "
-        report += f"{page_stats.get('moderate_count', 0)} moderate, "
-        report += f"{page_stats.get('minor_count', 0)} minor\n\n"
-
-        # List issues for this page
         page_report = analysis.get("report") or {}
-        for issue in page_report.get("critical_issues", []):
-            report += f"- 🔴 **{issue.get('trap_name')}**: {issue.get('problem', '')[:100]}...\n"
-        for issue in page_report.get("moderate_issues", []):
-            report += f"- 🟡 **{issue.get('trap_name')}**: {issue.get('problem', '')[:100]}...\n"
 
-        if page_report.get("critical_issues") or page_report.get("moderate_issues"):
+        critical_count = page_stats.get('critical_count', 0)
+        moderate_count = page_stats.get('moderate_count', 0)
+        minor_count = page_stats.get('minor_count', 0)
+
+        report += f"**Issues Found:** {critical_count} critical, {moderate_count} moderate, {minor_count} minor\n\n"
+
+        # Critical issues
+        for issue in page_report.get("critical_issues", []):
+            report += f"#### 🔴 CRITICAL: {issue.get('trap_name', 'Unknown')}\n\n"
+            report += f"**Tenet Violated:** {issue.get('tenet', 'Unknown')}\n"
+            report += f"**Location:** {issue.get('location', 'Unknown')}\n\n"
+            report += f"**Problem:** {issue.get('problem', 'No description')}\n\n"
+            report += f"**Recommendation:** {issue.get('recommendation', 'No recommendation')}\n\n"
+
+        # Moderate issues
+        for issue in page_report.get("moderate_issues", []):
+            report += f"#### 🟡 MODERATE: {issue.get('trap_name', 'Unknown')}\n\n"
+            report += f"**Tenet Violated:** {issue.get('tenet', 'Unknown')}\n"
+            report += f"**Location:** {issue.get('location', 'Unknown')}\n\n"
+            report += f"**Problem:** {issue.get('problem', 'No description')}\n\n"
+            report += f"**Recommendation:** {issue.get('recommendation', 'No recommendation')}\n\n"
+
+        # Minor issues
+        for issue in page_report.get("minor_issues", []):
+            report += f"#### 🟢 MINOR: {issue.get('trap_name', 'Unknown')}\n\n"
+            report += f"**Tenet Violated:** {issue.get('tenet', 'Unknown')}\n"
+            report += f"**Location:** {issue.get('location', 'Unknown')}\n\n"
+            report += f"**Problem:** {issue.get('problem', 'No description')}\n\n"
+            report += f"**Recommendation:** {issue.get('recommendation', 'No recommendation')}\n\n"
+
+        # Positive observations
+        positives = page_report.get("positive_observations", [])
+        if positives:
+            report += "#### ✅ Positive Observations\n\n"
+            for pos in positives:
+                report += f"- {pos}\n"
             report += "\n"
 
-    # Footer
-    report += """---
+        # No issues found
+        if critical_count == 0 and moderate_count == 0 and minor_count == 0:
+            report += "*No UI Traps detected on this page.*\n\n"
 
+        report += "---\n\n"
+
+    # Footer
+    report += """
 ## Methodology
 
-This analysis used the **UI Tenets & Traps** heuristic framework, which evaluates interfaces against 27 common usability pitfalls organized by four core tenets:
-
-- **UNDERSTANDABLE**: Users can comprehend what they see
-- **EFFICIENT**: Users can accomplish tasks without unnecessary effort
-- **TRUSTWORTHY**: Users can rely on the system to behave predictably
-- **BEAUTIFUL**: The interface is aesthetically pleasing and professional
+This analysis used the **UI Tenets & Traps** heuristic framework, which evaluates interfaces against 27 common usability pitfalls organized under 9 core tenets.
 
 Each page was analyzed considering its **role** in the site (homepage, product page, contact, etc.) and evaluated only for tasks **appropriate to that page type**.
 
@@ -239,6 +158,7 @@ Reproduction, distribution, or sharing without written permission is prohibited.
 def generate_site_report_html(analysis_result: Dict[str, Any], url: str) -> str:
     """
     Generate a cohesive HTML report for entire site analysis.
+    Page-centric format with all issues shown per page.
 
     Args:
         analysis_result: Complete result from SiteAnalyzer.analyze_site()
@@ -249,9 +169,6 @@ def generate_site_report_html(analysis_result: Dict[str, Any], url: str) -> str:
     """
     domain = urlparse(url).netloc
     summary = analysis_result.get("site_summary", {})
-    stats = analysis_result.get("statistics", {})
-    flow_analyses = analysis_result.get("flow_analyses", [])
-    recommendations = analysis_result.get("recommendations", [])
     page_analyses = analysis_result.get("page_analyses", [])
     metadata = analysis_result.get("metadata", {})
 
@@ -300,8 +217,8 @@ def generate_site_report_html(analysis_result: Dict[str, Any], url: str) -> str:
         }}
         h3 {{
             color: #374151;
-            font-size: 1.2em;
-            margin: 20px 0 10px 0;
+            font-size: 1.3em;
+            margin: 25px 0 10px 0;
         }}
         .meta {{
             background: #f8fafc;
@@ -313,7 +230,7 @@ def generate_site_report_html(analysis_result: Dict[str, Any], url: str) -> str:
         .meta p {{ margin: 5px 0; color: #64748b; }}
         .stats-grid {{
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
             gap: 15px;
             margin: 20px 0;
         }}
@@ -328,7 +245,7 @@ def generate_site_report_html(analysis_result: Dict[str, Any], url: str) -> str:
         .stat-card.minor {{ background: linear-gradient(135deg, #22c55e, #16a34a); }}
         .stat-card.total {{ background: linear-gradient(135deg, #6366f1, #4f46e5); }}
         .stat-card h3 {{ color: white; font-size: 2em; margin: 0; }}
-        .stat-card p {{ opacity: 0.9; margin-top: 5px; }}
+        .stat-card p {{ opacity: 0.9; margin-top: 5px; font-size: 0.9em; }}
         .assessment {{
             background: #fef3c7;
             border: 1px solid #f59e0b;
@@ -340,27 +257,59 @@ def generate_site_report_html(analysis_result: Dict[str, Any], url: str) -> str:
             background: #dcfce7;
             border-color: #22c55e;
         }}
-        .flow-item {{
-            background: #f8fafc;
-            border-radius: 8px;
-            padding: 15px 20px;
-            margin: 15px 0;
-            border-left: 4px solid #6366f1;
-        }}
-        .flow-item.incomplete {{
-            border-left-color: #f59e0b;
-            background: #fffbeb;
-        }}
-        .flow-item h4 {{ margin-bottom: 8px; }}
-        .flow-status {{
-            display: inline-block;
-            padding: 3px 10px;
+        .page-section {{
+            background: #fafafa;
+            border: 1px solid #e5e7eb;
             border-radius: 12px;
+            padding: 25px;
+            margin: 25px 0;
+        }}
+        .page-header {{
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }}
+        .page-header h3 {{
+            margin: 0;
+            flex-grow: 1;
+        }}
+        .role-badge {{
+            background: #6366f1;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 600;
+            text-transform: uppercase;
+        }}
+        .page-url {{
+            font-size: 0.9em;
+            margin-bottom: 15px;
+        }}
+        .page-url a {{
+            color: #6366f1;
+            text-decoration: none;
+        }}
+        .page-url a:hover {{
+            text-decoration: underline;
+        }}
+        .issue-summary {{
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }}
+        .issue-count {{
+            padding: 6px 14px;
+            border-radius: 20px;
             font-size: 0.85em;
             font-weight: 600;
         }}
-        .flow-status.complete {{ background: #dcfce7; color: #166534; }}
-        .flow-status.incomplete {{ background: #fef3c7; color: #92400e; }}
+        .issue-count.critical {{ background: #fef2f2; color: #dc2626; }}
+        .issue-count.moderate {{ background: #fffbeb; color: #d97706; }}
+        .issue-count.minor {{ background: #f0fdf4; color: #16a34a; }}
         .issue-card {{
             border-radius: 8px;
             padding: 20px;
@@ -375,78 +324,77 @@ def generate_site_report_html(analysis_result: Dict[str, Any], url: str) -> str:
             background: #fffbeb;
             border-left-color: #f59e0b;
         }}
-        .issue-card h4 {{
-            margin-bottom: 10px;
+        .issue-card.minor {{
+            background: #f0fdf4;
+            border-left-color: #22c55e;
         }}
-        .issue-card .location {{
+        .issue-card h4 {{
+            margin: 0 0 12px 0;
+            font-size: 1.1em;
+        }}
+        .issue-card .severity-label {{
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.75em;
+            letter-spacing: 0.5px;
+        }}
+        .issue-card .severity-label.critical {{ color: #dc2626; }}
+        .issue-card .severity-label.moderate {{ color: #d97706; }}
+        .issue-card .severity-label.minor {{ color: #16a34a; }}
+        .issue-meta {{
             font-size: 0.9em;
             color: #64748b;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
         }}
-        .recommendation {{
-            background: #eff6ff;
-            padding: 10px 15px;
+        .issue-problem {{
+            margin-bottom: 12px;
+        }}
+        .issue-recommendation {{
+            background: rgba(255,255,255,0.7);
+            padding: 12px 15px;
             border-radius: 6px;
-            margin-top: 10px;
             font-size: 0.95em;
         }}
-        .page-summary {{
-            background: white;
-            border: 1px solid #e5e7eb;
+        .issue-recommendation strong {{
+            color: #4f46e5;
+        }}
+        .positive-section {{
+            background: #f0fdf4;
             border-radius: 8px;
-            padding: 20px;
-            margin: 15px 0;
+            padding: 15px 20px;
+            margin-top: 15px;
         }}
-        .page-summary h4 {{
-            display: flex;
-            align-items: center;
-            gap: 10px;
+        .positive-section h4 {{
+            color: #166534;
+            margin: 0 0 10px 0;
+            font-size: 1em;
         }}
-        .role-badge {{
-            background: #6366f1;
-            color: white;
-            padding: 2px 10px;
-            border-radius: 12px;
-            font-size: 0.75em;
-            font-weight: 600;
-            text-transform: uppercase;
+        .positive-section ul {{
+            margin: 0;
+            padding-left: 20px;
         }}
-        .issue-badges {{
-            display: flex;
-            gap: 10px;
-            margin: 10px 0;
+        .positive-section li {{
+            margin: 5px 0;
+            color: #166534;
         }}
-        .badge {{
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 0.85em;
-            font-weight: 600;
+        .no-issues {{
+            color: #166534;
+            background: #dcfce7;
+            padding: 15px 20px;
+            border-radius: 8px;
+            text-align: center;
         }}
-        .badge.critical {{ background: #fef2f2; color: #dc2626; }}
-        .badge.moderate {{ background: #fffbeb; color: #d97706; }}
-        .badge.minor {{ background: #f0fdf4; color: #16a34a; }}
-        .recommendations-list {{
+        .toc {{
             background: #f8fafc;
-            border-radius: 8px;
             padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
         }}
-        .recommendations-list ol {{
-            margin-left: 20px;
-        }}
-        .recommendations-list li {{
-            margin: 12px 0;
-            line-height: 1.5;
-        }}
-        .severity-icon {{
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            margin-right: 8px;
-        }}
-        .severity-icon.critical {{ background: #ef4444; }}
-        .severity-icon.moderate {{ background: #f59e0b; }}
-        .severity-icon.minor {{ background: #22c55e; }}
+        .toc h3 {{ margin-bottom: 15px; font-size: 1.1em; }}
+        .toc ul {{ list-style: none; }}
+        .toc li {{ margin: 8px 0; }}
+        .toc a {{ color: #6366f1; text-decoration: none; }}
+        .toc a:hover {{ text-decoration: underline; }}
         .footer {{
             margin-top: 40px;
             padding-top: 20px;
@@ -455,17 +403,6 @@ def generate_site_report_html(analysis_result: Dict[str, Any], url: str) -> str:
             color: #64748b;
             font-size: 0.9em;
         }}
-        .toc {{
-            background: #f8fafc;
-            padding: 20px;
-            border-radius: 8px;
-            margin: 20px 0;
-        }}
-        .toc h3 {{ margin-bottom: 15px; }}
-        .toc ul {{ list-style: none; }}
-        .toc li {{ margin: 8px 0; }}
-        .toc a {{ color: #6366f1; text-decoration: none; }}
-        .toc a:hover {{ text-decoration: underline; }}
     </style>
 </head>
 <body>
@@ -475,21 +412,25 @@ def generate_site_report_html(analysis_result: Dict[str, Any], url: str) -> str:
         <div class="meta">
             <p><strong>Analysis Date:</strong> {metadata.get('timestamp', '')}</p>
             <p><strong>Pages Analyzed:</strong> {metadata.get('pages_analyzed', 0)}</p>
-            <p><strong>Starting URL:</strong> {url}</p>
+            <p><strong>Starting URL:</strong> <a href="{url}" target="_blank">{url}</a></p>
         </div>
 
         <div class="toc">
-            <h3>Contents</h3>
+            <h3>Pages Analyzed</h3>
             <ul>
-                <li><a href="#summary">Executive Summary</a></li>
-                <li><a href="#flows">Task Flow Analysis</a></li>
-                <li><a href="#critical">Critical Issues</a></li>
-                <li><a href="#recommendations">Top Recommendations</a></li>
-                <li><a href="#pages">Page-by-Page Details</a></li>
-            </ul>
+"""
+
+    # Build table of contents
+    for i, page_result in enumerate(page_analyses):
+        page = page_result.get("page", {})
+        title = page.get('title', 'Unknown')
+        role = page_result.get("page_role", "unknown")
+        html += f'                <li><a href="#page-{i}">{title}</a> <span style="color: #64748b; font-size: 0.85em;">({role})</span></li>\n'
+
+    html += f"""            </ul>
         </div>
 
-        <h2 id="summary">Executive Summary</h2>
+        <h2>Executive Summary</h2>
 
         <div class="assessment {"good" if critical_count == 0 else ""}">
             <strong>Overall Assessment:</strong> {summary.get('overall_assessment', '')}
@@ -510,104 +451,106 @@ def generate_site_report_html(analysis_result: Dict[str, Any], url: str) -> str:
             </div>
             <div class="stat-card total">
                 <h3>{total_issues}</h3>
-                <p>Total Issues</p>
+                <p>Total</p>
             </div>
         </div>
 
-        <h2 id="flows">Task Flow Analysis</h2>
-        <p>Can users complete their goals across the site?</p>
+        <h2>Page-by-Page Analysis</h2>
 """
 
-    # Task flows
-    for flow in flow_analyses:
-        complete = flow.get("complete", False)
-        status_class = "complete" if complete else "incomplete"
-        status_text = "Complete" if complete else "Incomplete"
-
-        html += f"""
-        <div class="flow-item {status_class}">
-            <h4>{flow.get('task', '')}</h4>
-            <span class="flow-status {status_class}">{status_text}</span>
-"""
-        if not complete:
-            missing = flow.get("missing_page_types", [])
-            html += f"""
-            <p style="margin-top: 10px;"><strong>Missing:</strong> {', '.join(missing)}</p>
-            <p><em>{flow.get('assessment', '')}</em></p>
-"""
-        html += "        </div>\n"
-
-    # Critical issues
-    critical_recs = [r for r in recommendations if r.get("severity") == "critical"]
-    html += f"""
-        <h2 id="critical">Critical Issues ({len(critical_recs)})</h2>
-"""
-    if critical_recs:
-        for rec in critical_recs:
-            html += f"""
-        <div class="issue-card critical">
-            <h4>🔴 {rec.get('trap_name', '')}</h4>
-            <p class="location"><strong>Page:</strong> {rec.get('page', '')} | <strong>Location:</strong> {rec.get('location', '')}</p>
-            <p>{rec.get('problem', '')}</p>
-            <div class="recommendation">
-                <strong>Recommendation:</strong> {rec.get('recommendation', '')}
-            </div>
-        </div>
-"""
-    else:
-        html += "        <p><em>No critical issues found!</em></p>\n"
-
-    # Top recommendations
-    html += """
-        <h2 id="recommendations">Top Recommendations</h2>
-        <div class="recommendations-list">
-            <ol>
-"""
-    for rec in recommendations[:10]:
-        severity = rec.get("severity", "minor")
-        html += f"""                <li>
-                    <span class="severity-icon {severity}"></span>
-                    <strong>{rec.get('trap_name', '')}</strong> ({rec.get('page', '')}): {rec.get('recommendation', '')}
-                </li>
-"""
-    html += """            </ol>
-        </div>
-
-        <h2 id="pages">Page-by-Page Details</h2>
-"""
-
-    # Page summaries
-    for page_result in page_analyses:
+    # Page-by-page with ALL issues
+    for i, page_result in enumerate(page_analyses):
         page = page_result.get("page", {})
         role = page_result.get("page_role", "unknown")
-        title = page.get("title", "Unknown")
+        page_url = page.get('url', '#')
+        title = page.get('title', 'Unknown')
 
         html += f"""
-        <div class="page-summary">
-            <h4>{title} <span class="role-badge">{role}</span></h4>
-            <p><a href="{page.get('url', '#')}" target="_blank">{page.get('url', '')}</a></p>
+        <div class="page-section" id="page-{i}">
+            <div class="page-header">
+                <h3>{title}</h3>
+                <span class="role-badge">{role}</span>
+            </div>
+            <p class="page-url"><a href="{page_url}" target="_blank">{page_url}</a></p>
 """
-        if page_result.get("success"):
-            analysis = page_result.get("analysis") or {}
-            page_stats = analysis.get("statistics") or {}
 
-            html += f"""
-            <div class="issue-badges">
-                <span class="badge critical">{page_stats.get('critical_count', 0)} critical</span>
-                <span class="badge moderate">{page_stats.get('moderate_count', 0)} moderate</span>
-                <span class="badge minor">{page_stats.get('minor_count', 0)} minor</span>
+        if not page_result.get("success"):
+            html += f'            <p style="color: #dc2626;"><em>Error analyzing this page: {page_result.get("error", "Unknown error")}</em></p>\n'
+            html += "        </div>\n"
+            continue
+
+        analysis = page_result.get("analysis") or {}
+        page_stats = analysis.get("statistics") or {}
+        page_report = analysis.get("report") or {}
+
+        page_critical = page_stats.get('critical_count', 0)
+        page_moderate = page_stats.get('moderate_count', 0)
+        page_minor = page_stats.get('minor_count', 0)
+
+        html += f"""
+            <div class="issue-summary">
+                <span class="issue-count critical">{page_critical} critical</span>
+                <span class="issue-count moderate">{page_moderate} moderate</span>
+                <span class="issue-count minor">{page_minor} minor</span>
             </div>
 """
-            # List key issues
-            page_report = analysis.get("report") or {}
-            issues = page_report.get("critical_issues", []) + page_report.get("moderate_issues", [])[:2]
-            if issues:
-                html += "            <ul style='margin-top: 10px;'>\n"
-                for issue in issues:
-                    html += f"                <li><strong>{issue.get('trap_name', '')}</strong>: {issue.get('problem', '')[:80]}...</li>\n"
-                html += "            </ul>\n"
+
+        # Check if no issues
+        if page_critical == 0 and page_moderate == 0 and page_minor == 0:
+            html += '            <div class="no-issues">✅ No UI Traps detected on this page</div>\n'
         else:
-            html += f"            <p><em>Error: {page_result.get('error', 'Unknown')}</em></p>\n"
+            # Critical issues
+            for issue in page_report.get("critical_issues", []):
+                html += f"""
+            <div class="issue-card critical">
+                <h4><span class="severity-label critical">🔴 CRITICAL</span> — {issue.get('trap_name', 'Unknown')}</h4>
+                <p class="issue-meta"><strong>Tenet:</strong> {issue.get('tenet', 'Unknown')} | <strong>Location:</strong> {issue.get('location', 'Unknown')}</p>
+                <p class="issue-problem">{issue.get('problem', 'No description')}</p>
+                <div class="issue-recommendation">
+                    <strong>Recommendation:</strong> {issue.get('recommendation', 'No recommendation')}
+                </div>
+            </div>
+"""
+
+            # Moderate issues
+            for issue in page_report.get("moderate_issues", []):
+                html += f"""
+            <div class="issue-card moderate">
+                <h4><span class="severity-label moderate">🟡 MODERATE</span> — {issue.get('trap_name', 'Unknown')}</h4>
+                <p class="issue-meta"><strong>Tenet:</strong> {issue.get('tenet', 'Unknown')} | <strong>Location:</strong> {issue.get('location', 'Unknown')}</p>
+                <p class="issue-problem">{issue.get('problem', 'No description')}</p>
+                <div class="issue-recommendation">
+                    <strong>Recommendation:</strong> {issue.get('recommendation', 'No recommendation')}
+                </div>
+            </div>
+"""
+
+            # Minor issues
+            for issue in page_report.get("minor_issues", []):
+                html += f"""
+            <div class="issue-card minor">
+                <h4><span class="severity-label minor">🟢 MINOR</span> — {issue.get('trap_name', 'Unknown')}</h4>
+                <p class="issue-meta"><strong>Tenet:</strong> {issue.get('tenet', 'Unknown')} | <strong>Location:</strong> {issue.get('location', 'Unknown')}</p>
+                <p class="issue-problem">{issue.get('problem', 'No description')}</p>
+                <div class="issue-recommendation">
+                    <strong>Recommendation:</strong> {issue.get('recommendation', 'No recommendation')}
+                </div>
+            </div>
+"""
+
+        # Positive observations
+        positives = page_report.get("positive_observations", [])
+        if positives:
+            html += """
+            <div class="positive-section">
+                <h4>✅ Positive Observations</h4>
+                <ul>
+"""
+            for pos in positives:
+                html += f"                    <li>{pos}</li>\n"
+            html += """                </ul>
+            </div>
+"""
 
         html += "        </div>\n"
 
