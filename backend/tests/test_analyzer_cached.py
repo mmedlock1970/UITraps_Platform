@@ -22,12 +22,12 @@ import sys
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+# Add backend to path (not src directly)
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from schema import VALID_TRAP_NAMES, VALID_TENET_NAMES
-from analyzer import UITrapsAnalyzer
-from formatters import get_report_statistics
+from src.schema import VALID_TRAP_NAMES, VALID_TENET_NAMES
+from src.analyzer import UITrapsAnalyzer
+from src.formatters import get_report_statistics
 
 
 # ============================================================================

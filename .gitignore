@@ -24,3 +24,9 @@ Thumbs.db
 
 # Build artifacts
 *.log
+
+# Test artifacts
+test_output/
+test_output_*/
+.pytest_cache/
+backend/_ul
