@@ -282,14 +282,15 @@ class FigmaAnalyzer:
         self,
         figma_url: str,
         output_dir: Optional[str] = None,
-        cached_file_data: Optional[Dict] = None
+        cached_file_data: Optional[Dict] = None,
+        max_frames: Optional[int] = None
     ) -> Dict:
         """
         Complete analysis workflow for a Figma file.
 
         1. Parse URL to get file_key
         2. Fetch file data (or use cached)
-        3. Export all frames as images
+        3. Export frames as images (limited by max_frames)
         4. Detect prototype flows
         5. Prepare for UI Traps analysis
 
@@ -297,6 +298,7 @@ class FigmaAnalyzer:
             figma_url: Figma file URL
             output_dir: Directory to save exported images (optional)
             cached_file_data: Pre-fetched file data to avoid API call (optional)
+            max_frames: Maximum number of frames to export (optional, exports all if None)
 
         Returns:
             Dictionary containing:
@@ -340,10 +342,17 @@ class FigmaAnalyzer:
             output_path = Path(output_dir)
             output_path.mkdir(parents=True, exist_ok=True)
 
+            # Limit frames to export if max_frames is specified
+            frames_to_export = frames[:max_frames] if max_frames else frames
+            total_to_export = len(frames_to_export)
+
             print(f"Exporting frame images to {output_dir}...")
-            for i, frame in enumerate(frames, 1):
+            if max_frames and len(frames) > max_frames:
+                print(f"  (Limiting to {max_frames} of {len(frames)} frames)")
+
+            for i, frame in enumerate(frames_to_export, 1):
                 try:
-                    print(f"  [{i}/{len(frames)}] Exporting: {frame['name']}")
+                    print(f"  [{i}/{total_to_export}] Exporting: {frame['name']}")
 
                     # Export frame
                     image_data = self.export_frame_as_image(file_key, frame['id'])
@@ -358,6 +367,9 @@ class FigmaAnalyzer:
                 except Exception as e:
                     print(f"    Warning: Failed to export {frame['name']}: {e}")
                     frame['image_path'] = None
+
+            # Only return frames that were exported
+            frames = frames_to_export
 
         return {
             'file_info': file_info,

@@ -22,7 +22,7 @@ import styles from './App.module.css';
 import cardsImage from './assets/cards.png';
 
 // Default API endpoint for development
-const DEFAULT_API_ENDPOINT = 'http://localhost:8000';
+const DEFAULT_API_ENDPOINT = 'http://localhost:8001';
 
 /** Helper to normalize time estimates from different sources */
 function normalizeTimeEstimate(estimate: UnifiedEstimate | null): TimeEstimate | undefined {
