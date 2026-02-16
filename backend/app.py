@@ -55,6 +55,9 @@ from src.usage_service import (
     get_current_month
 )
 
+# Report saver for automatic report persistence
+from src.report_saver import save_analysis_report, get_report_saver
+
 # NEW: JWT auth for unified platform
 from src.auth import get_current_user
 
@@ -414,6 +417,15 @@ async def analyze(
             new_usage = increment_usage(session, api_key, 1, MONTHLY_LIMIT)
             log_analysis(session, api_key, "/analyze", "single_image", 1, "success")
 
+            # 8.5. Save report to disk
+            report_path = save_analysis_report(
+                analysis_result=result,
+                analysis_type="single_image",
+                user_context=user_context,
+                metadata={"file_name": image.filename, "api_key": api_key[:8] + "..."}
+            )
+            logger.info(f"Report saved to: {report_path}")
+
             # 9. Return response
             return {
                 "success": True,
@@ -619,6 +631,19 @@ async def analyze_multi(
             log_analysis(session, api_key, "/analyze-multi", "multi_image", credits_needed, "success",
                         {"image_count": len(images)})
 
+            # 7.5. Save report to disk
+            report_path = save_analysis_report(
+                analysis_result=result,
+                analysis_type="multi_image",
+                user_context=user_context,
+                metadata={
+                    "image_count": len(images),
+                    "file_names": [img.filename for img in images],
+                    "api_key": api_key[:8] + "..."
+                }
+            )
+            logger.info(f"Report saved to: {report_path}")
+
             return {
                 "success": True,
                 "report_html": result.get("html"),
@@ -730,6 +755,19 @@ async def analyze_video(
             log_analysis(session, api_key, "/analyze-video", "video", actual_frames, "success",
                         {"frame_count": actual_frames})
 
+            # 9.5. Save report to disk
+            report_path = save_analysis_report(
+                analysis_result=result,
+                analysis_type="video",
+                user_context=user_context,
+                metadata={
+                    "file_name": video.filename,
+                    "frame_count": actual_frames,
+                    "api_key": api_key[:8] + "..."
+                }
+            )
+            logger.info(f"Report saved to: {report_path}")
+
             return {
                 "success": True,
                 "report_html": result.get("html"),
@@ -780,6 +818,69 @@ async def get_capabilities():
         "supported_video_types": ["video/mp4", "video/quicktime", "video/webm"],
         "supported_document_types": ["application/pdf"]
     }
+
+
+@app.get("/reports")
+async def list_saved_reports(limit: int = 20):
+    """
+    List saved analysis reports.
+
+    Returns a list of recently saved reports with metadata.
+    Use this to reference previous analyses for troubleshooting.
+
+    Args:
+        limit: Maximum number of reports to return (default 20)
+
+    Returns:
+        List of report summaries
+    """
+    try:
+        saver = get_report_saver()
+        reports = saver.list_reports(limit=limit)
+        return {
+            "success": True,
+            "reports": reports,
+            "count": len(reports)
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to list reports: {str(e)}"
+        )
+
+
+@app.get("/reports/{filename}")
+async def get_saved_report(filename: str):
+    """
+    Retrieve a specific saved report by filename.
+
+    Args:
+        filename: Report filename (e.g., report_2024-01-15_14-30-00_url.json)
+
+    Returns:
+        Full report data
+    """
+    try:
+        saver = get_report_saver()
+        report = saver.get_report(filename)
+
+        if report is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Report not found: {filename}"
+            )
+
+        return {
+            "success": True,
+            "report": report
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve report: {str(e)}"
+        )
 
 
 # ===========================================================
@@ -979,6 +1080,27 @@ async def analyze_figma(
                 log_analysis(session, api_key, "/analyze-figma", "figma", frame_count, "success",
                             {"frame_count": frame_count, "file_name": figma_result["file_info"]["name"]})
 
+                # Save report to disk
+                report_path = save_analysis_report(
+                    analysis_result={
+                        "html": html_report,
+                        "statistics": result.get("statistics"),
+                        "site_summary": result.get("site_summary"),
+                        "page_analyses": result.get("page_analyses"),
+                        "flow_analyses": result.get("flow_analyses"),
+                        "recommendations": result.get("recommendations")
+                    },
+                    analysis_type="figma",
+                    user_context=user_context,
+                    metadata={
+                        "figma_url": figma_url,
+                        "file_name": figma_result["file_info"]["name"],
+                        "frame_count": frame_count,
+                        "api_key": api_key[:8] + "..."
+                    }
+                )
+                logger.info(f"Report saved to: {report_path}")
+
                 return {
                     "success": True,
                     "report_html": html_report,
@@ -1126,6 +1248,28 @@ async def analyze_url(
                 new_usage = increment_usage(session, api_key, pages_analyzed, MONTHLY_LIMIT)
                 log_analysis(session, api_key, "/analyze-url", "url", pages_analyzed, "success",
                             {"pages_analyzed": pages_analyzed, "url": url})
+
+                # Save report to disk
+                report_path = save_analysis_report(
+                    analysis_result={
+                        "html": html_report,
+                        "statistics": result.get("statistics"),
+                        "site_summary": result.get("site_summary"),
+                        "page_analyses": result.get("page_analyses"),
+                        "flow_analyses": result.get("flow_analyses"),
+                        "recommendations": result.get("recommendations"),
+                        "interaction_analysis": result.get("interaction_analysis")
+                    },
+                    analysis_type="url",
+                    user_context=user_context,
+                    metadata={
+                        "url": url,
+                        "pages_analyzed": pages_analyzed,
+                        "capture_interactions": capture_interactions,
+                        "api_key": api_key[:8] + "..."
+                    }
+                )
+                logger.info(f"Report saved to: {report_path}")
 
                 response_data = {
                     "success": True,
@@ -1307,6 +1451,20 @@ async def analyze_pdf(
             new_usage = increment_usage(session, api_key, actual_pages, MONTHLY_LIMIT)
             log_analysis(session, api_key, "/analyze-pdf", "pdf", actual_pages, "success",
                         {"pages_analyzed": actual_pages, "file_name": file.filename})
+
+            # Save report to disk
+            report_path = save_analysis_report(
+                analysis_result=result,
+                analysis_type="pdf",
+                user_context=user_context,
+                metadata={
+                    "file_name": file.filename,
+                    "pages_analyzed": actual_pages,
+                    "pdf_info": result.get("pdf_info"),
+                    "api_key": api_key[:8] + "..."
+                }
+            )
+            logger.info(f"Report saved to: {report_path}")
 
             return {
                 "success": True,
