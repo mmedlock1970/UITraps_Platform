@@ -320,6 +320,9 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
   // Loading state for unified requests
   const [isUnifiedLoading, setIsUnifiedLoading] = useState(false);
 
+  // Flag: context was gathered before task capture, so skip re-asking after capture completes
+  const [contextGatheredForCapture, setContextGatheredForCapture] = useState(false);
+
   // Chat hook for pure chat messages
   const chat = useChat({ apiEndpoint, token });
 
@@ -462,12 +465,14 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
 
     switch (choiceId) {
       case 'describe_task':
+        setContextGatheredForCapture(false);  // Clear flag - not using task capture
         chat.addSystemPrompt(
           'Go ahead — describe the UI issue or task flow and I\'ll identify any UI traps for you.'
         );
         break;
 
       case 'drop_screenshots':
+        // Keep contextGatheredForCapture - user is dropping screenshots, context still applies
         chat.addSystemPrompt(
           'Drop your screenshots into the input area below (or click to select files). ' +
           'If you have multiple screenshots, I\'ll ask if they\'re in order.'
@@ -475,6 +480,7 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
         break;
 
       case 'step_capture':
+        // Keep contextGatheredForCapture - this is the task capture flow
         chat.addSystemPrompt(
           pendingUrlTask
             ? `Got it — opening step-by-step capture for: **${pendingUrlTask}**`
@@ -484,6 +490,7 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
         break;
 
       case 'just_chat':
+        setContextGatheredForCapture(false);  // Clear flag - not using task capture
         chat.addSystemPrompt('Sure — what would you like to know?');
         break;
     }
@@ -495,6 +502,7 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
     setAnalysisPhase('idle');
     setEstimate(null);
     setIsUnifiedLoading(false);
+    setContextGatheredForCapture(false);  // Clear the flag on cancel
   }, [elapsed]);
 
   /** Start the estimation step (called after context is complete) */
@@ -717,6 +725,7 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
         // URL context flow: show capture options widget instead of starting estimation
         if (isUrlContextFlow) {
           setIsUrlContextFlow(false);
+          setContextGatheredForCapture(true);  // Mark that context is ready for task capture
           const hostname = pendingUrl ? new URL(pendingUrl).hostname : 'that site';
           chat.addOptionsWidget(
             `All set! Now, how would you like to capture screenshots of **${hostname}**?`,
@@ -904,9 +913,10 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
     setPendingQuestion(userText);
     setInputText('');
 
-    // Check if we already have full context
-    if (hasFullContext(users, expertise, tasks, format)) {
+    // Check if we already have full context OR context was gathered for task capture
+    if (hasFullContext(users, expertise, tasks, format) || contextGatheredForCapture) {
       // Context is ready — go straight to estimation
+      setContextGatheredForCapture(false);  // Clear the flag
       await startEstimation();
       return;
     }
@@ -920,7 +930,7 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
     );
   }, [
     token, contextGatheringPhase, detectedMode, inputText, files, detectedUrl, pendingUrl,
-    users, expertise, tasks, format, chat, startEstimation, isUrlContextFlow,
+    users, expertise, tasks, format, chat, startEstimation, isUrlContextFlow, contextGatheredForCapture,
   ]);
 
   return {
