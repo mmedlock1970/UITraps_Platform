@@ -6,7 +6,7 @@
  */
 
 import { useState, useCallback, useRef } from 'react';
-import { ChatMessage, MessageMode } from '../api/types';
+import { ChatMessage, MessageMode, OptionsWidgetChoice } from '../api/types';
 import { sendChatMessage } from '../api/client';
 
 interface UseChatOptions {
@@ -23,6 +23,8 @@ interface UseChatReturn {
   sendMessage: (message: string) => Promise<void>;
   addUserMessage: (content: string, mode?: MessageMode) => void;
   addSystemPrompt: (content: string) => void;
+  addOptionsWidget: (content: string, choices: OptionsWidgetChoice[]) => void;
+  markWidgetUsed: (messageId: string) => void;
   addAnalysisMessage: (reportHtml: string, statistics?: Record<string, unknown>) => void;
   clearHistory: () => void;
 }
@@ -125,6 +127,26 @@ export function useChat(options: UseChatOptions): UseChatReturn {
     setMessages(prev => [...prev, msg]);
   }, []);
 
+  const addOptionsWidget = useCallback((content: string, choices: OptionsWidgetChoice[]) => {
+    const msg: ChatMessage = {
+      id: generateId(),
+      role: 'assistant',
+      content,
+      mode: 'chat',
+      timestamp: new Date(),
+      widgetType: 'options',
+      widgetChoices: choices,
+      widgetUsed: false,
+    };
+    setMessages(prev => [...prev, msg]);
+  }, []);
+
+  const markWidgetUsed = useCallback((messageId: string) => {
+    setMessages(prev =>
+      prev.map(m => m.id === messageId ? { ...m, widgetUsed: true } : m)
+    );
+  }, []);
+
   const addAnalysisMessage = useCallback((
     reportHtml: string,
     statistics?: Record<string, unknown>,
@@ -154,6 +176,8 @@ export function useChat(options: UseChatOptions): UseChatReturn {
     sendMessage,
     addUserMessage,
     addSystemPrompt,
+    addOptionsWidget,
+    markWidgetUsed,
     addAnalysisMessage,
     clearHistory,
   };

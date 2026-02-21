@@ -475,15 +475,19 @@ export interface UrlEstimateOptions {
   apiEndpoint: string;
   url: string;
   maxPages?: number;
+  deviceType?: string;
   timeout?: number;
 }
 
 export async function getUrlEstimate(options: UrlEstimateOptions): Promise<UrlEstimateResponse> {
-  const { apiEndpoint, url, maxPages = 10, timeout = 30000 } = options;
+  const { apiEndpoint, url, maxPages = 10, deviceType, timeout = 30000 } = options;
 
   const formData = new FormData();
   formData.append('url', url);
   formData.append('max_pages', maxPages.toString());
+  if (deviceType) {
+    formData.append('device_type', deviceType);
+  }
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
@@ -588,12 +592,13 @@ export interface AnalyzeUrlOptions {
   url: string;
   context: UserContext;
   maxPages?: number;
+  deviceType?: string;
   timeout?: number;
   signal?: AbortSignal;
 }
 
 export async function analyzeUrl(options: AnalyzeUrlOptions): Promise<SiteAnalysisResponse> {
-  const { apiEndpoint, apiKey, url, context, maxPages = 10, timeout = 600000, signal } = options;
+  const { apiEndpoint, apiKey, url, context, maxPages = 10, deviceType, timeout = 600000, signal } = options;
 
   const formData = new FormData();
   formData.append('url', url);
@@ -603,6 +608,9 @@ export async function analyzeUrl(options: AnalyzeUrlOptions): Promise<SiteAnalys
   formData.append('content_type', context.contentType || 'website');
   formData.append('api_key', apiKey);
   formData.append('max_pages', maxPages.toString());
+  if (deviceType) {
+    formData.append('device_type', deviceType);
+  }
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);

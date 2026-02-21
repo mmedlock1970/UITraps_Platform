@@ -295,6 +295,44 @@ def generate_site_report_html(analysis_result: Dict[str, Any], url: str) -> str:
         .page-url a:hover {{
             text-decoration: underline;
         }}
+        .screenshot-section {{
+            margin: 15px 0;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+        }}
+        .screenshot-toggle {{
+            cursor: pointer;
+            padding: 12px 15px;
+            background: #f8fafc;
+            font-weight: 500;
+            color: #374151;
+            user-select: none;
+            display: block;
+        }}
+        .screenshot-toggle:hover {{
+            background: #f1f5f9;
+        }}
+        details .screenshot-toggle::before {{
+            content: '▶ ';
+            display: inline-block;
+            transition: transform 0.2s;
+        }}
+        details[open] .screenshot-toggle::before {{
+            transform: rotate(90deg);
+        }}
+        .screenshot-container {{
+            padding: 15px;
+            background: white;
+            text-align: center;
+        }}
+        .page-screenshot {{
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }}
         .issue-summary {{
             display: flex;
             gap: 10px;
@@ -472,6 +510,23 @@ def generate_site_report_html(analysis_result: Dict[str, Any], url: str) -> str:
                 <span class="role-badge">{role}</span>
             </div>
             <p class="page-url"><a href="{page_url}" target="_blank">{page_url}</a></p>
+"""
+
+        # Add screenshot if available
+        screenshot_base64 = page.get('screenshot_base64')
+        if screenshot_base64:
+            html += f"""
+            <details class="screenshot-section">
+                <summary class="screenshot-toggle">📸 View Screenshot</summary>
+                <div class="screenshot-container">
+                    <img
+                        src="data:image/jpeg;base64,{screenshot_base64}"
+                        alt="Screenshot of {title}"
+                        loading="lazy"
+                        class="page-screenshot"
+                    />
+                </div>
+            </details>
 """
 
         if not page_result.get("success"):

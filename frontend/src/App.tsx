@@ -15,11 +15,20 @@ import { EstimatePreview } from './components/EstimatePreview';
 import { AnalysisProgress } from './components/AnalysisProgress';
 import { ReportViewer } from './components/ReportViewer';
 import { PastAnalyses } from './components/PastAnalyses';
+import { TaskCaptureScreen, CapturedStep } from './components/TaskCaptureScreen';
 import { saveAnalysis, getAnalysisHistory, StoredAnalysis } from './services/analysisHistory';
 import { ReportStatistics, UsageInfo, UnifiedAskResponse, TimeEstimate, isFigmaEstimate, isUrlEstimate, isFileEstimate, UnifiedEstimate } from './api/types';
 import './styles/variables.css';
 import styles from './App.module.css';
 import cardsImage from './assets/cards.png';
+
+/** Estimate running cost based on screenshot count (rough calculation) */
+function estimateRunningCost(count: number): string {
+  if (count === 0) return '';
+  const cost = (count * 0.03).toFixed(2);
+  const mins = count <= 5 ? '~1 min' : count <= 10 ? '~2 min' : '~3-4 min';
+  return `${count} screenshot${count > 1 ? 's' : ''} — est. $${cost}, ${mins}`;
+}
 
 // Default API endpoint for development
 const DEFAULT_API_ENDPOINT = 'http://localhost:8000';
@@ -45,7 +54,7 @@ function normalizeTimeEstimate(estimate: UnifiedEstimate | null): TimeEstimate |
   return undefined;
 }
 
-type AppView = 'chat' | 'report' | 'history';
+type AppView = 'chat' | 'report' | 'history' | 'task-capture';
 
 interface ActiveReport {
   html: string;
@@ -58,6 +67,10 @@ export const App: React.FC = () => {
   const [apiEndpoint] = useState(DEFAULT_API_ENDPOINT);
   const [view, setView] = useState<AppView>('chat');
   const [activeReport, setActiveReport] = useState<ActiveReport | null>(null);
+
+  // Task capture state
+  const [taskName, setTaskName] = useState('');
+  const [capturedSteps, setCapturedSteps] = useState<CapturedStep[]>([]);
 
   const auth = useAuth({ mode: 'standalone' });
 
@@ -94,10 +107,17 @@ export const App: React.FC = () => {
     }
   }, []);
 
+  const handleStartTaskCapture = useCallback((initialTaskName: string) => {
+    setTaskName(initialTaskName);
+    setCapturedSteps([]);
+    setView('task-capture');
+  }, []);
+
   const unified = useUnifiedInput({
     apiEndpoint,
     token: effectiveToken,
     onAnalysisComplete: handleAnalysisComplete,
+    onStartTaskCapture: handleStartTaskCapture,
   });
 
   const toggleTheme = useCallback(() => {
@@ -112,11 +132,51 @@ export const App: React.FC = () => {
     setView('report');
   }, []);
 
+  // Task capture handlers
+  const handleAddStep = useCallback((step: CapturedStep) => {
+    setCapturedSteps(prev => [...prev, step]);
+  }, []);
+
+  const handleDeleteStep = useCallback((id: string) => {
+    setCapturedSteps(prev => {
+      const filtered = prev.filter(s => s.id !== id);
+      return filtered.map((s, i) => ({ ...s, stepNumber: i + 1 }));
+    });
+  }, []);
+
+  const handleReorderSteps = useCallback((steps: CapturedStep[]) => {
+    setCapturedSteps(steps);
+  }, []);
+
+  const handleFinishTask = useCallback(async () => {
+    if (capturedSteps.length === 0) return;
+
+    // Convert base64 data URLs back to File objects for the analysis pipeline
+    const files = await Promise.all(capturedSteps.map(async (step, i) => {
+      const res = await fetch(step.imageData);
+      const blob = await res.blob();
+      return new File([blob], `step-${i + 1}.jpg`, { type: 'image/jpeg' });
+    }));
+
+    // Pre-fill the task as context, inject files into unified input, then return to chat
+    unified.setTasks(taskName);
+    unified.setFiles(files);
+    setView('chat');
+    unified.notifyTaskCaptureComplete(capturedSteps.length);
+  }, [capturedSteps, taskName, unified]);
+
+  const handleCancelTaskCapture = useCallback(() => {
+    setCapturedSteps([]);
+    setTaskName('');
+    setView('chat');
+  }, []);
+
   // Auth gate: show token input if not authenticated
   if (!auth.isAuthenticated && !devMode) {
     return (
-      <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
-        <div className={styles.authPrompt}>
+      <div className={`uitraps-viewport-wrapper ${styles.viewportWrapper}`} data-theme={theme}>
+        <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
+          <div className={styles.authPrompt}>
           <div className={styles.authTitle}>
             UI Traps <span className={styles.logoAccent}>Helper</span>
           </div>
@@ -144,6 +204,28 @@ export const App: React.FC = () => {
             In production, the WordPress plugin provides the JWT token automatically.
             Dev mode lets you test the chat UI without authentication.
           </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Task capture view ──
+  if (view === 'task-capture') {
+    return (
+      <div className={`uitraps-viewport-wrapper ${styles.viewportWrapper}`} data-theme={theme}>
+        <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
+          <TaskCaptureScreen
+            taskName={taskName}
+            onTaskNameChange={setTaskName}
+            steps={capturedSteps}
+            onAddStep={handleAddStep}
+            onDeleteStep={handleDeleteStep}
+            onReorderSteps={handleReorderSteps}
+            onFinish={handleFinishTask}
+            onCancel={handleCancelTaskCapture}
+            runningCostEstimate={estimateRunningCost(capturedSteps.length)}
+          />
         </div>
       </div>
     );
@@ -152,31 +234,33 @@ export const App: React.FC = () => {
   // ── Report view ──
   if (view === 'report' && activeReport) {
     return (
-      <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
-        <header className={styles.header}>
-          <div className={styles.logo}>
-            UI Traps <span className={styles.logoAccent}>Helper</span>
+      <div className={`uitraps-viewport-wrapper ${styles.viewportWrapper}`} data-theme={theme}>
+        <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
+          <header className={styles.header}>
+            <div className={styles.logo}>
+              UI Traps <span className={styles.logoAccent}>Helper</span>
+            </div>
+            <div className={styles.headerActions}>
+              <button className={styles.headerButton} onClick={() => setView('chat')}>
+                Back to Chat
+              </button>
+              <button className={styles.headerButton} onClick={toggleTheme}>
+                {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
+              </button>
+            </div>
+          </header>
+          <div className={styles.reportContainer}>
+            <ReportViewer
+              html={activeReport.html}
+              statistics={activeReport.statistics}
+              showStatistics={true}
+              showUsageInfo={false}
+              onNewAnalysis={() => {
+                setView('chat');
+                setActiveReport(null);
+              }}
+            />
           </div>
-          <div className={styles.headerActions}>
-            <button className={styles.headerButton} onClick={() => setView('chat')}>
-              Back to Chat
-            </button>
-            <button className={styles.headerButton} onClick={toggleTheme}>
-              {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
-            </button>
-          </div>
-        </header>
-        <div className={styles.reportContainer}>
-          <ReportViewer
-            html={activeReport.html}
-            statistics={activeReport.statistics}
-            showStatistics={true}
-            showUsageInfo={false}
-            onNewAnalysis={() => {
-              setView('chat');
-              setActiveReport(null);
-            }}
-          />
         </div>
       </div>
     );
@@ -185,24 +269,26 @@ export const App: React.FC = () => {
   // ── History view ──
   if (view === 'history') {
     return (
-      <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
-        <header className={styles.header}>
-          <div className={styles.logo}>
-            UI Traps <span className={styles.logoAccent}>Helper</span>
-          </div>
-          <div className={styles.headerActions}>
-            <button className={styles.headerButton} onClick={() => setView('chat')}>
-              Back to Chat
-            </button>
-            <button className={styles.headerButton} onClick={toggleTheme}>
-              {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
-            </button>
-          </div>
-        </header>
-        <PastAnalyses
-          onViewReport={handleViewHistoryReport}
-          onClose={() => setView('chat')}
-        />
+      <div className={`uitraps-viewport-wrapper ${styles.viewportWrapper}`} data-theme={theme}>
+        <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
+          <header className={styles.header}>
+            <div className={styles.logo}>
+              UI Traps <span className={styles.logoAccent}>Helper</span>
+            </div>
+            <div className={styles.headerActions}>
+              <button className={styles.headerButton} onClick={() => setView('chat')}>
+                Back to Chat
+              </button>
+              <button className={styles.headerButton} onClick={toggleTheme}>
+                {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
+              </button>
+            </div>
+          </header>
+          <PastAnalyses
+            onViewReport={handleViewHistoryReport}
+            onClose={() => setView('chat')}
+          />
+        </div>
       </div>
     );
   }
@@ -210,23 +296,25 @@ export const App: React.FC = () => {
   // ── Estimate preview overlay ──
   if (unified.analysisPhase === 'previewing' && unified.estimate) {
     return (
-      <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
-        <header className={styles.header}>
-          <div className={styles.logo}>
-            UI Traps <span className={styles.logoAccent}>Helper</span>
+      <div className={`uitraps-viewport-wrapper ${styles.viewportWrapper}`} data-theme={theme}>
+        <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
+          <header className={styles.header}>
+            <div className={styles.logo}>
+              UI Traps <span className={styles.logoAccent}>Helper</span>
+            </div>
+            <div className={styles.headerActions}>
+              <button className={styles.headerButton} onClick={unified.cancelAnalysis}>
+                Cancel
+              </button>
+            </div>
+          </header>
+          <div className={styles.overlayContainer}>
+            <EstimatePreview
+              estimate={unified.estimate}
+              onConfirm={unified.confirmAnalysis}
+              onBack={unified.cancelAnalysis}
+            />
           </div>
-          <div className={styles.headerActions}>
-            <button className={styles.headerButton} onClick={unified.cancelAnalysis}>
-              Cancel
-            </button>
-          </div>
-        </header>
-        <div className={styles.overlayContainer}>
-          <EstimatePreview
-            estimate={unified.estimate}
-            onConfirm={unified.confirmAnalysis}
-            onBack={unified.cancelAnalysis}
-          />
         </div>
       </div>
     );
@@ -235,20 +323,22 @@ export const App: React.FC = () => {
   // ── Analysis in progress ──
   if (unified.analysisPhase === 'analyzing') {
     return (
-      <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
-        <header className={styles.header}>
-          <div className={styles.logo}>
-            UI Traps <span className={styles.logoAccent}>Helper</span>
+      <div className={`uitraps-viewport-wrapper ${styles.viewportWrapper}`} data-theme={theme}>
+        <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
+          <header className={styles.header}>
+            <div className={styles.logo}>
+              UI Traps <span className={styles.logoAccent}>Helper</span>
+            </div>
+          </header>
+          <div className={styles.overlayContainer}>
+            <AnalysisProgress
+              elapsedTime={unified.elapsedTime}
+              onCancel={unified.cancelAnalysis}
+              inputType={unified.detectedUrl ? (unified.detectedMode === 'figma' ? 'figma' : 'url') : (unified.files.length > 1 ? 'multi_image' : 'single_image')}
+              fileCount={unified.files.length}
+              estimatedTime={normalizeTimeEstimate(unified.estimate)}
+            />
           </div>
-        </header>
-        <div className={styles.overlayContainer}>
-          <AnalysisProgress
-            elapsedTime={unified.elapsedTime}
-            onCancel={unified.cancelAnalysis}
-            inputType={unified.detectedUrl ? (unified.detectedMode === 'figma' ? 'figma' : 'url') : (unified.files.length > 1 ? 'multi_image' : 'single_image')}
-            fileCount={unified.files.length}
-            estimatedTime={normalizeTimeEstimate(unified.estimate)}
-          />
         </div>
       </div>
     );
@@ -258,93 +348,96 @@ export const App: React.FC = () => {
   const isEmpty = unified.messages.length === 0 && !unified.isLoading;
 
   return (
-    <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
-      <header className={styles.header}>
-        <div className={styles.logo}>
-          UI Traps <span className={styles.logoAccent}>Helper</span>
-        </div>
-        <div className={styles.headerActions}>
-          <button className={styles.headerButton} onClick={() => unified.clearHistory()}>
-            New Session
-          </button>
-          {getAnalysisHistory().length > 0 && (
-            <button className={styles.headerButton} onClick={() => setView('history')}>
-              Past Analyses
-            </button>
-          )}
-          <button className={styles.headerButton} onClick={toggleTheme}>
-            {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
-          </button>
-        </div>
-      </header>
-
-      {isEmpty ? (
-        <div className={styles.centeredLayout}>
-          <img
-            src={cardsImage}
-            alt="UI Tenets & Traps Cards"
-            className={styles.welcomeImage}
-          />
-          <div className={styles.welcomeTitle}>
+    <div className={`uitraps-viewport-wrapper ${styles.viewportWrapper}`} data-theme={theme}>
+      <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
+        <header className={styles.header}>
+          <div className={styles.logo}>
             UI Traps <span className={styles.logoAccent}>Helper</span>
           </div>
-          <div className={styles.welcomeSubtitle}>
-            <ul>
-              <li>Ask any question about UI Tenets & Traps</li>
-              <li>Describe an interface issue, it will identify Traps for you</li>
-              <li>Analyze screenshots, Figma designs, or websites</li>
-              <li>Get detailed reports with findings and recommendations</li>
-            </ul>
+          <div className={styles.headerActions}>
+            <button className={styles.headerButton} onClick={() => unified.clearHistory()}>
+              New Session
+            </button>
+            {getAnalysisHistory().length > 0 && (
+              <button className={styles.headerButton} onClick={() => setView('history')}>
+                Past Analyses
+              </button>
+            )}
+            <button className={styles.headerButton} onClick={toggleTheme}>
+              {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
+            </button>
           </div>
-          <UnifiedInput
-            centered
-            placeholder=""
-            inputText={unified.inputText}
-            onInputTextChange={unified.setInputText}
-            files={unified.files}
-            onFilesChange={unified.setFiles}
-            users={unified.users}
-            onUsersChange={unified.setUsers}
-            tasks={unified.tasks}
-            onTasksChange={unified.setTasks}
-            format={unified.format}
-            onFormatChange={unified.setFormat}
-            contentType={unified.contentType}
-            onContentTypeChange={unified.setContentType}
-            contextExpanded={unified.contextExpanded}
-            onContextExpandedChange={unified.setContextExpanded}
-            detectedMode={unified.detectedMode}
-            isLoading={unified.isLoading}
-            onSubmit={unified.submit}
-          />
-        </div>
-      ) : (
-        <>
-          <ConversationPanel
-            messages={unified.messages}
-            isLoading={unified.isLoading}
-          />
-          <UnifiedInput
-            inputText={unified.inputText}
-            onInputTextChange={unified.setInputText}
-            files={unified.files}
-            onFilesChange={unified.setFiles}
-            users={unified.users}
-            onUsersChange={unified.setUsers}
-            tasks={unified.tasks}
-            onTasksChange={unified.setTasks}
-            format={unified.format}
-            onFormatChange={unified.setFormat}
-            contentType={unified.contentType}
-            onContentTypeChange={unified.setContentType}
-            contextExpanded={unified.contextExpanded}
-            onContextExpandedChange={unified.setContextExpanded}
-            detectedMode={unified.detectedMode}
-            isLoading={unified.isLoading}
-            onSubmit={unified.submit}
-          />
-        </>
-      )}
+        </header>
+
+        {isEmpty ? (
+          <div className={styles.centeredLayout}>
+            <img
+              src={cardsImage}
+              alt="UI Tenets & Traps Cards"
+              className={styles.welcomeImage}
+            />
+            <div className={styles.welcomeTitle}>
+              UI Traps <span className={styles.logoAccent}>Helper</span>
+            </div>
+            <div className={styles.welcomeSubtitle}>
+              <ul>
+                <li>Ask any question about UI Tenets & Traps</li>
+                <li>Describe an interface issue, it will identify Traps for you</li>
+                <li>Analyze screenshots, Figma designs, or websites</li>
+                <li>Get detailed reports with findings and recommendations</li>
+              </ul>
+            </div>
+            <UnifiedInput
+              centered
+              placeholder=""
+              inputText={unified.inputText}
+              onInputTextChange={unified.setInputText}
+              files={unified.files}
+              onFilesChange={unified.setFiles}
+              users={unified.users}
+              onUsersChange={unified.setUsers}
+              tasks={unified.tasks}
+              onTasksChange={unified.setTasks}
+              format={unified.format}
+              onFormatChange={unified.setFormat}
+              contentType={unified.contentType}
+              onContentTypeChange={unified.setContentType}
+              contextExpanded={unified.contextExpanded}
+              onContextExpandedChange={unified.setContextExpanded}
+              detectedMode={unified.detectedMode}
+              isLoading={unified.isLoading}
+              onSubmit={unified.submit}
+            />
+          </div>
+        ) : (
+          <>
+            <ConversationPanel
+              messages={unified.messages}
+              isLoading={unified.isLoading}
+              onWidgetChoice={unified.handleWidgetChoice}
+            />
+            <UnifiedInput
+              inputText={unified.inputText}
+              onInputTextChange={unified.setInputText}
+              files={unified.files}
+              onFilesChange={unified.setFiles}
+              users={unified.users}
+              onUsersChange={unified.setUsers}
+              tasks={unified.tasks}
+              onTasksChange={unified.setTasks}
+              format={unified.format}
+              onFormatChange={unified.setFormat}
+              contentType={unified.contentType}
+              onContentTypeChange={unified.setContentType}
+              contextExpanded={unified.contextExpanded}
+              onContextExpandedChange={unified.setContextExpanded}
+              detectedMode={unified.detectedMode}
+              isLoading={unified.isLoading}
+              onSubmit={unified.submit}
+            />
+          </>
+        )}
+      </div>
     </div>
   );
 };

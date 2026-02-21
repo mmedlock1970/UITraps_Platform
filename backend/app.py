@@ -61,8 +61,7 @@ from src.report_saver import save_analysis_report, get_report_saver
 # NEW: JWT auth for unified platform
 from src.auth import get_current_user
 
-# NEW: RAG chat pipeline
-from src.chat.pinecone_service import PineconeService
+# NEW: Full-context chat pipeline (no RAG - knowledge base injected directly)
 from src.chat.ai_service import ChatAIService
 from src.chat.chat_service import ChatService
 
@@ -265,30 +264,28 @@ _chat_service = None
 
 
 def get_chat_service() -> ChatService:
-    """Get or create chat service instance. Returns None if not configured."""
+    """
+    Get or create chat service instance.
+
+    Uses full context injection - the complete UI Tenets & Traps knowledge base
+    is loaded into the system prompt. No external vector database required.
+
+    Returns None if ANTHROPIC_API_KEY is not configured.
+    """
     global _chat_service
     if _chat_service is None:
-        pinecone_key = os.environ.get("PINECONE_API_KEY", "")
-        openai_key = os.environ.get("OPENAI_API_KEY", "")
         anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
-        index_name = os.environ.get("PINECONE_INDEX_NAME", "")
 
-        if not all([pinecone_key, openai_key, anthropic_key, index_name]):
+        if not anthropic_key:
             return None  # Chat not configured yet
 
-        pinecone_svc = PineconeService(
-            pinecone_api_key=pinecone_key,
-            index_name=index_name,
-            openai_api_key=openai_key,
-            top_k=int(os.environ.get("PINECONE_TOP_K", "5")),
-        )
         ai_svc = ChatAIService(
             anthropic_api_key=anthropic_key,
             model=os.environ.get("CHAT_AI_MODEL", "claude-sonnet-4-5-20250929"),
             max_tokens=int(os.environ.get("CHAT_MAX_TOKENS", "1024")),
             temperature=float(os.environ.get("CHAT_TEMPERATURE", "0.7")),
         )
-        _chat_service = ChatService(pinecone_svc, ai_svc)
+        _chat_service = ChatService(ai_svc)
     return _chat_service
 
 
@@ -950,14 +947,24 @@ async def estimate_figma(
 @app.post("/estimate-url")
 async def estimate_url(
     url: str = Form(..., description="Website URL to analyze"),
-    max_pages: int = Form(10, description="Maximum pages to crawl (1-10)")
+    max_pages: int = Form(10, description="Maximum pages to crawl (1-10)"),
+    device_type: Optional[str] = Form(None, description="Device type: mobile, tablet, or desktop")
 ):
     """
     Get estimate for website crawl and analysis.
 
     Returns estimated time and cost based on max pages setting.
     """
-    if not is_playwright_available():
+    # DISABLED: Web crawler disabled — bot protection makes this unreliable.
+    # Code preserved below for future reinstatement.
+    # To re-enable: remove this raise and uncomment the original implementation.
+    raise HTTPException(
+        status_code=503,
+        detail="Automatic website analysis is not available. Please capture screenshots of the website instead."
+    )
+
+    # --- Original implementation preserved ---
+    if not is_playwright_available():  # noqa: unreachable
         raise HTTPException(
             status_code=503,
             detail="URL analysis not available. Playwright not installed."
@@ -965,6 +972,17 @@ async def estimate_url(
 
     # Validate max_pages
     max_pages = max(1, min(10, max_pages))
+
+    # Determine viewport from device type
+    viewport_presets = {
+        "mobile": (390, 844, "iPhone 13"),
+        "tablet": (768, 1024, "iPad"),
+        "desktop": (1920, 1080, "Desktop")
+    }
+    viewport_width, viewport_height, device_name = viewport_presets.get(
+        device_type,
+        (1920, 1080, "Desktop")
+    )
 
     # Estimate: ~20 seconds per page for crawl, ~30 seconds per page for analysis
     time_per_page = 50  # seconds
@@ -975,6 +993,12 @@ async def estimate_url(
         "success": True,
         "url": url,
         "estimated_pages": max_pages,
+        "device_type": device_type or "desktop",
+        "viewport": {
+            "width": viewport_width,
+            "height": viewport_height,
+            "description": f"{device_name} ({viewport_width}×{viewport_height})"
+        },
         "time_estimate": {
             "min_seconds": time_min,
             "max_seconds": time_max,
@@ -1128,7 +1152,11 @@ async def analyze_url(
     content_type: str = Form("website", description="Content type"),
     api_key: str = Form(..., description="Your API key"),
     max_pages: int = Form(10, description="Maximum pages to crawl (1-10)"),
-    capture_interactions: bool = Form(False, description="Enable interaction capture (hover, click, form states)")
+    capture_interactions: bool = Form(False, description="Enable interaction capture (hover, click, form states)"),
+    cookies: Optional[str] = Form(None, description="Cookies as JSON string (array or dict format)"),
+    device_type: Optional[str] = Form(None, description="Device type: mobile, tablet, or desktop"),
+    viewport_width: Optional[int] = Form(None, description="Viewport width override"),
+    viewport_height: Optional[int] = Form(None, description="Viewport height override")
 ):
     """
     Crawl and analyze a website for UI Traps.
@@ -1141,8 +1169,21 @@ async def analyze_url(
     - Click feedback on buttons and links
     - Form validation states
     - Responsive behavior at different viewport sizes
+
+    With cookies parameter, can access authenticated/logged-in pages:
+    - Format: '[{"name":"session","value":"abc123","domain":".site.com"}]'
+    - Helps avoid false positives from missing authenticated content
     """
-    if not is_playwright_available():
+    # DISABLED: Web crawler disabled — bot protection makes this unreliable.
+    # Code preserved below for future reinstatement.
+    # To re-enable: remove this raise and uncomment the original implementation.
+    raise HTTPException(
+        status_code=503,
+        detail="Automatic website analysis is not available. Please capture screenshots of the website instead."
+    )
+
+    # --- Original implementation preserved ---
+    if not is_playwright_available():  # noqa: unreachable
         raise HTTPException(
             status_code=503,
             detail="URL analysis not available. Playwright not installed. "
@@ -1170,6 +1211,25 @@ async def analyze_url(
             )
 
         try:
+            # Apply viewport presets based on device type
+            viewport_presets = {
+                "mobile": (390, 844),   # iPhone 13
+                "tablet": (768, 1024),  # iPad
+                "desktop": (1920, 1080)  # Standard desktop
+            }
+
+            # Use explicit viewport if provided, otherwise use device preset
+            if viewport_width and viewport_height:
+                final_viewport_width = viewport_width
+                final_viewport_height = viewport_height
+            else:
+                final_viewport_width, final_viewport_height = viewport_presets.get(
+                    device_type,
+                    (1920, 1080)  # Default to desktop
+                )
+
+            logger.info(f"Using viewport: {final_viewport_width}x{final_viewport_height} (device_type: {device_type})")
+
             # Create temp directory for screenshots
             with tempfile.TemporaryDirectory() as tmp_dir:
                 # Crawl website (with optional interaction capture)
@@ -1181,6 +1241,9 @@ async def analyze_url(
                     crawler = WebCrawler(
                         max_pages=max_pages,
                         max_depth=2,
+                        viewport_width=final_viewport_width,
+                        viewport_height=final_viewport_height,
+                        cookies=cookies,  # ADD: Cookie support for authenticated crawling
                         enable_interaction_capture=capture_interactions,
                         enable_navigation_graph=True,  # Explicitly enable navigation graph
                         verify_ctas=True  # Verify CTA destinations
@@ -1195,7 +1258,21 @@ async def analyze_url(
 
                 pages = crawl_result.get("pages", [])
                 if not pages:
-                    raise HTTPException(status_code=400, detail="No pages could be crawled from the URL")
+                    error_detail = (
+                        f"No pages could be crawled from {url}. "
+                        "This typically happens when:\n"
+                        "1. The site is blocking automated access (bot detection)\n"
+                        "2. The site requires authentication or cookies\n"
+                        "3. The site is not accessible or has network issues\n"
+                        "4. The site uses heavy JavaScript that didn't load in time\n\n"
+                        "Try:\n"
+                        "- Verifying the URL is accessible in a browser\n"
+                        "- Using authentication if the site requires login\n"
+                        "- Trying a different URL that may be less protected\n"
+                        "- Waiting a few minutes before retrying (rate limiting)"
+                    )
+                    logger.warning(f"Crawl failed for {url}: No pages captured")
+                    raise HTTPException(status_code=400, detail=error_detail)
 
                 # Prepare pages for SiteAnalyzer
                 site_pages = []
@@ -1204,7 +1281,8 @@ async def analyze_url(
                         page_data = {
                             "url": page["url"],
                             "title": page["title"],
-                            "screenshot_path": page["screenshot_path"]
+                            "screenshot_path": page["screenshot_path"],
+                            "screenshot_base64": page.get("screenshot_base64")  # ADD: Include base64 for embedding
                         }
                         # Include interactions if captured
                         if page.get("interactions"):
@@ -1226,7 +1304,9 @@ async def analyze_url(
                     "users": users,
                     "tasks": tasks,
                     "format": format,
-                    "content_type": content_type
+                    "content_type": content_type,
+                    "device_type": device_type or "desktop",
+                    "viewport": f"{final_viewport_width}×{final_viewport_height}"
                 }
 
                 # Use interaction-aware analysis if interactions were captured
@@ -1534,7 +1614,7 @@ async def api_chat(
     if chat_svc is None:
         raise HTTPException(
             status_code=503,
-            detail="Chat service not configured. Missing PINECONE_API_KEY, OPENAI_API_KEY, or PINECONE_INDEX_NAME.",
+            detail="Chat service not configured. Missing ANTHROPIC_API_KEY.",
         )
 
     try:
@@ -1548,11 +1628,6 @@ async def api_chat(
             raise HTTPException(
                 status_code=429,
                 detail="AI service rate limit reached. Please try again in a moment.",
-            )
-        if "pinecone" in error_msg.lower():
-            raise HTTPException(
-                status_code=503,
-                detail="Content search temporarily unavailable. Please try again.",
             )
         logger.error("Chat error: %s", error_msg)
         raise HTTPException(

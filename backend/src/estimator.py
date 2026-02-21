@@ -75,7 +75,7 @@ class EstimationConstants:
     DOLLARS_PER_CREDIT_MAX = 0.30
 
     # Maximum files allowed
-    MAX_IMAGES = 10
+    MAX_IMAGES = 15
     MAX_VIDEO_FRAMES = 20
 
 

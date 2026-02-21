@@ -445,6 +445,11 @@ export type AnalyzerAction =
 
 export type MessageMode = 'analysis' | 'chat' | 'hybrid';
 
+export interface OptionsWidgetChoice {
+  id: string;
+  label: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -455,6 +460,11 @@ export interface ChatMessage {
   /** If this message contains an analysis report */
   reportHtml?: string;
   statistics?: ReportStatistics;
+  /** If this message contains an options widget */
+  widgetType?: 'options';
+  widgetChoices?: OptionsWidgetChoice[];
+  /** Whether widget choices have been used (disables buttons after selection) */
+  widgetUsed?: boolean;
 }
 
 export interface ChatApiResponse {

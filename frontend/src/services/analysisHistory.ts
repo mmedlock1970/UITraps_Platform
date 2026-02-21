@@ -14,19 +14,33 @@ export interface StoredAnalysis {
 }
 
 const STORAGE_KEY = 'uitraps-analysis-history';
-const MAX_ENTRIES = 10;
+const MAX_ENTRIES = 5; // Reduced from 10 due to larger report sizes with embedded screenshots
 
 export function saveAnalysis(analysis: Omit<StoredAnalysis, 'id'>): void {
   const id = `analysis-${Date.now()}`;
   const entry: StoredAnalysis = { id, ...analysis };
   const existing = getAnalysisHistory();
   const updated = [entry, ...existing].slice(0, MAX_ENTRIES);
+
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  } catch {
-    // localStorage full — remove oldest entries and retry
-    const trimmed = updated.slice(0, 5);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
+  } catch (e) {
+    // localStorage full — progressive fallback
+    console.warn('localStorage full, reducing stored analyses...');
+
+    try {
+      // Try with 3 entries
+      const trimmed = updated.slice(0, 3);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
+    } catch {
+      try {
+        // Last resort: only save this one entry
+        localStorage.setItem(STORAGE_KEY, JSON.stringify([entry]));
+        console.warn('localStorage critically full - keeping only latest analysis');
+      } catch {
+        console.error('Cannot save analysis - localStorage quota exceeded');
+      }
+    }
   }
 }
 

@@ -11,9 +11,10 @@ import styles from './ConversationPanel.module.css';
 interface ConversationPanelProps {
   messages: ChatMessage[];
   isLoading: boolean;
+  onWidgetChoice?: (messageId: string, choiceId: string) => void;
 }
 
-export const ConversationPanel: React.FC<ConversationPanelProps> = ({ messages, isLoading }) => {
+export const ConversationPanel: React.FC<ConversationPanelProps> = ({ messages, isLoading, onWidgetChoice }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom on new messages
@@ -38,7 +39,7 @@ export const ConversationPanel: React.FC<ConversationPanelProps> = ({ messages, 
   return (
     <div className={styles.panel}>
       {messages.map(msg => (
-        <ChatMessageComponent key={msg.id} message={msg} />
+        <ChatMessageComponent key={msg.id} message={msg} onWidgetChoice={onWidgetChoice} />
       ))}
 
       {isLoading && (

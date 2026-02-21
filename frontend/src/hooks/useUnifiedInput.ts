@@ -9,15 +9,19 @@
  */
 
 import { useState, useCallback, useMemo } from 'react';
-import { ChatMessage, ContentType, UserContext, EstimateResponse, UnifiedAskResponse, FigmaEstimateResponse, UrlEstimateResponse, PdfEstimateResponse } from '../api/types';
+import { ChatMessage, ContentType, UserContext, EstimateResponse, UnifiedAskResponse, FigmaEstimateResponse, UrlEstimateResponse, PdfEstimateResponse, OptionsWidgetChoice } from '../api/types';
 import { useChat } from './useChat';
 import { useElapsedTime } from './useElapsedTime';
-import { unifiedAsk, getEstimate, getFigmaEstimate, getUrlEstimate, analyzeFigma, analyzeUrl, getPdfEstimate, analyzePdf } from '../api/client';
+import { unifiedAsk, getEstimate, getFigmaEstimate, analyzeFigma, getPdfEstimate, analyzePdf } from '../api/client';
+
+// NOTE: getUrlEstimate and analyzeUrl are intentionally not imported.
+// Web crawler is disabled — URL inputs redirect to task capture flow instead.
 
 interface UseUnifiedInputOptions {
   apiEndpoint: string;
   token: string;
   onAnalysisComplete?: (result: UnifiedAskResponse, fileNames: string[]) => void;
+  onStartTaskCapture?: (taskName: string) => void;
 }
 
 type DetectedMode = 'chat' | 'analysis' | 'hybrid' | 'idle' | 'figma' | 'url' | 'pdf' | 'video';
@@ -53,32 +57,74 @@ function detectFileType(files: File[]): 'pdf' | 'video' | 'image' | 'mixed' | nu
 
 /** URL detection helpers */
 const FIGMA_URL_PATTERN = /https?:\/\/(www\.)?figma\.com\/(file|design|proto)\/[a-zA-Z0-9]+[^\s]*/i;
-// Match URLs anywhere in text (not just at start/end)
+// Match URLs with http(s):// protocol
 const WEBSITE_URL_PATTERN_EXTRACT = /https?:\/\/[^\s]+/i;
+// Match domain names without protocol (e.g., "amazon.com", "www.google.com")
+// Requires at least one dot and valid domain structure
+const DOMAIN_PATTERN = /\b(?:www\.)?[a-zA-Z0-9][-a-zA-Z0-9]*(?:\.[a-zA-Z0-9][-a-zA-Z0-9]*)+(?:\/[^\s]*)?\b/i;
 
 function detectUrlType(url: string): 'figma' | 'url' | null {
   if (!url) return null;
-  if (FIGMA_URL_PATTERN.test(url)) return 'figma';
-  // Any http/https URL that's not Figma is a website
-  if (WEBSITE_URL_PATTERN_EXTRACT.test(url)) return 'url';
+  // Normalize URL by adding protocol if missing
+  const normalizedUrl = url.match(/^https?:\/\//i) ? url : `https://${url}`;
+  if (FIGMA_URL_PATTERN.test(normalizedUrl)) return 'figma';
+  // Any URL (with or without protocol) that's not Figma is a website
+  if (WEBSITE_URL_PATTERN_EXTRACT.test(normalizedUrl) || DOMAIN_PATTERN.test(url)) return 'url';
   return null;
 }
 
 function extractUrl(text: string): string | null {
   const trimmed = text.trim();
+
   // Check for Figma URL first (can be anywhere in text)
   const figmaMatch = trimmed.match(FIGMA_URL_PATTERN);
   if (figmaMatch) return figmaMatch[0];
-  // Check for any URL anywhere in text
+
+  // Check for URLs with protocol
   const urlMatch = trimmed.match(WEBSITE_URL_PATTERN_EXTRACT);
   if (urlMatch) {
     // Clean up any trailing punctuation that might have been captured
     let url = urlMatch[0];
-    // Remove trailing punctuation that's likely not part of the URL
     url = url.replace(/[.,;:!?)>\]]+$/, '');
     return url;
   }
+
+  // Check for domain names without protocol
+  const domainMatch = trimmed.match(DOMAIN_PATTERN);
+  if (domainMatch) {
+    let domain = domainMatch[0];
+    domain = domain.replace(/[.,;:!?)>\]]+$/, '');
+    // Prepend https:// for domain-only matches
+    return `https://${domain}`;
+  }
+
   return null;
+}
+
+/**
+ * Extract task description from text that contains a URL
+ * Returns the text with the URL removed and cleaned up
+ */
+function extractTaskFromUrlText(text: string, detectedUrl: string): string {
+  let task = text;
+
+  // Remove the detected URL (with or without protocol)
+  // Use case-insensitive replacement
+  const urlWithoutProtocol = detectedUrl.replace(/^https?:\/\//i, '');
+  const urlPattern = new RegExp(urlWithoutProtocol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+  task = task.replace(urlPattern, '').trim();
+
+  // Also try removing the full URL with protocol if it appears
+  const fullUrlPattern = new RegExp(detectedUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+  task = task.replace(fullUrlPattern, '').trim();
+
+  // Remove common command-like prefixes
+  task = task.replace(/^(test|analyze|check|review|evaluate)\s+/i, '').trim();
+
+  // Remove "with this task" or similar phrases at the beginning
+  task = task.replace(/^with\s+this\s+task[:\s]*/i, '').trim();
+
+  return task;
 }
 
 /** Phases for conversational context gathering */
@@ -146,6 +192,8 @@ interface UseUnifiedInputReturn {
   // Actions
   submit: () => Promise<void>;
   clearHistory: () => void;
+  handleWidgetChoice: (messageId: string, choiceId: string) => void;
+  notifyTaskCaptureComplete: (screenshotCount: number) => void;
 }
 
 function detectMode(
@@ -196,8 +244,50 @@ function hasFullContext(users: string, expertise: string, tasks: string, format:
   );
 }
 
+/** Intent patterns that trigger the options widget instead of plain chat */
+const ANALYSIS_INTENT_PATTERNS = [
+  /\banalyze\b/i,
+  /\banalysis\b/i,
+  /\bcheck\s+(my|this|the)\b/i,
+  /\breview\s+(my|this|the)\b/i,
+  /\bevaluate\b/i,
+  /\btest\s+(my|this|the)\b/i,
+  /\bstart\s+(a\s+)?new\s+analysis\b/i,
+  /\bi\s+have\s+a\s+design\b/i,
+  /\bi\s+want\s+to\s+(analyze|check|review|test)\b/i,
+];
+
+const CAPABILITY_PATTERNS = [
+  /\bwhat\s+can\s+you\s+do\b/i,
+  /\bhow\s+does\s+this\s+work\b/i,
+  /\bwhat\s+is\s+this\b/i,
+  /\bhelp\s*me?\b/i,
+  /\bget\s+started\b/i,
+];
+
+const PAST_ANALYSES_PATTERNS = [
+  /\bpast\s+anal/i,
+  /\bprevious\s+anal/i,
+  /\bmy\s+anal/i,
+  /\bhistory\b/i,
+  /\bsee\s+my\b/i,
+];
+
+const OPTIONS_WIDGET_CHOICES: OptionsWidgetChoice[] = [
+  { id: 'describe_task', label: 'Describe the task here' },
+  { id: 'drop_screenshots', label: 'Drop screenshots you have already taken' },
+  { id: 'step_capture', label: 'Help me capture step by step screenshots of the task' },
+  { id: 'just_chat', label: 'Other (just chat)' },
+];
+
+const URL_WIDGET_CHOICES: OptionsWidgetChoice[] = [
+  { id: 'drop_screenshots', label: 'Drop screenshots you have already taken' },
+  { id: 'step_capture', label: 'Capture step by step screenshots of the task (I will help you)' },
+  { id: 'just_chat', label: 'Other (just chat)' },
+];
+
 export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInputReturn {
-  const { apiEndpoint, token, onAnalysisComplete } = options;
+  const { apiEndpoint, token, onAnalysisComplete, onStartTaskCapture } = options;
 
   // Input state
   const [inputText, setInputText] = useState('');
@@ -212,6 +302,7 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
   const [tasks, setTasks] = useState('');
   const [format, setFormat] = useState('');
   const [contentType, setContentType] = useState<ContentType>('website');
+  const [deviceType, setDeviceType] = useState<string | null>(null);
   const [contextExpanded, setContextExpanded] = useState(false);
 
   // Conversational context gathering
@@ -222,6 +313,8 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
   const [analysisPhase, setAnalysisPhase] = useState<AnalysisPhase>('idle');
   const [estimate, setEstimate] = useState<UnifiedEstimate | null>(null);
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
+  const [pendingUrlTask, setPendingUrlTask] = useState<string>('');
+  const [isUrlContextFlow, setIsUrlContextFlow] = useState(false);
   const elapsed = useElapsedTime();
 
   // Loading state for unified requests
@@ -253,9 +346,9 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
     try {
       let analysisName: string;
 
-      // Handle URL-based analysis (Figma or website)
-      if (pendingUrl) {
-        const urlType = detectUrlType(pendingUrl);
+      // Handle URL-based analysis — only for Figma; files take priority over website pendingUrl
+      if (pendingUrl && files.length === 0 && detectUrlType(pendingUrl) === 'figma') {
+        const urlType = 'figma';
 
         if (urlType === 'figma') {
           analysisName = `Figma file`;
@@ -279,27 +372,9 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
             }, [analysisName]);
           }
         } else {
-          // Website URL analysis
-          analysisName = new URL(pendingUrl).hostname;
-          const result = await analyzeUrl({
-            apiEndpoint,
-            apiKey: token,
-            url: pendingUrl,
-            context,
-            maxPages: 10,
-          });
-
-          elapsed.stop();
-          setAnalysisPhase('complete');
-
-          if (result.success && onAnalysisComplete) {
-            onAnalysisComplete({
-              success: true,
-              mode: 'analysis',
-              report_html: result.report_html,
-              statistics: result.statistics,
-            }, [analysisName]);
-          }
+          // Website URL analysis is disabled — this branch should not be reached
+          // (URL inputs are intercepted in submit() before reaching runAnalysis)
+          throw new Error('Website URL analysis is not available. Please use task-based screenshot capture instead.');
         }
 
         chat.addSystemPrompt(`Analysis completed for ${analysisName}. View the full report above.`);
@@ -333,6 +408,9 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
           .slice(-10)
           .map(m => ({ role: m.role, content: m.content }));
 
+        // Scale timeout with file count: 3 min base + 60s per file, max 15 min
+        const imageTimeout = Math.min(180000 + files.length * 60000, 900000);
+
         const result = await unifiedAsk({
           apiEndpoint,
           token,
@@ -340,6 +418,7 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
           files,
           context,
           conversationHistory: JSON.stringify(conversationHistory),
+          timeout: imageTimeout,
         });
 
         elapsed.stop();
@@ -370,12 +449,45 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
     } finally {
       setIsUnifiedLoading(false);
     }
-  }, [users, expertise, tasks, format, contentType, files, pendingQuestion, pendingUrl, apiEndpoint, token, chat, elapsed, onAnalysisComplete]);
+  }, [users, expertise, tasks, format, contentType, deviceType, files, pendingQuestion, pendingUrl, apiEndpoint, token, chat, elapsed, onAnalysisComplete]);
 
   /** User confirms the estimate → start analysis */
   const confirmAnalysis = useCallback(async () => {
     await runAnalysis();
   }, [runAnalysis]);
+
+  /** User picks a choice from the options widget */
+  const handleWidgetChoice = useCallback((messageId: string, choiceId: string) => {
+    chat.markWidgetUsed(messageId);
+
+    switch (choiceId) {
+      case 'describe_task':
+        chat.addSystemPrompt(
+          'Go ahead — describe the UI issue or task flow and I\'ll identify any UI traps for you.'
+        );
+        break;
+
+      case 'drop_screenshots':
+        chat.addSystemPrompt(
+          'Drop your screenshots into the input area below (or click to select files). ' +
+          'If you have multiple screenshots, I\'ll ask if they\'re in order.'
+        );
+        break;
+
+      case 'step_capture':
+        chat.addSystemPrompt(
+          pendingUrlTask
+            ? `Got it — opening step-by-step capture for: **${pendingUrlTask}**`
+            : 'Starting step-by-step capture. What task are you capturing? *(e.g., "Sign up for an account", "Complete a purchase")*'
+        );
+        onStartTaskCapture?.(pendingUrlTask);
+        break;
+
+      case 'just_chat':
+        chat.addSystemPrompt('Sure — what would you like to know?');
+        break;
+    }
+  }, [chat, onStartTaskCapture, pendingUrlTask]);
 
   /** User cancels from estimate preview or progress */
   const cancelAnalysis = useCallback(() => {
@@ -386,6 +498,16 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
   }, [elapsed]);
 
   /** Start the estimation step (called after context is complete) */
+  /** Called when task capture finishes — clears pendingUrl and asks for any last context */
+  const notifyTaskCaptureComplete = useCallback((screenshotCount: number) => {
+    setPendingUrl(null);
+    chat.addSystemPrompt(
+      `Got it — **${screenshotCount} screenshot${screenshotCount > 1 ? 's' : ''}** captured. ` +
+      'Is there anything else you\'d like me to know before running the analysis? ' +
+      '*(Or just hit send to proceed.)*'
+    );
+  }, [chat]);
+
   const startEstimation = useCallback(async (urlToAnalyze?: string) => {
     setAnalysisPhase('estimating');
     setIsUnifiedLoading(true);
@@ -394,17 +516,36 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
       let est: UnifiedEstimate;
 
       if (urlToAnalyze) {
-        // URL-based estimate
-        const urlType = detectUrlType(urlToAnalyze);
-        if (urlType === 'figma') {
-          est = await getFigmaEstimate({ apiEndpoint, figmaUrl: urlToAnalyze });
-        } else {
-          est = await getUrlEstimate({ apiEndpoint, url: urlToAnalyze, maxPages: 10 });
-        }
+        // Only Figma URLs reach estimation — website URLs are intercepted earlier
+        est = await getFigmaEstimate({ apiEndpoint, figmaUrl: urlToAnalyze });
         setPendingUrl(urlToAnalyze);
       } else if (files.length === 1 && isPdfFile(files[0])) {
         // PDF estimate
         est = await getPdfEstimate({ apiEndpoint, file: files[0] });
+      } else if (files.length > 10) {
+        // Estimate API caps at 10 files — calculate locally for larger sets
+        const count = files.length;
+        const minS = count * 20;
+        const maxS = count * 35;
+        est = {
+          success: true,
+          input_type: 'multi_image',
+          file_count: count,
+          total_size_mb: 0,
+          time_estimate: {
+            min_seconds: minS,
+            max_seconds: maxS,
+            min_formatted: `${Math.round(minS / 60)} min`,
+            max_formatted: `${Math.round(maxS / 60)} min`,
+          },
+          cost_estimate: {
+            min_credits: count,
+            max_credits: count,
+            min_dollars: parseFloat((count * 0.03).toFixed(2)),
+            max_dollars: parseFloat((count * 0.05).toFixed(2)),
+          },
+          ffmpeg_available: false,
+        };
       } else {
         // File-based estimate (images or video)
         est = await getEstimate({ apiEndpoint, files });
@@ -420,29 +561,18 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
       );
       // Create a fallback estimate so the user can still proceed
       if (urlToAnalyze) {
-        const urlType = detectUrlType(urlToAnalyze);
+        // Only Figma URLs reach this path — fallback to Figma estimate
         setPendingUrl(urlToAnalyze);
-        if (urlType === 'figma') {
-          setEstimate({
-            success: true,
-            file_name: 'Figma file',
-            frame_count: 5,
-            has_prototype_flows: false,
-            flow_count: 0,
-            time_estimate: { min_seconds: 120, max_seconds: 300, description: '2-5 minutes' },
-            cost_estimate: { credits: 5, description: '~5 credits' },
-            figma_available: true,
-          });
-        } else {
-          setEstimate({
-            success: true,
-            url: urlToAnalyze,
-            estimated_pages: 5,
-            time_estimate: { min_seconds: 200, max_seconds: 400, description: '3-7 minutes' },
-            cost_estimate: { credits: 5, description: '~5 credits' },
-            playwright_available: true,
-          });
-        }
+        setEstimate({
+          success: true,
+          file_name: 'Figma file',
+          frame_count: 5,
+          has_prototype_flows: false,
+          flow_count: 0,
+          time_estimate: { min_seconds: 120, max_seconds: 300, description: '2-5 minutes' },
+          cost_estimate: { credits: 5, description: '~5 credits' },
+          figma_available: true,
+        });
       } else if (files.length === 1 && isPdfFile(files[0])) {
         // PDF fallback estimate
         setEstimate({
@@ -475,7 +605,7 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
     } finally {
       setIsUnifiedLoading(false);
     }
-  }, [apiEndpoint, files, chat]);
+  }, [apiEndpoint, files, deviceType, chat]);
 
   const submit = useCallback(async () => {
     if (!token) return;
@@ -517,6 +647,17 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
           return;
         }
         setExpertise(answer);
+
+        // Skip asking for tasks if they were already provided (e.g., from URL input)
+        if (tasks && tasks.trim().length >= 10) {
+          setContextGatheringPhase('asking_format');
+          chat.addSystemPrompt(
+            'Thanks. Finally, **what format is this design?**\n\n' +
+            '*(e.g., "Mobile app screenshot", "Desktop website", "Tablet app")*'
+          );
+          return;
+        }
+
         setContextGatheringPhase('asking_tasks');
         chat.addSystemPrompt(
           'Thanks. Now, **what tasks are these users trying to accomplish?**\n\n' +
@@ -559,12 +700,29 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
         const lowerAnswer = answer.toLowerCase();
         if (lowerAnswer.includes('mobile') || lowerAnswer.includes('ios') || lowerAnswer.includes('android')) {
           setContentType('mobile_app');
+          setDeviceType('mobile');
+        } else if (lowerAnswer.includes('tablet') || lowerAnswer.includes('ipad')) {
+          setContentType('website');
+          setDeviceType('tablet');
         } else if (lowerAnswer.includes('desktop') || lowerAnswer.includes('windows') || lowerAnswer.includes('mac')) {
           setContentType('desktop_app');
+          setDeviceType('desktop');
         } else if (lowerAnswer.includes('game')) {
           setContentType('game');
         } else if (lowerAnswer.includes('web') || lowerAnswer.includes('site')) {
           setContentType('website');
+          setDeviceType('desktop'); // Default web to desktop
+        }
+
+        // URL context flow: show capture options widget instead of starting estimation
+        if (isUrlContextFlow) {
+          setIsUrlContextFlow(false);
+          const hostname = pendingUrl ? new URL(pendingUrl).hostname : 'that site';
+          chat.addOptionsWidget(
+            `All set! Now, how would you like to capture screenshots of **${hostname}**?`,
+            URL_WIDGET_CHOICES
+          );
+          return;
         }
 
         chat.addSystemPrompt(
@@ -572,7 +730,7 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
         );
 
         // Context is now complete — proceed to estimation
-        // Pass pendingUrl if this was a URL analysis
+        // Pass pendingUrl if this was a Figma analysis
         await startEstimation(pendingUrl || undefined);
         return;
       }
@@ -586,6 +744,35 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
     if (detectedMode === 'chat') {
       const text = inputText.trim();
       setInputText('');
+
+      // Past analyses intent
+      if (PAST_ANALYSES_PATTERNS.some(p => p.test(text))) {
+        chat.addUserMessage(text, 'chat');
+        chat.addSystemPrompt("Your past analyses are saved — click **Past Analyses** in the menu to view them.");
+        return;
+      }
+
+      // Capability / help intent
+      if (CAPABILITY_PATTERNS.some(p => p.test(text))) {
+        chat.addUserMessage(text, 'chat');
+        chat.addOptionsWidget(
+          "I can help you with UI analysis in a few ways:",
+          OPTIONS_WIDGET_CHOICES
+        );
+        return;
+      }
+
+      // Analysis intent with no files or URL
+      if (ANALYSIS_INTENT_PATTERNS.some(p => p.test(text))) {
+        chat.addUserMessage(text, 'chat');
+        chat.addOptionsWidget(
+          "How would you like to analyze your UI?",
+          OPTIONS_WIDGET_CHOICES
+        );
+        return;
+      }
+
+      // Default: plain RAG chat
       await chat.sendMessage(text);
       return;
     }
@@ -616,34 +803,90 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
       return;
     }
 
-    // ── Figma or URL analysis modes ──
-    if (detectedMode === 'figma' || detectedMode === 'url') {
+    // ── Figma mode ──
+    if (detectedMode === 'figma') {
       const url = detectedUrl!;
-      const urlLabel = detectedMode === 'figma'
-        ? 'Figma file'
-        : new URL(url).hostname;
-
-      // Store URL for later use after context gathering
       setPendingUrl(url);
+      const taskDescription = extractTaskFromUrlText(inputText, url);
+      if (taskDescription && taskDescription.length >= 10) setTasks(taskDescription);
 
-      // Show user message in chat
-      chat.addUserMessage(`Analyze this ${detectedMode === 'figma' ? 'Figma design' : 'website'}: ${url}`, 'analysis');
+      const userMessage = taskDescription
+        ? `Analyze this Figma design: ${url}\n\nTask: ${taskDescription}`
+        : `Analyze this Figma design: ${url}`;
+      chat.addUserMessage(userMessage, 'analysis');
       setInputText('');
 
-      // Check if we already have full context
-      if (hasFullContext(users, expertise, tasks, format)) {
-        chat.addSystemPrompt(`Starting analysis of ${urlLabel}...`);
+      if (hasFullContext(users, expertise, tasks || taskDescription, format)) {
+        chat.addSystemPrompt('Starting Figma analysis...');
         await startEstimation(url);
         return;
       }
 
-      // Context is missing — start conversational gathering
       setContextGatheringPhase('asking_users');
       chat.addSystemPrompt(
-        `I'll analyze **${urlLabel}** for UI traps! First, I need a bit of context.\n\n` +
+        `I'll analyze this **Figma design** for UI traps! First, I need a bit of context.\n\n` +
         '**Who are the intended users** of this interface?\n\n' +
         '*(e.g., "Adults ages 25-45 looking to stream movies", "Enterprise software developers")*'
       );
+      return;
+    }
+
+    // ── URL mode — web crawler disabled, gather context then offer capture options ──
+    if (detectedMode === 'url') {
+      const url = detectedUrl!;
+      const hostname = new URL(url).hostname;
+      const taskText = extractTaskFromUrlText(inputText, url);
+      setPendingUrlTask(taskText);
+      setPendingUrl(url);
+      if (taskText && taskText.length >= 10) setTasks(taskText);
+      chat.addUserMessage(inputText.trim(), 'chat');
+      setInputText('');
+
+      // Use the task text we just extracted (not the stale state value) for the check
+      const effectiveTasks = (taskText && taskText.length >= 10) ? taskText : tasks;
+
+      // If all context already provided, go straight to the capture options widget
+      if (hasFullContext(users, expertise, effectiveTasks, format)) {
+        chat.addOptionsWidget(
+          `I can't automatically crawl **${hostname}** — most sites block automated access.\n\nHow would you like to capture screenshots of this flow?`,
+          URL_WIDGET_CHOICES
+        );
+        return;
+      }
+
+      // Otherwise gather missing context first, then show the widget
+      setIsUrlContextFlow(true);
+      const intro = `I can't automatically crawl **${hostname}** — most sites block automated access, so I'll need you to capture screenshots. First, a few quick questions.\n\n`;
+
+      if (users.trim().length < 10) {
+        setContextGatheringPhase('asking_users');
+        chat.addSystemPrompt(
+          intro +
+          '**Who are the intended users** of this interface?\n\n' +
+          '*(e.g., "Adults ages 25-45 who own pets", "Enterprise software developers")*'
+        );
+      } else if (expertise.trim().length < 5) {
+        setContextGatheringPhase('asking_expertise');
+        chat.addSystemPrompt(
+          intro +
+          '**What level of expertise** will these users have?\n\n' +
+          '*(e.g., "First-time users", "Intermediate users", "Power users")*'
+        );
+      } else if (effectiveTasks.trim().length < 10) {
+        setContextGatheringPhase('asking_tasks');
+        chat.addSystemPrompt(
+          intro +
+          '**What tasks are these users trying to accomplish?**\n\n' +
+          '*(e.g., "Find and buy cat food", "Sign up for an account")*'
+        );
+      } else {
+        setContextGatheringPhase('asking_format');
+        chat.addSystemPrompt(
+          intro +
+          '**What type of device** will users be on?\n\n' +
+          '*(e.g., "Desktop website", "Mobile browser", "Tablet")*'
+        );
+      }
       return;
     }
 
@@ -677,7 +920,7 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
     );
   }, [
     token, contextGatheringPhase, detectedMode, inputText, files, detectedUrl, pendingUrl,
-    users, expertise, tasks, format, chat, startEstimation,
+    users, expertise, tasks, format, chat, startEstimation, isUrlContextFlow,
   ]);
 
   return {
@@ -710,5 +953,7 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
     error: chat.error,
     submit,
     clearHistory: chat.clearHistory,
+    handleWidgetChoice,
+    notifyTaskCaptureComplete,
   };
 }

@@ -9,10 +9,12 @@
 import React from 'react';
 import DOMPurify from 'dompurify';
 import { ChatMessage as ChatMessageType } from '../api/types';
+import { OptionsWidget } from './OptionsWidget';
 import styles from './ChatMessage.module.css';
 
 interface ChatMessageProps {
   message: ChatMessageType;
+  onWidgetChoice?: (messageId: string, choiceId: string) => void;
 }
 
 const SANITIZE_CONFIG = {
@@ -46,8 +48,8 @@ function formatMarkdown(text: string): string {
     .join('');
 }
 
-export const ChatMessageComponent: React.FC<ChatMessageProps> = React.memo(({ message }) => {
-  const { role, content, mode, sources, timestamp, reportHtml } = message;
+export const ChatMessageComponent: React.FC<ChatMessageProps> = React.memo(({ message, onWidgetChoice }) => {
+  const { role, content, mode, sources, timestamp, reportHtml, widgetType, widgetChoices, widgetUsed } = message;
   const isUser = role === 'user';
 
   // Analysis result message — render as a card
@@ -81,6 +83,13 @@ export const ChatMessageComponent: React.FC<ChatMessageProps> = React.memo(({ me
           className={styles.bubble}
           dangerouslySetInnerHTML={{ __html: formatMarkdown(content) }}
         />
+        {widgetType === 'options' && widgetChoices && (
+          <OptionsWidget
+            choices={widgetChoices}
+            disabled={widgetUsed}
+            onChoice={(choiceId) => onWidgetChoice?.(message.id, choiceId)}
+          />
+        )}
         {sources && sources.length > 0 && (
           <div className={styles.sources}>
             <strong>Sources: </strong>

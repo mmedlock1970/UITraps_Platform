@@ -224,7 +224,9 @@ class SiteAnalyzer:
             "page_title": title,
             "page_url": url,
             "site_pages": site_page_titles,
-            "relevant_tasks": relevant_tasks.get("full", []) + relevant_tasks.get("partial", [])
+            "relevant_tasks": relevant_tasks.get("full", []) + relevant_tasks.get("partial", []),
+            "device_type": user_context.get("device_type"),
+            "viewport": user_context.get("viewport")
         }
 
         # Add navigation context if available (critical for flow-aware analysis)

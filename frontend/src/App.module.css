@@ -1,7 +1,14 @@
+/* Full-viewport wrapper that handles background for all screen widths */
+.viewportWrapper {
+  min-height: 100vh;
+  width: 100%;
+  background: var(--uitraps-bg);
+}
+
 .platform {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  min-height: 100vh;
   width: 100%;
   max-width: 900px;
   margin: 0 auto;

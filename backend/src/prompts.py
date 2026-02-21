@@ -633,13 +633,74 @@ def build_user_message(
    === END NAVIGATION CONTEXT ===
 """
 
+        # Build device context section if provided
+        device_section = ""
+        device_type = page_context.get('device_type')
+        viewport = page_context.get('viewport')
+
+        if device_type:
+            device_constraints = {
+                'mobile': """
+   === MOBILE DEVICE CONSTRAINTS ===
+   📱 Touch-only interface (NO hover states available)
+   📱 Minimum tap target: 44×44px (Apple HIG) or 48×48dp (Material Design)
+   📱 Thumb zone: Bottom 1/3 of screen is easiest to reach; top corners are hardest
+   📱 Navigation: Expect hamburger menus, bottom tabs, or sticky headers
+   📱 Viewport: Limited screen real estate — content must be single-column and scannable
+   📱 Text: Minimum 16px for body text (smaller text is hard to read on mobile)
+
+   ⚠️ CRITICAL MOBILE-SPECIFIC CHECKS:
+   - Are tap targets large enough? (Buttons, links, form fields)
+   - Are important actions within thumb reach (bottom half of screen)?
+   - Is there ANY hover-dependent functionality? (This BREAKS on mobile!)
+   - Is text readable without zooming?
+   - Are form inputs properly sized for touch keyboards?
+   === END MOBILE CONSTRAINTS ===
+""",
+                'tablet': """
+   === TABLET DEVICE CONSTRAINTS ===
+   📱 Touch-primary interface (hover may exist but shouldn't be required)
+   📱 Minimum tap target: 44×44px recommended
+   📱 Thumb zones: Consider both portrait and landscape orientations
+   📱 Viewport: Medium screen — can support 2-column layouts but keep it simple
+   📱 Text: Minimum 16px for body text
+
+   ⚠️ TABLET-SPECIFIC CHECKS:
+   - Are tap targets appropriately sized?
+   - Does layout work in both portrait and landscape?
+   - Are important actions easily accessible?
+   - Is hover-dependent functionality avoided or has touch alternatives?
+   === END TABLET CONSTRAINTS ===
+""",
+                'desktop': """
+   === DESKTOP DEVICE CONSTRAINTS ===
+   🖱️ Mouse and keyboard interface
+   🖱️ Hover states are AVAILABLE and EXPECTED for interactive feedback
+   🖱️ Precision: Users can click small targets (but don't make them too small)
+   🖱️ Viewport: Large screen — multi-column layouts are appropriate
+   🖱️ Navigation: Expect horizontal nav bars, dropdown menus, breadcrumbs
+   🖱️ Keyboard: Tab navigation and keyboard shortcuts should be supported
+
+   ⚠️ DESKTOP-SPECIFIC CHECKS:
+   - Do interactive elements show hover states for feedback?
+   - Are there keyboard shortcuts for power users?
+   - Is the layout making good use of screen space?
+   - Can users tab through forms efficiently?
+   === END DESKTOP CONSTRAINTS ===
+"""
+            }
+
+            device_section = device_constraints.get(device_type, "")
+            if viewport:
+                device_section = f"   Viewport: {viewport}\n{device_section}"
+
         page_context_section = f"""
 {page_context_num}. PAGE CONTEXT (IMPORTANT - Read Before Analyzing):
 
    Page Role: {page_context.get('page_role', 'Unknown').upper()}
    Page Title: {page_context.get('page_title', 'Unknown')}
    Page URL: {page_context.get('page_url', 'Unknown')}
-{nav_section}
+{device_section}{nav_section}
    Tasks RELEVANT to this page type:
    {chr(10).join('   - ' + task for task in page_context.get('relevant_tasks', []))}
 
