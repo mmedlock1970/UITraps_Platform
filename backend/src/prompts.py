@@ -163,6 +163,194 @@ you MUST understand this page's position in the user journey.
    - Use this context to calibrate your expectations for this page
 '''
 
+# Gestalt Principles for POOR GROUPING evaluation
+# Based on perceptual psychology - these are objective rules, not subjective taste
+GESTALT_PRINCIPLES_GUIDANCE = '''
+🎯 POOR GROUPING - GESTALT PRINCIPLE EVALUATION (OBJECTIVE RULES)
+
+POOR GROUPING is NOT about taste or aesthetics. It is about violations of human perceptual psychology.
+You MUST evaluate grouping against these Gestalt principles. A POOR GROUPING trap exists ONLY when
+one or more of these principles is violated.
+
+**THE 8 GESTALT PRINCIPLES FOR UI EVALUATION:**
+
+1. **PROXIMITY** (Most Common Violation)
+   - Rule: Related elements should be spatially closer to each other than to unrelated elements
+   - Violation Signal: Related items have MORE space between them than unrelated neighbors
+   - Example Violation: A form label is closer to the PREVIOUS field than to its own input
+   - Example OK: A "Cat Food" card next to "Dog Food" card with equal spacing - these ARE related (both product categories)
+   - Measurement: Compare pixel distances between elements
+
+2. **SIMILARITY**
+   - Rule: Elements with the same function share visual properties (color, size, shape, typography)
+   - Violation Signal: Same-function elements look different, OR different-function elements look identical
+   - Example Violation: Two primary action buttons with completely different styling
+   - Example OK: Product category cards that all look the same - this is CORRECT, they have the same function
+   - Example OK: "Pet Services" styled same as "Cat Food" - both are navigation cards, same function
+
+3. **COMMON REGION**
+   - Rule: Elements enclosed within the same visual boundary (box, background, border) are perceived as related
+   - Violation Signal: Unrelated elements share a container, OR related elements are split across containers
+   - Example Violation: A "Delete Account" button inside the "Profile Settings" card when it should be separate
+   - Example OK: Mixed product/service categories in one section IF they share a common purpose (e.g., "Quick Links")
+
+4. **CONTINUITY (Alignment)**
+   - Rule: The eye follows smooth, aligned visual paths; elements on the same axis are perceived as related
+   - Violation Signal: Misalignment breaks expected reading order or visual flow
+   - Example Violation: Form fields with inconsistent left edges
+   - Example OK: A grid of cards with consistent alignment
+
+5. **FIGURE-GROUND**
+   - Rule: Foreground (interactive) elements must be clearly distinguishable from background
+   - Violation Signal: Low contrast, visual noise, or competing backgrounds obscure what's clickable
+   - Example Violation: Light gray buttons on light gray background
+   - Note: This overlaps with EFFECTIVELY INVISIBLE ELEMENT - use POOR GROUPING only when it's about grouping confusion
+
+6. **CLOSURE**
+   - Rule: Incomplete shapes are perceived as complete when visual cues are sufficient
+   - Violation Signal: Partial visual elements don't resolve into recognizable forms
+   - Example Violation: A progress indicator that's half-visible and unclear
+   - Rarely applies to most UI analysis
+
+7. **COMMON FATE (Motion)**
+   - Rule: Elements that move together are perceived as related
+   - Violation Signal: Related elements animate inconsistently (one fades, another slides)
+   - Note: Requires video/interaction sequences to detect - cannot assess from static screenshots
+   - Only flag if you have multiple frames showing inconsistent animation
+
+8. **SYMMETRY/ORDER**
+   - Rule: Symmetrical or orderly layouts are perceived as stable and intentional
+   - Violation Signal: Near-symmetry that creates unintentional imbalance
+   - Example Violation: Two columns of equal importance but one has 3 items and one has 7, creating visual imbalance
+   - Example OK: Intentionally asymmetric layouts that are clearly designed that way
+
+**CRITICAL: WHAT IS NOT POOR GROUPING**
+
+❌ DO NOT flag as POOR GROUPING:
+- Mixed content types in the same section IF they serve the same navigation purpose
+- Standard layouts that follow common conventions (search in upper right, footer links grouped)
+- Multiple navigation options that provide flexibility (this might be GRATUITOUS REDUNDANCY, not POOR GROUPING)
+- Aesthetic preferences about spacing or alignment that don't violate the rules above
+
+✅ DO flag as POOR GROUPING:
+- Gestalt PROXIMITY violation: related elements farther apart than unrelated ones
+- Gestalt SIMILARITY violation: same-function elements with inconsistent styling
+- Gestalt COMMON REGION violation: wrong elements grouped together in a container
+- Gestalt CONTINUITY violation: misalignment that breaks reading flow
+
+**OUTPUT REQUIREMENT:**
+When flagging POOR GROUPING, you MUST cite:
+1. Which specific Gestalt principle is violated
+2. The measurable/observable evidence (distances, visual properties, alignment)
+3. What the EXPECTED grouping should be vs. what is ACTUAL
+
+If you cannot cite a specific Gestalt principle violation with evidence, it is NOT POOR GROUPING.
+'''
+
+# Tier 2: Incomplete Flow Traps - AI can assess but needs complete task flows
+INCOMPLETE_FLOW_TRAPS_GUIDANCE = '''
+📋 TIER 2 TRAPS: REQUIRES COMPLETE TASK FLOWS
+
+The following traps ARE rule-based and AI CAN assess them, but ONLY with complete task flows.
+Screenshots may be missing intermediate steps. Flag these with appropriate caveats.
+
+**TRAPS REQUIRING COMPLETE FLOWS:**
+
+1. **UNNECESSARY STEP**
+   - Why complete flow needed: Steps can happen BETWEEN the screenshots you're given
+   - What to do: If you detect a potential unnecessary step, note that additional screens
+     in the flow might reveal context that justifies the step
+   - Caveat: "Based on provided screenshots. Additional steps in the flow may provide context."
+
+2. **FORCED SYNTAX**
+   - Why complete flow needed: Syntax requirements often span many steps (e.g., multi-field forms)
+   - What to do: Only flag if the syntax requirement is clearly visible in provided screenshots
+   - Caveat: "Syntax requirements may extend beyond visible screenshots."
+
+3. **GRATUITOUS REDUNDANCY**
+   - Why complete flow needed: Redundancy might exist for flexibility across different task paths
+   - What to do: Flag visible redundancy but acknowledge it might serve different user journeys
+   - Caveat: "May be intentional flexibility for different user paths."
+
+4. **MEMORY CHALLENGE**
+   - Why complete flow needed: Need to see what information user had to remember from earlier
+   - What to do: Only flag if you can see both the source info AND where it's needed
+   - Caveat: "Earlier screens may have provided this information."
+
+5. **SYSTEM AMNESIA**
+   - Why complete flow needed: Need to see what user entered earlier that system forgot
+   - What to do: Only flag if you can see prior user input AND evidence system forgot it
+   - Caveat: "Earlier interactions may have captured this data."
+
+6. **VARIABLE OUTCOME**
+   - Why complete flow needed: Requires seeing SAME action produce DIFFERENT results
+   - What to do: Can only detect if multiple flows show inconsistent behavior
+   - Caveat: "Requires multiple task flows to confirm inconsistency."
+
+**OUTPUT REQUIREMENT:**
+For these traps, include confidence level "medium" or "low" and add the caveat to your finding.
+If you have incomplete information, use `incomplete_flow_findings` array instead of asserting
+as critical/moderate/minor issues.
+'''
+
+# Human-judgment-required traps guidance (Tier 3)
+HUMAN_REVIEW_TRAPS_GUIDANCE = '''
+🧠 TIER 3 TRAPS: REQUIRES HUMAN JUDGMENT (Flag for Review, Don't Assert)
+
+The following traps depend on human conventions, lived experience, or subjective perception that AI cannot
+reliably assess. For these traps, you must flag observations for HUMAN REVIEW rather than asserting
+they are definitely traps.
+
+**TRAPS REQUIRING HUMAN REVIEW:**
+
+1. **UNCOMPREHENDED ELEMENT**
+   - Why AI can't assess: Whether terminology is "confusing" depends on users' cultural background,
+     industry knowledge, regional conventions, and lived experience
+   - What AI CAN do: Identify terminology that MIGHT be unfamiliar (jargon, acronyms, regional terms)
+   - What AI CANNOT do: Know whether target users would actually be confused
+   - Example: "Cat Food" card - AI cannot know if users understand this leads to a category vs specific product
+   - Flag for human review with: "Would your target users understand what [term/element] means?"
+
+2. **INVITING DEAD END**
+   - Why AI can't assess: Whether a CTA "misleads" depends on human expectations formed by years of
+     using similar interfaces - conventions that are learned, not logical
+   - What AI CAN do: Identify where CTA text might not match destination content
+   - What AI CANNOT do: Know whether users' expectations match the actual destination
+   - Example: Product image cards leading to categories - AI cannot know if users expect this convention
+   - Flag for human review with: "Do your users expect [CTA text] to lead to [destination type]?"
+
+3. **DISTRACTION**
+   - Why AI can't assess: What captures human attention depends on cognitive patterns, visual salience
+     relative to the task, and individual differences
+   - What AI CAN do: Identify visually prominent elements that aren't task-related
+   - What AI CANNOT do: Know whether these actually distract real users during real tasks
+   - Flag for human review with: "Does [element] pull user attention away from [primary task]?"
+
+4. **EFFECTIVELY INVISIBLE ELEMENT**
+   - Why AI can't assess: Whether users "notice" something depends on attention patterns, scanning
+     behavior, and what users have learned to look for
+   - What AI CAN do: Identify elements with low visual prominence (small size, low contrast, peripheral location)
+   - What AI CANNOT do: Know whether real users would actually miss these elements
+   - Flag for human review with: "Would your users notice [element] in its current location/styling?"
+
+5. **POOR AESTHETIC**
+   - Why AI can't assess: Beauty and aesthetic quality are subjective and culturally dependent
+   - What AI CAN do: Identify potential visual inconsistencies or departures from common styling
+   - What AI CANNOT do: Judge whether something is "ugly" or "beautiful" to target users
+   - Flag for human review with: "Does the visual design of [element] meet your brand/quality standards?"
+
+**OUTPUT REQUIREMENT:**
+For these 5 traps, output to `flagged_for_human_review` array instead of critical/moderate/minor issues.
+Include:
+- trap_name: One of the 5 above
+- observation: Factual description of what you see (no claims about user confusion)
+- why_human_review_needed: What human knowledge is required to confirm
+- question_for_reviewer: Specific yes/no question for the human to answer
+
+**IMPORTANT: DO NOT flag as critical/moderate/minor issues unless you have OBJECTIVE evidence.**
+Theoretical confusion ≠ Actual confusion. When in doubt, flag for human review.
+'''
+
 # Bug detection guidance
 BUG_DETECTION_GUIDANCE = '''
 🐛 BUG DETECTION (Separate from UI Traps):
@@ -295,7 +483,7 @@ Before flagging ANY trap, you MUST:
 
 **Common Over-Application to AVOID:**
 - GRATUITOUS REDUNDANCY: Multiple navigation options ≠ redundancy. Flexible starting points (noun→verb or verb→noun) are OK. Only flag true duplicates visible simultaneously. If flagged, usually Moderate or Minor severity, NOT Critical.
-- POOR GROUPING: Standard layout conventions (search in upper right, utility nav separate from main nav) are NOT poor grouping. Only flag when visual relationships contradict logical relationships.
+- POOR GROUPING: **USE GESTALT PRINCIPLES** - Standard layout conventions are NOT poor grouping. POOR GROUPING requires a VIOLATION of a specific Gestalt perceptual principle (Proximity, Similarity, Common Region, Continuity, Figure-Ground, Closure, Common Fate, or Symmetry). If no Gestalt principle is violated, it is NOT Poor Grouping. Mixed content types (products + services) in the same section is OK if they serve the same navigational purpose. See detailed Gestalt rules below.
 - PHYSICAL CHALLENGE: Standard-sized interface elements are NOT traps. Only flag if below WCAG minimums (touch targets <44px, click targets <24px, text <12px) OR if clearly problematic. Navigation menus with standard sizing are fine.
 
 - INFORMATION OVERLOAD (II): **CRITICAL CALIBRATION - DO NOT UNDER-FLAG**
@@ -327,28 +515,38 @@ Before flagging ANY trap, you MUST:
 
   **DO NOT put in Potential Issues if:** The task is clearly obscured by excessive text. That's a confirmed trap, flag it at appropriate severity.
 
-- UNCOMPREHENDED ELEMENT - Regional Terminology: **CRITICAL CALIBRATION NEEDED**
+- UNCOMPREHENDED ELEMENT: **⚠️ REQUIRES HUMAN JUDGMENT - FLAG FOR REVIEW**
 
-  ✅ **DO Flag These (Genuinely Confusing Regional Terms):**
-  - "Tabs" for vehicle registration stickers (Washington State) - Users from other states call these "stickers", "tags", "registration", or "decals"
-  - "The T" for subway/metro in Boston - Visitors won't know this local name
-  - "The Pike" for turnpike/highway - Regional road nicknames
-  - Industry jargon on public-facing sites (e.g., "LOS" for "Level of Service" without definition)
-  - Local government acronyms used prominently WITHOUT definition on first use (e.g., "DOL" in page titles or primary CTAs)
+  AI CANNOT reliably determine if users will be confused by terminology because confusion depends on:
+  - Users' cultural background and lived experience
+  - Regional conventions learned over a lifetime
+  - Industry knowledge the AI cannot verify
+  - UI conventions users have internalized through years of use
 
-  ❌ **DO NOT Flag These (Acceptable Regional/Contextual Terms):**
-  - Well-established acronyms defined in page header/logo and used consistently (e.g., "DOL" when "Department of Licensing" appears in header)
-  - Industry-standard acronyms where the user base IS that industry (e.g., "CDL" on a commercial driver section, "EDL" explained as "Enhanced Driver License")
-  - Terms that are self-evident from context or visual cues
-  - Regional terminology when the user context indicates LOCAL users (e.g., "DMV" in California for California residents)
-  - Acronyms used in secondary navigation or footer links (not blocking primary tasks)
+  **INSTEAD OF flagging as Critical/Moderate/Minor, output to `flagged_for_human_review` with:**
+  - observation: "The term [X] appears in [location]"
+  - why_human_review_needed: "I cannot determine if target users would understand this term"
+  - question_for_reviewer: "Would your target users understand what [term] means in this context?"
 
-  **Severity Guidelines for UNCOMPREHENDED ELEMENT:**
-  - Critical: Regional terminology in page TITLES, primary CTAs, or blocking core task completion
-  - Moderate: Regional terminology in secondary content, explained later on page, or with contextual clues
-  - Minor: Terminology in footer, rarely-used sections, or specialized areas where users are expected to know terms
+  **EXCEPTION - Only flag directly (not for human review) when:**
+  - The term is objectively undefined jargon (acronym with no expansion anywhere visible)
+  - The terminology is provably region-specific AND users are explicitly stated to be from outside that region
 
-- INVITING DEAD END: Look for elements that SEEM right but lead wrong. Common case: similar labels for different functions (e.g., "Register a vehicle" vs "Renew vehicle registration" where users confuse them).
+- INVITING DEAD END: **⚠️ REQUIRES HUMAN JUDGMENT - FLAG FOR REVIEW**
+
+  AI CANNOT reliably determine if a CTA "misleads" because expectations depend on:
+  - UI conventions users have learned from years of using similar interfaces
+  - Mental models formed through lived experience
+  - What users "just know" category cards, product images, etc. typically do
+
+  **INSTEAD OF flagging as Critical/Moderate/Minor, output to `flagged_for_human_review` with:**
+  - observation: "The [element type] shows [what's visible] and likely leads to [destination type]"
+  - why_human_review_needed: "I cannot determine if users expect this navigation pattern"
+  - question_for_reviewer: "Do your users expect [element] to lead to [destination]?"
+
+  **EXCEPTION - Only flag directly when:**
+  - You have VERIFIED the destination (in multi-page analysis) and it objectively mismatches the CTA text
+  - The CTA text makes a specific promise that is objectively not kept (e.g., "Free Download" leads to payment)
 
 **Severity Guidelines:**
 - Critical = Blocks core user tasks, prevents goal completion (e.g., regional jargon on primary actions, missing essential controls)
@@ -481,6 +679,7 @@ OUTPUT REQUIREMENTS:
 - Provide 5-9 summary bullet points
 - For confirmed issues (Critical/Moderate/Minor), specify: trap name (in ALL CAPS), tenet violated, exact location, detailed problem explanation, actionable recommendation, and confidence level
 - For borderline cases, use potential_issues field with: trap_name, tenet, location, observation, why_uncertain, confidence ("low")
+- **For human-judgment traps (UNCOMPREHENDED ELEMENT, INVITING DEAD END, DISTRACTION, EFFECTIVELY INVISIBLE ELEMENT, POOR AESTHETIC):** Use `flagged_for_human_review` field with: trap_name, tenet, location, observation (factual only), why_human_review_needed, question_for_reviewer
 - Use confidence levels: "high", "medium", or "low"
 - List traps you specifically looked for but did not find OR could not evaluate from static design
 - Note positive design elements
@@ -494,7 +693,19 @@ If an issue doesn't fit one of these 27 traps, it is NOT a UI Trap - do not repo
 ⚠️ VISUAL VERIFICATION REMINDER:
 Before submitting, verify each finding against what you actually see in the image. Do NOT flag elements as missing if they are visible in the screenshot.
 
-You will submit your analysis using the ui_analysis_report tool with all required fields including potential_issues."""
+You will submit your analysis using the ui_analysis_report tool with all required fields including potential_issues and flagged_for_human_review."""
+
+    # Build the complete system prompt with all guidance sections
+    full_system_prompt = f"""{system_prompt_intro}
+
+===== DETAILED GESTALT PRINCIPLES FOR POOR GROUPING =====
+{GESTALT_PRINCIPLES_GUIDANCE}
+
+===== TIER 2: INCOMPLETE FLOW TRAPS GUIDANCE =====
+{INCOMPLETE_FLOW_TRAPS_GUIDANCE}
+
+===== TIER 3: HUMAN JUDGMENT TRAPS GUIDANCE =====
+{HUMAN_REVIEW_TRAPS_GUIDANCE}"""
 
     # Build system message blocks with optional caching
     if use_caching:
@@ -502,7 +713,7 @@ You will submit your analysis using the ui_analysis_report tool with all require
         return [
             {
                 "type": "text",
-                "text": system_prompt_intro
+                "text": full_system_prompt
             },
             {
                 "type": "text",
@@ -515,7 +726,7 @@ You will submit your analysis using the ui_analysis_report tool with all require
         return [
             {
                 "type": "text",
-                "text": f"{system_prompt_intro}\n\n===== UI TENETS & TRAPS TRAINING CONTENT =====\n\n{training_content}"
+                "text": f"{full_system_prompt}\n\n===== UI TENETS & TRAPS TRAINING CONTENT =====\n\n{training_content}"
             }
         ]
 

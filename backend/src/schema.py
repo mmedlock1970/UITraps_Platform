@@ -227,6 +227,83 @@ UI_ANALYSIS_SCHEMA = {
                 },
                 "required": ["frame_index", "issue", "description", "should_skip"]
             }
+        },
+        "flagged_for_human_review": {
+            "type": "array",
+            "description": "Tier 3 traps that require human judgment to confirm. These traps depend on understanding user conventions, expectations, or taste that AI cannot reliably assess. A human reviewer must verify whether these are actual issues for the target users.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "trap_name": {
+                        "type": "string",
+                        "enum": ["UNCOMPREHENDED ELEMENT", "INVITING DEAD END", "DISTRACTION", "EFFECTIVELY INVISIBLE ELEMENT", "POOR AESTHETIC"],
+                        "description": "The trap being flagged - limited to Tier 3 traps requiring human judgment"
+                    },
+                    "tenet": {
+                        "type": "string",
+                        "enum": VALID_TENET_NAMES,
+                        "description": "Parent tenet that might be violated"
+                    },
+                    "location": {
+                        "type": "string",
+                        "description": "Where in the design this was observed"
+                    },
+                    "observation": {
+                        "type": "string",
+                        "description": "Factual description of what the AI observes - no assumptions about user confusion"
+                    },
+                    "why_human_review_needed": {
+                        "type": "string",
+                        "description": "Why AI cannot determine if this is a real issue - what human knowledge is needed"
+                    },
+                    "question_for_reviewer": {
+                        "type": "string",
+                        "description": "Specific question the human reviewer should answer to confirm/reject this finding"
+                    }
+                },
+                "required": ["trap_name", "tenet", "location", "observation", "why_human_review_needed", "question_for_reviewer"]
+            }
+        },
+        "incomplete_flow_findings": {
+            "type": "array",
+            "description": "Tier 2 traps that AI can assess but require complete task flows. These findings are flagged with caveats because screenshots may be missing intermediate steps. AI can detect these traps but confidence is limited without seeing the full user journey.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "trap_name": {
+                        "type": "string",
+                        "enum": ["UNNECESSARY STEP", "FORCED SYNTAX", "GRATUITOUS REDUNDANCY", "MEMORY CHALLENGE", "SYSTEM AMNESIA", "VARIABLE OUTCOME"],
+                        "description": "The trap being flagged - limited to Tier 2 traps requiring complete flows"
+                    },
+                    "tenet": {
+                        "type": "string",
+                        "enum": VALID_TENET_NAMES,
+                        "description": "Parent tenet that might be violated"
+                    },
+                    "location": {
+                        "type": "string",
+                        "description": "Where in the design this was observed"
+                    },
+                    "observation": {
+                        "type": "string",
+                        "description": "What was observed in the provided screenshots"
+                    },
+                    "caveat": {
+                        "type": "string",
+                        "description": "Why this finding may be incomplete - what additional context might change the assessment"
+                    },
+                    "additional_screenshots_needed": {
+                        "type": "string",
+                        "description": "What additional screenshots would help confirm this finding"
+                    },
+                    "confidence": {
+                        "type": "string",
+                        "enum": ["medium", "low"],
+                        "description": "Confidence level - typically medium or low for incomplete flow findings"
+                    }
+                },
+                "required": ["trap_name", "tenet", "location", "observation", "caveat", "confidence"]
+            }
         }
     },
     "required": [
