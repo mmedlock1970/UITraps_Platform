@@ -304,11 +304,13 @@ they are definitely traps.
 **TRAPS REQUIRING HUMAN REVIEW:**
 
 1. **UNCOMPREHENDED ELEMENT**
+   - Definition: Label, icon, or element whose MEANING is unclear (terminology/iconography confusion)
    - Why AI can't assess: Whether terminology is "confusing" depends on users' cultural background,
      industry knowledge, regional conventions, and lived experience
    - What AI CAN do: Identify terminology that MIGHT be unfamiliar (jargon, acronyms, regional terms)
    - What AI CANNOT do: Know whether target users would actually be confused
-   - Example: "Cat Food" card - AI cannot know if users understand this leads to a category vs specific product
+   - **COMMON MISTAKE:** Do NOT use this trap for filter/dropdown state visibility issues.
+     "Price" and "Rating" are clear labels - if users can't see the CURRENT STATE, that's FEEDBACK FAILURE.
    - Flag for human review with: "Would your target users understand what [term/element] means?"
 
 2. **INVITING DEAD END**
@@ -515,22 +517,35 @@ Before flagging ANY trap, you MUST:
 
   **DO NOT put in Potential Issues if:** The task is clearly obscured by excessive text. That's a confirmed trap, flag it at appropriate severity.
 
-- UNCOMPREHENDED ELEMENT: **⚠️ REQUIRES HUMAN JUDGMENT - FLAG FOR REVIEW**
+- UNCOMPREHENDED ELEMENT: **⚠️ REQUIRES HUMAN JUDGMENT - ALWAYS FLAG FOR REVIEW**
+
+  **DEFINITION:** A label, icon, or other interface element is noticed, but its MEANING is unclear.
+  This trap is ONLY about terminology, iconography, or labeling confusion.
+
+  **WHAT IS UNCOMPREHENDED ELEMENT:**
+  - Unfamiliar icons (e.g., branded icon instead of standard magnifying glass for search)
+  - Unfamiliar terminology (e.g., regional jargon like "tabs" for vehicle registration)
+  - Ambiguous labels (e.g., button labeled with unclear action word)
+  - Icons without text labels that users might not recognize
+
+  **WHAT IS NOT UNCOMPREHENDED ELEMENT (DO NOT USE THIS TRAP FOR):**
+  - Filter/dropdown state not visible → Use FEEDBACK FAILURE instead
+  - Selected values not displayed → Use FEEDBACK FAILURE or INVISIBLE ELEMENT
+  - Standard UI patterns (chevrons, hamburger menus, common icons) → Users know these
+  - Clear labels like "Price", "Rating", "Sort", "Filter" → Universally understood
+  - Any issue about VISIBILITY of current state rather than MEANING of labels
 
   AI CANNOT reliably determine if users will be confused by terminology because confusion depends on:
   - Users' cultural background and lived experience
   - Regional conventions learned over a lifetime
   - Industry knowledge the AI cannot verify
-  - UI conventions users have internalized through years of use
 
-  **INSTEAD OF flagging as Critical/Moderate/Minor, output to `flagged_for_human_review` with:**
-  - observation: "The term [X] appears in [location]"
-  - why_human_review_needed: "I cannot determine if target users would understand this term"
-  - question_for_reviewer: "Would your target users understand what [term] means in this context?"
+  **ALWAYS output to `flagged_for_human_review` - NO EXCEPTIONS:**
+  - observation: "The term/icon [X] appears in [location]"
+  - why_human_review_needed: "I cannot determine if target users would understand this"
+  - question_for_reviewer: "Would your target users understand what [term/icon] means?"
 
-  **EXCEPTION - Only flag directly (not for human review) when:**
-  - The term is objectively undefined jargon (acronym with no expansion anywhere visible)
-  - The terminology is provably region-specific AND users are explicitly stated to be from outside that region
+  **DO NOT flag UNCOMPREHENDED ELEMENT as critical/moderate/minor. It MUST go to human review.**
 
 - INVITING DEAD END: **⚠️ REQUIRES HUMAN JUDGMENT - FLAG FOR REVIEW**
 
@@ -630,7 +645,7 @@ When analyzing a page that is part of a larger site, you MUST consider:
 
 **What to Focus On:**
 - Systematically check for all 27 Traps (but respect limitations above)
-- Follow the gated decision procedure for Information Overload (Gates 0-3)
+- Use the gated decision procedure for Information Overload (Gates 0-3) as INTERNAL REASONING only
 - Provide specific visual references where traps occur
 - **RESPECT PAGE ROLES** - Don't flag missing elements that belong elsewhere
 - **CRITICAL: When evaluating UNCOMPREHENDED ELEMENT for regional terminology:**
@@ -644,23 +659,27 @@ When analyzing a page that is part of a larger site, you MUST consider:
 
 **Few-Shot Learning Examples:**
 
-EXAMPLE 1 - CORRECT DETECTION of UNCOMPREHENDED ELEMENT:
+EXAMPLE 1 - CORRECT HANDLING of UNCOMPREHENDED ELEMENT (Flag for Human Review):
 - Scenario: Washington State DOL website, page title "Renew Vehicle Tabs"
 - User Context: General public including new residents from other states
-- Analysis: ✅ FLAG as Critical - "Tabs" is Washington-specific jargon for vehicle registration stickers. Users from other states won't understand this term. It appears in the page title (primary entry point) with no definition until deep in content.
-- Recommendation: Change to "Renew Vehicle Registration (Tabs)" or "Renew Registration Stickers"
+- Analysis: ✅ Output to `flagged_for_human_review`:
+  - observation: "The term 'Tabs' appears in the page title with no definition visible"
+  - why_human_review_needed: "I cannot determine if Washington residents understand 'Tabs' means vehicle registration stickers"
+  - question_for_reviewer: "Would your target users (including new WA residents) understand what 'Tabs' means?"
+- Note: DO NOT flag as Critical/Moderate/Minor - human must confirm if users are actually confused
 
-EXAMPLE 2 - CORRECT NON-DETECTION (Do Not Flag):
+EXAMPLE 2 - CORRECT NON-DETECTION (Do Not Flag at All):
 - Scenario: Same website, footer link says "Contact DOL"
 - User Context: Same as above
-- Analysis: ❌ DO NOT flag - "Department of Licensing" appears in the site header/logo. This is a footer link, not blocking core tasks. Users can infer "DOL" from context.
-- Reasoning: Secondary location, context available, not blocking primary user goals
+- Analysis: ❌ DO NOT flag - "Department of Licensing" appears in the site header/logo. Users can infer "DOL" from context. Footer links are secondary, not blocking core tasks.
+- Reasoning: Standard abbreviation with context available nearby
 
-EXAMPLE 3 - MODERATE vs CRITICAL Severity:
-- Scenario: Page content uses "CDL" repeatedly in section titled "Commercial Driver Licenses (CDL)"
-- User Context: Mixed audience, some getting first license (16-year-olds)
-- Analysis: Flag as Moderate (not Critical) - Acronym is defined in the section heading. Users who need CDL info will see the definition. Not blocking general users' tasks.
-- Recommendation: Move to Moderate severity, suggest defining on first use in body text too
+EXAMPLE 3 - WRONG TRAP TYPE (Common Mistake to Avoid):
+- Scenario: Filter dropdowns show chevrons but no indication of current filter state
+- User Context: Users trying to filter products by price
+- Analysis: ❌ DO NOT flag as UNCOMPREHENDED ELEMENT - Labels like "Price" and "Rating" are universally understood.
+  The issue is that users can't see IF a filter is applied or WHAT values are selected.
+  ✅ This is FEEDBACK FAILURE (no visual indication of current state), not a comprehension issue.
 
 EXAMPLE 4 - CORRECT NON-DETECTION on Destination Page (Do Not Flag):
 - Scenario: Policies page on e-commerce site (URL: /policies/), navigation shows: About, Contact Us, Cart (0 items)
@@ -678,6 +697,15 @@ EXAMPLE 4 - CORRECT NON-DETECTION on Destination Page (Do Not Flag):
 OUTPUT REQUIREMENTS:
 - Provide 5-9 summary bullet points
 - For confirmed issues (Critical/Moderate/Minor), specify: trap name (in ALL CAPS), tenet violated, exact location, detailed problem explanation, actionable recommendation, and confidence level
+
+**⚠️ CRITICAL - HUMAN-READABLE OUTPUT:**
+The 'problem' field MUST be written for end users (clients, designers, stakeholders) who have never heard of UI Traps methodology:
+- DO NOT include "GATE 0", "GATE 1", etc. or any internal reasoning steps
+- DO NOT include analytical labels like "This is an ACTION task" or "Evidence of excess:"
+- DO write in plain language: describe WHAT the issue is, WHERE it appears, and HOW it impacts users
+- DO write as a consultant explaining findings to a client
+- Example BAD: "GATE 0 - User goal: purchase. GATE 1 - Evidence: multiple banners..."
+- Example GOOD: "Three promotional banners appear between the size selector and Add to Cart button, forcing users to scroll past marketing content to complete their purchase."
 - For borderline cases, use potential_issues field with: trap_name, tenet, location, observation, why_uncertain, confidence ("low")
 - **For human-judgment traps (UNCOMPREHENDED ELEMENT, INVITING DEAD END, DISTRACTION, EFFECTIVELY INVISIBLE ELEMENT, POOR AESTHETIC):** Use `flagged_for_human_review` field with: trap_name, tenet, location, observation (factual only), why_human_review_needed, question_for_reviewer
 - Use confidence levels: "high", "medium", or "low"

@@ -86,7 +86,7 @@ UI_ANALYSIS_SCHEMA = {
                     },
                     "problem": {
                         "type": "string",
-                        "description": "Detailed explanation of why the trap is present"
+                        "description": "Human-readable explanation for end users. Describe the specific UI element causing the issue and how it impacts the user experience. Do NOT include internal reasoning steps, gate numbers, or analytical framework terminology. Write as if explaining to a client who has never heard of UI Traps methodology."
                     },
                     "recommendation": {
                         "type": "string",
@@ -110,7 +110,7 @@ UI_ANALYSIS_SCHEMA = {
                     "trap_name": {"type": "string", "enum": VALID_TRAP_NAMES},
                     "tenet": {"type": "string", "enum": VALID_TENET_NAMES},
                     "location": {"type": "string"},
-                    "problem": {"type": "string"},
+                    "problem": {"type": "string", "description": "Human-readable explanation for end users. Describe the issue and its impact without internal reasoning steps or framework terminology."},
                     "recommendation": {"type": "string"},
                     "confidence": {
                         "type": "string",
@@ -129,7 +129,7 @@ UI_ANALYSIS_SCHEMA = {
                     "trap_name": {"type": "string", "enum": VALID_TRAP_NAMES},
                     "tenet": {"type": "string", "enum": VALID_TENET_NAMES},
                     "location": {"type": "string"},
-                    "problem": {"type": "string"},
+                    "problem": {"type": "string", "description": "Human-readable explanation for end users. Describe the issue and its impact without internal reasoning steps or framework terminology."},
                     "recommendation": {"type": "string"},
                     "confidence": {
                         "type": "string",

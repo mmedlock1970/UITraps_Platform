@@ -411,8 +411,9 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
           .slice(-10)
           .map(m => ({ role: m.role, content: m.content }));
 
-        // Scale timeout with file count: 3 min base + 60s per file, max 15 min
-        const imageTimeout = Math.min(180000 + files.length * 60000, 900000);
+        // Scale timeout with file count: 3 min base + 2 min per file, max 30 min
+        // Claude Vision with structured output (tool forcing) takes 60-120s per image
+        const imageTimeout = Math.min(180000 + files.length * 120000, 1800000);
 
         const result = await unifiedAsk({
           apiEndpoint,
