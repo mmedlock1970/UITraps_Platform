@@ -208,6 +208,28 @@ class UITrapsAnalyzer:
                 if not isinstance(report['traps_checked_not_found'], list):
                     report['traps_checked_not_found'] = []
 
+                # Reconcile summary with actual structured counts to prevent contradictions
+                # (Claude's free-form summary text can diverge from the structured issue arrays)
+                n_critical = len(report['critical_issues'])
+                n_moderate = len(report['moderate_issues'])
+                n_minor = len(report['minor_issues'])
+                n_total = n_critical + n_moderate + n_minor
+                if n_total > 0:
+                    parts = []
+                    if n_critical:
+                        parts.append(f"{n_critical} critical")
+                    if n_moderate:
+                        parts.append(f"{n_moderate} moderate")
+                    if n_minor:
+                        parts.append(f"{n_minor} minor")
+                    count_bullet = f"{n_total} issue{'s' if n_total != 1 else ''} identified: {', '.join(parts)}."
+                else:
+                    count_bullet = "No confirmed issues identified in this design."
+                if report['summary']:
+                    report['summary'][0] = count_bullet
+                else:
+                    report['summary'] = [count_bullet]
+
         except Exception as e:
             raise ValueError(
                 f"Failed to parse Claude's response: {e}\n\n"

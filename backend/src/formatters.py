@@ -9,6 +9,79 @@ import re
 from typing import Dict, Any, Optional
 from datetime import datetime
 
+# Canonical tenet → trap ordering for the coverage matrix
+TENETS_AND_TRAPS = [
+    ("UNDERSTANDABLE", [
+        "INVISIBLE ELEMENT", "EFFECTIVELY INVISIBLE ELEMENT", "DISTRACTION",
+        "UNCOMPREHENDED ELEMENT", "INVITING DEAD END", "POOR GROUPING",
+        "FORCED SYNTAX", "MEMORY CHALLENGE", "FEEDBACK FAILURE",
+    ]),
+    ("COMFORTABLE", ["PHYSICAL CHALLENGE", "ACCIDENTAL ACTIVATION"]),
+    ("RESPONSIVE", ["SLOW OR NO RESPONSE", "CAPTIVE WAIT"]),
+    ("EFFICIENT", ["UNNECESSARY STEPS", "INFORMATION OVERLOAD", "SYSTEM AMNESIA"]),
+    ("ACCURATE", ["BAD PREDICTION", "INCORRECT INFORMATION"]),
+    ("PROTECTIVE", ["IRREVERSIBLE ACTION", "UNWANTED DISCLOSURE", "DATA LOSS"]),
+    ("HABITUATING", [
+        "GRATUITOUS REDUNDANCY", "VARIABLE OUTCOME", "WANDERING ELEMENT",
+        "INCONSISTENT APPEARANCE", "AMBIGUOUS HOME",
+    ]),
+    ("BEAUTIFUL", ["POOR AESTHETIC"]),
+]
+
+
+def _normalize_trap_name(name: str) -> str:
+    name = name.upper()
+    name = re.sub(r'\(S\)', 'S', name)           # STEP(S) -> STEPS
+    name = re.sub(r'\s*\([^)]*\)\s*', ' ', name) # strip other parentheticals
+    return re.sub(r'\s+', ' ', name).strip()
+
+
+def _build_trap_matrix_html(report: Dict[str, Any]) -> str:
+    """Build an HTML table showing confirmed issue counts by trap and severity."""
+    counts: Dict[str, Dict[str, int]] = {'critical': {}, 'moderate': {}, 'minor': {}}
+    for sev, field in [('critical', 'critical_issues'), ('moderate', 'moderate_issues'), ('minor', 'minor_issues')]:
+        for issue in report.get(field, []):
+            norm = _normalize_trap_name(issue.get('trap_name', ''))
+            if norm:
+                counts[sev][norm] = counts[sev].get(norm, 0) + 1
+
+    rows = []
+    for tenet, traps in TENETS_AND_TRAPS:
+        for i, trap in enumerate(traps):
+            norm = _normalize_trap_name(trap)
+            c = counts['critical'].get(norm, 0)
+            m = counts['moderate'].get(norm, 0)
+            mi = counts['minor'].get(norm, 0)
+            total = c + m + mi
+            row_class = ' class="has-issues"' if total > 0 else ''
+            cells = (
+                f"<td class='trap-name'>{trap}</td>"
+                f"<td class='count critical'>{c or ''}</td>"
+                f"<td class='count moderate'>{m or ''}</td>"
+                f"<td class='count minor'>{mi or ''}</td>"
+                f"<td class='count total'>{total or ''}</td>"
+            )
+            if i == 0:
+                tenet_cell = f"<td class='tenet-cell' rowspan='{len(traps)}'>{tenet}</td>"
+                rows.append(f"<tr{row_class}>{tenet_cell}{cells}</tr>")
+            else:
+                rows.append(f"<tr{row_class}>{cells}</tr>")
+
+    return (
+        "<div class='trap-matrix'>"
+        "<h2>Trap Coverage Matrix</h2>"
+        "<table class='trap-matrix-table'>"
+        "<thead><tr>"
+        "<th>Tenet</th><th>Trap</th>"
+        "<th class='count-col'>&#128308; Critical</th>"
+        "<th class='count-col'>&#128993; Moderate</th>"
+        "<th class='count-col'>&#128994; Minor</th>"
+        "<th class='count-col'>Total</th>"
+        "</tr></thead>"
+        "<tbody>" + "\n".join(rows) + "</tbody>"
+        "</table></div>"
+    )
+
 
 def parse_claude_response(response_text: str) -> Dict[str, Any]:
     """
@@ -528,6 +601,48 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
             border-top: 1px solid #ecf0f1;
             margin: 20px 0;
         }
+        .trap-matrix { margin: 30px 0; }
+        .trap-matrix-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.88em;
+        }
+        .trap-matrix-table thead th {
+            background: #2c3e50;
+            color: white;
+            padding: 10px 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+        .trap-matrix-table thead th.count-col { text-align: center; }
+        .trap-matrix-table td {
+            padding: 7px 12px;
+            border-bottom: 1px solid #ecf0f1;
+            vertical-align: middle;
+        }
+        .trap-matrix-table .tenet-cell {
+            font-weight: 700;
+            font-size: 0.78em;
+            letter-spacing: 0.06em;
+            background: #f4f6f8;
+            color: #2c3e50;
+            text-align: center;
+            border-right: 2px solid #dee2e6;
+            white-space: nowrap;
+        }
+        .trap-matrix-table .trap-name {
+            color: #34495e;
+            font-size: 0.85em;
+        }
+        .trap-matrix-table .count { text-align: center; font-weight: 600; min-width: 60px; }
+        .trap-matrix-table .count.critical { color: #e74c3c; }
+        .trap-matrix-table .count.moderate { color: #e67e22; }
+        .trap-matrix-table .count.minor { color: #2980b9; }
+        .trap-matrix-table .count.total {
+            color: #2c3e50;
+            border-left: 1px solid #ecf0f1;
+        }
+        .trap-matrix-table tr.has-issues td.trap-name { font-weight: 600; color: #2c3e50; }
     """)
     html.append("</style>")
     html.append("</head>")
@@ -942,6 +1057,9 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
     else:
         html.append("<p>All traps were either found or not fully evaluated</p>")
     html.append("</div>")
+
+    # Trap Coverage Matrix
+    html.append(_build_trap_matrix_html(report))
 
     # Footer
     html.append("<div class='footer confidentiality-notice'>")
