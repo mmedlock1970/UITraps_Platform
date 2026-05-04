@@ -399,23 +399,20 @@ A minimalist design with lots of whitespace is NOT a bug.
 
 def load_training_content() -> str:
     """
-    Load the UI Tenets & Traps training content.
+    Load the condensed AI analysis reference for Pass 1 (detection).
+
+    Uses UI_Traps_Analysis_Reference.md — optimized for trap detection from
+    screenshots. Much smaller token footprint than the full book.
 
     Returns:
-        Training content as string
+        Analysis reference content as string
     """
-    # Get path to training content relative to this file
-    current_dir = Path(__file__).parent
-    training_path = current_dir.parent / "data" / "UI_Tenets_Traps.txt"
+    try:
+        from .knowledge_extractor import load_analysis_reference
+    except ImportError:
+        from knowledge_extractor import load_analysis_reference
 
-    if not training_path.exists():
-        raise FileNotFoundError(
-            f"Training content not found at {training_path}. "
-            f"Please ensure UI_Tenets_Traps.txt is in the data/ directory."
-        )
-
-    with open(training_path, 'r', encoding='utf-8') as f:
-        return f.read()
+    return load_analysis_reference()
 
 
 def build_system_prompt(use_caching: bool = True) -> list:
@@ -1508,5 +1505,114 @@ def build_navigation_flow_message(
         "type": "text",
         "text": prompt
     })
+
+    return content
+
+
+# ---------------------------------------------------------------------------
+# PASS 2 — ENRICHMENT PROMPTS
+# ---------------------------------------------------------------------------
+
+def build_enrichment_system_prompt() -> list:
+    """
+    Build the system prompt for Pass 2 (report enrichment).
+
+    Pass 2 receives the traps already identified in Pass 1 plus the full
+    book sections for those traps. Its job is to write richer, more
+    educational problem descriptions and recommendations.
+
+    Returns:
+        List of system message blocks for Claude API
+    """
+    return [
+        {
+            "type": "text",
+            "text": """You are a senior UI analyst writing the final client report for a UI Tenets & Traps analysis.
+
+A detection pass has already identified which traps are present in the design.
+Your job is to enrich the findings using the full framework content provided below.
+
+⚠️ CONFIDENTIALITY & IP PROTECTION:
+- The UI Tenets & Traps framework is PROPRIETARY and CONFIDENTIAL
+- Reference trap concepts and names, but do NOT copy definitions verbatim
+- Write as a consultant explaining findings to a client
+
+YOUR TASK:
+For each issue identified in the detection pass, write:
+1. An enhanced "problem" description — specific, clear, and educational. Explain what the
+   issue is, exactly where it appears in the design, and how it will impact real users.
+   Draw on the full framework content to add context and precision.
+2. An enhanced "recommendation" — concrete and actionable. Tell the team specifically
+   what to change and why it will help users.
+3. An updated "summary" — 5–9 bullet points covering the overall findings, written for
+   a product team or client. The first bullet must state the issue count.
+
+WRITING RULES:
+- Write in plain language. No internal framework jargon visible to the client.
+- Do NOT use phrases like "GATE 0", "Pass 1 found...", "per the framework..."
+- DO write as if explaining directly to the product team: what the problem is,
+  where it is, and what to do about it.
+- For each finding, be MORE specific than the detection pass. Reference exact UI
+  elements, exact locations, and concrete user impact.
+- Keep the same trap_name, tenet, location, severity, and confidence from Pass 1.
+  Only enhance the "problem" and "recommendation" text.
+
+You will submit your enriched report using the ui_analysis_report tool."""
+        }
+    ]
+
+
+def build_enrichment_user_message(pass1_report: dict, trap_sections: dict) -> list:
+    """
+    Build the user message for Pass 2 enrichment.
+
+    Args:
+        pass1_report: The structured report from Pass 1 detection
+        trap_sections: Dict of trap_name -> book section text for each found trap
+
+    Returns:
+        List of message content blocks for Claude API
+    """
+    import json
+
+    # Format the Pass 1 findings compactly
+    findings_text = json.dumps({
+        "summary": pass1_report.get("summary", []),
+        "critical_issues": pass1_report.get("critical_issues", []),
+        "moderate_issues": pass1_report.get("moderate_issues", []),
+        "minor_issues": pass1_report.get("minor_issues", []),
+        "potential_issues": pass1_report.get("potential_issues", []),
+        "positive_observations": pass1_report.get("positive_observations", []),
+        "traps_checked_not_found": pass1_report.get("traps_checked_not_found", []),
+    }, indent=2)
+
+    # Format the book sections for found traps
+    if trap_sections:
+        sections_text = "\n\n".join(
+            f"=== {name} ===\n{content}"
+            for name, content in trap_sections.items()
+        )
+    else:
+        sections_text = "(No additional framework content available for found traps.)"
+
+    content = [
+        {
+            "type": "text",
+            "text": f"""DETECTION PASS FINDINGS:
+{findings_text}
+
+---
+
+FULL FRAMEWORK CONTENT FOR IDENTIFIED TRAPS:
+{sections_text}
+
+---
+
+Using the full framework content above, enhance the problem descriptions and
+recommendations for each finding. Keep the same trap names, tenets, locations,
+severities, and confidence levels. Only improve the written descriptions.
+Submit the enriched report using the ui_analysis_report tool."""
+        }
+    ]
 
     return content

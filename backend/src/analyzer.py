@@ -18,19 +18,23 @@ try:
     from .validators import validate_file_format, validate_context, is_figma_url
     from .prompts import (
         build_system_prompt, build_user_message, build_figma_message,
-        INTERACTION_ANALYSIS_SYSTEM_PROMPT, build_interaction_message
+        INTERACTION_ANALYSIS_SYSTEM_PROMPT, build_interaction_message,
+        build_enrichment_system_prompt, build_enrichment_user_message
     )
     from .formatters import parse_claude_response, format_report_as_markdown, format_report_as_html, get_report_statistics
     from .schema import get_ui_analysis_schema, get_interaction_analysis_schema
+    from .knowledge_extractor import collect_found_trap_names, extract_trap_sections
 except ImportError:
     # Fallback for direct script execution
     from validators import validate_file_format, validate_context, is_figma_url
     from prompts import (
         build_system_prompt, build_user_message, build_figma_message,
-        INTERACTION_ANALYSIS_SYSTEM_PROMPT, build_interaction_message
+        INTERACTION_ANALYSIS_SYSTEM_PROMPT, build_interaction_message,
+        build_enrichment_system_prompt, build_enrichment_user_message
     )
     from formatters import parse_claude_response, format_report_as_markdown, format_report_as_html, get_report_statistics
     from schema import get_ui_analysis_schema, get_interaction_analysis_schema
+    from knowledge_extractor import collect_found_trap_names, extract_trap_sections
 
 
 class UITrapsAnalyzer:
@@ -252,7 +256,14 @@ class UITrapsAnalyzer:
             "user_id": user_id
         }
 
-        # Step 7: Generate outputs
+        # Step 7: Pass 2 — Enrich findings using full book sections
+        try:
+            report = self._enrich_report(report, timeout=timeout)
+        except Exception as e:
+            # Enrichment failure is non-fatal — use Pass 1 report as-is
+            print(f"[UITraps] Pass 2 enrichment skipped (non-fatal): {e}")
+
+        # Step 8: Generate outputs
         markdown_report = format_report_as_markdown(report, user_context)
         html_report = format_report_as_html(report, user_context)
         statistics = get_report_statistics(report)
@@ -265,6 +276,97 @@ class UITrapsAnalyzer:
             "statistics": statistics,
             "status": "success"
         }
+
+    def _enrich_report(self, pass1_report: Dict[str, Any], timeout: int = 120) -> Dict[str, Any]:
+        """
+        Pass 2: Enrich Pass 1 findings using full book sections for found traps.
+
+        Extracts the relevant book sections for each trap identified in Pass 1,
+        then calls Claude to rewrite the problem descriptions and recommendations
+        with richer, more educational content.
+
+        Args:
+            pass1_report: Structured report from Pass 1 detection
+            timeout: API call timeout in seconds
+
+        Returns:
+            Enriched report (same schema as Pass 1, with enhanced text fields).
+            Falls back to pass1_report unchanged if no traps were found.
+        """
+        # Collect trap names found in Pass 1
+        found_trap_names = collect_found_trap_names(pass1_report)
+
+        # If nothing was found, no enrichment needed
+        if not found_trap_names:
+            return pass1_report
+
+        # Extract the relevant book sections
+        trap_sections = extract_trap_sections(found_trap_names)
+
+        # Build Pass 2 prompts
+        system_prompt = build_enrichment_system_prompt()
+        user_message = build_enrichment_user_message(pass1_report, trap_sections)
+        schema = get_ui_analysis_schema()
+
+        print(f"[UITraps] Pass 2: enriching {len(found_trap_names)} trap(s): {', '.join(found_trap_names)}")
+
+        response = self.client.messages.create(
+            model=self.model,
+            max_tokens=8192,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_message}],
+            tools=[
+                {
+                    "name": "ui_analysis_report",
+                    "description": "Submit the enriched UI Tenets & Traps analysis report",
+                    "input_schema": schema
+                }
+            ],
+            tool_choice={"type": "tool", "name": "ui_analysis_report"},
+            timeout=timeout
+        )
+
+        # Parse enriched report
+        tool_use_block = next(
+            (block for block in response.content if block.type == "tool_use"),
+            None
+        )
+
+        if not tool_use_block:
+            print("[UITraps] Pass 2: no tool use block in response, using Pass 1 report")
+            return pass1_report
+
+        enriched = tool_use_block.input
+
+        # Preserve Pass 1 fields that Pass 2 might not return
+        for field in ("bugs_detected", "incomplete_flow_findings", "flagged_for_human_review"):
+            if field in pass1_report and field not in enriched:
+                enriched[field] = pass1_report[field]
+
+        # Re-apply the count reconciliation on the enriched summary
+        n_critical = len(enriched.get("critical_issues", []))
+        n_moderate = len(enriched.get("moderate_issues", []))
+        n_minor = len(enriched.get("minor_issues", []))
+        n_total = n_critical + n_moderate + n_minor
+        if n_total > 0:
+            parts = []
+            if n_critical:
+                parts.append(f"{n_critical} critical")
+            if n_moderate:
+                parts.append(f"{n_moderate} moderate")
+            if n_minor:
+                parts.append(f"{n_minor} minor")
+            count_bullet = f"{n_total} issue{'s' if n_total != 1 else ''} identified: {', '.join(parts)}."
+        else:
+            count_bullet = "No confirmed issues identified in this design."
+
+        if enriched.get("summary"):
+            enriched["summary"][0] = count_bullet
+        else:
+            enriched["summary"] = [count_bullet]
+
+        print(f"[UITraps] Pass 2: enrichment complete ({response.usage.input_tokens} input tokens)")
+        return enriched
 
     def _load_image(self, image_path: str) -> Dict[str, Any]:
         """

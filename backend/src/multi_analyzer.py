@@ -16,11 +16,27 @@ import os
 import base64
 import tempfile
 import json
+import time
 from typing import List, Dict, Any, Optional, Tuple
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .analyzer import UITrapsAnalyzer
+
+
+def _analyze_with_retry(analyzer, path, user_context, max_retries=3):
+    """Call analyze_design with exponential backoff on 429 rate limit errors."""
+    delay = 60  # seconds to wait on first 429
+    for attempt in range(max_retries):
+        try:
+            return analyzer.analyze_design(design_file=path, user_context=user_context)
+        except Exception as e:
+            if '429' in str(e) and attempt < max_retries - 1:
+                print(f"[UITraps] Rate limited. Waiting {delay}s before retry {attempt + 2}/{max_retries}...")
+                time.sleep(delay)
+                delay = min(delay * 2, 300)  # cap at 5 minutes
+            else:
+                raise
 
 
 # Frame quality classification prompt (lightweight, fast)
@@ -299,10 +315,7 @@ class MultiAnalyzer:
             image_data = _load_image_as_base64(path)
 
             try:
-                result = self.analyzer.analyze_design(
-                    design_file=path,
-                    user_context=user_context
-                )
+                result = _analyze_with_retry(self.analyzer, path, user_context)
                 results.append({
                     'path': path,
                     'filename': os.path.basename(path),
@@ -312,6 +325,7 @@ class MultiAnalyzer:
                     'image_data': image_data
                 })
             except Exception as e:
+                print(f"[UITraps ERROR] Image {i + 1} ({os.path.basename(path)}) failed: {e}")
                 results.append({
                     'path': path,
                     'filename': os.path.basename(path),
