@@ -633,8 +633,18 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
       // Helper: infer expertise from a free-text description
       const inferExpertise = (text: string): boolean => {
         const lower = text.toLowerCase();
-        return ['beginner', 'novice', 'intermediate', 'advanced', 'expert',
-          'power user', 'first-time', 'experienced', 'familiar', 'unfamiliar'
+        return [
+          'beginner', 'novice', 'intermediate', 'advanced', 'expert',
+          'power user', 'first-time', 'experienced', 'familiar', 'unfamiliar',
+          'tech savvy', 'tech-savvy', 'technically savvy', 'savvy',
+          'non-technical', 'non technical', 'not technical', 'technical background',
+          'technical user', 'technical knowledge',
+          'proficient', 'knowledgeable', 'skilled',
+          'new to', 'new user', 'new users', 'casual user', 'casual users',
+          'everyday user', 'average user', 'general public', 'layperson',
+          'digital native', 'computer literate', 'low tech', 'high tech',
+          'no experience', 'little experience', 'limited experience',
+          'years of experience', 'veteran',
         ].some(kw => lower.includes(kw));
       };
 

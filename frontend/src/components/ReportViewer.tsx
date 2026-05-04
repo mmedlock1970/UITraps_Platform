@@ -25,6 +25,7 @@ export const ReportViewer: React.FC<ReportViewerProps> = ({
       ALLOWED_ATTR: [
         'class', 'id', 'href', 'target', 'rel', 'style',
         'src', 'alt', 'title', 'width', 'height', // Image attributes
+        'rowspan', 'colspan', // Table structure
       ],
     });
   }, [html]);
