@@ -37,7 +37,7 @@ def detect_intent(
     Route user input to the appropriate pipeline.
 
     Rules:
-    1. Files + context fields filled (users/tasks/format >= 10 chars each) → ANALYSIS
+    1. Files + context fields filled (users/tasks/format >= 2 chars each) → ANALYSIS
     2. Files + question text only (no context fields)                      → HYBRID
     3. Text only, no files                                                 → CHAT
     4. Files only, no text, no context                                     → ANALYSIS (basic)
@@ -58,9 +58,9 @@ def detect_intent(
     has_files = len(files) > 0
     has_message = bool(message and message.strip())
     has_context = all([
-        users and len(users.strip()) >= 10,
-        tasks and len(tasks.strip()) >= 10,
-        format_desc and len(format_desc.strip()) >= 10,
+        users and len(users.strip()) >= 2,
+        tasks and len(tasks.strip()) >= 2,
+        format_desc and len(format_desc.strip()) >= 2,
     ])
 
     if has_files and has_context:
