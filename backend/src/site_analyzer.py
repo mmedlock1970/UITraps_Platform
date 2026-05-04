@@ -112,10 +112,9 @@ class SiteAnalyzer:
         required_fields = ['users', 'tasks', 'format']
         for field in required_fields:
             value = user_context.get(field, "")
-            if isinstance(value, str) and len(value.strip()) < 10:
+            if isinstance(value, str) and len(value.strip()) < 2:
                 raise ValueError(
-                    f"Field '{field}' is too short. Please provide more detail "
-                    f"(at least 10 characters). Current value: '{value}'"
+                    f"Field '{field}' is too short. Current value: '{value}'"
                 )
 
         # Parse tasks into list if string

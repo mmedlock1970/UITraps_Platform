@@ -86,13 +86,9 @@ def validate_context(user_context: dict) -> Tuple[bool, str]:
         if not value or not isinstance(value, str):
             return False, f"Field '{field}' must be a non-empty string"
 
-        # Check minimum length (avoid vague answers)
-        if len(value.strip()) < 10:
-            return False, (
-                f"Field '{field}' is too short. Please provide more detail "
-                f"(at least 10 characters). Examples and suggestions should be "
-                f"shown to the user if their answer is unclear."
-            )
+        # Check minimum length (avoid completely empty answers)
+        if len(value.strip()) < 2:
+            return False, f"Field '{field}' must be at least 2 characters."
 
     return True, "Context is valid"
 

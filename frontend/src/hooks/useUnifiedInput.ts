@@ -208,10 +208,10 @@ function detectMode(
   const hasText = inputText.trim().length > 0;
   const hasFiles = files.length > 0;
   const hasContext = (
-    users.trim().length >= 10 &&
-    expertise.trim().length >= 5 &&
-    tasks.trim().length >= 10 &&
-    format.trim().length >= 10
+    users.trim().length >= 2 &&
+    expertise.trim().length >= 2 &&
+    tasks.trim().length >= 2 &&
+    format.trim().length >= 2
   );
 
   // URL-based analysis modes
@@ -237,10 +237,10 @@ function detectMode(
 
 function hasFullContext(users: string, expertise: string, tasks: string, format: string): boolean {
   return (
-    users.trim().length >= 10 &&
-    expertise.trim().length >= 5 &&
-    tasks.trim().length >= 10 &&
-    format.trim().length >= 10
+    users.trim().length >= 2 &&
+    expertise.trim().length >= 2 &&
+    tasks.trim().length >= 2 &&
+    format.trim().length >= 2
   );
 }
 
@@ -628,121 +628,101 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
       chat.addUserMessage(answer, 'analysis');
       setInputText('');
 
-      if (contextGatheringPhase === 'asking_users') {
-        // Validate minimum length (10 chars required by backend)
-        if (answer.trim().length < 10) {
-          chat.addSystemPrompt(
-            'That response is a bit too short. Please provide more detail (at least 10 characters) about who the users are.\n\n' +
-            '*(e.g., "Adults ages 25-45 looking to stream movies", "Enterprise software developers")*'
-          );
-          return;
-        }
-        setUsers(answer);
-        setContextGatheringPhase('asking_expertise');
-        chat.addSystemPrompt(
-          'Got it. **What level of expertise will these users have** with this product?\n\n' +
-          '*(e.g., "First-time users unfamiliar with the domain", "Intermediate users with some experience", "Power users with years of experience")*'
-        );
-        return;
-      }
+      // ── Single source of truth: handle each answer then ask what's still missing ──
 
-      if (contextGatheringPhase === 'asking_expertise') {
-        // Validate minimum length (5 chars required)
-        if (answer.trim().length < 5) {
-          chat.addSystemPrompt(
-            'Please provide a bit more detail about the users\' expertise level (at least 5 characters).\n\n' +
-            '*(e.g., "First-time users", "Intermediate", "Power users")*'
-          );
-          return;
-        }
-        setExpertise(answer);
+      // Helper: infer expertise from a free-text description
+      const inferExpertise = (text: string): boolean => {
+        const lower = text.toLowerCase();
+        return ['beginner', 'novice', 'intermediate', 'advanced', 'expert',
+          'power user', 'first-time', 'experienced', 'familiar', 'unfamiliar'
+        ].some(kw => lower.includes(kw));
+      };
 
-        // Skip asking for tasks if they were already provided (e.g., from URL input)
-        if (tasks && tasks.trim().length >= 10) {
-          setContextGatheringPhase('asking_format');
-          chat.addSystemPrompt(
-            'Thanks. Finally, **what format is this design?**\n\n' +
-            '*(e.g., "Mobile app screenshot", "Desktop website", "Tablet app")*'
-          );
-          return;
-        }
-
-        setContextGatheringPhase('asking_tasks');
-        chat.addSystemPrompt(
-          'Thanks. Now, **what tasks are these users trying to accomplish?**\n\n' +
-          '*(e.g., "Find and play a movie", "Sign up for an account", "Complete a purchase")*'
-        );
-        return;
-      }
-
-      if (contextGatheringPhase === 'asking_tasks') {
-        // Validate minimum length (10 chars required by backend)
-        if (answer.trim().length < 10) {
-          chat.addSystemPrompt(
-            'That response is a bit too short. Please provide more detail (at least 10 characters) about the tasks.\n\n' +
-            '*(e.g., "Find and play a movie", "Sign up for an account and complete a purchase")*'
-          );
-          return;
-        }
-        setTasks(answer);
-        setContextGatheringPhase('asking_format');
-        chat.addSystemPrompt(
-          'Thanks. Finally, **what format is this design?**\n\n' +
-          '*(e.g., "Mobile app screenshot", "Desktop website", "Tablet app")*'
-        );
-        return;
-      }
-
-      if (contextGatheringPhase === 'asking_format') {
-        // Validate minimum length (10 chars required by backend)
-        if (answer.trim().length < 10) {
-          chat.addSystemPrompt(
-            'Please provide more detail about the format (at least 10 characters).\n\n' +
-            '*(e.g., "Mobile app screenshot", "Desktop website layout", "Tablet application UI")*'
-          );
-          return;
-        }
-        setFormat(answer);
-        setContextGatheringPhase('idle');
-
-        // Auto-detect content type from format answer
-        const lowerAnswer = answer.toLowerCase();
-        if (lowerAnswer.includes('mobile') || lowerAnswer.includes('ios') || lowerAnswer.includes('android')) {
-          setContentType('mobile_app');
-          setDeviceType('mobile');
-        } else if (lowerAnswer.includes('tablet') || lowerAnswer.includes('ipad')) {
-          setContentType('website');
-          setDeviceType('tablet');
-        } else if (lowerAnswer.includes('desktop') || lowerAnswer.includes('windows') || lowerAnswer.includes('mac')) {
-          setContentType('desktop_app');
-          setDeviceType('desktop');
-        } else if (lowerAnswer.includes('game')) {
+      // Helper: apply format answer side-effects (content type detection)
+      const applyFormatSideEffects = (fmt: string) => {
+        const lower = fmt.toLowerCase();
+        if (lower.includes('mobile') || lower.includes('ios') || lower.includes('android')) {
+          setContentType('mobile_app'); setDeviceType('mobile');
+        } else if (lower.includes('tablet') || lower.includes('ipad')) {
+          setContentType('website'); setDeviceType('tablet');
+        } else if (lower.includes('desktop') || lower.includes('windows') || lower.includes('mac')) {
+          setContentType('desktop_app'); setDeviceType('desktop');
+        } else if (lower.includes('game')) {
           setContentType('game');
-        } else if (lowerAnswer.includes('web') || lowerAnswer.includes('site')) {
-          setContentType('website');
-          setDeviceType('desktop'); // Default web to desktop
+        } else if (lower.includes('web') || lower.includes('site')) {
+          setContentType('website'); setDeviceType('desktop');
         }
+      };
 
-        // URL context flow: show capture options widget instead of starting estimation
+      // Record the answer for the current phase
+      let updatedUsers = users;
+      let updatedExpertise = expertise;
+      let updatedTasks = tasks;
+      let updatedFormat = format;
+
+      if (contextGatheringPhase === 'asking_users') {
+        if (answer.trim().length < 2) {
+          chat.addSystemPrompt('Please describe who the users are.\n\n*(e.g., "Adults ages 25-45 who own pets", "Enterprise software developers")*');
+          return;
+        }
+        updatedUsers = answer;
+        setUsers(answer);
+        if (inferExpertise(answer)) {
+          updatedExpertise = answer;
+          setExpertise(answer);
+        }
+      } else if (contextGatheringPhase === 'asking_expertise') {
+        if (answer.trim().length < 2) {
+          chat.addSystemPrompt('Please describe the users\' expertise level.\n\n*(e.g., "First-time users", "Intermediate", "Power users")*');
+          return;
+        }
+        updatedExpertise = answer;
+        setExpertise(answer);
+      } else if (contextGatheringPhase === 'asking_tasks') {
+        if (answer.trim().length < 2) {
+          chat.addSystemPrompt('Please describe the tasks these users are trying to accomplish.\n\n*(e.g., "Find and buy cat food", "Sign up for an account")*');
+          return;
+        }
+        updatedTasks = answer;
+        setTasks(answer);
+      } else if (contextGatheringPhase === 'asking_format') {
+        if (answer.trim().length < 2) {
+          chat.addSystemPrompt('Please describe the format.\n\n*(e.g., "Mobile app", "Desktop website", "Tablet")*');
+          return;
+        }
+        updatedFormat = answer;
+        setFormat(answer);
+        applyFormatSideEffects(answer);
+      }
+
+      // ── Now ask for the next missing piece, in order ──
+      if (updatedUsers.trim().length < 2) {
+        setContextGatheringPhase('asking_users');
+        chat.addSystemPrompt('**Who are the intended users** of this interface?\n\n*(e.g., "Adults ages 25-45 who own pets", "Enterprise software developers")*');
+      } else if (updatedExpertise.trim().length < 2 && !inferExpertise(updatedUsers)) {
+        setContextGatheringPhase('asking_expertise');
+        chat.addSystemPrompt('**What level of expertise** will these users have?\n\n*(e.g., "First-time users", "Intermediate users", "Power users")*');
+      } else if (updatedTasks.trim().length < 2) {
+        setContextGatheringPhase('asking_tasks');
+        chat.addSystemPrompt('**What tasks are these users trying to accomplish?**\n\n*(e.g., "Find and buy cat food", "Sign up for an account")*');
+      } else if (updatedFormat.trim().length < 2) {
+        setContextGatheringPhase('asking_format');
+        chat.addSystemPrompt('Finally, **what format is this design?**\n\n*(e.g., "Mobile app", "Desktop website", "Tablet")*');
+      } else {
+        // All context collected — complete the flow
+        setContextGatheringPhase('idle');
         if (isUrlContextFlow) {
           setIsUrlContextFlow(false);
-          setContextGatheredForCapture(true);  // Mark that context is ready for task capture
+          setContextGatheredForCapture(true);
           const hostname = pendingUrl ? new URL(pendingUrl).hostname : 'that site';
           chat.addOptionsWidget(
             `All set! Now, how would you like to capture screenshots of **${hostname}**?`,
             URL_WIDGET_CHOICES
           );
-          return;
+        } else {
+          chat.addSystemPrompt('All set! Let me estimate how long this analysis will take...');
+          await startEstimation(pendingUrl || undefined);
         }
-
-        chat.addSystemPrompt(
-          'All set! Let me estimate how long this analysis will take...'
-        );
-
-        // Context is now complete — proceed to estimation
-        // Pass pendingUrl if this was a Figma analysis
-        await startEstimation(pendingUrl || undefined);
-        return;
       }
 
       return;
@@ -818,7 +798,7 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
       const url = detectedUrl!;
       setPendingUrl(url);
       const taskDescription = extractTaskFromUrlText(inputText, url);
-      if (taskDescription && taskDescription.length >= 10) setTasks(taskDescription);
+      if (taskDescription && taskDescription.length >= 2) setTasks(taskDescription);
 
       const userMessage = taskDescription
         ? `Analyze this Figma design: ${url}\n\nTask: ${taskDescription}`
@@ -848,12 +828,12 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
       const taskText = extractTaskFromUrlText(inputText, url);
       setPendingUrlTask(taskText);
       setPendingUrl(url);
-      if (taskText && taskText.length >= 10) setTasks(taskText);
+      if (taskText && taskText.length >= 2) setTasks(taskText);
       chat.addUserMessage(inputText.trim(), 'chat');
       setInputText('');
 
       // Use the task text we just extracted (not the stale state value) for the check
-      const effectiveTasks = (taskText && taskText.length >= 10) ? taskText : tasks;
+      const effectiveTasks = (taskText && taskText.length >= 2) ? taskText : tasks;
 
       // If all context already provided, go straight to the capture options widget
       if (hasFullContext(users, expertise, effectiveTasks, format)) {
@@ -868,21 +848,51 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
       setIsUrlContextFlow(true);
       const intro = `I can't automatically crawl **${hostname}** — most sites block automated access, so I'll need you to capture screenshots. First, a few quick questions.\n\n`;
 
-      if (users.trim().length < 10) {
+      if (users.trim().length < 2) {
         setContextGatheringPhase('asking_users');
         chat.addSystemPrompt(
           intro +
           '**Who are the intended users** of this interface?\n\n' +
           '*(e.g., "Adults ages 25-45 who own pets", "Enterprise software developers")*'
         );
-      } else if (expertise.trim().length < 5) {
-        setContextGatheringPhase('asking_expertise');
-        chat.addSystemPrompt(
-          intro +
-          '**What level of expertise** will these users have?\n\n' +
-          '*(e.g., "First-time users", "Intermediate users", "Power users")*'
-        );
-      } else if (effectiveTasks.trim().length < 10) {
+      } else if (expertise.trim().length < 2) {
+        // Check if expertise is implied by the users answer
+        const lowerUsers = users.toLowerCase();
+        const expertiseKeywords = ['beginner', 'novice', 'intermediate', 'advanced', 'expert', 'power user', 'first-time', 'experienced', 'familiar', 'unfamiliar', 'web experienced', 'experienced'];
+        const hasExpertise = expertiseKeywords.some(kw => lowerUsers.includes(kw));
+        if (hasExpertise) {
+          setExpertise(users);
+          if (effectiveTasks.trim().length >= 2 && format.trim().length >= 2) {
+            // All context already present — go straight to widget
+            setContextGatheringPhase('idle');
+            chat.addOptionsWidget(
+              `I can't automatically crawl **${hostname}** — most sites block automated access.\n\nHow would you like to capture screenshots of this flow?`,
+              URL_WIDGET_CHOICES
+            );
+          } else if (effectiveTasks.trim().length >= 2) {
+            setContextGatheringPhase('asking_format');
+            chat.addSystemPrompt(
+              intro +
+              '**What format is this design?**\n\n' +
+              '*(e.g., "Mobile app", "Desktop website", "Tablet")*'
+            );
+          } else {
+            setContextGatheringPhase('asking_tasks');
+            chat.addSystemPrompt(
+              intro +
+              '**What tasks are these users trying to accomplish?**\n\n' +
+              '*(e.g., "Find and buy cat food", "Sign up for an account")*'
+            );
+          }
+        } else {
+          setContextGatheringPhase('asking_expertise');
+          chat.addSystemPrompt(
+            intro +
+            '**What level of expertise** will these users have?\n\n' +
+            '*(e.g., "First-time users", "Intermediate users", "Power users")*'
+          );
+        }
+      } else if (effectiveTasks.trim().length < 2) {
         setContextGatheringPhase('asking_tasks');
         chat.addSystemPrompt(
           intro +
@@ -963,7 +973,26 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
     isLoading: chat.isLoading || isUnifiedLoading,
     error: chat.error,
     submit,
-    clearHistory: chat.clearHistory,
+    clearHistory: () => {
+      // Reset all context state so the new session starts completely fresh
+      setUsers('');
+      setExpertise('');
+      setTasks('');
+      setFormat('');
+      setContentType('website');
+      setDeviceType(null);
+      setContextGatheringPhase('idle');
+      setPendingQuestion('');
+      setAnalysisPhase('idle');
+      setEstimate(null);
+      setPendingUrl(null);
+      setPendingUrlTask('');
+      setIsUrlContextFlow(false);
+      setContextGatheredForCapture(false);
+      setInputText('');
+      setFiles([]);
+      chat.clearHistory();
+    },
     handleWidgetChoice,
     notifyTaskCaptureComplete,
   };

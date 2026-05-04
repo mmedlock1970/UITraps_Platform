@@ -1694,7 +1694,7 @@ async def unified_ask(
         if not intent.has_context:
             raise HTTPException(
                 status_code=400,
-                detail="Analysis requires context. Please provide users, tasks, and format descriptions (at least 10 characters each).",
+                detail="Analysis requires context. Please provide users, tasks, and format descriptions.",
             )
 
         # Determine single vs multi image
