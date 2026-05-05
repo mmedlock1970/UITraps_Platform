@@ -25,9 +25,6 @@ Thumbs.db
 # Build artifacts
 *.log
 
-# Local book source cache (downloaded from Drive — not committed)
-backend/data/.book_source_cache.pdf
-backend/data/.book_cache_meta.json
 
 # Test artifacts
 test_output/
