@@ -8,6 +8,7 @@ Manages loading and extraction from two knowledge sources:
 - UI_Traps_Analysis_Reference.md  →  Pass 1 (detection, condensed, AI-optimized)
 - UI_Tenets_Traps.txt             →  Pass 2 (enrichment, full book content)
 """
+import os
 import re
 from pathlib import Path
 from typing import Dict, List
@@ -72,12 +73,71 @@ def load_analysis_reference() -> str:
     return _analysis_reference_cache
 
 
+def _sync_book_from_source() -> bool:
+    """
+    If BOOK_SOURCE_PATH env var points at a PDF that is newer than UI_Tenets_Traps.txt,
+    auto-extract and regenerate the training file, then invalidate the cache.
+
+    Returns True if the training file was updated.
+    """
+    global _full_book_cache
+
+    source = os.environ.get("BOOK_SOURCE_PATH", "").strip()
+    if not source:
+        return False
+
+    source_path = Path(source)
+    if not source_path.exists():
+        return False
+
+    # Only re-extract when the source file is newer than the training file
+    if FULL_BOOK_PATH.exists():
+        if source_path.stat().st_mtime <= FULL_BOOK_PATH.stat().st_mtime:
+            return False
+
+    try:
+        import pypdf
+    except ImportError:
+        return False
+
+    # Extract text from source PDF
+    reader = pypdf.PdfReader(str(source_path))
+    skip = {"[page intentionally blank]", "[COVER PAGE]", "[FRONT MATTER]"}
+    pages_text = [
+        t for page in reader.pages
+        if (t := page.extract_text().strip()) not in skip and len(t) > 10
+    ]
+    pdf_text = "\n\n".join(pages_text)
+
+    # Trim bibliography (keep appendices, drop citations and about sections)
+    bib_idx = pdf_text.find("\nBibliography\n")
+    if bib_idx != -1:
+        pdf_text = pdf_text[:bib_idx].rstrip()
+
+    # Preserve the existing confidentiality header above ## KNOWLEDGE BASE
+    header = ""
+    if FULL_BOOK_PATH.exists():
+        existing = FULL_BOOK_PATH.read_text(encoding="utf-8")
+        kb_idx = existing.find("## KNOWLEDGE BASE")
+        if kb_idx != -1:
+            header = existing[:kb_idx].rstrip() + "\n\n"
+
+    new_content = header + "## KNOWLEDGE BASE\n\n" + pdf_text + "\n"
+    FULL_BOOK_PATH.write_text(new_content, encoding="utf-8")
+
+    # Invalidate cache so the next load picks up the fresh content
+    _full_book_cache = None
+    return True
+
+
 def load_full_book() -> str:
     """
     Load the full book manuscript (Pass 2 knowledge base).
+    Auto-syncs from BOOK_SOURCE_PATH if the source file is newer.
     Cached after first load.
     """
     global _full_book_cache
+    _sync_book_from_source()
     if _full_book_cache is None:
         if not FULL_BOOK_PATH.exists():
             raise FileNotFoundError(
