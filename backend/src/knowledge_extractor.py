@@ -96,6 +96,48 @@ def _trap_name_to_slug(name: str) -> str:
     return name.lower().replace(" ", "_")
 
 
+def _is_drive_folder_url(url: str) -> bool:
+    return bool(re.search(r'/folders/[a-zA-Z0-9_-]{20,}', url))
+
+
+def _extract_drive_folder_id(url: str) -> str:
+    m = re.search(r'/folders/([a-zA-Z0-9_-]{20,})', url)
+    return m.group(1) if m else ""
+
+
+def _get_latest_folder_pdf(folder_id: str, api_key: str) -> Optional[tuple]:
+    """
+    Return (file_id, filename) of the most recently modified PDF in a Drive folder,
+    or None if the folder is empty or unreachable.
+    """
+    try:
+        import requests
+    except ImportError:
+        return None
+
+    params = {
+        "q": f"'{folder_id}' in parents and mimeType='application/pdf' and trashed=false",
+        "orderBy": "modifiedTime desc",
+        "pageSize": "1",
+        "fields": "files(id,name)",
+        "key": api_key,
+    }
+    try:
+        resp = requests.get(
+            "https://www.googleapis.com/drive/v3/files",
+            params=params, timeout=15
+        )
+        resp.raise_for_status()
+        files = resp.json().get("files", [])
+        if not files:
+            print("[UITraps] No PDFs found in Drive folder")
+            return None
+        return files[0]["id"], files[0]["name"]
+    except Exception as e:
+        print(f"[UITraps] Drive folder lookup error: {e}")
+        return None
+
+
 def _download_google_drive(url: str, dest: Path) -> bool:
     """Download a file from a Google Drive share link using requests."""
     try:
@@ -298,41 +340,96 @@ def _sync_from_local_path(source_path: Path) -> bool:
     return True
 
 
-def _sync_from_url(url: str) -> bool:
-    """
-    Sync training file and images from a Google Drive URL.
-    Re-downloads if the cached copy is older than BOOK_SYNC_INTERVAL_HOURS (default 24).
-    Returns True if the training file was updated.
-    """
-    interval_hours = float(os.environ.get("BOOK_SYNC_INTERVAL_HOURS", "24"))
-
-    meta: dict = {}
+def _load_meta() -> dict:
     if _BOOK_CACHE_META.exists():
         try:
-            meta = json.loads(_BOOK_CACHE_META.read_text())
+            return json.loads(_BOOK_CACHE_META.read_text())
         except Exception:
             pass
+    return {}
 
+
+def _save_meta(meta: dict) -> None:
+    _BOOK_CACHE_META.write_text(json.dumps(meta))
+
+
+def _sync_from_folder_url(url: str, folder_id: str) -> bool:
+    """
+    Sync from a Google Drive folder URL.
+    Uses the Drive API (requires GOOGLE_API_KEY) to find the most recently
+    modified PDF in the folder. Re-downloads only when the file ID changes.
+    """
+    api_key = os.environ.get("GOOGLE_API_KEY", "").strip()
+    if not api_key:
+        print("[UITraps] GOOGLE_API_KEY not set — cannot list Drive folder. "
+              "See backend/.env.example for setup instructions.")
+        return False
+
+    interval_hours = float(os.environ.get("BOOK_SYNC_INTERVAL_HOURS", "24"))
+    meta = _load_meta()
     last_checked: float = meta.get("last_checked", 0)
-    cached_url: str = meta.get("source_url", "")
     stale = (time.time() - last_checked) > (interval_hours * 3600)
 
-    # Use the cached PDF if it exists and is fresh
-    if not stale and cached_url == url and _BOOK_CACHE_PDF.exists():
+    # Skip the folder API call entirely if cache is still fresh
+    if not stale and meta.get("source_url") == url and _BOOK_CACHE_PDF.exists():
         return _sync_from_local_path(_BOOK_CACHE_PDF)
 
-    # (Re-)download from Drive
-    print(f"[UITraps] Checking for updated book from Drive (last checked {int((time.time() - last_checked) / 3600)}h ago)…")
-    if not _download_google_drive(url, _BOOK_CACHE_PDF):
-        # Fall back to existing cached PDF if download fails
+    print(f"[UITraps] Checking Drive folder for latest PDF…")
+    result = _get_latest_folder_pdf(folder_id, api_key)
+    if not result:
         if _BOOK_CACHE_PDF.exists():
             return _sync_from_local_path(_BOOK_CACHE_PDF)
         return False
 
-    # Stamp the download time
-    _BOOK_CACHE_META.write_text(json.dumps({"source_url": url, "last_checked": time.time()}))
+    file_id, filename = result
+    meta.update({"source_url": url, "last_checked": time.time()})
 
+    # If the file ID hasn't changed, no download needed
+    if file_id == meta.get("last_file_id") and _BOOK_CACHE_PDF.exists():
+        _save_meta(meta)
+        return _sync_from_local_path(_BOOK_CACHE_PDF)
+
+    print(f"[UITraps] New book file detected in folder: '{filename}' — downloading…")
+    file_url = f"https://drive.google.com/file/d/{file_id}/view"
+    if not _download_google_drive(file_url, _BOOK_CACHE_PDF):
+        return False
+
+    meta["last_file_id"] = file_id
+    meta["last_filename"] = filename
+    _save_meta(meta)
     return _sync_from_local_path(_BOOK_CACHE_PDF)
+
+
+def _sync_from_file_url(url: str) -> bool:
+    """
+    Sync from a specific Google Drive file URL.
+    Re-downloads if the cached copy is older than BOOK_SYNC_INTERVAL_HOURS.
+    """
+    interval_hours = float(os.environ.get("BOOK_SYNC_INTERVAL_HOURS", "24"))
+    meta = _load_meta()
+    last_checked: float = meta.get("last_checked", 0)
+    stale = (time.time() - last_checked) > (interval_hours * 3600)
+
+    if not stale and meta.get("source_url") == url and _BOOK_CACHE_PDF.exists():
+        return _sync_from_local_path(_BOOK_CACHE_PDF)
+
+    print(f"[UITraps] Checking for updated book from Drive "
+          f"(last checked {int((time.time() - last_checked) / 3600)}h ago)…")
+    if not _download_google_drive(url, _BOOK_CACHE_PDF):
+        if _BOOK_CACHE_PDF.exists():
+            return _sync_from_local_path(_BOOK_CACHE_PDF)
+        return False
+
+    _save_meta({"source_url": url, "last_checked": time.time()})
+    return _sync_from_local_path(_BOOK_CACHE_PDF)
+
+
+def _sync_from_url(url: str) -> bool:
+    """Route to folder or file sync depending on the Drive URL type."""
+    if _is_drive_folder_url(url):
+        folder_id = _extract_drive_folder_id(url)
+        return _sync_from_folder_url(url, folder_id)
+    return _sync_from_file_url(url)
 
 
 def _sync_book_from_source() -> bool:
