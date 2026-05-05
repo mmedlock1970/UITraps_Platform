@@ -1562,13 +1562,18 @@ You will submit your enriched report using the ui_analysis_report tool."""
     ]
 
 
-def build_enrichment_user_message(pass1_report: dict, trap_sections: dict) -> list:
+def build_enrichment_user_message(
+    pass1_report: dict,
+    trap_sections: dict,
+    trap_images: Optional[dict] = None,
+) -> list:
     """
     Build the user message for Pass 2 enrichment.
 
     Args:
         pass1_report: The structured report from Pass 1 detection
         trap_sections: Dict of trap_name -> book section text for each found trap
+        trap_images: Optional dict of trap_name -> list of base64 PNG strings (book illustrations)
 
     Returns:
         List of message content blocks for Claude API
@@ -1598,21 +1603,36 @@ def build_enrichment_user_message(pass1_report: dict, trap_sections: dict) -> li
     content = [
         {
             "type": "text",
-            "text": f"""DETECTION PASS FINDINGS:
-{findings_text}
-
----
-
-FULL FRAMEWORK CONTENT FOR IDENTIFIED TRAPS:
-{sections_text}
-
----
-
-Using the full framework content above, enhance the problem descriptions and
-recommendations for each finding. Keep the same trap names, tenets, locations,
-severities, and confidence levels. Only improve the written descriptions.
-Submit the enriched report using the ui_analysis_report tool."""
+            "text": f"DETECTION PASS FINDINGS:\n{findings_text}\n\n---\n\n"
+                    f"FULL FRAMEWORK CONTENT FOR IDENTIFIED TRAPS:\n{sections_text}\n\n---",
         }
     ]
+
+    # Append book illustrations when available
+    if trap_images:
+        content.append({
+            "type": "text",
+            "text": "\nBOOK ILLUSTRATIONS — visual examples from the UI Traps framework:",
+        })
+        for trap_name, images in trap_images.items():
+            if images:
+                content.append({"type": "text", "text": f"\n[{trap_name}]"})
+                for img_b64 in images:
+                    content.append({
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "image/png",
+                            "data": img_b64,
+                        },
+                    })
+
+    content.append({
+        "type": "text",
+        "text": "\nUsing the full framework content and any illustrations above, enhance the "
+                "problem descriptions and recommendations for each finding. Keep the same trap "
+                "names, tenets, locations, severities, and confidence levels. Only improve the "
+                "written descriptions.\nSubmit the enriched report using the ui_analysis_report tool.",
+    })
 
     return content

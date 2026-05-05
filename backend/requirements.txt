@@ -17,7 +17,10 @@ slowapi>=0.1.9              # FastAPI-compatible rate limiting
 # Web crawler and analysis
 playwright>=1.40.0  # For web crawler and screenshot capture
 Pillow>=10.0.0  # For screenshot compression and image processing
-requests>=2.32.0  # For Figma API integration
+requests>=2.32.0  # For Figma API integration and Google Drive downloads
+
+# Book manuscript processing
+pypdf[image]>=3.1.0  # PDF text and image extraction (3.1+ required for page.images API; [image] pulls in Pillow)
 
 # Development/testing (optional)
 # pytest>=7.4.0

@@ -23,7 +23,7 @@ try:
     )
     from .formatters import parse_claude_response, format_report_as_markdown, format_report_as_html, get_report_statistics
     from .schema import get_ui_analysis_schema, get_interaction_analysis_schema
-    from .knowledge_extractor import collect_found_trap_names, extract_trap_sections
+    from .knowledge_extractor import collect_found_trap_names, extract_trap_sections, extract_trap_images
 except ImportError:
     # Fallback for direct script execution
     from validators import validate_file_format, validate_context, is_figma_url
@@ -34,7 +34,7 @@ except ImportError:
     )
     from formatters import parse_claude_response, format_report_as_markdown, format_report_as_html, get_report_statistics
     from schema import get_ui_analysis_schema, get_interaction_analysis_schema
-    from knowledge_extractor import collect_found_trap_names, extract_trap_sections
+    from knowledge_extractor import collect_found_trap_names, extract_trap_sections, extract_trap_images
 
 
 class UITrapsAnalyzer:
@@ -300,12 +300,17 @@ class UITrapsAnalyzer:
         if not found_trap_names:
             return pass1_report
 
-        # Extract the relevant book sections
+        # Extract the relevant book sections and illustrations
         trap_sections = extract_trap_sections(found_trap_names)
+        trap_images = extract_trap_images(found_trap_names)
+
+        if trap_images:
+            n_imgs = sum(len(v) for v in trap_images.values())
+            print(f"[UITraps] Pass 2: including {n_imgs} book illustration(s) for {len(trap_images)} trap(s)")
 
         # Build Pass 2 prompts
         system_prompt = build_enrichment_system_prompt()
-        user_message = build_enrichment_user_message(pass1_report, trap_sections)
+        user_message = build_enrichment_user_message(pass1_report, trap_sections, trap_images)
         schema = get_ui_analysis_schema()
 
         print(f"[UITraps] Pass 2: enriching {len(found_trap_names)} trap(s): {', '.join(found_trap_names)}")
