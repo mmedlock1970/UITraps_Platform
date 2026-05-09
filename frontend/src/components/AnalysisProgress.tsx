@@ -65,12 +65,11 @@ function getCurrentPhase(elapsedTime: number, phases: Phase[]): Phase {
   return phases[phases.length - 1];
 }
 
-function calculateProgress(elapsedTime: number, estimatedTime?: TimeEstimate): number {
-  // Use estimated max time if available, otherwise use a default
-  const maxTime = estimatedTime?.max_seconds || 60;
-  const progress = (elapsedTime / maxTime) * 100;
-  // Cap at 95% until complete
-  return Math.min(progress, 95);
+function calculateProgress(elapsedTime: number): number {
+  // Exponential decay curve: starts visibly moving, decelerates, asymptotically
+  // approaches 50% — never overstates progress before the analysis is actually done.
+  // t=10s ≈ 17%  |  t=30s ≈ 35%  |  t=60s ≈ 46%  |  t=90s ≈ 49%
+  return 50 * (1 - Math.exp(-0.04 * elapsedTime));
 }
 
 function getInputTypeLabel(inputType?: InputType, fileCount?: number): string {
@@ -119,7 +118,7 @@ export const AnalysisProgress: React.FC<AnalysisProgressProps> = ({
 }) => {
   const phases = useMemo(() => getPhases(inputType), [inputType]);
   const currentPhase = useMemo(() => getCurrentPhase(elapsedTime, phases), [elapsedTime, phases]);
-  const progress = useMemo(() => calculateProgress(elapsedTime, estimatedTime), [elapsedTime, estimatedTime]);
+  const progress = useMemo(() => calculateProgress(elapsedTime), [elapsedTime]);
   const inputLabel = useMemo(() => getInputTypeLabel(inputType, fileCount), [inputType, fileCount]);
   const helpText = useMemo(() => getHelpText(inputType, estimatedTime), [inputType, estimatedTime]);
   const extendedWaitThreshold = useMemo(() => getExtendedWaitThreshold(inputType), [inputType]);
