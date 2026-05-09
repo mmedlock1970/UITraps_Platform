@@ -24,6 +24,7 @@ try:
     from .formatters import parse_claude_response, format_report_as_markdown, format_report_as_html, get_report_statistics
     from .schema import get_ui_analysis_schema, get_interaction_analysis_schema
     from .knowledge_extractor import collect_found_trap_names, extract_trap_sections, extract_trap_images
+    from .knowledge_base import get_chunks_for_traps
 except ImportError:
     # Fallback for direct script execution
     from validators import validate_file_format, validate_context, is_figma_url
@@ -35,6 +36,7 @@ except ImportError:
     from formatters import parse_claude_response, format_report_as_markdown, format_report_as_html, get_report_statistics
     from schema import get_ui_analysis_schema, get_interaction_analysis_schema
     from knowledge_extractor import collect_found_trap_names, extract_trap_sections, extract_trap_images
+    from knowledge_base import get_chunks_for_traps
 
 
 class UITrapsAnalyzer:
@@ -70,7 +72,8 @@ class UITrapsAnalyzer:
 
         self.client = Anthropic(api_key=self.api_key)
         self.use_caching = use_caching
-        self.model = "claude-sonnet-4-5-20250929"  # Latest Sonnet 4.5
+        self.model = "claude-sonnet-4-5-20250929"          # Pass 1: full visual analysis
+        self.enrich_model = "claude-haiku-4-5-20251001"    # Pass 2: text enrichment only
 
     def analyze_design(
         self,
@@ -78,7 +81,8 @@ class UITrapsAnalyzer:
         user_context: Dict[str, str],
         timeout: int = 120,
         user_id: Optional[str] = None,
-        page_context: Optional[Dict[str, Any]] = None
+        page_context: Optional[Dict[str, Any]] = None,
+        chat_context: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Analyze a UI design using the UI Tenets & Traps framework.
@@ -138,6 +142,20 @@ class UITrapsAnalyzer:
             image_data = self._load_image(design_file)
             user_message = build_user_message(user_context, image_data, page_context)
 
+        # Prepend chat context if provided (from a prior discussion about this design)
+        if chat_context and chat_context.strip():
+            context_block = {
+                "type": "text",
+                "text": (
+                    "IMPORTANT — The user has provided the following clarifying context from "
+                    "a prior conversation about this design. Take this into account during your "
+                    "analysis and adjust your findings accordingly:\n\n"
+                    f"{chat_context.strip()}\n\n"
+                    "---\n"
+                )
+            }
+            user_message = [context_block] + list(user_message)
+
         # Step 4: Call Claude API with structured output
         # Use tool forcing to ensure structured JSON output
         schema = get_ui_analysis_schema()
@@ -145,7 +163,7 @@ class UITrapsAnalyzer:
         try:
             response = self.client.messages.create(
                 model=self.model,
-                max_tokens=8192,  # Enough for detailed reports
+                max_tokens=5000,
                 system=system_prompt,
                 messages=[
                     {
@@ -308,16 +326,23 @@ class UITrapsAnalyzer:
             n_imgs = sum(len(v) for v in trap_images.values())
             print(f"[UITraps] Pass 2: including {n_imgs} book illustration(s) for {len(trap_images)} trap(s)")
 
+        # Load structured knowledge base chunks for found traps
+        knowledge_chunks = get_chunks_for_traps(found_trap_names)
+        if knowledge_chunks:
+            print(f"[UITraps] Pass 2: loaded structured KB chunks for {len(found_trap_names)} trap(s)")
+
         # Build Pass 2 prompts
         system_prompt = build_enrichment_system_prompt()
-        user_message = build_enrichment_user_message(pass1_report, trap_sections, trap_images)
+        user_message = build_enrichment_user_message(
+            pass1_report, trap_sections, trap_images, knowledge_chunks=knowledge_chunks
+        )
         schema = get_ui_analysis_schema()
 
         print(f"[UITraps] Pass 2: enriching {len(found_trap_names)} trap(s): {', '.join(found_trap_names)}")
 
         response = self.client.messages.create(
-            model=self.model,
-            max_tokens=8192,
+            model=self.enrich_model,
+            max_tokens=4096,
             system=system_prompt,
             messages=[{"role": "user", "content": user_message}],
             tools=[

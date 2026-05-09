@@ -86,65 +86,14 @@
   color: var(--uitraps-text-secondary);
 }
 
-/* Report Content */
-.reportContent {
-  padding: var(--uitraps-spacing-lg);
-  background-color: var(--uitraps-bg);
-  border: 1px solid var(--uitraps-border);
-  border-radius: var(--uitraps-border-radius);
-  /* Report flows naturally with the page - no separate scroll area */
-}
-
-.reportContent h1,
-.reportContent h2,
-.reportContent h3,
-.reportContent h4 {
-  color: var(--uitraps-text);
-  margin-top: var(--uitraps-spacing-lg);
-  margin-bottom: var(--uitraps-spacing-sm);
-}
-
-.reportContent h1:first-child,
-.reportContent h2:first-child {
-  margin-top: 0;
-}
-
-.reportContent p {
-  color: var(--uitraps-text);
-  margin-bottom: var(--uitraps-spacing-md);
-}
-
-.reportContent ul,
-.reportContent ol {
-  margin-bottom: var(--uitraps-spacing-md);
-  padding-left: var(--uitraps-spacing-lg);
-}
-
-.reportContent li {
-  margin-bottom: var(--uitraps-spacing-sm);
-}
-
-.reportContent a {
-  color: var(--uitraps-primary);
-}
-
-.reportContent table {
+/* Report iframe — auto-height is set via JS; border provided by the report's own CSS */
+.reportFrame {
+  display: block;
   width: 100%;
-  border-collapse: collapse;
-  margin-bottom: var(--uitraps-spacing-md);
+  border: none;
+  border-radius: var(--uitraps-border-radius);
 }
 
-.reportContent th,
-.reportContent td {
-  padding: var(--uitraps-spacing-sm);
-  border: 1px solid var(--uitraps-border);
-  text-align: left;
-}
-
-.reportContent th {
-  background-color: var(--uitraps-bg-secondary);
-  font-weight: 600;
-}
 
 /* Actions */
 .actions {

@@ -20,7 +20,7 @@ import { unifiedAsk, getEstimate, getFigmaEstimate, analyzeFigma, getPdfEstimate
 interface UseUnifiedInputOptions {
   apiEndpoint: string;
   token: string;
-  onAnalysisComplete?: (result: UnifiedAskResponse, fileNames: string[]) => void;
+  onAnalysisComplete?: (result: UnifiedAskResponse, fileNames: string[], files: File[], context: { users: string; tasks: string; format: string; contentType: ContentType }) => void;
   onStartTaskCapture?: (taskName: string) => void;
 }
 
@@ -431,7 +431,8 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
         // Notify parent (App) so it can switch to report view
         const fileNames = files.map(f => f.name);
         if ((result.mode === 'analysis' || result.mode === 'hybrid') && onAnalysisComplete) {
-          onAnalysisComplete(result, fileNames);
+          const capturedContext = { users, tasks, format, contentType };
+          onAnalysisComplete(result, fileNames, [...files], capturedContext);
         }
         chat.addSystemPrompt(`Analysis completed for ${fileNames.join(', ')}. View the full report above.`);
       }
@@ -664,6 +665,44 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
         }
       };
 
+      // ── Semantic validation helpers ──
+
+      // Returns true if the answer contains at least one people-related word.
+      // If it doesn't, the answer is not describing users regardless of what it says.
+      const describesPeople = (text: string): boolean => {
+        const lower = text.toLowerCase();
+        const peopleTerms = [
+          'user', 'customer', 'client', 'person', 'people', 'adult', 'employee',
+          'student', 'professional', 'developer', 'manager', 'member', 'subscriber',
+          'visitor', 'shopper', 'buyer', 'worker', 'staff', 'admin', 'guest', 'public',
+          'consumer', 'patient', 'parent', 'teacher', 'executive', 'analyst', 'engineer',
+          'designer', 'owner', 'operator', 'reader', 'viewer', 'team', 'group',
+          'ages', 'age ', 'who ', 'they', 'their', 'someone', 'anyone',
+          // demographics
+          'male', 'female', 'men', 'women', 'kids', 'children', 'teen', 'senior',
+          'beginner', 'expert', 'novice', 'experienced', 'general public',
+          // role suffixes that reliably indicate people
+          'ist ', 'ists', 'ers ', 'ors ', 'ians', 'ees ',
+        ];
+        return peopleTerms.some(t => lower.includes(t));
+      };
+
+      // Returns true if the answer sounds like it describes tasks (actions people do).
+      const looksLikeTasks = (text: string): boolean => {
+        const lower = text.toLowerCase();
+        const actionVerbs = [
+          'buy', 'purchase', 'find', 'search', 'sign', 'log', 'create', 'view', 'read',
+          'submit', 'manage', 'browse', 'shop', 'order', 'check', 'update', 'edit',
+          'delete', 'share', 'download', 'upload', 'book', 'schedule', 'pay', 'contact',
+          'navigate', 'learn', 'complete', 'fill', 'enter', 'select', 'register',
+          'subscribe', 'cancel', 'review', 'compare', 'track', 'access', 'set up',
+          'configure', 'report', 'request', 'approve', 'add', 'remove', 'post',
+          'comment', 'follow', 'connect', 'export', 'import', 'print',
+        ];
+        // Accept if it contains an action verb OR is a reasonably detailed description
+        return actionVerbs.some(v => lower.includes(v)) || lower.length > 25;
+      };
+
       // Record the answer for the current phase
       let updatedUsers = users;
       let updatedExpertise = expertise;
@@ -673,6 +712,10 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
       if (contextGatheringPhase === 'asking_users') {
         if (answer.trim().length < 2) {
           chat.addSystemPrompt('Please describe who the users are.\n\n*(e.g., "Adults ages 25-45 who own pets", "Enterprise software developers")*');
+          return;
+        }
+        if (!describesPeople(answer)) {
+          chat.addSystemPrompt(`That doesn't quite describe the users. **Who are the people** that will be using this interface?\n\n*(e.g., "Adults ages 25-45 who own pets", "Enterprise software developers", "First-time online shoppers")*`);
           return;
         }
         updatedUsers = answer;
@@ -691,6 +734,10 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
       } else if (contextGatheringPhase === 'asking_tasks') {
         if (answer.trim().length < 2) {
           chat.addSystemPrompt('Please describe the tasks these users are trying to accomplish.\n\n*(e.g., "Find and buy cat food", "Sign up for an account")*');
+          return;
+        }
+        if (!looksLikeTasks(answer)) {
+          chat.addSystemPrompt(`That doesn't quite describe a user task. **What are users trying to do** with this interface?\n\n*(e.g., "Find and buy cat food", "Sign up for an account", "Track a delivery")*`);
           return;
         }
         updatedTasks = answer;

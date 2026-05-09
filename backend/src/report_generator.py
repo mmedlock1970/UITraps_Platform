@@ -113,7 +113,7 @@ def generate_site_report_markdown(analysis_result: Dict[str, Any], url: str) -> 
 
         # Minor issues
         for issue in page_report.get("minor_issues", []):
-            report += f"#### 🟢 MINOR: {issue.get('trap_name', 'Unknown')}\n\n"
+            report += f"#### 🔵 MINOR: {issue.get('trap_name', 'Unknown')}\n\n"
             report += f"**Tenet Violated:** {issue.get('tenet', 'Unknown')}\n"
             report += f"**Location:** {issue.get('location', 'Unknown')}\n\n"
             report += f"**Problem:** {issue.get('problem', 'No description')}\n\n"
@@ -242,7 +242,7 @@ def generate_site_report_html(analysis_result: Dict[str, Any], url: str) -> str:
         }}
         .stat-card.critical {{ background: linear-gradient(135deg, #ef4444, #dc2626); }}
         .stat-card.moderate {{ background: linear-gradient(135deg, #f59e0b, #d97706); }}
-        .stat-card.minor {{ background: linear-gradient(135deg, #22c55e, #16a34a); }}
+        .stat-card.minor {{ background: linear-gradient(135deg, #3b82f6, #2563eb); }}
         .stat-card.total {{ background: linear-gradient(135deg, #6366f1, #4f46e5); }}
         .stat-card h3 {{ color: white; font-size: 2em; margin: 0; }}
         .stat-card p {{ opacity: 0.9; margin-top: 5px; font-size: 0.9em; }}
@@ -347,7 +347,7 @@ def generate_site_report_html(analysis_result: Dict[str, Any], url: str) -> str:
         }}
         .issue-count.critical {{ background: #fef2f2; color: #dc2626; }}
         .issue-count.moderate {{ background: #fffbeb; color: #d97706; }}
-        .issue-count.minor {{ background: #f0fdf4; color: #16a34a; }}
+        .issue-count.minor {{ background: #eff6ff; color: #2563eb; }}
         .issue-card {{
             border-radius: 8px;
             padding: 20px;
@@ -363,8 +363,8 @@ def generate_site_report_html(analysis_result: Dict[str, Any], url: str) -> str:
             border-left-color: #f59e0b;
         }}
         .issue-card.minor {{
-            background: #f0fdf4;
-            border-left-color: #22c55e;
+            background: #eff6ff;
+            border-left-color: #3b82f6;
         }}
         .issue-card h4 {{
             margin: 0 0 12px 0;
@@ -378,7 +378,7 @@ def generate_site_report_html(analysis_result: Dict[str, Any], url: str) -> str:
         }}
         .issue-card .severity-label.critical {{ color: #dc2626; }}
         .issue-card .severity-label.moderate {{ color: #d97706; }}
-        .issue-card .severity-label.minor {{ color: #16a34a; }}
+        .issue-card .severity-label.minor {{ color: #2563eb; }}
         .issue-meta {{
             font-size: 0.9em;
             color: #64748b;
@@ -584,7 +584,7 @@ def generate_site_report_html(analysis_result: Dict[str, Any], url: str) -> str:
             for issue in page_report.get("minor_issues", []):
                 html += f"""
             <div class="issue-card minor">
-                <h4><span class="severity-label minor">🟢 MINOR</span> — {issue.get('trap_name', 'Unknown')}</h4>
+                <h4><span class="severity-label minor">🔵 MINOR</span> — {issue.get('trap_name', 'Unknown')}</h4>
                 <p class="issue-meta"><strong>Tenet:</strong> {issue.get('tenet', 'Unknown')} | <strong>Location:</strong> {issue.get('location', 'Unknown')}</p>
                 <p class="issue-problem">{issue.get('problem', 'No description')}</p>
                 <div class="issue-recommendation">

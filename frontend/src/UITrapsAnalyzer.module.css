@@ -35,6 +35,23 @@
   min-height: 300px;
 }
 
+/* Report + chat side-by-side layout */
+.reportLayout {
+  max-width: 1300px;
+}
+
+.reportMain {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  min-height: 300px;
+}
+
+.reportArea {
+  flex: 1;
+  min-width: 0;
+}
+
 /* Error State */
 .error {
   display: flex;

@@ -60,8 +60,8 @@ class AnalysisEstimate:
 # Estimation constants (adjust based on actual measurements)
 class EstimationConstants:
     # Time per image analysis (seconds)
-    TIME_PER_IMAGE_MIN = 30
-    TIME_PER_IMAGE_MAX = 60
+    TIME_PER_IMAGE_MIN = 120
+    TIME_PER_IMAGE_MAX = 240
 
     # Time for video frame extraction (seconds)
     VIDEO_EXTRACTION_TIME = 10

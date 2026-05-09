@@ -65,11 +65,11 @@ function getCurrentPhase(elapsedTime: number, phases: Phase[]): Phase {
   return phases[phases.length - 1];
 }
 
-function calculateProgress(elapsedTime: number): number {
-  // Exponential decay curve: starts visibly moving, decelerates, asymptotically
-  // approaches 50% — never overstates progress before the analysis is actually done.
-  // t=10s ≈ 17%  |  t=30s ≈ 35%  |  t=60s ≈ 46%  |  t=90s ≈ 49%
-  return 50 * (1 - Math.exp(-0.04 * elapsedTime));
+function calculateProgress(elapsedTime: number, isComplete?: boolean): number {
+  if (isComplete) return 100;
+  // Exponential decay: starts visibly moving, decelerates toward 70% asymptote.
+  // t=10s ≈ 18%  |  t=30s ≈ 42%  |  t=60s ≈ 59%  |  t=90s ≈ 65%  |  t=120s ≈ 68%
+  return 70 * (1 - Math.exp(-0.03 * elapsedTime));
 }
 
 function getInputTypeLabel(inputType?: InputType, fileCount?: number): string {
@@ -85,16 +85,16 @@ function getInputTypeLabel(inputType?: InputType, fileCount?: number): string {
 
 function getHelpText(inputType?: InputType, estimatedTime?: TimeEstimate): string {
   if (estimatedTime) {
-    return `Estimated time: ${estimatedTime.min_formatted} - ${estimatedTime.max_formatted}. Please keep this window open.`;
+    return 'Analysis may take up to several minutes. Please keep this window open.';
   }
 
   switch (inputType) {
     case 'video':
-      return 'Video analysis typically takes 3-15 minutes depending on length. Please keep this window open.';
+      return 'Video analysis may take up to several minutes. Please keep this window open.';
     case 'multi_image':
-      return 'Multi-screenshot analysis typically takes 1-5 minutes. Please keep this window open.';
+      return 'Multi-screenshot analysis may take up to several minutes. Please keep this window open.';
     default:
-      return 'This typically takes 30-60 seconds. Please keep this window open.';
+      return 'Analysis may take up to several minutes. Please keep this window open.';
   }
 }
 
@@ -105,7 +105,7 @@ function getExtendedWaitThreshold(inputType?: InputType): number {
     case 'multi_image':
       return 300; // 5 minutes
     default:
-      return 90; // 1.5 minutes
+      return 180; // 3 minutes
   }
 }
 
@@ -115,10 +115,11 @@ export const AnalysisProgress: React.FC<AnalysisProgressProps> = ({
   inputType,
   fileCount,
   estimatedTime,
+  isComplete,
 }) => {
   const phases = useMemo(() => getPhases(inputType), [inputType]);
   const currentPhase = useMemo(() => getCurrentPhase(elapsedTime, phases), [elapsedTime, phases]);
-  const progress = useMemo(() => calculateProgress(elapsedTime), [elapsedTime]);
+  const progress = useMemo(() => calculateProgress(elapsedTime, isComplete), [elapsedTime, isComplete]);
   const inputLabel = useMemo(() => getInputTypeLabel(inputType, fileCount), [inputType, fileCount]);
   const helpText = useMemo(() => getHelpText(inputType, estimatedTime), [inputType, estimatedTime]);
   const extendedWaitThreshold = useMemo(() => getExtendedWaitThreshold(inputType), [inputType]);

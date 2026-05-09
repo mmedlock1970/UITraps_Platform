@@ -9,6 +9,7 @@
 import React, { useState, useCallback } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { useUnifiedInput } from './hooks/useUnifiedInput';
+import { useElapsedTime } from './hooks/useElapsedTime';
 import { ConversationPanel } from './components/ConversationPanel';
 import { UnifiedInput } from './components/UnifiedInput';
 import { EstimatePreview } from './components/EstimatePreview';
@@ -17,7 +18,9 @@ import { ReportViewer } from './components/ReportViewer';
 import { PastAnalyses } from './components/PastAnalyses';
 import { TaskCaptureScreen, CapturedStep } from './components/TaskCaptureScreen';
 import { saveAnalysis, getAnalysisHistory, StoredAnalysis } from './services/analysisHistory';
-import { ReportStatistics, UsageInfo, UnifiedAskResponse, TimeEstimate, isFigmaEstimate, isUrlEstimate, isFileEstimate, UnifiedEstimate } from './api/types';
+import { ReportStatistics, UsageInfo, UnifiedAskResponse, TimeEstimate, ContentType, isFigmaEstimate, isUrlEstimate, isFileEstimate, UnifiedEstimate } from './api/types';
+import { unifiedAsk } from './api/client';
+import { ChatPanel } from './components/ChatPanel';
 import './styles/variables.css';
 import styles from './App.module.css';
 import cardsImage from './assets/cards.png';
@@ -58,8 +61,11 @@ type AppView = 'chat' | 'report' | 'history' | 'task-capture';
 
 interface ActiveReport {
   html: string;
+  markdown?: string;
   statistics?: ReportStatistics;
   usage?: UsageInfo;
+  originalFiles?: File[];
+  originalContext?: { users: string; tasks: string; format: string; contentType: ContentType };
 }
 
 export const App: React.FC = () => {
@@ -67,6 +73,9 @@ export const App: React.FC = () => {
   const [apiEndpoint] = useState(DEFAULT_API_ENDPOINT);
   const [view, setView] = useState<AppView>('chat');
   const [activeReport, setActiveReport] = useState<ActiveReport | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [isRerunning, setIsRerunning] = useState(false);
+  const rerunElapsed = useElapsedTime();
 
   // Task capture state
   const [taskName, setTaskName] = useState('');
@@ -87,12 +96,15 @@ export const App: React.FC = () => {
   const [devMode, setDevMode] = useState(false);
   const effectiveToken = auth.token || (devMode ? 'dev-mode' : '');
 
-  const handleAnalysisComplete = useCallback((result: UnifiedAskResponse, fileNames: string[]) => {
+  const handleAnalysisComplete = useCallback((result: UnifiedAskResponse, fileNames: string[], files?: File[], context?: { users: string; tasks: string; format: string; contentType: ContentType }) => {
     if (result.report_html) {
       const report: ActiveReport = {
         html: result.report_html,
+        markdown: result.report_markdown,
         statistics: result.statistics,
         usage: result.usage,
+        originalFiles: files,
+        originalContext: context,
       };
       setActiveReport(report);
       setView('report');
@@ -106,6 +118,55 @@ export const App: React.FC = () => {
       });
     }
   }, []);
+
+  const handleRerunAnalysis = useCallback(async (chatMessages: Array<{ role: string; content: string }>) => {
+    if (!activeReport?.originalFiles?.length || !activeReport?.originalContext) return;
+
+    const chatContext = chatMessages
+      .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
+      .join('\n\n');
+
+    setIsRerunning(true);
+    rerunElapsed.start();
+
+    try {
+      const { users, tasks, format, contentType } = activeReport.originalContext;
+      const imageTimeout = Math.min(180000 + activeReport.originalFiles.length * 120000, 1800000);
+
+      const result = await unifiedAsk({
+        apiEndpoint,
+        token: effectiveToken,
+        files: activeReport.originalFiles,
+        context: { users, tasks, format, contentType, expertise: '' },
+        chatContext,
+        timeout: imageTimeout,
+      });
+
+      rerunElapsed.stop();
+
+      if (result.report_html) {
+        setActiveReport(prev => prev ? {
+          ...prev,
+          html: result.report_html!,
+          markdown: result.report_markdown,
+          statistics: result.statistics,
+        } : prev);
+
+        saveAnalysis({
+          timestamp: new Date().toISOString(),
+          fileNames: activeReport.originalFiles.map(f => f.name),
+          statistics: result.statistics,
+          html: result.report_html,
+        });
+      }
+    } catch (err) {
+      rerunElapsed.stop();
+      console.error('Re-run analysis failed:', err);
+    } finally {
+      setIsRerunning(false);
+      rerunElapsed.reset();
+    }
+  }, [activeReport, apiEndpoint, effectiveToken, rerunElapsed]);
 
   const handleStartTaskCapture = useCallback((initialTaskName: string) => {
     setTaskName(initialTaskName);
@@ -233,14 +294,42 @@ export const App: React.FC = () => {
 
   // ── Report view ──
   if (view === 'report' && activeReport) {
+    if (isRerunning) {
+      return (
+        <div className={`uitraps-viewport-wrapper ${styles.viewportWrapper}`} data-theme={theme}>
+          <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
+            <header className={styles.header}>
+              <div className={styles.logo}>
+                UI Traps <span className={styles.logoAccent}>Helper</span>
+              </div>
+            </header>
+            <div className={styles.overlayContainer}>
+              <AnalysisProgress
+                elapsedTime={rerunElapsed.elapsedTime}
+                onCancel={() => { setIsRerunning(false); rerunElapsed.reset(); }}
+                inputType="multi_image"
+                fileCount={activeReport.originalFiles?.length ?? 1}
+              />
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
-      <div className={`uitraps-viewport-wrapper ${styles.viewportWrapper}`} data-theme={theme}>
-        <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
+      <div className={`uitraps-viewport-wrapper ${styles.viewportWrapper}`} data-theme={theme} style={{ height: '100vh', overflow: 'hidden' }}>
+        <div className={`uitraps-platform ${styles.platform}`} data-theme={theme} style={{ height: '100vh', overflow: 'hidden' }}>
           <header className={styles.header}>
             <div className={styles.logo}>
               UI Traps <span className={styles.logoAccent}>Helper</span>
             </div>
             <div className={styles.headerActions}>
+              <button
+                className={chatOpen ? styles.headerButtonActive : styles.headerButton}
+                onClick={() => setChatOpen(o => !o)}
+              >
+                Chat about Results
+              </button>
               <button className={styles.headerButton} onClick={() => setView('chat')}>
                 Back to Chat
               </button>
@@ -249,17 +338,28 @@ export const App: React.FC = () => {
               </button>
             </div>
           </header>
-          <div className={styles.reportContainer}>
-            <ReportViewer
-              html={activeReport.html}
-              statistics={activeReport.statistics}
-              showStatistics={true}
-              showUsageInfo={false}
-              onNewAnalysis={() => {
-                setView('chat');
-                setActiveReport(null);
-              }}
-            />
+          <div className={styles.reportWithChat}>
+            <div className={styles.reportArea}>
+              <ReportViewer
+                html={activeReport.html}
+                statistics={activeReport.statistics}
+                showStatistics={true}
+                showUsageInfo={false}
+                onNewAnalysis={() => {
+                  setView('chat');
+                  setActiveReport(null);
+                }}
+              />
+            </div>
+            {chatOpen && (
+              <ChatPanel
+                apiEndpoint={apiEndpoint}
+                apiKey={effectiveToken}
+                reportMarkdown={activeReport.markdown || null}
+                canRerun={!!activeReport.originalFiles?.length && !!activeReport.originalContext}
+                onRerunAnalysis={handleRerunAnalysis}
+              />
+            )}
           </div>
         </div>
       </div>

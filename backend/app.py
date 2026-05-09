@@ -104,6 +104,20 @@ def set_cached_figma_data(file_key: str, data: dict):
         oldest_key = min(_figma_cache.keys(), key=lambda k: _figma_cache[k]["timestamp"])
         del _figma_cache[oldest_key]
 
+def _friendly_api_error(e: Exception) -> HTTPException:
+    """Convert raw Anthropic/network errors to user-friendly HTTP exceptions."""
+    err = str(e).lower()
+    if "credit" in err or "balance" in err or "billing" in err:
+        return HTTPException(status_code=402, detail="The AI service is temporarily unavailable due to insufficient API credits. Please contact the administrator.")
+    if "rate_limit" in err or "429" in err:
+        return HTTPException(status_code=429, detail="Too many requests. Please wait a moment and try again.")
+    if "overloaded" in err or "529" in err:
+        return HTTPException(status_code=503, detail="The AI service is temporarily overloaded. Please try again in a moment.")
+    if "timeout" in err or "timed out" in err:
+        return HTTPException(status_code=504, detail="The request timed out. Please try again.")
+    return HTTPException(status_code=500, detail="Analysis failed. Please try again.")
+
+
 # --- Initialize Database ---
 init_db()  # Create tables if they don't exist
 
@@ -441,11 +455,8 @@ async def analyze(
             raise HTTPException(status_code=400, detail=str(e))
 
         except Exception as e:
-            # Unexpected errors
-            raise HTTPException(
-                status_code=500,
-                detail=f"Analysis failed: {str(e)}"
-            )
+            logger.error(f"Analysis error: {e}")
+            raise _friendly_api_error(e)
 
         finally:
             # Clean up temp file
@@ -1645,6 +1656,7 @@ async def unified_ask(
     format: Optional[str] = Form(None),
     content_type: str = Form("website"),
     conversation_history: Optional[str] = Form(None),
+    chat_context: Optional[str] = Form(None),
 ):
     """
     Unified endpoint: auto-routes to analysis, chat, or hybrid based on input.
@@ -1714,7 +1726,7 @@ async def unified_ask(
                     tmp_path = tmp.name
 
                 user_context = {"users": users, "tasks": tasks, "format": format, "content_type": content_type}
-                result = get_analyzer().analyze_design(design_file=tmp_path, user_context=user_context)
+                result = get_analyzer().analyze_design(design_file=tmp_path, user_context=user_context, chat_context=chat_context)
 
                 return {
                     "success": True,
@@ -1744,7 +1756,7 @@ async def unified_ask(
                         tmp_paths.append(tmp.name)
 
                 user_context = {"users": users, "tasks": tasks, "format": format, "content_type": content_type}
-                result = get_multi_analyzer().analyze_images(tmp_paths, user_context)
+                result = get_multi_analyzer().analyze_images(tmp_paths, user_context, chat_context=chat_context)
 
                 return {
                     "success": True,
@@ -1816,6 +1828,92 @@ async def unified_ask(
                 os.unlink(tmp_path)
             except Exception:
                 pass
+
+
+# ===========================================================
+# Report Chat Endpoint
+# ===========================================================
+
+class ReportChatRequest(BaseModel):
+    message: str
+    report_markdown: str
+    conversation: list[dict] = []
+    api_key: str
+
+
+@app.post("/analyze/chat")
+async def report_chat(request: ReportChatRequest):
+    """
+    Conversational Q&A about a completed analysis report.
+
+    Accepts the report markdown + prior conversation + a new user message.
+    Returns a grounded response without re-running analysis.
+    Does not consume usage credits.
+    """
+    with Session(engine) as session:
+        if not verify_api_key(request.api_key, session):
+            raise HTTPException(status_code=403, detail="Invalid API key")
+
+    if not request.message.strip():
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+
+    if len(request.message) > 2000:
+        raise HTTPException(status_code=400, detail="Message too long (max 2000 characters)")
+
+    anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not anthropic_key:
+        raise HTTPException(status_code=503, detail="AI service not configured")
+
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=anthropic_key)
+
+        system_prompt = (
+            "You are a UI/UX expert assistant helping a designer or researcher discuss their "
+            "UI analysis report. The report was generated using the UI Tenets & Traps framework, "
+            "which identifies specific usability patterns called 'traps'.\n\n"
+            "Here is the analysis report:\n\n"
+            "---\n"
+            f"{request.report_markdown}\n"
+            "---\n\n"
+            "IMPORTANT — Re-run Analysis:\n"
+            "There is a 'Re-run Analysis' button at the top of this chat panel. If the user "
+            "provides context that changes how the design should be interpreted (e.g. 'those "
+            "users are adults', 'that modal is intentional'), acknowledge the clarification and "
+            "suggest they click 'Re-run Analysis' so the tool can incorporate their context into "
+            "a fresh analysis. Do NOT say you cannot re-run the analysis or that re-running "
+            "requires going back to the main screen — the button is right here in the panel.\n\n"
+            "Guidelines:\n"
+            "- Answer questions about specific findings in the report\n"
+            "- Explain what a trap means and why it was flagged\n"
+            "- If the user provides context that changes the interpretation of a finding, "
+            "acknowledge it clearly and suggest clicking 'Re-run Analysis' to get an updated report\n"
+            "- Be concise. One to three short paragraphs is usually enough.\n"
+            "- Do not invent findings that are not in the report\n"
+            "- Stay focused on the report and UI/UX topics"
+        )
+
+        messages = []
+        for msg in request.conversation:
+            role = msg.get("role", "")
+            content = msg.get("content", "")
+            if role in ("user", "assistant") and content:
+                messages.append({"role": role, "content": content})
+        messages.append({"role": "user", "content": request.message})
+
+        model = os.environ.get("CHAT_AI_MODEL", "claude-haiku-4-5-20251001")
+        response = client.messages.create(
+            model=model,
+            max_tokens=1024,
+            system=system_prompt,
+            messages=messages,
+        )
+
+        return {"success": True, "response": response.content[0].text}
+
+    except Exception as e:
+        logger.error(f"Report chat error: {e}")
+        raise _friendly_api_error(e)
 
 
 # --- Error Handlers ---

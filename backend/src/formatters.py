@@ -75,7 +75,7 @@ def _build_trap_matrix_html(report: Dict[str, Any]) -> str:
         "<th>Tenet</th><th>Trap</th>"
         "<th class='count-col'>&#128308; Critical</th>"
         "<th class='count-col'>&#128993; Moderate</th>"
-        "<th class='count-col'>&#128994; Minor</th>"
+        "<th class='count-col'>&#128309; Minor</th>"
         "<th class='count-col'>Total</th>"
         "</tr></thead>"
         "<tbody>" + "\n".join(rows) + "</tbody>"
@@ -176,6 +176,21 @@ def format_report_as_markdown(report: Dict[str, Any], user_context: Dict[str, st
     # Summary
     md.append("## Summary")
     md.append("")
+    n_issues = len(report.get('user_issues', []))
+    n_high = len(report.get('critical_issues', []))
+    n_moderate = len(report.get('moderate_issues', []))
+    n_low = len(report.get('minor_issues', []))
+    n_traps = n_high + n_moderate + n_low
+    trap_breakdown = ", ".join(filter(None, [
+        f"{n_high} high severity" if n_high else "",
+        f"{n_moderate} moderate" if n_moderate else "",
+        f"{n_low} low severity" if n_low else "",
+    ]))
+    trap_summary = f"{n_traps} trap{'s' if n_traps != 1 else ''}"
+    if trap_breakdown:
+        trap_summary += f" ({trap_breakdown})"
+    md.append(f"**Found:** {n_issues} general issue{'s' if n_issues != 1 else ''} • {trap_summary}")
+    md.append("")
     for bullet in report['summary']:
         md.append(f"- {bullet}")
     md.append("")
@@ -255,7 +270,7 @@ def format_report_as_markdown(report: Dict[str, Any], user_context: Dict[str, st
 
     # Minor Issues
     if report['minor_issues']:
-        md.append("## 🟢 Minor Issues")
+        md.append("## 🔵 Minor Issues")
         md.append("")
         for issue in report['minor_issues']:
             render_frame_info(issue)
@@ -273,7 +288,7 @@ def format_report_as_markdown(report: Dict[str, Any], user_context: Dict[str, st
                 md.append(f"*Confidence: {issue['confidence']}*")
                 md.append("")
     else:
-        md.append("## 🟢 Minor Issues")
+        md.append("## 🔵 Minor Issues")
         md.append("")
         md.append("*None found* ✓")
         md.append("")
@@ -385,6 +400,36 @@ def format_report_as_markdown(report: Dict[str, Any], user_context: Dict[str, st
                 md.append(f"- **Frame {note.get('frame_index', '?')}**: {issue_label} - {note.get('description', 'Skipped')}")
         md.append("")
 
+    # General Issues (synthesis layer)
+    user_issues = report.get('user_issues', [])
+    if user_issues:
+        impact_order = {"high": 0, "medium": 1, "low": 2}
+        user_issues = sorted(user_issues, key=lambda x: impact_order.get(x.get('impact_level', 'low'), 3))
+        md.append("## General Issues")
+        md.append("")
+        md.append("*General issues are broad problems experienced by users. Each may stem from one or more specific traps listed below.*")
+        md.append("")
+        for issue in user_issues:
+            impact = issue.get('impact_level', 'low').upper()
+            md.append(f"### {issue.get('issue_title', 'Untitled Issue')} [{impact} IMPACT]")
+            md.append("")
+            if issue.get('task_context'):
+                md.append(f"*Task: {issue['task_context']}*")
+                md.append("")
+            md.append(issue.get('issue_description', ''))
+            md.append("")
+            traps = issue.get('contributing_traps', [])
+            if traps:
+                trap_names = ", ".join(t.get('trap_name', '') for t in traps if t.get('trap_name'))
+                md.append(f"**Underlying traps:** {trap_names}")
+                md.append("")
+            recs = issue.get('recommendations', [])
+            if recs:
+                md.append("**How to fix:**")
+                for rec in recs:
+                    md.append(f"- {rec}")
+                md.append("")
+
     # Traps Checked but Not Found
     md.append("## Traps Checked But Not Found")
     md.append("")
@@ -419,7 +464,7 @@ def format_report_as_markdown(report: Dict[str, Any], user_context: Dict[str, st
 
 
 def _build_user_issues_html(report: Dict[str, Any]) -> str:
-    """Build the User-Impacting Issues section HTML."""
+    """Build the General Issues section HTML."""
     issues = report.get('user_issues', [])
     if not issues:
         return ""
@@ -428,8 +473,8 @@ def _build_user_issues_html(report: Dict[str, Any]) -> str:
     issues = sorted(issues, key=lambda x: impact_order.get(x.get('impact_level', 'low'), 3))
 
     html = ["<div class='user-issues-section'>"]
-    html.append("<h2>🎯 User-Impacting Issues</h2>")
-    html.append("<p class='user-issues-intro'>Each issue is named from the user's perspective. The underlying traps explain why it occurs and how to fix it.</p>")
+    html.append("<h2>General Issues</h2>")
+    html.append("<p class='user-issues-intro'>General issues are broad problems experienced by users. Each issue may stem from one or more specific traps. The traps listed under each issue identify the root causes.</p>")
 
     for issue in issues:
         impact = issue.get('impact_level', 'low')
@@ -501,13 +546,10 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
             max-width: 900px;
             margin: 0 auto;
             padding: 20px;
-            background-color: #f5f5f5;
+            background-color: #fff;
         }
         .ui-traps-report {
-            background: white;
-            padding: 40px;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 20px;
         }
         h1 {
             color: #2c3e50;
@@ -529,17 +571,38 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
             font-style: italic;
         }
         .context-section {
-            background: #ecf0f1;
             padding: 20px;
             border-radius: 5px;
             margin: 20px 0;
+            border: 1px solid #dee2e6;
         }
         .summary-section ul {
-            background: #e8f4f8;
             padding: 20px 40px;
             border-left: 4px solid #3498db;
             border-radius: 4px;
         }
+        .findings-overview {
+            font-size: 0.95em;
+            color: #4a5568;
+            margin: 0 0 12px 0;
+            padding: 10px 16px;
+            background: #f7fafc;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+        }
+        /* CSS-only severity dots — explicit color, no emoji rendering */
+        .sev-dot {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+            vertical-align: middle;
+            flex-shrink: 0;
+        }
+        .sev-critical { background: #e74c3c; }
+        .sev-moderate { background: #f39c12; }
+        .sev-minor    { background: #3498db; }
         .issue-card {
             background: #fff;
             border: 1px solid #ddd;
@@ -550,15 +613,12 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
         }
         .issue-card.critical {
             border-left-color: #e74c3c;
-            background: #fef5f5;
         }
         .issue-card.moderate {
             border-left-color: #f39c12;
-            background: #fef9f5;
         }
         .issue-card.minor {
             border-left-color: #3498db;
-            background: #f5f9fe;
         }
         .issue-card h3 {
             margin-top: 0;
@@ -595,18 +655,22 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
             border-radius: 6px;
             border: 1px solid #e9ecef;
         }
+        .section-intro {
+            color: #6b7280;
+            font-size: 0.92em;
+            margin: -8px 0 16px;
+            line-height: 1.5;
+        }
         .none-found {
-            color: #27ae60;
+            color: #7f8c8d;
             font-style: italic;
         }
         .positive-section {
-            background: #eafaf1;
             padding: 20px;
             border-radius: 5px;
             border-left: 4px solid #27ae60;
         }
         .potential-issues-section {
-            background: #fff9e6;
             padding: 20px;
             border-radius: 5px;
             border-left: 4px solid #f39c12;
@@ -614,10 +678,8 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
         }
         .potential-issues-section .issue-card.potential {
             border-left-color: #f39c12;
-            background: #fffbf0;
         }
         .traps-not-found {
-            background: #f8f9fa;
             padding: 20px;
             border-radius: 5px;
         }
@@ -634,8 +696,7 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
             border-top: 2px solid #ecf0f1;
         }
         .confidentiality-notice {
-            background: #fff3cd;
-            border: 1px solid #ffc107;
+            border: 1px solid #dee2e6;
             padding: 20px;
             border-radius: 5px;
             margin-top: 20px;
@@ -698,13 +759,12 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
         }
         .trap-matrix-table tr.has-issues td.trap-name { font-weight: 600; color: #2c3e50; }
 
-        /* User-Impacting Issues */
+        /* General Issues */
         .user-issues-section {
             margin: 30px 0;
             padding: 24px 28px;
-            background: #f8f6ff;
             border-radius: 8px;
-            border: 1px solid #e0d9ff;
+            border: 1px solid #e2e8f0;
         }
         .user-issues-section h2 { border-bottom-color: #c4b5fd; margin-top: 0; }
         .user-issues-intro { color: #6b7280; font-size: 0.93em; margin: -4px 0 18px; }
@@ -783,6 +843,25 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
     # Summary
     html.append("<div class='summary-section'>")
     html.append("<h2>Summary</h2>")
+
+    # Findings overview — distinguishes general issues from traps
+    n_issues = len(report.get('user_issues', []))
+    n_high = len(report.get('critical_issues', []))
+    n_moderate = len(report.get('moderate_issues', []))
+    n_low = len(report.get('minor_issues', []))
+    n_traps = n_high + n_moderate + n_low
+    trap_breakdown = ", ".join(filter(None, [
+        f"{n_high} high severity" if n_high else "",
+        f"{n_moderate} moderate" if n_moderate else "",
+        f"{n_low} low severity" if n_low else "",
+    ]))
+    trap_summary = f"{n_traps} trap{'s' if n_traps != 1 else ''}"
+    if trap_breakdown:
+        trap_summary += f" ({trap_breakdown})"
+    issue_summary = f"{n_issues} general issue{'s' if n_issues != 1 else ''}"
+
+    html.append(f"<p class='findings-overview'><strong>Found:</strong> {issue_summary} &bull; {trap_summary}</p>")
+
     html.append("<ul>")
     for bullet in report['summary']:
         html.append(f"<li>{bullet}</li>")
@@ -944,30 +1023,30 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
         else:
             html.append(f"<p class='none-found'>None found ✓</p>")
 
-    # User-Impacting Issues (synthesis layer)
+    # General Issues (synthesis layer)
     html.append(_build_user_issues_html(report))
 
     # Critical Issues
     html.append("<div class='issues-section critical'>")
-    html.append("<h2>🔴 Critical Issues</h2>")
-    render_issues(report['critical_issues'], "🔴", "critical")
+    html.append("<h2><span class='sev-dot sev-critical'></span>High Severity Traps</h2>")
+    render_issues(report['critical_issues'], "", "critical")
     html.append("</div>")
 
     # Moderate Issues
     html.append("<div class='issues-section moderate'>")
-    html.append("<h2>🟡 Moderate Issues</h2>")
-    render_issues(report['moderate_issues'], "🟡", "moderate")
+    html.append("<h2><span class='sev-dot sev-moderate'></span>Moderate Severity Traps</h2>")
+    render_issues(report['moderate_issues'], "", "moderate")
     html.append("</div>")
 
     # Minor Issues
     html.append("<div class='issues-section minor'>")
-    html.append("<h2>🟢 Minor Issues</h2>")
-    render_issues(report['minor_issues'], "🟢", "minor")
+    html.append("<h2><span class='sev-dot sev-minor'></span>Low Severity Traps</h2>")
+    render_issues(report['minor_issues'], "", "minor")
     html.append("</div>")
 
     # Positive Observations
     html.append("<div class='positive-section'>")
-    html.append("<h2>✅ Positive Observations</h2>")
+    html.append("<h2>Positives</h2>")
     if report['positive_observations']:
         html.append("<ul>")
         for obs in report['positive_observations']:
@@ -979,11 +1058,11 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
 
     # Bugs Detected (Technical Issues)
     if report.get('bugs_detected') and len(report['bugs_detected']) > 0:
-        html.append("<div class='bugs-section' style='background: #fce4ec; padding: 20px; border-radius: 5px; border-left: 4px solid #e91e63; margin: 20px 0;'>")
+        html.append("<div class='bugs-section' style='padding: 20px; border-radius: 5px; border-left: 4px solid #e91e63; margin: 20px 0;'>")
         html.append("<h2>🐛 Technical Bugs Detected</h2>")
         html.append("<p><em>These are technical issues or broken states, not UI Traps. They represent system failures that should be fixed regardless of usability.</em></p>")
         for bug in report['bugs_detected']:
-            html.append("<div class='issue-card' style='border-left-color: #e91e63; background: #fff5f7;'>")
+            html.append("<div class='issue-card' style='border-left-color: #e91e63;'>")
 
             # Show frame reference if available
             has_frame_info = 'frame_index' in bug or 'frame_indices' in bug or 'frame' in bug
@@ -1080,12 +1159,12 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
 
     # Cross-Frame Issues (for video/multi-frame analysis)
     if report.get('cross_frame_issues') and len(report['cross_frame_issues']) > 0:
-        html.append("<div class='cross-frame-section' style='background: #e8f5e9; padding: 20px; border-radius: 5px; border-left: 4px solid #4caf50; margin: 20px 0;'>")
+        html.append("<div class='cross-frame-section' style='padding: 20px; border-radius: 5px; border-left: 4px solid #4caf50; margin: 20px 0;'>")
         html.append("<h2>🔄 Cross-Frame Issues</h2>")
         html.append("<p><em>These issues were detected by comparing element positions across multiple frames:</em></p>")
         for issue in report['cross_frame_issues']:
             severity_color = '#f39c12' if issue.get('severity') == 'moderate' else '#e74c3c' if issue.get('severity') == 'critical' else '#3498db'
-            html.append(f"<div class='issue-card' style='border-left-color: {severity_color}; background: #f5fff5;'>")
+            html.append(f"<div class='issue-card' style='border-left-color: {severity_color};'>")
             html.append(f"<h3 style='margin-top: 0; color: #2c3e50;'>{issue.get('trap_name', 'WANDERING ELEMENT')}</h3>")
             html.append(f"<p class='tenet'><strong>Tenet:</strong> {issue.get('tenet', 'HABITUATING')}</p>")
             html.append(f"<p><strong>Element:</strong> {issue.get('element_description', 'UI element')}</p>")
@@ -1124,7 +1203,7 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
 
     # Frame Quality Notes (for video/multi-frame analysis)
     if report.get('frame_quality_notes') and len(report['frame_quality_notes']) > 0:
-        html.append("<div class='frame-quality-section' style='background: #e3f2fd; padding: 20px; border-radius: 5px; border-left: 4px solid #2196f3; margin: 20px 0;'>")
+        html.append("<div class='frame-quality-section' style='padding: 20px; border-radius: 5px; border-left: 4px solid #2196f3; margin: 20px 0;'>")
         html.append("<h2>🎬 Frame Quality Notes</h2>")
         html.append("<p><em>Some frames were filtered out during analysis due to quality issues:</em></p>")
         html.append("<ul style='margin: 10px 0;'>")

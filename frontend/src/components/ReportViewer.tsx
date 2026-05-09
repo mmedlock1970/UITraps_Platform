@@ -1,5 +1,4 @@
-import React, { useMemo, useCallback } from 'react';
-import DOMPurify from 'dompurify';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { ReportViewerProps } from '../api/types';
 import styles from './ReportViewer.module.css';
 
@@ -11,23 +10,30 @@ export const ReportViewer: React.FC<ReportViewerProps> = ({
   showUsageInfo = false,
   onNewAnalysis,
 }) => {
-  // Sanitize HTML to prevent XSS while allowing images for frame display
-  const sanitizedHtml = useMemo(() => {
-    return DOMPurify.sanitize(html, {
-      ALLOWED_TAGS: [
-        'div', 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-        'ul', 'ol', 'li', 'strong', 'em', 'b', 'i', 'a',
-        'table', 'tr', 'td', 'th', 'thead', 'tbody', 'tfoot',
-        'br', 'hr', 'blockquote', 'pre', 'code',
-        'section', 'article', 'header', 'footer', 'main',
-        'img', // Allow images for frame thumbnails and gallery
-      ],
-      ALLOWED_ATTR: [
-        'class', 'id', 'href', 'target', 'rel', 'style',
-        'src', 'alt', 'title', 'width', 'height', // Image attributes
-        'rowspan', 'colspan', // Table structure
-      ],
-    });
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  // Auto-resize iframe to match its content height
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+
+    const resize = () => {
+      try {
+        const doc = iframe.contentDocument;
+        if (doc && doc.body) {
+          iframe.style.height = doc.body.scrollHeight + 40 + 'px';
+        }
+      } catch {
+        // cross-origin safety guard
+      }
+    };
+
+    iframe.addEventListener('load', resize);
+    // Also resize if already loaded (srcdoc can load synchronously)
+    if (iframe.contentDocument?.readyState === 'complete') {
+      resize();
+    }
+    return () => iframe.removeEventListener('load', resize);
   }, [html]);
 
   const handleDownload = useCallback(() => {
@@ -49,19 +55,19 @@ export const ReportViewer: React.FC<ReportViewerProps> = ({
         <div className={styles.statsGrid}>
           <div className={`${styles.statCard} ${styles.critical}`}>
             <span className={styles.statValue}>{statistics.critical_count}</span>
-            <span className={styles.statLabel}>Critical</span>
+            <span className={styles.statLabel}>High Severity</span>
           </div>
           <div className={`${styles.statCard} ${styles.moderate}`}>
             <span className={styles.statValue}>{statistics.moderate_count}</span>
-            <span className={styles.statLabel}>Moderate</span>
+            <span className={styles.statLabel}>Moderate Severity</span>
           </div>
           <div className={`${styles.statCard} ${styles.minor}`}>
             <span className={styles.statValue}>{statistics.minor_count}</span>
-            <span className={styles.statLabel}>Minor</span>
+            <span className={styles.statLabel}>Low Severity</span>
           </div>
           <div className={`${styles.statCard} ${styles.positive}`}>
             <span className={styles.statValue}>{statistics.positive_count}</span>
-            <span className={styles.statLabel}>Positive</span>
+            <span className={styles.statLabel}>Positives</span>
           </div>
         </div>
       )}
@@ -75,10 +81,14 @@ export const ReportViewer: React.FC<ReportViewerProps> = ({
         </div>
       )}
 
-      {/* Report Content */}
-      <div
-        className={styles.reportContent}
-        dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+      {/* Report Content — rendered in an iframe so embedded CSS applies correctly */}
+      <iframe
+        ref={iframeRef}
+        className={styles.reportFrame}
+        srcDoc={html}
+        title="Analysis Report"
+        sandbox="allow-same-origin"
+        style={{ width: '100%', border: 'none', minHeight: '400px' }}
       />
 
       {/* Actions */}

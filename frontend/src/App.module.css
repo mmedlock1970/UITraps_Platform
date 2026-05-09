@@ -61,6 +61,22 @@
   color: var(--uitraps-text);
 }
 
+.headerButtonActive {
+  padding: var(--uitraps-spacing-xs) var(--uitraps-spacing-sm);
+  border: 1px solid var(--uitraps-primary);
+  border-radius: var(--uitraps-border-radius-sm);
+  background: var(--uitraps-primary);
+  color: white;
+  font-size: var(--uitraps-font-size-xs);
+  cursor: pointer;
+  transition: all var(--uitraps-transition);
+}
+
+.headerButtonActive:hover {
+  background: var(--uitraps-primary-hover);
+  border-color: var(--uitraps-primary-hover);
+}
+
 .authPrompt {
   display: flex;
   flex-direction: column;
@@ -181,4 +197,21 @@
   flex: 1;
   overflow-y: auto;
   padding: var(--uitraps-spacing-md);
+}
+
+/* Report + chat side-by-side layout */
+.reportWithChat {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 16px;
+  overflow: hidden;
+  padding: var(--uitraps-spacing-md);
+  align-items: stretch;
+}
+
+.reportArea {
+  flex: 1;
+  overflow-y: auto;
+  min-width: 0;
 }

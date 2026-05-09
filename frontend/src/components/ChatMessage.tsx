@@ -78,7 +78,7 @@ export const ChatMessageComponent: React.FC<ChatMessageProps> = React.memo(({ me
   return (
     <div className={messageClass}>
       <div className={styles.avatar}>{isUser ? 'U' : 'AI'}</div>
-      <div>
+      <div className={styles.content}>
         <div
           className={styles.bubble}
           dangerouslySetInnerHTML={{ __html: formatMarkdown(content) }}

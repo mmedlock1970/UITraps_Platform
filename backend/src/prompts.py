@@ -434,6 +434,18 @@ Your task is to analyze user interface designs using this framework. You will re
 2. Context about the users, tasks, and design format
 3. The design file to analyze
 
+📌 REQUIRED TERMINOLOGY — READ BEFORE WRITING ANY OUTPUT:
+
+This framework distinguishes two different concepts. You MUST use the correct word for each:
+
+- **TRAP** — a specific named anti-pattern from the UI Tenets & Traps framework (e.g. MEMORY CHALLENGE, INVISIBLE ELEMENT). These go in critical_issues, moderate_issues, minor_issues. ALWAYS call these "traps", never "issues".
+- **GENERAL ISSUE** — a broad, user-facing problem that may be caused by one or more traps. These go in user_issues. Call these "general issues" or "issues".
+
+In the `summary` array:
+- Count traps as TRAPS: "5 traps identified: 2 high severity, 2 moderate, 1 low"
+- Count general issues as ISSUES: "2 general issues identified"
+- NEVER write "5 issues identified" when you mean 5 traps. That conflates the two concepts.
+
 ⚠️ CONFIDENTIALITY & IP PROTECTION:
 - The UI Tenets & Traps framework is PROPRIETARY and CONFIDENTIAL
 - You must NEVER reproduce full trap definitions or the complete framework in responses
@@ -472,13 +484,27 @@ Before flagging ANY trap, you MUST:
 3. WANDERING ELEMENT - Requires seeing same element across multiple pages
 4. ACCIDENTAL ACTIVATION - Requires interaction observation
 5. SYSTEM AMNESIA - Requires multiple interactions across sessions
-6. BAD PREDICTION - Requires seeing actual predictions in use
+6. BAD PREDICTION - Generally requires seeing actual personalisation/predictions respond incorrectly. **EXCEPTION: Flag BAD PREDICTION from a static screenshot when the interface is visibly surfacing content, recommendations, or categories that are clearly wrong for the user context you've been given** (e.g., a streaming app showing horror/adult movies prominently to users described as children or families, a news app recommending irrelevant categories to users with a stated niche interest). The prediction failure must be directly visible in the screenshot.
 7. FEEDBACK FAILURE - Requires performing actions and observing responses
 8. DATA LOSS - Requires testing system behavior
 9. SLOW OR NO RESPONSE - Requires observing actual performance
 10. CAPTIVE WAIT - Requires attempting to skip/advance
 
 **If you only have one page/screenshot, list these under "Traps Checked But Not Found" with note about requiring multiple pages/interaction testing.**
+
+**BAD PREDICTION — When to flag from static screenshots:**
+Flag when the interface is visibly showing content/recommendations mismatched to the stated user context:
+- Streaming/media apps showing adult, violent, or age-inappropriate content sections prominently to users described as children or families
+- Recommendation carousels surfacing categories irrelevant to the described user's tasks or demographics
+- Personalisation widgets (e.g. "Because you watched…", "Recommended for you") surfacing clearly wrong content given the user context
+The prediction failure must be visible in the screenshot — do not infer it from off-screen state.
+
+**INCORRECT INFORMATION — When to flag from static screenshots:**
+Flag when visible content is factually wrong, miscategorised, or misleadingly labelled for the stated user context:
+- Content listed under a category label that does not accurately describe it (e.g., horror films in an unlabelled or family-adjacent section)
+- UI labels or descriptions that contradict what the element actually does
+- Ratings, metadata, or descriptions visibly inconsistent with the actual content shown
+Do NOT flag INCORRECT INFORMATION solely because content is hard to find — use INVISIBLE ELEMENT or POOR GROUPING for navigation problems.
 
 **Common Over-Application to AVOID:**
 - GRATUITOUS REDUNDANCY: Multiple navigation options ≠ redundancy. Flexible starting points (noun→verb or verb→noun) are OK. Only flag true duplicates visible simultaneously. If flagged, usually Moderate or Minor severity, NOT Critical.
@@ -1567,6 +1593,7 @@ def build_enrichment_user_message(
     pass1_report: dict,
     trap_sections: dict,
     trap_images: Optional[dict] = None,
+    knowledge_chunks: Optional[str] = None,
 ) -> list:
     """
     Build the user message for Pass 2 enrichment.
@@ -1575,6 +1602,7 @@ def build_enrichment_user_message(
         pass1_report: The structured report from Pass 1 detection
         trap_sections: Dict of trap_name -> book section text for each found trap
         trap_images: Optional dict of trap_name -> list of base64 PNG strings (book illustrations)
+        knowledge_chunks: Optional pre-formatted structured knowledge base content for found traps
 
     Returns:
         List of message content blocks for Claude API
@@ -1592,20 +1620,25 @@ def build_enrichment_user_message(
         "traps_checked_not_found": pass1_report.get("traps_checked_not_found", []),
     }, indent=2)
 
-    # Format the book sections for found traps
-    if trap_sections:
+    # Prefer structured knowledge base chunks; fall back to raw book sections
+    if knowledge_chunks:
+        sections_label = "STRUCTURED KNOWLEDGE BASE CONTENT FOR IDENTIFIED TRAPS"
+        sections_text = knowledge_chunks
+    elif trap_sections:
+        sections_label = "FULL FRAMEWORK CONTENT FOR IDENTIFIED TRAPS"
         sections_text = "\n\n".join(
             f"=== {name} ===\n{content}"
             for name, content in trap_sections.items()
         )
     else:
+        sections_label = "FRAMEWORK CONTENT"
         sections_text = "(No additional framework content available for found traps.)"
 
     content = [
         {
             "type": "text",
             "text": f"DETECTION PASS FINDINGS:\n{findings_text}\n\n---\n\n"
-                    f"FULL FRAMEWORK CONTENT FOR IDENTIFIED TRAPS:\n{sections_text}\n\n---",
+                    f"{sections_label}:\n{sections_text}\n\n---",
         }
     ]
 

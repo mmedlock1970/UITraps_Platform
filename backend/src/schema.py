@@ -56,10 +56,10 @@ UI_ANALYSIS_SCHEMA = {
     "properties": {
         "summary": {
             "type": "array",
-            "description": "5-9 bullet points summarizing overall findings. MUST be an array where each item is a complete sentence/bullet point.",
+            "description": "5-9 bullet points summarizing overall findings. MUST be an array where each item is a complete sentence/bullet point. CRITICAL TERMINOLOGY: use 'trap' (not 'issue') when referring to specific named anti-patterns (e.g. 'MEMORY CHALLENGE', 'INVISIBLE ELEMENT'). Use 'general issue' only for broad user-facing problems that group one or more traps. Do NOT say '5 issues identified' — instead say '5 traps identified' if referring to the trap count.",
             "items": {
                 "type": "string",
-                "description": "A single complete bullet point (complete sentence)"
+                "description": "A single complete bullet point (complete sentence). Use 'trap' for named anti-patterns, 'general issue' for broad user-facing problems."
             },
             "minItems": 5,
             "maxItems": 9
@@ -272,7 +272,7 @@ UI_ANALYSIS_SCHEMA = {
                 "properties": {
                     "issue_title": {
                         "type": "string",
-                        "description": "Short, user-centric title describing what users experience (e.g., 'Users fail at initial setup', 'Checkout is confusing and causes abandonment'). Write from the user's perspective, not the framework's."
+                        "description": "Short, user-centric title describing ONE unified problem users experience (e.g., 'Users cannot find the checkout button', 'Setup fails silently without feedback'). CRITICAL: do NOT use 'and' to join two separate problems into one title — if two problems feel distinct, create two separate issues. Write from the user's perspective, not the framework's."
                     },
                     "issue_description": {
                         "type": "string",

@@ -24,12 +24,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from .analyzer import UITrapsAnalyzer
 
 
-def _analyze_with_retry(analyzer, path, user_context, max_retries=3):
+def _analyze_with_retry(analyzer, path, user_context, max_retries=3, chat_context=None):
     """Call analyze_design with exponential backoff on 429 rate limit errors."""
     delay = 60  # seconds to wait on first 429
     for attempt in range(max_retries):
         try:
-            return analyzer.analyze_design(design_file=path, user_context=user_context)
+            return analyzer.analyze_design(design_file=path, user_context=user_context, chat_context=chat_context)
         except Exception as e:
             if '429' in str(e) and attempt < max_retries - 1:
                 print(f"[UITraps] Rate limited. Waiting {delay}s before retry {attempt + 2}/{max_retries}...")
@@ -291,7 +291,8 @@ class MultiAnalyzer:
         self,
         image_paths: List[str],
         user_context: Dict[str, str],
-        progress_callback: callable = None
+        progress_callback: callable = None,
+        chat_context: str = None
     ) -> Dict[str, Any]:
         """
         Analyze multiple images and aggregate results.
@@ -315,7 +316,7 @@ class MultiAnalyzer:
             image_data = _load_image_as_base64(path)
 
             try:
-                result = _analyze_with_retry(self.analyzer, path, user_context)
+                result = _analyze_with_retry(self.analyzer, path, user_context, chat_context=chat_context)
                 results.append({
                     'path': path,
                     'filename': os.path.basename(path),

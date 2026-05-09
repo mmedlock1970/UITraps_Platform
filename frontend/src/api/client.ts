@@ -299,6 +299,59 @@ export async function checkHealth(apiEndpoint: string): Promise<{ status: string
 
 
 // ===========================================================
+// Report Chat API
+// ===========================================================
+
+export interface ReportChatOptions {
+  apiEndpoint: string;
+  apiKey: string;
+  message: string;
+  reportMarkdown: string;
+  conversation: Array<{ role: 'user' | 'assistant'; content: string }>;
+  signal?: AbortSignal;
+  timeout?: number;
+}
+
+export async function reportChat(options: ReportChatOptions): Promise<{ response: string }> {
+  const { apiEndpoint, apiKey, message, reportMarkdown, conversation, signal, timeout = 60000 } = options;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+  const combinedSignal = signal ? anySignal([signal, controller.signal]) : controller.signal;
+
+  try {
+    const response = await fetch(`${apiEndpoint}/analyze/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message,
+        report_markdown: reportMarkdown,
+        conversation,
+        api_key: apiKey,
+      }),
+      signal: combinedSignal,
+    });
+
+    clearTimeout(timeoutId);
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || data.detail || `HTTP ${response.status}`);
+    }
+
+    return data as { response: string };
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') throw new Error('Request timed out. Please try again.');
+      throw error;
+    }
+    throw new Error('Unknown error occurred');
+  }
+}
+
+
+// ===========================================================
 // Chat & Unified Platform API
 // ===========================================================
 
@@ -362,13 +415,14 @@ export interface UnifiedAskOptions {
   files?: File[];
   context?: UserContext;
   conversationHistory?: string;
+  chatContext?: string;
   signal?: AbortSignal;
   timeout?: number;
 }
 
 export async function unifiedAsk(options: UnifiedAskOptions): Promise<UnifiedAskResponse> {
   const { apiEndpoint, token, message, files = [], context,
-          conversationHistory, signal, timeout = 120000 } = options;
+          conversationHistory, chatContext, signal, timeout = 120000 } = options;
 
   const formData = new FormData();
   if (message) formData.append('message', message);
@@ -380,6 +434,7 @@ export async function unifiedAsk(options: UnifiedAskOptions): Promise<UnifiedAsk
     formData.append('content_type', context.contentType || 'website');
   }
   if (conversationHistory) formData.append('conversation_history', conversationHistory);
+  if (chatContext) formData.append('chat_context', chatContext);
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);

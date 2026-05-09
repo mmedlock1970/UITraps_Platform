@@ -353,6 +353,7 @@ export interface AnalysisProgressProps {
   inputType?: InputType;
   fileCount?: number;
   estimatedTime?: TimeEstimate;
+  isComplete?: boolean;
 }
 
 /** Union type for all estimate responses */

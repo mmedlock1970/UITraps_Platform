@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { UITrapsAnalyzerProps } from './api/types';
 import { useAnalyzer } from './hooks/useAnalyzer';
 import { useElapsedTime } from './hooks/useElapsedTime';
@@ -6,6 +6,7 @@ import { AnalyzerForm } from './components/AnalyzerForm';
 import { AnalysisProgress } from './components/AnalysisProgress';
 import { ReportViewer } from './components/ReportViewer';
 import { EstimatePreview } from './components/EstimatePreview';
+import { ChatPanel } from './components/ChatPanel';
 import './styles/variables.css';
 import styles from './UITrapsAnalyzer.module.css';
 
@@ -50,6 +51,7 @@ export const UITrapsAnalyzer: React.FC<UITrapsAnalyzerProps> = ({
   });
 
   const { elapsedTime, start: startTimer, stop: stopTimer, reset: resetTimer } = useElapsedTime();
+  const [showCompletion, setShowCompletion] = useState(false);
 
   // Start/stop timer based on analysis state
   useEffect(() => {
@@ -59,6 +61,15 @@ export const UITrapsAnalyzer: React.FC<UITrapsAnalyzerProps> = ({
       stopTimer();
     }
   }, [state.view, startTimer, stopTimer]);
+
+  // Flash 100% progress before showing the report
+  useEffect(() => {
+    if (state.view === 'report') {
+      setShowCompletion(true);
+      const timer = setTimeout(() => setShowCompletion(false), 600);
+      return () => clearTimeout(timer);
+    }
+  }, [state.view]);
 
   const handleNewAnalysis = () => {
     resetTimer();
@@ -78,9 +89,11 @@ export const UITrapsAnalyzer: React.FC<UITrapsAnalyzerProps> = ({
     await confirmAnalysis();
   };
 
+  const showReport = state.view === 'report' && !showCompletion;
+
   return (
     <div
-      className={`uitraps-analyzer ${styles.container} ${className || ''}`}
+      className={`uitraps-analyzer ${styles.container} ${showReport ? styles.reportLayout : ''} ${className || ''}`}
       data-theme={theme}
       style={style}
     >
@@ -96,7 +109,7 @@ export const UITrapsAnalyzer: React.FC<UITrapsAnalyzerProps> = ({
         </p>
       </header>
 
-      <main className={styles.main}>
+      <main className={`${styles.main} ${showReport ? styles.reportMain : ''}`}>
         {state.view === 'form' && (
           <AnalyzerForm
             files={state.files}
@@ -124,24 +137,35 @@ export const UITrapsAnalyzer: React.FC<UITrapsAnalyzerProps> = ({
           />
         )}
 
-        {state.view === 'loading' && (
+        {(state.view === 'loading' || showCompletion) && (
           <AnalysisProgress
             elapsedTime={elapsedTime}
-            onCancel={handleCancel}
+            onCancel={showCompletion ? undefined : handleCancel}
             inputType={state.inputType || undefined}
             fileCount={state.files.length}
             estimatedTime={state.estimate?.time_estimate}
+            isComplete={showCompletion}
           />
         )}
 
-        {state.view === 'report' && state.reportHtml && (
-          <ReportViewer
-            html={state.reportHtml}
-            statistics={state.statistics || undefined}
-            usage={state.usage || undefined}
-            showStatistics={showStatistics}
-            showUsageInfo={showUsageInfo}
-            onNewAnalysis={handleNewAnalysis}
+        {showReport && state.reportHtml && (
+          <div className={styles.reportArea}>
+            <ReportViewer
+              html={state.reportHtml}
+              statistics={state.statistics || undefined}
+              usage={state.usage || undefined}
+              showStatistics={showStatistics}
+              showUsageInfo={showUsageInfo}
+              onNewAnalysis={handleNewAnalysis}
+            />
+          </div>
+        )}
+
+        {showReport && (
+          <ChatPanel
+            apiEndpoint={apiEndpoint}
+            apiKey={apiKey}
+            reportMarkdown={state.reportMarkdown}
           />
         )}
 
