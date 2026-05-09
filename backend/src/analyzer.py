@@ -344,7 +344,7 @@ class UITrapsAnalyzer:
         enriched = tool_use_block.input
 
         # Preserve Pass 1 fields that Pass 2 might not return
-        for field in ("bugs_detected", "incomplete_flow_findings", "flagged_for_human_review"):
+        for field in ("bugs_detected", "incomplete_flow_findings", "flagged_for_human_review", "user_issues"):
             if field in pass1_report and field not in enriched:
                 enriched[field] = pass1_report[field]
 

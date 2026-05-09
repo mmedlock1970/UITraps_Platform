@@ -264,6 +264,63 @@ UI_ANALYSIS_SCHEMA = {
                 "required": ["trap_name", "tenet", "location", "observation", "why_human_review_needed", "question_for_reviewer"]
             }
         },
+        "user_issues": {
+            "type": "array",
+            "description": "User-facing issues synthesized from detected trap findings. Each issue names an observable user problem in plain language, groups the traps that underlie it, and provides synthesized recommendations. Rank by impact_level (high first). Omit if no confirmed traps were found.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "issue_title": {
+                        "type": "string",
+                        "description": "Short, user-centric title describing what users experience (e.g., 'Users fail at initial setup', 'Checkout is confusing and causes abandonment'). Write from the user's perspective, not the framework's."
+                    },
+                    "issue_description": {
+                        "type": "string",
+                        "description": "Plain-language description of the user experience and its consequence. No framework terminology."
+                    },
+                    "impact_level": {
+                        "type": "string",
+                        "enum": ["high", "medium", "low"],
+                        "description": "high = blocks or severely disrupts important tasks; medium = significant frustration or inefficiency; low = minor annoyance"
+                    },
+                    "task_context": {
+                        "type": "string",
+                        "description": "The user task or flow this issue affects (e.g., 'Account setup', 'Checkout', 'Search'). Omit if not task-specific."
+                    },
+                    "contributing_traps": {
+                        "type": "array",
+                        "description": "The traps that underlie this issue, each with a brief explanation of its contribution",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "trap_name": {
+                                    "type": "string",
+                                    "enum": VALID_TRAP_NAMES,
+                                    "description": "MUST be one of the 27 valid trap names"
+                                },
+                                "severity": {
+                                    "type": "string",
+                                    "enum": ["critical", "moderate", "minor"]
+                                },
+                                "contribution": {
+                                    "type": "string",
+                                    "description": "One sentence: how this trap contributes to the user-facing issue"
+                                }
+                            },
+                            "required": ["trap_name", "severity", "contribution"]
+                        },
+                        "minItems": 1
+                    },
+                    "recommendations": {
+                        "type": "array",
+                        "description": "Prioritized fixes for this issue, synthesized across all contributing traps",
+                        "items": {"type": "string"},
+                        "minItems": 1
+                    }
+                },
+                "required": ["issue_title", "issue_description", "impact_level", "contributing_traps", "recommendations"]
+            }
+        },
         "incomplete_flow_findings": {
             "type": "array",
             "description": "Tier 2 traps that AI can assess but require complete task flows. These findings are flagged with caveats because screenshots may be missing intermediate steps. AI can detect these traps but confidence is limited without seeing the full user journey.",

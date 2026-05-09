@@ -1001,6 +1001,7 @@ Remember to:
 {('- **DETECT BUGS** - Report technical failures separately from UI traps' if (is_video_analysis or is_multi_frame) else '')}
 - Note positive observations
 - List traps you checked but didn't find
+- **Synthesize user_issues**: after identifying all traps, group related findings into user-facing issues named from the user's perspective (e.g., "Users fail at checkout", not "UNNECESSARY STEP detected"). Each issue should reference the contributing traps, state the impact level (high/medium/low), and provide synthesized recommendations. A trap may appear in more than one issue if it contributes to distinct user problems. Omit this field if no confirmed traps were found.
 - Submit your complete analysis using the ui_analysis_report tool
 
 Begin your analysis now."""

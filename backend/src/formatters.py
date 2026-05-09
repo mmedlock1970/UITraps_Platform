@@ -418,6 +418,60 @@ def format_report_as_markdown(report: Dict[str, Any], user_context: Dict[str, st
     return "\n".join(md)
 
 
+def _build_user_issues_html(report: Dict[str, Any]) -> str:
+    """Build the User-Impacting Issues section HTML."""
+    issues = report.get('user_issues', [])
+    if not issues:
+        return ""
+
+    impact_order = {"high": 0, "medium": 1, "low": 2}
+    issues = sorted(issues, key=lambda x: impact_order.get(x.get('impact_level', 'low'), 3))
+
+    html = ["<div class='user-issues-section'>"]
+    html.append("<h2>🎯 User-Impacting Issues</h2>")
+    html.append("<p class='user-issues-intro'>Each issue is named from the user's perspective. The underlying traps explain why it occurs and how to fix it.</p>")
+
+    for issue in issues:
+        impact = issue.get('impact_level', 'low')
+        html.append(f"<div class='user-issue-card impact-{impact}'>")
+
+        html.append("<div class='user-issue-header'>")
+        html.append(f"<span class='impact-badge {impact}'>{impact.upper()} IMPACT</span>")
+        html.append(f"<h3 class='user-issue-title'>{issue.get('issue_title', '')}</h3>")
+        html.append("</div>")
+
+        if issue.get('task_context'):
+            html.append(f"<p class='task-context'>Task: {issue['task_context']}</p>")
+
+        html.append(f"<p>{issue.get('issue_description', '')}</p>")
+
+        traps = issue.get('contributing_traps', [])
+        if traps:
+            html.append("<div class='contributing-traps'>")
+            html.append("<span class='traps-label'>Underlying traps:</span>")
+            for t in traps:
+                sev = t.get('severity', 'minor')
+                name = t.get('trap_name', '')
+                contrib = t.get('contribution', '')
+                html.append(f"<span class='trap-pill {sev}' title='{contrib}'>{name}</span>")
+            html.append("</div>")
+
+        recs = issue.get('recommendations', [])
+        if recs:
+            html.append("<div class='user-issue-recs'>")
+            html.append("<strong>How to fix:</strong>")
+            html.append("<ul>")
+            for rec in recs:
+                html.append(f"<li>{rec}</li>")
+            html.append("</ul>")
+            html.append("</div>")
+
+        html.append("</div>")
+
+    html.append("</div>")
+    return "\n".join(html)
+
+
 def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] = None) -> str:
     """
     Format the report as HTML for web display.
@@ -643,6 +697,50 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
             border-left: 1px solid #ecf0f1;
         }
         .trap-matrix-table tr.has-issues td.trap-name { font-weight: 600; color: #2c3e50; }
+
+        /* User-Impacting Issues */
+        .user-issues-section {
+            margin: 30px 0;
+            padding: 24px 28px;
+            background: #f8f6ff;
+            border-radius: 8px;
+            border: 1px solid #e0d9ff;
+        }
+        .user-issues-section h2 { border-bottom-color: #c4b5fd; margin-top: 0; }
+        .user-issues-intro { color: #6b7280; font-size: 0.93em; margin: -4px 0 18px; }
+        .user-issue-card {
+            background: white;
+            border-radius: 6px;
+            padding: 18px 20px;
+            margin: 14px 0;
+            border-left: 5px solid #95a5a6;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        }
+        .user-issue-card.impact-high   { border-left-color: #e74c3c; }
+        .user-issue-card.impact-medium { border-left-color: #e67e22; }
+        .user-issue-card.impact-low    { border-left-color: #3498db; }
+        .user-issue-header { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+        .impact-badge {
+            font-size: 0.7em; font-weight: 700; letter-spacing: 0.07em;
+            padding: 3px 9px; border-radius: 10px; white-space: nowrap;
+        }
+        .impact-badge.high   { background: #fdecea; color: #c0392b; }
+        .impact-badge.medium { background: #fef3e2; color: #d35400; }
+        .impact-badge.low    { background: #eaf4fd; color: #2471a3; }
+        .user-issue-title { margin: 0; font-size: 1.02em; color: #2c3e50; }
+        .task-context { color: #7f8c8d; font-size: 0.88em; margin: 2px 0 10px; font-style: italic; }
+        .contributing-traps { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 12px 0 8px; }
+        .traps-label { font-size: 0.82em; color: #7f8c8d; font-weight: 600; margin-right: 2px; }
+        .trap-pill {
+            font-size: 0.72em; font-weight: 700; padding: 2px 9px;
+            border-radius: 10px; letter-spacing: 0.04em;
+        }
+        .trap-pill.critical { background: #fdecea; color: #c0392b; border: 1px solid #f5c6c6; }
+        .trap-pill.moderate { background: #fef3e2; color: #d35400; border: 1px solid #f5ddc6; }
+        .trap-pill.minor    { background: #eaf4fd; color: #2471a3; border: 1px solid #c6dff5; }
+        .user-issue-recs strong { font-size: 0.9em; color: #34495e; }
+        .user-issue-recs ul { margin: 6px 0 0; padding-left: 20px; }
+        .user-issue-recs li { margin: 3px 0; font-size: 0.95em; }
     """)
     html.append("</style>")
     html.append("</head>")
@@ -845,6 +943,9 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
                 html.append("</div>")
         else:
             html.append(f"<p class='none-found'>None found ✓</p>")
+
+    # User-Impacting Issues (synthesis layer)
+    html.append(_build_user_issues_html(report))
 
     # Critical Issues
     html.append("<div class='issues-section critical'>")
@@ -1094,6 +1195,7 @@ def get_report_statistics(report: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dictionary with report statistics
     """
+    user_issues = report.get('user_issues', [])
     return {
         'total_issues': len(report['critical_issues']) + len(report['moderate_issues']) + len(report['minor_issues']),
         'critical_count': len(report['critical_issues']),
@@ -1101,7 +1203,11 @@ def get_report_statistics(report: Dict[str, Any]) -> Dict[str, Any]:
         'minor_count': len(report['minor_issues']),
         'positive_count': len(report['positive_observations']),
         'traps_not_found_count': len(report['traps_checked_not_found']),
-        'summary_length': len(report['summary'])
+        'summary_length': len(report['summary']),
+        'user_issues_count': len(user_issues),
+        'user_issues_high': sum(1 for i in user_issues if i.get('impact_level') == 'high'),
+        'user_issues_medium': sum(1 for i in user_issues if i.get('impact_level') == 'medium'),
+        'user_issues_low': sum(1 for i in user_issues if i.get('impact_level') == 'low'),
     }
 
 
