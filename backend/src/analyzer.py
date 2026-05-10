@@ -427,12 +427,13 @@ class UITrapsAnalyzer:
             raise ValueError(f"Unsupported image format: {ext}")
 
         MAX_SIDE = 1568
-        with Image.open(image_path) as img:
+        try:
+            img = Image.open(image_path)
             w, h = img.size
             if max(w, h) > MAX_SIDE:
                 scale = MAX_SIDE / max(w, h)
                 new_w, new_h = int(w * scale), int(h * scale)
-                img = img.resize((new_w, new_h), Image.LANCZOS)
+                img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
                 print(f"[UITraps] Image resized {w}×{h} → {new_w}×{new_h}")
 
             buf = io.BytesIO()
@@ -442,8 +443,12 @@ class UITrapsAnalyzer:
                 img.save(buf, format='JPEG', quality=92, optimize=True)
             else:
                 img.save(buf, format='PNG', optimize=True)
-
-        image_data = base64.standard_b64encode(buf.getvalue()).decode('utf-8')
+            img.close()
+            image_data = base64.standard_b64encode(buf.getvalue()).decode('utf-8')
+        except Exception as e:
+            print(f"[UITraps] Image resize failed ({e}), using raw file")
+            with open(image_path, 'rb') as f:
+                image_data = base64.standard_b64encode(f.read()).decode('utf-8')
 
         return {
             "type": "image",
