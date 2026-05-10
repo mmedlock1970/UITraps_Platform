@@ -13,6 +13,7 @@ import json
 import logging
 import tempfile
 import time
+import traceback
 from datetime import datetime
 from typing import Optional, List
 from pathlib import Path
@@ -69,6 +70,17 @@ from src.chat.chat_service import ChatService
 from src.router import detect_intent, IntentMode
 
 logger = logging.getLogger(__name__)
+
+# File-based error log so we can capture crashes regardless of terminal
+_LOG_FILE = os.path.join(os.path.dirname(__file__), 'uitraps_error.log')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s %(name)s: %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(_LOG_FILE, encoding='utf-8'),
+    ]
+)
 
 # --- Configuration ---
 
@@ -405,9 +417,11 @@ async def analyze(
         suffix = ".png" if image.content_type == "image/png" else ".jpg"
 
         try:
+            logger.info(f"[/analyze] start — file={image.filename} size={len(contents)} content_type={image.content_type}")
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
                 tmp.write(contents)
                 tmp_path = tmp.name
+            logger.info(f"[/analyze] temp file written: {tmp_path}")
 
             # 6. Build user context
             user_context = {
@@ -418,15 +432,19 @@ async def analyze(
             }
 
             # 7. Run analysis
+            logger.info("[/analyze] starting analyze_design")
             analyzer_instance = get_analyzer()
             result = analyzer_instance.analyze_design(
                 design_file=tmp_path,
                 user_context=user_context
             )
+            logger.info("[/analyze] analyze_design complete")
 
             # 8. Increment usage after successful analysis
+            logger.info("[/analyze] incrementing usage")
             new_usage = increment_usage(session, api_key, 1, MONTHLY_LIMIT)
             log_analysis(session, api_key, "/analyze", "single_image", 1, "success")
+            logger.info(f"[/analyze] usage incremented to {new_usage}")
 
             # 8.5. Save report to disk
             report_path = save_analysis_report(
@@ -455,7 +473,7 @@ async def analyze(
             raise HTTPException(status_code=400, detail=str(e))
 
         except Exception as e:
-            logger.error(f"Analysis error: {e}")
+            logger.error(f"Analysis error: {e}\n{traceback.format_exc()}")
             raise _friendly_api_error(e)
 
         finally:
@@ -1717,12 +1735,16 @@ async def unified_ask(
 
             suffix = ".png" if image.content_type == "image/png" else ".jpg"
             try:
+                logger.info(f"[/api/ask analysis] start — file={image.filename} size={len(contents)}")
                 with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
                     tmp.write(contents)
                     tmp_path = tmp.name
+                logger.info(f"[/api/ask analysis] temp file written: {tmp_path}")
 
                 user_context = {"users": users, "tasks": tasks, "format": format, "content_type": content_type}
+                logger.info("[/api/ask analysis] calling analyze_design")
                 result = get_analyzer().analyze_design(design_file=tmp_path, user_context=user_context, chat_context=chat_context)
+                logger.info("[/api/ask analysis] analyze_design complete")
 
                 return {
                     "success": True,
@@ -1731,6 +1753,9 @@ async def unified_ask(
                     "report_markdown": result.get("markdown"),
                     "statistics": result.get("statistics"),
                 }
+            except Exception as e:
+                logger.error(f"[/api/ask analysis] error: {e}\n{traceback.format_exc()}")
+                raise _friendly_api_error(e)
             finally:
                 try:
                     os.unlink(tmp_path)

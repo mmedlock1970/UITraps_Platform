@@ -1403,7 +1403,7 @@ def get_report_statistics(report: Dict[str, Any]) -> Dict[str, Any]:
         'moderate_count': len(report['moderate_issues']),
         'minor_count': len(report['minor_issues']),
         'positive_count': len(report['positive_observations']),
-        'traps_not_found_count': len(report['traps_checked_not_found']),
+        'traps_not_found_count': len(report.get('traps_checked_not_found', [])),
         'summary_length': len(report['summary']),
         'user_issues_count': len(user_issues),
         'user_issues_high': sum(1 for i in user_issues if i.get('impact_level') == 'high'),

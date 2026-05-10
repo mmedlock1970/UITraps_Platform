@@ -203,19 +203,14 @@ class UITrapsAnalyzer:
                 # Extract structured data directly from tool input
                 report = tool_use_block.input
 
-                # Validate required fields are present
-                required_fields = [
-                    'summary', 'critical_issues', 'moderate_issues',
-                    'minor_issues', 'positive_observations', 'potential_issues', 'traps_checked_not_found'
-                ]
-                for field in required_fields:
+                # Validate truly required fields (core structure)
+                for field in ['summary', 'critical_issues', 'moderate_issues', 'minor_issues']:
                     if field not in report:
                         raise ValueError(f"Missing required field in response: {field}")
 
                 # Validate and fix data types
                 # Summary must be an array of strings
                 if isinstance(report['summary'], str):
-                    # Claude returned a string instead of array - wrap it
                     report['summary'] = [report['summary']]
                 elif not isinstance(report['summary'], list):
                     raise ValueError(f"Summary must be an array, got {type(report['summary'])}")
@@ -225,13 +220,11 @@ class UITrapsAnalyzer:
                     if not isinstance(report[issue_field], list):
                         raise ValueError(f"{issue_field} must be an array, got {type(report[issue_field])}")
 
-                # Ensure positive observations, potential issues, and traps not found are arrays
-                if not isinstance(report['positive_observations'], list):
-                    report['positive_observations'] = []
-                if not isinstance(report['potential_issues'], list):
-                    report['potential_issues'] = []
-                if not isinstance(report['traps_checked_not_found'], list):
-                    report['traps_checked_not_found'] = []
+                # Default optional array fields if absent or wrong type
+                for opt_field in ['positive_observations', 'potential_issues', 'traps_checked_not_found',
+                                  'user_issues', 'flagged_for_human_review', 'incomplete_flow_findings']:
+                    if not isinstance(report.get(opt_field), list):
+                        report[opt_field] = []
 
                 # Reconcile summary with actual structured counts to prevent contradictions
                 # (Claude's free-form summary text can diverge from the structured issue arrays)
@@ -285,6 +278,13 @@ class UITrapsAnalyzer:
             print(f"[UITraps] Pass 2 enrichment skipped (non-fatal): {e}")
 
         # Step 8: Generate outputs
+        # Normalize optional fields after enrichment — Pass 2 may omit fields that were
+        # present in Pass 1, causing formatter KeyErrors.
+        for _opt in ['positive_observations', 'potential_issues', 'traps_checked_not_found',
+                     'user_issues', 'flagged_for_human_review', 'incomplete_flow_findings']:
+            if not isinstance(report.get(_opt), list):
+                report[_opt] = []
+
         if chat_context and chat_context.strip():
             user_context = dict(user_context)
             user_context['chat_context_used'] = True
@@ -375,7 +375,10 @@ class UITrapsAnalyzer:
         enriched = tool_use_block.input
 
         # Preserve Pass 1 fields that Pass 2 might not return
-        for field in ("bugs_detected", "incomplete_flow_findings", "flagged_for_human_review", "user_issues"):
+        for field in (
+            "traps_checked_not_found", "potential_issues",
+            "bugs_detected", "incomplete_flow_findings", "flagged_for_human_review", "user_issues",
+        ):
             if field in pass1_report and field not in enriched:
                 enriched[field] = pass1_report[field]
 
