@@ -479,28 +479,50 @@ Before flagging ANY trap, you MUST:
 
 🚨 CRITICAL TRAP DETECTION RULES:
 
-**Traps You CANNOT Detect from Static Screenshots (DO NOT FLAG THESE):**
-1. AMBIGUOUS HOME - Requires seeing multiple pages/sections to identify multiple "homes" in information architecture
-2. VARIABLE OUTCOME - Requires testing actual interactions in different modes/contexts
-3. WANDERING ELEMENT - Requires seeing same element across multiple pages
-4. ACCIDENTAL ACTIVATION - Requires interaction observation
-5. SYSTEM AMNESIA - Requires multiple interactions across sessions
+**Traps You CANNOT Detect from Static Screenshots (DO NOT FLAG THESE AS ISSUES):**
 6. BAD PREDICTION - Generally requires seeing actual personalisation/predictions respond incorrectly. **EXCEPTION: Flag BAD PREDICTION from a static screenshot when the interface is visibly surfacing content, recommendations, or categories that are clearly wrong for the user context you've been given** (e.g., a streaming app showing horror/adult movies prominently to users described as children or families, a news app recommending irrelevant categories to users with a stated niche interest). The prediction failure must be directly visible in the screenshot.
-7. FEEDBACK FAILURE - Requires performing actions and observing responses
-8. DATA LOSS - Requires testing system behavior
-9. SLOW OR NO RESPONSE - Requires observing actual performance
-10. CAPTIVE WAIT - Requires attempting to skip/advance
 
-**For `traps_checked_not_found`, include EVERY trap not flagged as a confirmed issue, using this format:**
-- Set `testable: true` for traps you examined and confirmed are NOT present.
-- Set `testable: false` for traps you COULD NOT evaluate due to insufficient information, and set `reason` to one sentence explaining what is needed.
+**For `traps_checked_not_found` — MANDATORY RULES:**
 
-Examples:
-  `{"trap_name": "POOR GROUPING", "testable": true}` — evaluated, not present
-  `{"trap_name": "WANDERING ELEMENT", "testable": false, "reason": "Requires seeing the same element across multiple pages to detect inconsistent positioning."}`
-  `{"trap_name": "VARIABLE OUTCOME", "testable": false, "reason": "Requires testing the same interaction in different modes or states."}`
+Include every trap not flagged as a confirmed issue. For each, set `testable` as follows:
 
-The traps listed above (AMBIGUOUS HOME, VARIABLE OUTCOME, WANDERING ELEMENT, ACCIDENTAL ACTIVATION, SYSTEM AMNESIA, IRREVERSIBLE ACTION, FEEDBACK FAILURE, DATA LOSS, SLOW OR NO RESPONSE, CAPTIVE WAIT) should always be `testable: false` when only a single static screenshot is provided.**
+🚫 **ALWAYS `testable: false` for single static screenshots — no exceptions:**
+
+The training material for this system explicitly states that the following traps cannot be evaluated from static design files. You MUST set `testable: false` for ALL of these when only a single screenshot is provided:
+
+1. INVISIBLE ELEMENT — requires a complete inventory of all system interactions, not just visible ones; static analysis is explicitly insufficient per training material
+2. EFFECTIVELY INVISIBLE ELEMENT — requires knowledge of users' prior learning and moment-to-moment attentional goals; not determinable from a screenshot
+3. DISTRACTION — requires knowing users' goals both within and outside the product; context-dependent, not visually determinable
+4. UNCOMPREHENDED ELEMENT — comprehensibility is user-dependent, not interface-inherent; requires knowing what users have and have not learned
+5. INVITING DEAD END — what constitutes a plausible wrong path is user-dependent; requires knowledge of user mental models
+6. MEMORY CHALLENGE — requires knowledge of what users have previously learned and must retain across sessions
+7. PHYSICAL CHALLENGE — explicitly not detectable from static design files; requires testing on real hardware in real environments
+8. ACCIDENTAL ACTIVATION — explicitly not detectable from static design files; requires testing on real hardware during realistic use
+9. FEEDBACK FAILURE — requires performing actions and observing system responses; cannot be assessed from a before-state screenshot
+10. SLOW OR NO RESPONSE — actual response times require live performance measurement; perceived slowness requires user observation
+11. CAPTIVE WAIT — requires attempting to skip or advance through the wait; not observable from a static state
+12. IRREVERSIBLE ACTION — requires observing the consequences of actions taken; not determinable from a single before-state
+13. DATA LOSS — requires testing failure modes (unexpected shutdowns, timeouts, network interruptions)
+14. SYSTEM AMNESIA — requires knowledge of the underlying data architecture and what information the system has access to
+15. VARIABLE OUTCOME — requires testing the same interaction across different modes, states, or contexts
+16. WANDERING ELEMENT — requires seeing the same element across multiple pages or screens
+17. INCONSISTENT APPEARANCE — requires comparing the same element across multiple screens or contexts
+18. AMBIGUOUS HOME — requires seeing the information architecture across multiple pages/sections
+19. UNWANTED DISCLOSURE — requires understanding the social and physical contexts in which the product is used
+20. POOR AESTHETIC — explicitly not reliably detectable through structural analysis; requires cultural and aesthetic judgment
+
+✅ **`testable: true` only for these traps** (when not flagged as a confirmed issue):
+
+These are the only traps that can be meaningfully evaluated from a single screenshot:
+- POOR GROUPING
+- FORCED SYNTAX
+- INFORMATION OVERLOAD
+- UNNECESSARY STEP(S)
+- GRATUITOUS REDUNDANCY
+- INCORRECT INFORMATION
+- BAD PREDICTION (only the visible content-mismatch exception)
+
+Do NOT set `testable: true` for any trap outside this list.
 
 **BAD PREDICTION — When to flag from static screenshots:**
 Flag when the interface is visibly showing content/recommendations mismatched to the stated user context:
