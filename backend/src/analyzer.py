@@ -72,7 +72,7 @@ class UITrapsAnalyzer:
 
         self.client = Anthropic(api_key=self.api_key, max_retries=3)
         self.use_caching = use_caching
-        self.model = "claude-sonnet-4-5-20250929"          # Pass 1: full visual analysis
+        self.model = "claude-sonnet-4-6"                    # Pass 1: full visual analysis
         self.enrich_model = "claude-haiku-4-5-20251001"    # Pass 2: text enrichment only
 
     def analyze_design(
@@ -408,27 +408,42 @@ class UITrapsAnalyzer:
         """
         Load image file and prepare for Claude vision API.
 
-        Args:
-            image_path: Path to image file
-
-        Returns:
-            Image data dict for Claude API
+        Resizes to 1568px max on the longest side before encoding.
+        Claude Vision scales images to this limit internally anyway, so
+        pre-resizing reduces upload payload and token count without any
+        loss in what Claude can perceive.
         """
-        # Determine media type
+        import io
+        from PIL import Image
+
         ext = Path(image_path).suffix.lower()
         media_type_map = {
             '.png': 'image/png',
             '.jpg': 'image/jpeg',
             '.jpeg': 'image/jpeg'
         }
-
         media_type = media_type_map.get(ext)
         if not media_type:
             raise ValueError(f"Unsupported image format: {ext}")
 
-        # Read and encode image
-        with open(image_path, 'rb') as f:
-            image_data = base64.standard_b64encode(f.read()).decode('utf-8')
+        MAX_SIDE = 1568
+        with Image.open(image_path) as img:
+            w, h = img.size
+            if max(w, h) > MAX_SIDE:
+                scale = MAX_SIDE / max(w, h)
+                new_w, new_h = int(w * scale), int(h * scale)
+                img = img.resize((new_w, new_h), Image.LANCZOS)
+                print(f"[UITraps] Image resized {w}×{h} → {new_w}×{new_h}")
+
+            buf = io.BytesIO()
+            if media_type == 'image/jpeg':
+                if img.mode in ('RGBA', 'LA', 'P'):
+                    img = img.convert('RGB')
+                img.save(buf, format='JPEG', quality=92, optimize=True)
+            else:
+                img.save(buf, format='PNG', optimize=True)
+
+        image_data = base64.standard_b64encode(buf.getvalue()).decode('utf-8')
 
         return {
             "type": "image",
@@ -443,7 +458,7 @@ class UITrapsAnalyzer:
         """
         Estimate API cost based on token usage.
 
-        Claude Sonnet 4.5 pricing (as of Jan 2025):
+        Claude Sonnet 4.6 pricing:
         - Input: $3 per million tokens
         - Output: $15 per million tokens
         - Cache writes: $3.75 per million tokens
