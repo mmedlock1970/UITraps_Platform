@@ -374,10 +374,15 @@ class UITrapsAnalyzer:
 
         enriched = tool_use_block.input
 
-        # Preserve Pass 1 fields that Pass 2 might not return
+        # Always restore traps_checked_not_found from Pass 1 — Pass 2 regenerates
+        # this field with all testable:true, overwriting the correct testable:false
+        # values set by Pass 1 based on the detectability rules.
+        enriched['traps_checked_not_found'] = pass1_report.get('traps_checked_not_found', [])
+
+        # Preserve other Pass 1 fields that Pass 2 might omit
         for field in (
-            "traps_checked_not_found", "potential_issues",
-            "bugs_detected", "incomplete_flow_findings", "flagged_for_human_review", "user_issues",
+            "potential_issues", "bugs_detected",
+            "incomplete_flow_findings", "flagged_for_human_review", "user_issues",
         ):
             if field in pass1_report and field not in enriched:
                 enriched[field] = pass1_report[field]

@@ -92,6 +92,54 @@ def _build_trap_matrix_html(report: Dict[str, Any]) -> str:
     )
 
 
+def parse_tasks(tasks_str: str) -> list:
+    """Extract individual tasks from a free-form tasks string.
+
+    Handles numbered lists (1) X  2) Y), preamble text ("there are two tasks:"),
+    semicolons, and bare "and"-joined items. Returns a list of clean task strings.
+    """
+    if not tasks_str or tasks_str.strip() in ('', 'N/A'):
+        return [tasks_str or 'N/A']
+
+    s = tasks_str.strip()
+
+    # Strip common preamble patterns before the actual task list
+    preamble = re.match(
+        r'^.*?\btasks?\b.*?(?:assess|include|are|consider)[:\s]+',
+        s, re.IGNORECASE
+    )
+    if preamble:
+        s = s[preamble.end():].strip()
+
+    # Find numbered markers: "1)", "2)", "1.", "2." — but NOT inside "(e.g."
+    markers = list(re.finditer(r'(?<!\()(?<!\w)(\d+)[.)]\s+', s))
+    if len(markers) >= 1:
+        tasks = []
+        # Content before the first numbered marker (may be an implicit "task 1")
+        if markers[0].start() > 0:
+            pre = s[:markers[0].start()].strip()
+            pre = re.sub(r'[\s,;]+(?:and|or)?\s*$', '', pre, flags=re.IGNORECASE).strip()
+            if pre:
+                tasks.append(pre)
+        for i, marker in enumerate(markers):
+            start = marker.end()
+            end = markers[i + 1].start() if i + 1 < len(markers) else len(s)
+            task_text = s[start:end].strip()
+            task_text = re.sub(r'[\s,;]+(?:and|or)?\s*$', '', task_text, flags=re.IGNORECASE).strip()
+            if task_text:
+                tasks.append(task_text)
+        if len(tasks) >= 2:
+            return tasks
+
+    # Semicolon-separated
+    if ';' in s:
+        parts = [t.strip() for t in s.split(';') if t.strip()]
+        if len(parts) >= 2:
+            return parts
+
+    return [tasks_str.strip()]
+
+
 def parse_claude_response(response_text: str) -> Dict[str, Any]:
     """
     Parse Claude's JSON response into structured report.
@@ -165,19 +213,11 @@ def format_report_as_markdown(report: Dict[str, Any], user_context: Dict[str, st
         md.append("")
 
         # Format tasks as bulleted list
-        tasks = user_context.get('tasks', 'N/A')
+        raw_tasks = user_context.get('tasks', 'N/A')
+        task_list = parse_tasks(raw_tasks)
         md.append("**Key Tasks:**")
-        if tasks and tasks != 'N/A':
-            # Split on common delimiters and create bullets
-            task_list = [t.strip() for t in tasks.replace(', ', ',').split(',') if t.strip()]
-            if len(task_list) > 1:
-                for task in task_list:
-                    md.append(f"- {task}")
-            else:
-                # If no commas, just show as single item
-                md.append(f"- {tasks}")
-        else:
-            md.append("- N/A")
+        for task in task_list:
+            md.append(f"- {task}")
         md.append("")
 
         md.append(f"**Materials Tested:** {user_context.get('format', 'N/A')}")
@@ -430,18 +470,15 @@ def format_report_as_markdown(report: Dict[str, Any], user_context: Dict[str, st
     user_issues = report.get('user_issues', [])
     if user_issues:
         impact_order = {"high": 0, "medium": 1, "low": 2}
-        user_issues = sorted(user_issues, key=lambda x: impact_order.get(x.get('impact_level', 'low'), 3))
         md.append("## General Issues")
         md.append("")
         md.append("*General issues are broad problems experienced by users. Each may stem from one or more specific traps listed below.*")
         md.append("")
-        for issue in user_issues:
+
+        def _render_md_issue(issue):
             impact = issue.get('impact_level', 'low').upper()
             md.append(f"### {issue.get('issue_title', 'Untitled Issue')} [{impact} IMPACT]")
             md.append("")
-            if issue.get('task_context'):
-                md.append(f"*Task: {issue['task_context']}*")
-                md.append("")
             md.append(issue.get('issue_description', ''))
             md.append("")
             traps = issue.get('contributing_traps', [])
@@ -455,6 +492,61 @@ def format_report_as_markdown(report: Dict[str, Any], user_context: Dict[str, st
                 for rec in recs:
                     md.append(f"- {rec}")
                 md.append("")
+
+        raw_tasks = user_context.get('tasks', 'N/A') if user_context else 'N/A'
+        task_list = parse_tasks(raw_tasks)
+        multi_task = len(task_list) > 1 and task_list != ['N/A']
+
+        if multi_task:
+            # Group issues by task_context; bucket unmatched as general
+            def _best_task_match(tc, tasks):
+                if not tc:
+                    return None
+                tc_lower = tc.lower()
+                for t in tasks:
+                    if tc_lower == t.lower() or tc_lower in t.lower() or t.lower() in tc_lower:
+                        return t
+                return tc  # keep original label if no match found
+
+            task_buckets = {t: [] for t in task_list}
+            general_bucket = []
+            other_buckets = {}
+            for issue in user_issues:
+                tc = issue.get('task_context', '').strip()
+                matched = _best_task_match(tc, task_list)
+                if matched is None:
+                    general_bucket.append(issue)
+                elif matched in task_buckets:
+                    task_buckets[matched].append(issue)
+                else:
+                    other_buckets.setdefault(matched, []).append(issue)
+
+            for task in task_list:
+                bucket = task_buckets[task]
+                if bucket:
+                    bucket = sorted(bucket, key=lambda x: impact_order.get(x.get('impact_level', 'low'), 3))
+                    md.append(f"**Task: {task}**")
+                    md.append("")
+                    for issue in bucket:
+                        _render_md_issue(issue)
+
+            for label, bucket in other_buckets.items():
+                bucket = sorted(bucket, key=lambda x: impact_order.get(x.get('impact_level', 'low'), 3))
+                md.append(f"**Task: {label}**")
+                md.append("")
+                for issue in bucket:
+                    _render_md_issue(issue)
+
+            if general_bucket:
+                general_bucket = sorted(general_bucket, key=lambda x: impact_order.get(x.get('impact_level', 'low'), 3))
+                md.append("**General (applies to all tasks)**")
+                md.append("")
+                for issue in general_bucket:
+                    _render_md_issue(issue)
+        else:
+            user_issues = sorted(user_issues, key=lambda x: impact_order.get(x.get('impact_level', 'low'), 3))
+            for issue in user_issues:
+                _render_md_issue(issue)
 
     # Traps Checked but Not Found — split into tested-clean vs could-not-test
     md.append("## Traps Checked But Not Found")
@@ -509,33 +601,22 @@ def format_report_as_markdown(report: Dict[str, Any], user_context: Dict[str, st
     return "\n".join(md)
 
 
-def _build_user_issues_html(report: Dict[str, Any]) -> str:
+def _build_user_issues_html(report: Dict[str, Any], user_context: Dict[str, str] = None) -> str:
     """Build the General Issues section HTML."""
     issues = report.get('user_issues', [])
     if not issues:
         return ""
 
     impact_order = {"high": 0, "medium": 1, "low": 2}
-    issues = sorted(issues, key=lambda x: impact_order.get(x.get('impact_level', 'low'), 3))
 
-    html = ["<div class='user-issues-section'>"]
-    html.append("<h2>General Issues</h2>")
-    html.append("<p class='user-issues-intro'>General issues are broad problems experienced by users. Each issue may stem from one or more specific traps. The traps listed under each issue identify the root causes.</p>")
-
-    for issue in issues:
+    def _render_issue_card(issue, html):
         impact = issue.get('impact_level', 'low')
         html.append(f"<div class='user-issue-card impact-{impact}'>")
-
         html.append("<div class='user-issue-header'>")
         html.append(f"<span class='impact-badge {impact}'>{impact.upper()} IMPACT</span>")
         html.append(f"<h3 class='user-issue-title'>{issue.get('issue_title', '')}</h3>")
         html.append("</div>")
-
-        if issue.get('task_context'):
-            html.append(f"<p class='task-context'>Task: {issue['task_context']}</p>")
-
         html.append(f"<p>{issue.get('issue_description', '')}</p>")
-
         traps = issue.get('contributing_traps', [])
         if traps:
             html.append("<div class='contributing-traps'>")
@@ -546,7 +627,6 @@ def _build_user_issues_html(report: Dict[str, Any]) -> str:
                 contrib = t.get('contribution', '')
                 html.append(f"<span class='trap-pill {sev}' title='{contrib}'>{name}</span>")
             html.append("</div>")
-
         recs = issue.get('recommendations', [])
         if recs:
             html.append("<div class='user-issue-recs'>")
@@ -556,8 +636,62 @@ def _build_user_issues_html(report: Dict[str, Any]) -> str:
                 html.append(f"<li>{rec}</li>")
             html.append("</ul>")
             html.append("</div>")
-
         html.append("</div>")
+
+    raw_tasks = user_context.get('tasks', 'N/A') if user_context else 'N/A'
+    task_list = parse_tasks(raw_tasks)
+    multi_task = len(task_list) > 1 and task_list != ['N/A']
+
+    html = ["<div class='user-issues-section'>"]
+    html.append("<h2>General Issues</h2>")
+    html.append("<p class='user-issues-intro'>General issues are broad problems experienced by users. Each issue may stem from one or more specific traps. The traps listed under each issue identify the root causes.</p>")
+
+    if multi_task:
+        def _best_task_match(tc, tasks):
+            if not tc:
+                return None
+            tc_lower = tc.lower()
+            for t in tasks:
+                if tc_lower == t.lower() or tc_lower in t.lower() or t.lower() in tc_lower:
+                    return t
+            return tc
+
+        task_buckets = {t: [] for t in task_list}
+        general_bucket = []
+        other_buckets = {}
+        for issue in issues:
+            tc = issue.get('task_context', '').strip()
+            matched = _best_task_match(tc, task_list)
+            if matched is None:
+                general_bucket.append(issue)
+            elif matched in task_buckets:
+                task_buckets[matched].append(issue)
+            else:
+                other_buckets.setdefault(matched, []).append(issue)
+
+        for task in task_list:
+            bucket = task_buckets[task]
+            if bucket:
+                bucket = sorted(bucket, key=lambda x: impact_order.get(x.get('impact_level', 'low'), 3))
+                html.append(f"<h3 class='task-group-header'>Task: {task}</h3>")
+                for issue in bucket:
+                    _render_issue_card(issue, html)
+
+        for label, bucket in other_buckets.items():
+            bucket = sorted(bucket, key=lambda x: impact_order.get(x.get('impact_level', 'low'), 3))
+            html.append(f"<h3 class='task-group-header'>Task: {label}</h3>")
+            for issue in bucket:
+                _render_issue_card(issue, html)
+
+        if general_bucket:
+            general_bucket = sorted(general_bucket, key=lambda x: impact_order.get(x.get('impact_level', 'low'), 3))
+            html.append("<h3 class='task-group-header'>General (applies to all tasks)</h3>")
+            for issue in general_bucket:
+                _render_issue_card(issue, html)
+    else:
+        issues = sorted(issues, key=lambda x: impact_order.get(x.get('impact_level', 'low'), 3))
+        for issue in issues:
+            _render_issue_card(issue, html)
 
     html.append("</div>")
     return "\n".join(html)
@@ -884,6 +1018,7 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
         .user-issue-recs strong { font-size: 0.9em; color: #34495e; }
         .user-issue-recs ul { margin: 6px 0 0; padding-left: 20px; }
         .user-issue-recs li { margin: 3px 0; font-size: 0.95em; }
+        .task-group-header { font-size: 0.97em; color: #4b5563; font-weight: 600; margin: 20px 0 6px; padding-bottom: 4px; border-bottom: 1px solid #e5e7eb; }
     """)
     html.append("</style>")
     html.append("</head>")
@@ -908,19 +1043,13 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
         html.append(f"<p><strong>Users:</strong> {user_context.get('users', 'N/A')}</p>")
 
         # Format tasks as bulleted list
-        tasks = user_context.get('tasks', 'N/A')
+        raw_tasks = user_context.get('tasks', 'N/A')
+        task_list = parse_tasks(raw_tasks)
         html.append("<p><strong>Key Tasks:</strong></p>")
-        if tasks and tasks != 'N/A':
-            task_list = [t.strip() for t in tasks.replace(', ', ',').split(',') if t.strip()]
-            if len(task_list) > 1:
-                html.append("<ul>")
-                for task in task_list:
-                    html.append(f"<li>{task}</li>")
-                html.append("</ul>")
-            else:
-                html.append(f"<ul><li>{tasks}</li></ul>")
-        else:
-            html.append("<p>N/A</p>")
+        html.append("<ul>")
+        for task in task_list:
+            html.append(f"<li>{task}</li>")
+        html.append("</ul>")
 
         html.append(f"<p><strong>Materials Tested:</strong> {user_context.get('format', 'N/A')}</p>")
         html.append("</div>")
@@ -1124,7 +1253,7 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
             html.append(f"<p class='none-found'>None found ✓</p>")
 
     # General Issues (synthesis layer)
-    html.append(_build_user_issues_html(report))
+    html.append(_build_user_issues_html(report, user_context))
 
     # Critical Issues
     html.append("<div class='issues-section critical'>")

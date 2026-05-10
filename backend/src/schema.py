@@ -311,7 +311,7 @@ UI_ANALYSIS_SCHEMA = {
                     },
                     "task_context": {
                         "type": "string",
-                        "description": "The user task or flow this issue affects (e.g., 'Account setup', 'Checkout', 'Search'). Omit if not task-specific."
+                        "description": "The specific user task this issue affects. When the user provided multiple numbered tasks, use the exact task wording they used (e.g., 'find kids shows', 'find a specific kids movie'). For general issues that span all tasks or are not task-specific, omit this field."
                     },
                     "contributing_traps": {
                         "type": "array",
