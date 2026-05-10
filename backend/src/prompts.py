@@ -491,7 +491,16 @@ Before flagging ANY trap, you MUST:
 9. SLOW OR NO RESPONSE - Requires observing actual performance
 10. CAPTIVE WAIT - Requires attempting to skip/advance
 
-**If you only have one page/screenshot, list these under "Traps Checked But Not Found" with note about requiring multiple pages/interaction testing.**
+**For `traps_checked_not_found`, include EVERY trap not flagged as a confirmed issue, using this format:**
+- Set `testable: true` for traps you examined and confirmed are NOT present.
+- Set `testable: false` for traps you COULD NOT evaluate due to insufficient information, and set `reason` to one sentence explaining what is needed.
+
+Examples:
+  `{"trap_name": "POOR GROUPING", "testable": true}` — evaluated, not present
+  `{"trap_name": "WANDERING ELEMENT", "testable": false, "reason": "Requires seeing the same element across multiple pages to detect inconsistent positioning."}`
+  `{"trap_name": "VARIABLE OUTCOME", "testable": false, "reason": "Requires testing the same interaction in different modes or states."}`
+
+The traps listed above (AMBIGUOUS HOME, VARIABLE OUTCOME, WANDERING ELEMENT, ACCIDENTAL ACTIVATION, SYSTEM AMNESIA, IRREVERSIBLE ACTION, FEEDBACK FAILURE, DATA LOSS, SLOW OR NO RESPONSE, CAPTIVE WAIT) should always be `testable: false` when only a single static screenshot is provided.**
 
 **BAD PREDICTION — When to flag from static screenshots:**
 Flag when the interface is visibly showing content/recommendations mismatched to the stated user context:

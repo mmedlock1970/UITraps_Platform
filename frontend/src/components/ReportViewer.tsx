@@ -103,6 +103,12 @@ const DARK_MODE_CSS = `
   .trap-matrix-table .count.total { color: #e2e8f0 !important; border-left-color: #2d3748 !important; }
   .trap-matrix-table thead th { background: #0d2137 !important; }
 
+  /* ── Traps not found / untestable ── */
+  .traps-not-found h3 { color: #e2e8f0 !important; }
+  .untestable-list li { border-bottom-color: #2d3748 !important; color: #a0aec0 !important; }
+  .untestable-list .trap-label { color: #e2e8f0 !important; }
+  .untestable-note { color: #718096 !important; }
+
   /* ── Positive observations ── */
   .positive-item { color: #68d391 !important; }
 

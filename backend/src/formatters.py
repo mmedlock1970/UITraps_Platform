@@ -456,16 +456,36 @@ def format_report_as_markdown(report: Dict[str, Any], user_context: Dict[str, st
                     md.append(f"- {rec}")
                 md.append("")
 
-    # Traps Checked but Not Found
+    # Traps Checked but Not Found — split into tested-clean vs could-not-test
     md.append("## Traps Checked But Not Found")
     md.append("")
-    if report['traps_checked_not_found']:
-        # Format in columns
-        traps = report['traps_checked_not_found']
-        for trap in traps:
+    raw_items = report.get('traps_checked_not_found', [])
+    md_tested_ok = []
+    md_untestable = []
+    for item in raw_items:
+        if isinstance(item, str):
+            md_tested_ok.append(item)
+        elif item.get('testable', True):
+            md_tested_ok.append(item['trap_name'].upper())
+        else:
+            md_untestable.append(item)
+
+    if md_tested_ok:
+        md.append("### ✓ Evaluated — Not Present")
+        md.append("")
+        for trap in md_tested_ok:
             md.append(f"- {trap}")
         md.append("")
-    else:
+
+    if md_untestable:
+        md.append("### ⚠ Could Not Evaluate — Insufficient Information")
+        md.append("")
+        for item in md_untestable:
+            reason = item.get('reason', 'Requires additional context to evaluate.')
+            md.append(f"- **{item['trap_name'].upper()}** — {reason}")
+        md.append("")
+
+    if not md_tested_ok and not md_untestable:
         md.append("*All traps were either found or not fully evaluated*")
         md.append("")
 
@@ -719,12 +739,39 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
             padding: 20px;
             border-radius: 5px;
         }
+        .traps-not-found h3 {
+            font-size: 0.95em;
+            margin: 16px 0 8px;
+            color: #2c3e50;
+        }
         .trap-list {
             column-count: 2;
             column-gap: 20px;
         }
         .trap-list li {
             break-inside: avoid;
+        }
+        .untestable-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .untestable-list li {
+            padding: 7px 0;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 0.88em;
+            color: #555;
+        }
+        .untestable-list li:last-child { border-bottom: none; }
+        .untestable-list .trap-label {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        .untestable-note {
+            font-size: 0.85em;
+            color: #7f8c8d;
+            margin: 0 0 8px;
+            font-style: italic;
         }
         .footer {
             margin-top: 40px;
@@ -1279,15 +1326,37 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
         html.append("</ul>")
         html.append("</div>")
 
-    # Traps Not Found
+    # Traps Not Found — split into tested-clean vs could-not-test
     html.append("<div class='traps-not-found'>")
     html.append("<h2>Traps Checked But Not Found</h2>")
-    if report['traps_checked_not_found']:
+    raw_items = report.get('traps_checked_not_found', [])
+    tested_ok = []
+    untestable = []
+    for item in raw_items:
+        if isinstance(item, str):
+            tested_ok.append(item)           # backward compat with old string format
+        elif item.get('testable', True):
+            tested_ok.append(item['trap_name'])
+        else:
+            untestable.append(item)
+
+    if tested_ok:
+        html.append("<h3>✓ Evaluated — Not Present</h3>")
         html.append("<ul class='trap-list'>")
-        for trap in report['traps_checked_not_found']:
+        for trap in tested_ok:
             html.append(f"<li>{trap}</li>")
         html.append("</ul>")
-    else:
+
+    if untestable:
+        html.append("<h3>⚠ Could Not Evaluate — Insufficient Information</h3>")
+        html.append("<p class='untestable-note'>These Traps require additional screenshots, interaction data, or session context to assess:</p>")
+        html.append("<ul class='untestable-list'>")
+        for item in untestable:
+            reason = _cap_terms(item.get('reason', 'Requires additional context to evaluate.'))
+            html.append(f"<li><span class='trap-label'>{item['trap_name'].upper()}</span> — {reason}</li>")
+        html.append("</ul>")
+
+    if not tested_ok and not untestable:
         html.append("<p>All traps were either found or not fully evaluated</p>")
     html.append("</div>")
 

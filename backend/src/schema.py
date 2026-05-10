@@ -164,9 +164,35 @@ UI_ANALYSIS_SCHEMA = {
         },
         "traps_checked_not_found": {
             "type": "array",
-            "description": "List of trap names that were checked but not found",
+            "description": (
+                "Every trap not flagged as an issue, categorized as either tested-and-not-found "
+                "or unable-to-test. Include ALL traps from the framework that were not reported "
+                "as confirmed issues."
+            ),
             "items": {
-                "type": "string"
+                "type": "object",
+                "properties": {
+                    "trap_name": {
+                        "type": "string",
+                        "description": "Name of the trap"
+                    },
+                    "testable": {
+                        "type": "boolean",
+                        "description": (
+                            "True if you evaluated this trap and confirmed it is NOT present. "
+                            "False if you lacked the information needed to make a judgment "
+                            "(e.g. requires multiple screens, interaction testing, session data)."
+                        )
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": (
+                            "Required when testable is false: one sentence explaining what "
+                            "information or testing scenario is needed to evaluate this trap."
+                        )
+                    }
+                },
+                "required": ["trap_name", "testable"]
             }
         },
         "bugs_detected": {
