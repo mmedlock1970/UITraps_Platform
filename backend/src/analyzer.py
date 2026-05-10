@@ -70,7 +70,7 @@ class UITrapsAnalyzer:
                 "set ANTHROPIC_API_KEY environment variable."
             )
 
-        self.client = Anthropic(api_key=self.api_key)
+        self.client = Anthropic(api_key=self.api_key, max_retries=3)
         self.use_caching = use_caching
         self.model = "claude-sonnet-4-5-20250929"          # Pass 1: full visual analysis
         self.enrich_model = "claude-haiku-4-5-20251001"    # Pass 2: text enrichment only
@@ -147,11 +147,14 @@ class UITrapsAnalyzer:
             context_block = {
                 "type": "text",
                 "text": (
-                    "IMPORTANT — The user has provided the following clarifying context from "
-                    "a prior conversation about this design. Take this into account during your "
-                    "analysis and adjust your findings accordingly:\n\n"
+                    "CRITICAL OVERRIDE — UPDATED CONTEXT FROM USER:\n"
+                    "The user has provided corrections or clarifications in a prior conversation. "
+                    "These corrections OVERRIDE any conflicting values in the structured context "
+                    "that follows (users, tasks, format, etc.). "
+                    "If the user corrected the user group, tasks, or any other context field, "
+                    "use their corrected values and DISREGARD the original values below.\n\n"
                     f"{chat_context.strip()}\n\n"
-                    "---\n"
+                    "--- END OF USER CORRECTIONS — use these when analyzing ---\n"
                 )
             }
             user_message = [context_block] + list(user_message)
@@ -282,6 +285,9 @@ class UITrapsAnalyzer:
             print(f"[UITraps] Pass 2 enrichment skipped (non-fatal): {e}")
 
         # Step 8: Generate outputs
+        if chat_context and chat_context.strip():
+            user_context = dict(user_context)
+            user_context['chat_context_used'] = True
         markdown_report = format_report_as_markdown(report, user_context)
         html_report = format_report_as_html(report, user_context)
         statistics = get_report_statistics(report)

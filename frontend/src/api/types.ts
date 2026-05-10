@@ -390,6 +390,7 @@ export interface ReportViewerProps {
   showStatistics?: boolean;
   showUsageInfo?: boolean;
   onNewAnalysis: () => void;
+  isDark?: boolean;
 }
 
 // Analyzer State

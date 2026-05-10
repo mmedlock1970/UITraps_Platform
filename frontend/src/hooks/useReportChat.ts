@@ -59,5 +59,9 @@ export function useReportChat({ apiEndpoint, apiKey, reportMarkdown }: UseReport
     setError(null);
   }, []);
 
-  return { messages, isLoading, error, sendMessage, clearMessages };
+  const addLocalMessage = useCallback((msg: ReportChatMessage) => {
+    setMessages(prev => [...prev, msg]);
+  }, []);
+
+  return { messages, isLoading, error, sendMessage, clearMessages, addLocalMessage };
 }

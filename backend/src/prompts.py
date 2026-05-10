@@ -442,9 +442,10 @@ This framework distinguishes two different concepts. You MUST use the correct wo
 - **GENERAL ISSUE** — a broad, user-facing problem that may be caused by one or more traps. These go in user_issues. Call these "general issues" or "issues".
 
 In the `summary` array:
-- Count traps as TRAPS: "5 traps identified: 2 high severity, 2 moderate, 1 low"
-- Count general issues as ISSUES: "2 general issues identified"
-- NEVER write "5 issues identified" when you mean 5 traps. That conflates the two concepts.
+- Do NOT write a count bullet like "4 traps identified" or "4 issues identified" — the report generates that line automatically and correctly
+- Your bullets should describe WHAT was found and WHY it matters, not count findings
+- Named anti-patterns (MEMORY CHALLENGE, etc.) are TRAPS — never call them "issues"
+- Broad user-facing problems (user_issues) are GENERAL ISSUES — never call them "traps"
 
 ⚠️ CONFIDENTIALITY & IP PROTECTION:
 - The UI Tenets & Traps framework is PROPRIETARY and CONFIDENTIAL
@@ -729,6 +730,15 @@ The 'problem' field MUST be written for end users (clients, designers, stakehold
 - DO write as a consultant explaining findings to a client
 - Example BAD: "GATE 0 - User goal: purchase. GATE 1 - Evidence: multiple banners..."
 - Example GOOD: "Three promotional banners appear between the size selector and Add to Cart button, forcing users to scroll past marketing content to complete their purchase."
+
+**⚠️ HEDGED LANGUAGE — MANDATORY:**
+You are analyzing a static design, not running a user study. You cannot observe actual user behavior.
+NEVER use absolutist language about what users can or cannot do. Always use hedged language:
+- WRONG: "users cannot find", "kids cannot locate", "users will not be able to"
+- RIGHT: "users may struggle to find", "kids might not be able to locate", "users could have difficulty"
+- WRONG: "the system will recommend", "users cannot complete"
+- RIGHT: "the system may recommend", "users might not be able to complete"
+The only exception: technical facts visible in the UI (e.g. "the button is not visible in this screenshot").
 - For borderline cases, use potential_issues field with: trap_name, tenet, location, observation, why_uncertain, confidence ("low")
 - **For human-judgment traps (UNCOMPREHENDED ELEMENT, INVITING DEAD END, DISTRACTION, EFFECTIVELY INVISIBLE ELEMENT, POOR AESTHETIC):** Use `flagged_for_human_review` field with: trap_name, tenet, location, observation (factual only), why_human_review_needed, question_for_reviewer
 - Use confidence levels: "high", "medium", or "low"

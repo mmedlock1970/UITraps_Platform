@@ -56,10 +56,10 @@ UI_ANALYSIS_SCHEMA = {
     "properties": {
         "summary": {
             "type": "array",
-            "description": "5-9 bullet points summarizing overall findings. MUST be an array where each item is a complete sentence/bullet point. CRITICAL TERMINOLOGY: use 'trap' (not 'issue') when referring to specific named anti-patterns (e.g. 'MEMORY CHALLENGE', 'INVISIBLE ELEMENT'). Use 'general issue' only for broad user-facing problems that group one or more traps. Do NOT say '5 issues identified' — instead say '5 traps identified' if referring to the trap count.",
+            "description": "4-8 bullet points summarizing the key findings. DO NOT write a count bullet (e.g. '4 traps identified') — the report generates that automatically. Focus on describing what was found and why it matters. Named anti-patterns (MEMORY CHALLENGE, INVISIBLE ELEMENT, etc.) are TRAPS. Broad user-facing problems are GENERAL ISSUES. Never call a trap an 'issue'.",
             "items": {
                 "type": "string",
-                "description": "A single complete bullet point (complete sentence). Use 'trap' for named anti-patterns, 'general issue' for broad user-facing problems."
+                "description": "A single complete bullet point describing a finding or pattern. Do NOT start with a trap/issue count — that is generated automatically."
             },
             "minItems": 5,
             "maxItems": 9

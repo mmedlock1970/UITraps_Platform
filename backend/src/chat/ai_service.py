@@ -18,11 +18,14 @@ class ChatAIService:
     def __init__(
         self,
         anthropic_api_key: str,
-        model: str = "claude-sonnet-4-5-20250929",
+        model: str = "claude-haiku-4-5-20251001",
         max_tokens: int = 1024,
         temperature: float = 0.7,
     ):
-        self._client = Anthropic(api_key=anthropic_api_key)
+        # max_retries=5 enables automatic exponential backoff on 429 rate limit errors.
+        # The full knowledge base system prompt is large (~tokens), so TPM limits can be hit
+        # on rapid follow-up messages. 5 retries gives ~31 seconds of total backoff time.
+        self._client = Anthropic(api_key=anthropic_api_key, max_retries=5)
         self._model = model
         self._max_tokens = max_tokens
         self._temperature = temperature

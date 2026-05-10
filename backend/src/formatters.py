@@ -36,6 +36,15 @@ def _normalize_trap_name(name: str) -> str:
     return re.sub(r'\s+', ' ', name).strip()
 
 
+def _cap_terms(text: str) -> str:
+    """Capitalize 'trap(s)' and 'tenet(s)' as words wherever they appear in body text."""
+    if not text:
+        return text
+    text = re.sub(r'\btraps?\b', lambda m: m.group(0).capitalize(), text, flags=re.IGNORECASE)
+    text = re.sub(r'\btenets?\b', lambda m: m.group(0).capitalize(), text, flags=re.IGNORECASE)
+    return text
+
+
 def _build_trap_matrix_html(report: Dict[str, Any]) -> str:
     """Build an HTML table showing confirmed issue counts by trap and severity."""
     counts: Dict[str, Dict[str, int]] = {'critical': {}, 'moderate': {}, 'minor': {}}
@@ -149,6 +158,9 @@ def format_report_as_markdown(report: Dict[str, Any], user_context: Dict[str, st
     if user_context:
         md.append("## Context")
         md.append("")
+        if user_context.get('chat_context_used'):
+            md.append("_↺ Re-analyzed with chat clarifications_")
+            md.append("")
         md.append(f"**Users:** {user_context.get('users', 'N/A')}")
         md.append("")
 
@@ -191,7 +203,21 @@ def format_report_as_markdown(report: Dict[str, Any], user_context: Dict[str, st
         trap_summary += f" ({trap_breakdown})"
     md.append(f"**Found:** {n_issues} general issue{'s' if n_issues != 1 else ''} • {trap_summary}")
     md.append("")
+
+    # Programmatic count bullet
+    import re as _re
+    _count_pattern = _re.compile(r'^\d+\s+(trap|issue)s?\s+identified', _re.IGNORECASE)
+    count_bullet = f"{n_traps} trap{'s' if n_traps != 1 else ''} identified"
+    if trap_breakdown:
+        count_bullet += f": {trap_breakdown}."
+    else:
+        count_bullet += "."
+    if n_issues:
+        count_bullet += f" {n_issues} general issue{'s' if n_issues != 1 else ''} identified."
+    md.append(f"- {count_bullet}")
     for bullet in report['summary']:
+        if _count_pattern.match(bullet.strip()):
+            continue  # skip AI-generated count bullet
         md.append(f"- {bullet}")
     md.append("")
 
@@ -224,15 +250,15 @@ def format_report_as_markdown(report: Dict[str, Any], user_context: Dict[str, st
         md.append("")
         for issue in report['critical_issues']:
             render_frame_info(issue)
-            md.append(f"**Trap Detected:** **{issue['trap_name']}**")
+            md.append(f"**Trap Detected:** **{issue['trap_name'].upper()}**")
             md.append("")
-            md.append(f"**Tenet Violated:** {issue['tenet']}")
+            md.append(f"**Tenet Violated:** {issue['tenet'].upper()}")
             md.append("")
-            md.append(f"**Where:** {issue['location']}")
+            md.append(f"**Where:** {_cap_terms(issue['location'])}")
             md.append("")
-            md.append(f"**Problem:** {issue['problem']}")
+            md.append(f"**Problem:** {_cap_terms(issue['problem'])}")
             md.append("")
-            md.append(f"**Recommendation:** {issue['recommendation']}")
+            md.append(f"**Recommendation:** {_cap_terms(issue['recommendation'])}")
             md.append("")
             if 'confidence' in issue:
                 md.append(f"*Confidence: {issue['confidence']}*")
@@ -249,15 +275,15 @@ def format_report_as_markdown(report: Dict[str, Any], user_context: Dict[str, st
         md.append("")
         for issue in report['moderate_issues']:
             render_frame_info(issue)
-            md.append(f"**Trap Detected:** **{issue['trap_name']}**")
+            md.append(f"**Trap Detected:** **{issue['trap_name'].upper()}**")
             md.append("")
-            md.append(f"**Tenet Violated:** {issue['tenet']}")
+            md.append(f"**Tenet Violated:** {issue['tenet'].upper()}")
             md.append("")
-            md.append(f"**Where:** {issue['location']}")
+            md.append(f"**Where:** {_cap_terms(issue['location'])}")
             md.append("")
-            md.append(f"**Problem:** {issue['problem']}")
+            md.append(f"**Problem:** {_cap_terms(issue['problem'])}")
             md.append("")
-            md.append(f"**Recommendation:** {issue['recommendation']}")
+            md.append(f"**Recommendation:** {_cap_terms(issue['recommendation'])}")
             md.append("")
             if 'confidence' in issue:
                 md.append(f"*Confidence: {issue['confidence']}*")
@@ -274,15 +300,15 @@ def format_report_as_markdown(report: Dict[str, Any], user_context: Dict[str, st
         md.append("")
         for issue in report['minor_issues']:
             render_frame_info(issue)
-            md.append(f"**Trap Detected:** **{issue['trap_name']}**")
+            md.append(f"**Trap Detected:** **{issue['trap_name'].upper()}**")
             md.append("")
-            md.append(f"**Tenet Violated:** {issue['tenet']}")
+            md.append(f"**Tenet Violated:** {issue['tenet'].upper()}")
             md.append("")
-            md.append(f"**Where:** {issue['location']}")
+            md.append(f"**Where:** {_cap_terms(issue['location'])}")
             md.append("")
-            md.append(f"**Problem:** {issue['problem']}")
+            md.append(f"**Problem:** {_cap_terms(issue['problem'])}")
             md.append("")
-            md.append(f"**Recommendation:** {issue['recommendation']}")
+            md.append(f"**Recommendation:** {_cap_terms(issue['recommendation'])}")
             md.append("")
             if 'confidence' in issue:
                 md.append(f"*Confidence: {issue['confidence']}*")
@@ -332,15 +358,15 @@ def format_report_as_markdown(report: Dict[str, Any], user_context: Dict[str, st
         md.append("")
         for issue in report['potential_issues']:
             render_frame_info(issue)
-            md.append(f"**Trap Detected:** **{issue.get('trap_name', 'UNKNOWN')}** (Potential)")
+            md.append(f"**Trap Detected:** **{issue.get('trap_name', 'UNKNOWN').upper()}** (Potential)")
             md.append("")
-            md.append(f"**Tenet:** {issue.get('tenet', 'N/A')}")
+            md.append(f"**Tenet:** {issue.get('tenet', 'N/A').upper()}")
             md.append("")
-            md.append(f"**Where:** {issue.get('location', 'N/A')}")
+            md.append(f"**Where:** {_cap_terms(issue.get('location', 'N/A'))}")
             md.append("")
-            md.append(f"**Observation:** {issue.get('observation', issue.get('problem', 'N/A'))}")
+            md.append(f"**Observation:** {_cap_terms(issue.get('observation', issue.get('problem', 'N/A')))}")
             md.append("")
-            md.append(f"**Why Uncertain:** {issue.get('why_uncertain', 'Requires human review')}")
+            md.append(f"**Why Uncertain:** {_cap_terms(issue.get('why_uncertain', 'Requires human review'))}")
             md.append("")
             md.append(f"*Confidence: {issue.get('confidence', 'low')} - Requires human review*")
             md.append("")
@@ -581,6 +607,16 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
             border-left: 4px solid #3498db;
             border-radius: 4px;
         }
+        .chat-context-badge {
+            display: inline-block;
+            font-size: 0.8em;
+            color: #2563eb;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 4px;
+            padding: 3px 10px;
+            margin-bottom: 12px;
+        }
         .findings-overview {
             font-size: 0.95em;
             color: #4a5568;
@@ -820,6 +856,8 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
     if user_context:
         html.append("<div class='context-section'>")
         html.append("<h2>Context</h2>")
+        if user_context.get('chat_context_used'):
+            html.append("<p class='chat-context-badge'>&#x21BA; Re-analyzed with chat clarifications</p>")
         html.append(f"<p><strong>Users:</strong> {user_context.get('users', 'N/A')}</p>")
 
         # Format tasks as bulleted list
@@ -862,8 +900,23 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
 
     html.append(f"<p class='findings-overview'><strong>Found:</strong> {issue_summary} &bull; {trap_summary}</p>")
 
+    # Programmatic count bullet — never trust the AI to get the terminology right
+    count_bullet = f"{n_traps} trap{'s' if n_traps != 1 else ''} identified"
+    if trap_breakdown:
+        count_bullet += f": {trap_breakdown}."
+    else:
+        count_bullet += "."
+    if n_issues:
+        count_bullet += f" {n_issues} general issue{'s' if n_issues != 1 else ''} identified."
+
+    import re as _re
+    _count_pattern = _re.compile(r'^\d+\s+(trap|issue)s?\s+identified', _re.IGNORECASE)
+
     html.append("<ul>")
+    html.append(f"<li>{count_bullet}</li>")
     for bullet in report['summary']:
+        if _count_pattern.match(bullet.strip()):
+            continue  # skip AI-generated count bullet
         html.append(f"<li>{bullet}</li>")
     html.append("</ul>")
     html.append("</div>")
@@ -1012,11 +1065,11 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
 
                     html.append("</div>")
 
-                html.append(f"<p><strong>Trap Detected:</strong> <strong>{issue['trap_name']}</strong></p>")
-                html.append(f"<p class='tenet'><strong>Tenet Violated:</strong> {issue['tenet']}</p>")
-                html.append(f"<p><strong>Where:</strong> {issue['location']}</p>")
-                html.append(f"<p><strong>Problem:</strong> {issue['problem']}</p>")
-                html.append(f"<p><strong>Recommendation:</strong> {issue['recommendation']}</p>")
+                html.append(f"<p><strong>Trap Detected:</strong> <strong>{issue['trap_name'].upper()}</strong></p>")
+                html.append(f"<p class='tenet'><strong>Tenet Violated:</strong> {issue['tenet'].upper()}</p>")
+                html.append(f"<p><strong>Where:</strong> {_cap_terms(issue['location'])}</p>")
+                html.append(f"<p><strong>Problem:</strong> {_cap_terms(issue['problem'])}</p>")
+                html.append(f"<p><strong>Recommendation:</strong> {_cap_terms(issue['recommendation'])}</p>")
                 if 'confidence' in issue:
                     html.append(f"<p class='confidence'><em>Confidence: {issue['confidence']}</em></p>")
                 html.append("</div>")
@@ -1148,11 +1201,11 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
 
                 html.append("</div>")
 
-            html.append(f"<p><strong>Trap Detected:</strong> <strong>{issue.get('trap_name', 'UNKNOWN')}</strong> (Potential)</p>")
-            html.append(f"<p class='tenet'><strong>Tenet:</strong> {issue.get('tenet', 'N/A')}</p>")
-            html.append(f"<p><strong>Where:</strong> {issue.get('location', 'N/A')}</p>")
-            html.append(f"<p><strong>Observation:</strong> {issue.get('observation', issue.get('problem', 'N/A'))}</p>")
-            html.append(f"<p><strong>Why Uncertain:</strong> {issue.get('why_uncertain', 'Requires human review')}</p>")
+            html.append(f"<p><strong>Trap Detected:</strong> <strong>{issue.get('trap_name', 'UNKNOWN').upper()}</strong> (Potential)</p>")
+            html.append(f"<p class='tenet'><strong>Tenet:</strong> {issue.get('tenet', 'N/A').upper()}</p>")
+            html.append(f"<p><strong>Where:</strong> {_cap_terms(issue.get('location', 'N/A'))}</p>")
+            html.append(f"<p><strong>Observation:</strong> {_cap_terms(issue.get('observation', issue.get('problem', 'N/A')))}</p>")
+            html.append(f"<p><strong>Why Uncertain:</strong> {_cap_terms(issue.get('why_uncertain', 'Requires human review'))}</p>")
             html.append(f"<p class='confidence'><em>Confidence: {issue.get('confidence', 'low')} - Requires human review</em></p>")
             html.append("</div>")
         html.append("</div>")
@@ -1165,8 +1218,8 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
         for issue in report['cross_frame_issues']:
             severity_color = '#f39c12' if issue.get('severity') == 'moderate' else '#e74c3c' if issue.get('severity') == 'critical' else '#3498db'
             html.append(f"<div class='issue-card' style='border-left-color: {severity_color};'>")
-            html.append(f"<h3 style='margin-top: 0; color: #2c3e50;'>{issue.get('trap_name', 'WANDERING ELEMENT')}</h3>")
-            html.append(f"<p class='tenet'><strong>Tenet:</strong> {issue.get('tenet', 'HABITUATING')}</p>")
+            html.append(f"<h3 style='margin-top: 0; color: #2c3e50;'>{issue.get('trap_name', 'WANDERING ELEMENT').upper()}</h3>")
+            html.append(f"<p class='tenet'><strong>Tenet:</strong> {issue.get('tenet', 'HABITUATING').upper()}</p>")
             html.append(f"<p><strong>Element:</strong> {issue.get('element_description', 'UI element')}</p>")
 
             # Show locations as tags
@@ -1178,7 +1231,7 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
                     html.append(f"<span style='background: #667eea; color: white; padding: 4px 12px; border-radius: 16px; font-size: 0.85em;'>{loc}</span>")
                 html.append("</div>")
 
-            html.append(f"<p><strong>Problem:</strong> {issue.get('problem', 'N/A')}</p>")
+            html.append(f"<p><strong>Problem:</strong> {_cap_terms(issue.get('problem', 'N/A'))}</p>")
 
             # Show frame timeline
             if issue.get('frame_occurrences'):
@@ -1626,9 +1679,9 @@ def format_interaction_summary_html(
             html.append(f"""
                 <div class='issue-card critical' style='background: #fef5f5; border-left: 4px solid #e74c3c;
                             padding: 15px; margin: 10px 0; border-radius: 4px;'>
-                    <strong>{issue.get('trap_name', 'UNKNOWN')}</strong> on {issue.get('page', 'Unknown page')}
-                    <p style='margin: 10px 0 5px 0;'>{issue.get('observation', 'N/A')}</p>
-                    <p style='margin: 0; color: #27ae60;'><strong>Recommendation:</strong> {issue.get('recommendation', 'N/A')}</p>
+                    <strong>{issue.get('trap_name', 'UNKNOWN').upper()}</strong> on {issue.get('page', 'Unknown page')}
+                    <p style='margin: 10px 0 5px 0;'>{_cap_terms(issue.get('observation', 'N/A'))}</p>
+                    <p style='margin: 0; color: #27ae60;'><strong>Recommendation:</strong> {_cap_terms(issue.get('recommendation', 'N/A'))}</p>
                 </div>
             """)
 

@@ -2,6 +2,116 @@ import React, { useCallback, useEffect, useRef } from 'react';
 import { ReportViewerProps } from '../api/types';
 import styles from './ReportViewer.module.css';
 
+const DARK_MODE_CSS = `
+  /* ── Base ── */
+  body, html { background: #1a1a2e !important; color: #e2e8f0 !important; }
+  body > div, .ui-traps-report, .container, .report-container {
+    background: #1a1a2e !important;
+  }
+
+  /* ── All text ── */
+  h1, h2, h3, h4, h5, h6 { color: #e2e8f0 !important; }
+  p, li, label, strong, b, small { color: #e2e8f0 !important; }
+
+  /* ── Sections ── */
+  .context-section, .summary-section, .user-issues-section,
+  .issues-section, .positives-section, .checked-section {
+    background: #1a1a2e !important;
+    color: #e2e8f0 !important;
+  }
+  .context-section, .summary-section {
+    background: #16213e !important;
+    border-color: #2d3748 !important;
+  }
+
+  /* ── Issue / trap cards ── */
+  .issue-card {
+    background: #16213e !important;
+    border-color: #2d3748 !important;
+    color: #e2e8f0 !important;
+  }
+  /* Preserve severity left-border accent colors */
+  .issue-card.critical  { border-left-color: #fc8181 !important; }
+  .issue-card.moderate  { border-left-color: #f6ad55 !important; }
+  .issue-card.minor     { border-left-color: #63b3ed !important; }
+
+  /* ── General issue cards ── */
+  .user-issue-card {
+    background: #16213e !important;
+    border-color: #2d3748 !important;
+    color: #e2e8f0 !important;
+    box-shadow: none !important;
+  }
+  .user-issue-card.impact-high   { border-left-color: #fc8181 !important; }
+  .user-issue-card.impact-medium { border-left-color: #f6ad55 !important; }
+  .user-issue-card.impact-low    { border-left-color: #63b3ed !important; }
+  .user-issue-title { color: #e2e8f0 !important; }
+  .user-issues-intro { color: #a0aec0 !important; }
+
+  /* ── Impact badges ── */
+  .impact-badge.high   { background: rgba(252,129,129,0.15) !important; color: #fc8181 !important; }
+  .impact-badge.medium { background: rgba(246,173,85,0.15)  !important; color: #f6ad55 !important; }
+  .impact-badge.low    { background: rgba(99,179,237,0.15)  !important; color: #63b3ed !important; }
+
+  /* ── Severity badges in trap cards ── */
+  .sev-critical { background: #c53030 !important; }
+  .sev-moderate { background: #c05621 !important; }
+  .sev-minor    { background: #2b6cb0 !important; }
+
+  /* ── Contributing trap pills ── */
+  .trap-pill, .contributing-traps span {
+    background: #0f3460 !important;
+    color: #90cdf4 !important;
+    border-color: #2b6cb0 !important;
+  }
+  .traps-label { color: #a0aec0 !important; }
+
+  /* ── Meta / muted text ── */
+  .task-context, .timestamp { color: #a0aec0 !important; }
+  em, i { color: #a0aec0 !important; }
+
+  /* ── Summary ── */
+  .findings-overview {
+    background: #16213e !important;
+    color: #a0aec0 !important;
+    border-color: #2d3748 !important;
+  }
+  .summary-section ul { border-left-color: #4a90d9 !important; }
+
+  /* ── Chat context badge ── */
+  .chat-context-badge {
+    background: #1e3a5f !important;
+    color: #63b3ed !important;
+    border-color: #2b6cb0 !important;
+  }
+
+  /* ── Tables (generic) ── */
+  table { background: #16213e !important; border-color: #2d3748 !important; }
+  tr { background: #1a1a2e !important; }
+  tr:nth-child(even) { background: #16213e !important; }
+  th { background: #0f3460 !important; color: #e2e8f0 !important; border-color: #2d3748 !important; }
+  td { color: #e2e8f0 !important; border-color: #2d3748 !important; }
+
+  /* ── Trap Coverage Matrix ── */
+  .trap-matrix-table .tenet-cell {
+    background: #0f3460 !important;
+    color: #90cdf4 !important;
+    border-right-color: #2d3748 !important;
+  }
+  .trap-matrix-table .trap-name { color: #e2e8f0 !important; }
+  .trap-matrix-table tr.has-issues td.trap-name { color: #e2e8f0 !important; }
+  .trap-matrix-table .count.total { color: #e2e8f0 !important; border-left-color: #2d3748 !important; }
+  .trap-matrix-table thead th { background: #0d2137 !important; }
+
+  /* ── Positive observations ── */
+  .positive-item { color: #68d391 !important; }
+
+  /* ── Misc ── */
+  a { color: #63b3ed !important; }
+  hr { border-color: #2d3748 !important; }
+  code, pre { background: #0f3460 !important; color: #e2e8f0 !important; }
+`;
+
 export const ReportViewer: React.FC<ReportViewerProps> = ({
   html,
   statistics,
@@ -9,32 +119,53 @@ export const ReportViewer: React.FC<ReportViewerProps> = ({
   showStatistics = true,
   showUsageInfo = false,
   onNewAnalysis,
+  isDark = false,
 }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  // Auto-resize iframe to match its content height
+  const applyDarkMode = useCallback((doc: Document, dark: boolean) => {
+    const existing = doc.getElementById('__dark-mode-override__');
+    if (dark && !existing) {
+      const style = doc.createElement('style');
+      style.id = '__dark-mode-override__';
+      style.textContent = DARK_MODE_CSS;
+      doc.head.appendChild(style);
+    } else if (!dark && existing) {
+      existing.remove();
+    }
+  }, []);
+
+  // Auto-resize iframe to match its content height, and apply dark mode on load
   useEffect(() => {
     const iframe = iframeRef.current;
     if (!iframe) return;
 
-    const resize = () => {
+    const onLoad = () => {
       try {
         const doc = iframe.contentDocument;
         if (doc && doc.body) {
           iframe.style.height = doc.body.scrollHeight + 40 + 'px';
+          applyDarkMode(doc, isDark);
         }
       } catch {
         // cross-origin safety guard
       }
     };
 
-    iframe.addEventListener('load', resize);
-    // Also resize if already loaded (srcdoc can load synchronously)
+    iframe.addEventListener('load', onLoad);
     if (iframe.contentDocument?.readyState === 'complete') {
-      resize();
+      onLoad();
     }
-    return () => iframe.removeEventListener('load', resize);
-  }, [html]);
+    return () => iframe.removeEventListener('load', onLoad);
+  }, [html, isDark, applyDarkMode]);
+
+  // Toggle dark mode without reloading the iframe
+  useEffect(() => {
+    const doc = iframeRef.current?.contentDocument;
+    if (doc?.readyState === 'complete') {
+      applyDarkMode(doc, isDark);
+    }
+  }, [isDark, applyDarkMode]);
 
   const handleDownload = useCallback(() => {
     const blob = new Blob([html], { type: 'text/html' });

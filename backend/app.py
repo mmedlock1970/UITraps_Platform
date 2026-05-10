@@ -1634,16 +1634,8 @@ async def api_chat(
         )
         return result
     except Exception as e:
-        error_msg = str(e)
-        if "rate limit" in error_msg.lower():
-            raise HTTPException(
-                status_code=429,
-                detail="AI service rate limit reached. Please try again in a moment.",
-            )
-        logger.error("Chat error: %s", error_msg)
-        raise HTTPException(
-            status_code=500, detail="Failed to generate response. Please try again."
-        )
+        logger.error("Chat error: %s", e)
+        raise _friendly_api_error(e)
 
 
 @app.post("/api/ask", response_model=UnifiedAskResponse)
@@ -1689,7 +1681,11 @@ async def unified_ask(
             except json.JSONDecodeError:
                 pass
 
-        result = chat_svc.handle_chat(message, history)
+        try:
+            result = chat_svc.handle_chat(message, history)
+        except Exception as e:
+            logger.error("Chat error in /api/ask: %s", e)
+            raise _friendly_api_error(e)
         return {
             "success": True,
             "mode": "chat",
@@ -1877,17 +1873,27 @@ async def report_chat(request: ReportChatRequest):
             f"{request.report_markdown}\n"
             "---\n\n"
             "IMPORTANT — Re-run Analysis:\n"
-            "There is a 'Re-run Analysis' button at the top of this chat panel. If the user "
-            "provides context that changes how the design should be interpreted (e.g. 'those "
-            "users are adults', 'that modal is intentional'), acknowledge the clarification and "
-            "suggest they click 'Re-run Analysis' so the tool can incorporate their context into "
-            "a fresh analysis. Do NOT say you cannot re-run the analysis or that re-running "
-            "requires going back to the main screen — the button is right here in the panel.\n\n"
+            "There is a 'Re-run Analysis' button at the top of this chat panel. When the user "
+            "clicks it, the ENTIRE conversation — including everything they have told you — is "
+            "automatically passed to the analyzer as context. You do NOT need to tell the user "
+            "to update any fields or re-enter anything manually.\n\n"
+            "CRITICAL — NEVER attempt an inline re-analysis. You cannot see the original images "
+            "and you cannot produce a structured report. If the user asks you to 're-run', "
+            "'rerun', 'run it again', 'redo', 're-analyze', or uses any similar phrasing, "
+            "do NOT generate a new analysis, do NOT describe what the findings would be, "
+            "do NOT say 'Here is how the findings changed'. Instead, respond with exactly one "
+            "short sentence: 'Click **Re-run Analysis** above and I'll apply this automatically.'\n\n"
+            "When the user provides clarifying context that would change the analysis (e.g. "
+            "'those users are adults', 'that modal is intentional', 'this is for kids'), "
+            "acknowledge the clarification briefly, then say: "
+            "'Click **Re-run Analysis** and I'll take this into account.' "
+            "Do NOT tell them to update user context fields, re-enter descriptions, or go back "
+            "to the main screen. Just point them to the button — everything else is automatic.\n\n"
             "Guidelines:\n"
             "- Answer questions about specific findings in the report\n"
             "- Explain what a trap means and why it was flagged\n"
             "- If the user provides context that changes the interpretation of a finding, "
-            "acknowledge it clearly and suggest clicking 'Re-run Analysis' to get an updated report\n"
+            "acknowledge it and say: 'Click Re-run Analysis and I'll apply this new context.'\n"
             "- Be concise. One to three short paragraphs is usually enough.\n"
             "- Do not invent findings that are not in the report\n"
             "- Stay focused on the report and UI/UX topics"

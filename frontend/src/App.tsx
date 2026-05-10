@@ -57,6 +57,64 @@ function normalizeTimeEstimate(estimate: UnifiedEstimate | null): TimeEstimate |
   return undefined;
 }
 
+// User group terms we can detect and extract from correction messages
+const USER_GROUP_TERMS = [
+  'adults', 'adult', 'kids', 'children', 'child', 'seniors', 'elderly',
+  'teens', 'teenagers', 'professionals', 'employees', 'students', 'customers',
+  'users', 'beginners', 'experts', 'parents', 'patients', 'developers',
+  'designers', 'managers', 'executives', 'shoppers', 'subscribers',
+];
+
+const CORRECTION_SIGNALS = [
+  'meant', 'should have', 'actually', 'oops', 'wrong', 'mistake',
+  'correction', 'not ', 'instead', 'scratch that', 'sorry', 'my bad',
+];
+
+/**
+ * Scans user chat messages for context corrections (e.g. "meant adults not kids")
+ * and returns an updated context with the corrected values.
+ */
+function extractContextCorrections(
+  messages: Array<{ role: string; content: string }>,
+  original: { users: string; tasks: string; format: string; contentType: ContentType }
+): { users: string; tasks: string; format: string; contentType: ContentType } {
+  const corrected = { ...original };
+
+  for (const msg of messages) {
+    if (msg.role !== 'user') continue;
+    const lower = msg.content.toLowerCase();
+
+    const isCorrection = CORRECTION_SIGNALS.some(s => lower.includes(s));
+    if (!isCorrection) continue;
+
+    // Find all user-group terms mentioned in this message
+    const found = USER_GROUP_TERMS.filter(t => lower.includes(t));
+    if (found.length === 0) continue;
+
+    const originalLower = corrected.users.toLowerCase();
+
+    // Any term NOT matching the original is a candidate correction.
+    // Pick the one that appears earliest (before the "not X" part).
+    let bestTerm: string | null = null;
+    let bestPos = Infinity;
+
+    for (const term of found) {
+      if (originalLower.includes(term)) continue; // this is the old value, skip
+      const pos = lower.indexOf(term);
+      if (pos !== -1 && pos < bestPos) {
+        bestTerm = term;
+        bestPos = pos;
+      }
+    }
+
+    if (bestTerm) {
+      corrected.users = bestTerm.charAt(0).toUpperCase() + bestTerm.slice(1);
+    }
+  }
+
+  return corrected;
+}
+
 type AppView = 'chat' | 'report' | 'history' | 'task-capture';
 
 interface ActiveReport {
@@ -130,7 +188,8 @@ export const App: React.FC = () => {
     rerunElapsed.start();
 
     try {
-      const { users, tasks, format, contentType } = activeReport.originalContext;
+      const correctedContext = extractContextCorrections(chatMessages, activeReport.originalContext);
+      const { users, tasks, format, contentType } = correctedContext;
       const imageTimeout = Math.min(180000 + activeReport.originalFiles.length * 120000, 1800000);
 
       const result = await unifiedAsk({
@@ -150,6 +209,7 @@ export const App: React.FC = () => {
           html: result.report_html!,
           markdown: result.report_markdown,
           statistics: result.statistics,
+          originalContext: correctedContext,
         } : prev);
 
         saveAnalysis({
@@ -345,6 +405,7 @@ export const App: React.FC = () => {
                 statistics={activeReport.statistics}
                 showStatistics={true}
                 showUsageInfo={false}
+                isDark={theme === 'dark'}
                 onNewAnalysis={() => {
                   setView('chat');
                   setActiveReport(null);

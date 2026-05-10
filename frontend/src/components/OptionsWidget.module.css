@@ -11,18 +11,18 @@
   width: 100%;
   padding: 10px 16px;
   text-align: left;
-  background: var(--uitraps-bg-primary, #fff);
-  border: 1.5px solid var(--uitraps-accent, #4f46e5);
+  background: var(--uitraps-bg);
+  border: 1.5px solid var(--uitraps-primary);
   border-radius: 8px;
-  color: var(--uitraps-accent, #4f46e5);
-  font-size: var(--uitraps-font-size-sm, 14px);
+  color: var(--uitraps-primary);
+  font-size: var(--uitraps-font-size-sm);
   font-weight: 500;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
 
 .choice:hover:not(:disabled) {
-  background: var(--uitraps-accent, #4f46e5);
+  background: var(--uitraps-primary);
   color: #fff;
 }
 
@@ -30,6 +30,6 @@
 .disabled {
   opacity: 0.45;
   cursor: not-allowed;
-  border-color: var(--uitraps-border, #e5e7eb);
-  color: var(--uitraps-text-secondary, #6b7280);
+  border-color: var(--uitraps-border);
+  color: var(--uitraps-text-secondary);
 }

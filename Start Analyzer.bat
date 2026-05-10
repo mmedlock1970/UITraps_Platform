@@ -3,12 +3,17 @@ cd /d "%~dp0"
 
 echo Stopping any existing Analyzer processes...
 
-:: Kill existing backend/frontend windows by title
+:: Kill existing backend/frontend windows by title (best effort)
 taskkill /f /fi "WINDOWTITLE eq UI Traps Backend*" >nul 2>&1
 taskkill /f /fi "WINDOWTITLE eq UI Traps Frontend*" >nul 2>&1
 
-:: Also free port 8000 if something else holds it
+:: Kill any process holding port 8000 (catches orphaned processes regardless of window title)
 for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":8000 " ^| findstr "LISTENING"') do (
+    taskkill /f /pid %%a >nul 2>&1
+)
+
+:: Kill any process holding port 5173 (Vite dev server)
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":5173 " ^| findstr "LISTENING"') do (
     taskkill /f /pid %%a >nul 2>&1
 )
 

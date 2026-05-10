@@ -286,6 +286,11 @@ const URL_WIDGET_CHOICES: OptionsWidgetChoice[] = [
   { id: 'just_chat', label: 'Other (just chat)' },
 ];
 
+const FILE_ACTIONS_WIDGET_CHOICES: OptionsWidgetChoice[] = [
+  { id: 'run_analysis', label: 'Run a full UI trap analysis' },
+  { id: 'just_chat', label: 'Just chat about it' },
+];
+
 export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInputReturn {
   const { apiEndpoint, token, onAnalysisComplete, onStartTaskCapture } = options;
 
@@ -322,6 +327,9 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
 
   // Flag: context was gathered before task capture, so skip re-asking after capture completes
   const [contextGatheredForCapture, setContextGatheredForCapture] = useState(false);
+
+  // Flag: user aborted analysis and wants to chat about the file instead of analyzing it
+  const [chatOnlyMode, setChatOnlyMode] = useState(false);
 
   // Chat hook for pure chat messages
   const chat = useChat({ apiEndpoint, token });
@@ -491,12 +499,31 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
         onStartTaskCapture?.(pendingUrlTask);
         break;
 
+      case 'run_analysis':
+        setContextGatheringPhase('asking_users');
+        chat.addSystemPrompt(
+          "Let's run a full trap analysis. First, a bit of context.\n\n" +
+          '**Who are the intended users** of this interface?\n\n' +
+          '*(e.g., "Adults ages 25-45 looking to stream movies", "Enterprise software developers")*'
+        );
+        break;
+
+      case 'ask_question':
+        setChatOnlyMode(true);
+        chat.addSystemPrompt("Go ahead — what would you like to know about this design?");
+        break;
+
       case 'just_chat':
-        setContextGatheredForCapture(false);  // Clear flag - not using task capture
-        chat.addSystemPrompt('Sure — what would you like to know?');
+        setContextGatheredForCapture(false);
+        setChatOnlyMode(files.length > 0);
+        chat.addSystemPrompt(
+          files.length > 0
+            ? "Sure — I'll keep the image for reference. What's on your mind?"
+            : "Sure — what would you like to know?"
+        );
         break;
     }
-  }, [chat, onStartTaskCapture, pendingUrlTask]);
+  }, [chat, onStartTaskCapture, pendingUrlTask, files]);
 
   /** User cancels from estimate preview or progress */
   const cancelAnalysis = useCallback(() => {
@@ -620,10 +647,117 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
   const submit = useCallback(async () => {
     if (!token) return;
 
+    // ── Chat-only mode: user has files attached but wants to chat, not analyze ──
+    if (chatOnlyMode) {
+      const text = inputText.trim();
+      if (!text) return;
+
+      // If the user asks for a trap analysis while in chat-only mode, switch to the
+      // structured pipeline — the RAG chat cannot see the image or produce a proper report
+      const TRAP_ANALYSIS_PATTERNS = [
+        ...ANALYSIS_INTENT_PATTERNS,
+        /\btraps?\b/i,
+        /\bany\s+(?:ui\s+)?traps?\b/i,
+        /\bdo\s+you\s+see\b/i,
+        /\bidentify\b/i,
+        /\bfind\s+(?:any\s+)?(?:issues?|problems?|traps?)\b/i,
+        /\bwhat('?s|\s+is|\s+are)\s+wrong\b/i,
+        /\bwhat\s+(?:issues?|problems?)\b/i,
+        /\brun\s+(?:an?\s+)?anal/i,
+        /\bfull\s+anal/i,
+      ];
+
+      if (files.length > 0 && TRAP_ANALYSIS_PATTERNS.some(p => p.test(text))) {
+        chat.addUserMessage(text, 'analysis');
+        setInputText('');
+        setChatOnlyMode(false);
+        setContextGatheringPhase('asking_users');
+        chat.addSystemPrompt(
+          "I'll run a proper structured analysis for that. First, a bit of context.\n\n" +
+          '**Who are the intended users** of this interface?\n\n' +
+          '*(e.g., "Adults ages 25-45 looking to stream movies", "Enterprise software developers")*'
+        );
+        return;
+      }
+
+      setInputText('');
+      await chat.sendMessage(text);
+      return;
+    }
+
     // ── Handle conversational context gathering ──
     if (contextGatheringPhase !== 'idle') {
       const answer = inputText.trim();
       if (!answer) return;
+
+      // Detect conversational interruptions — messages that are clearly not answering
+      // the current question (e.g. "wait", "actually", "i thought of another task")
+      const INTERRUPTION_PATTERNS = [
+        /^wait\b/i,
+        /^hold on\b/i,
+        /^actually\b/i,
+        /^never mind\b/i,
+        /^oops\b/i,
+        /^scratch that\b/i,
+        /^i meant\b/i,
+        /^i thought of\b/i,
+        /^before you\b/i,
+        /^one more thing\b/i,
+        /^correction\b/i,
+        /^i made a mistake\b/i,
+        /^ignore that\b/i,
+        /^forget that\b/i,
+        /^can you\b/i,
+        /^could you\b/i,
+        /^what if\b/i,
+        /^quick question\b/i,
+      ];
+
+      const CURRENT_QUESTION: Record<string, string> = {
+        asking_users: '**Who are the intended users** of this interface?\n\n*(e.g., "Adults ages 25-45", "Enterprise software developers")*',
+        asking_expertise: '**What level of expertise** will these users have?\n\n*(e.g., "First-time users", "Power users")*',
+        asking_tasks: '**What tasks are these users trying to accomplish?**\n\n*(e.g., "Find and buy cat food", "Sign up for an account")*',
+        asking_format: '**What format is this design?**\n\n*(e.g., "Mobile app", "Desktop website", "Tablet")*',
+      };
+
+      // Detect explicit intent to abandon analysis and just chat instead
+      const ABORT_ANALYSIS_PATTERNS = [
+        /don'?t\s+want.{0,20}anal/i,
+        /not\s+(?:here\s+to|trying\s+to|looking\s+to)\s+anal/i,
+        /skip\s+(?:the\s+)?anal/i,
+        /cancel\s+(?:the\s+)?anal/i,
+        /no\s+anal/i,
+        /just\s+(?:want\s+to\s+)?(?:chat|ask|talk|question)/i,
+        /only\s+(?:want\s+to\s+)?(?:chat|ask|talk|question)/i,
+        /(?:want|need)\s+to\s+(?:ask|chat|talk)/i,
+        /(?:have\s+a\s+)?(?:quick\s+)?question\s+(?:about|for)/i,
+        /instead\s+of\s+anal/i,
+        /don'?t\s+need\s+(?:an?\s+)?anal/i,
+        /without\s+(?:running\s+)?(?:the\s+)?anal/i,
+      ];
+
+      if (ABORT_ANALYSIS_PATTERNS.some(p => p.test(answer))) {
+        chat.addUserMessage(answer, 'analysis');
+        setInputText('');
+        setContextGatheringPhase('idle');
+        setPendingQuestion('');
+        setPendingUrl(null);
+        setChatOnlyMode(true);
+        chat.addSystemPrompt(
+          files.length > 0
+            ? "Got it — I'll keep the image for reference. What would you like to know about it?"
+            : "Got it — what would you like to know? I can answer questions about UI traps, best practices, or anything else."
+        );
+        return;
+      }
+
+      if (INTERRUPTION_PATTERNS.some(p => p.test(answer))) {
+        chat.addUserMessage(answer, 'analysis');
+        setInputText('');
+        const currentQ = CURRENT_QUESTION[contextGatheringPhase] ?? 'your answer';
+        chat.addSystemPrompt(`No problem — take your time. When you're ready, just answer: ${currentQ}`);
+        return;
+      }
 
       // Show user's answer in chat
       chat.addUserMessage(answer, 'analysis');
@@ -972,32 +1106,37 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
     const userText = inputText.trim();
     const userContent = userText
       ? `${userText}\n\n*Attached: ${fileNames}*`
-      : `*Attached for analysis: ${fileNames}*`;
+      : `*Attached: ${fileNames}*`;
 
-    // Show user message in chat
     chat.addUserMessage(userContent, 'analysis');
-
-    // Store the question for later use in the API call
     setPendingQuestion(userText);
     setInputText('');
 
-    // Check if we already have full context OR context was gathered for task capture
+    // If context is already complete (e.g. from a previous session), go straight to estimation
     if (hasFullContext(users, expertise, tasks, format) || contextGatheredForCapture) {
-      // Context is ready — go straight to estimation
-      setContextGatheredForCapture(false);  // Clear the flag
+      setContextGatheredForCapture(false);
       await startEstimation();
       return;
     }
 
-    // Context is missing — start conversational gathering
-    setContextGatheringPhase('asking_users');
-    chat.addSystemPrompt(
-      "I'd be happy to analyze this for UI traps! First, I need a bit of context.\n\n" +
-      '**Who are the intended users** of this interface?\n\n' +
-      '*(e.g., "Adults ages 25-45 looking to stream movies", "Enterprise software developers")*'
+    // If the user typed an explicit analysis intent alongside the file, start gathering
+    if (userText && ANALYSIS_INTENT_PATTERNS.some(p => p.test(userText))) {
+      setContextGatheringPhase('asking_users');
+      chat.addSystemPrompt(
+        "I'll run a full trap analysis. First, a bit of context.\n\n" +
+        '**Who are the intended users** of this interface?\n\n' +
+        '*(e.g., "Adults ages 25-45 looking to stream movies", "Enterprise software developers")*'
+      );
+      return;
+    }
+
+    // Otherwise — ask what they want to do, no assumptions
+    chat.addOptionsWidget(
+      "What would you like to do with this?",
+      FILE_ACTIONS_WIDGET_CHOICES
     );
   }, [
-    token, contextGatheringPhase, detectedMode, inputText, files, detectedUrl, pendingUrl,
+    token, chatOnlyMode, contextGatheringPhase, detectedMode, inputText, files, detectedUrl, pendingUrl,
     users, expertise, tasks, format, chat, startEstimation, isUrlContextFlow, contextGatheredForCapture,
   ]);
 
@@ -1005,7 +1144,10 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
     inputText,
     setInputText,
     files,
-    setFiles,
+    setFiles: (newFiles: File[]) => {
+      if (newFiles.length === 0) setChatOnlyMode(false);
+      setFiles(newFiles);
+    },
     detectedUrl,
     users,
     setUsers,
@@ -1046,6 +1188,7 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
       setPendingUrlTask('');
       setIsUrlContextFlow(false);
       setContextGatheredForCapture(false);
+      setChatOnlyMode(false);
       setInputText('');
       setFiles([]);
       chat.clearHistory();
