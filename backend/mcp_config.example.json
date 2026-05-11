@@ -1,0 +1,55 @@
+{
+  "_comment": "UITraps MCP Server — client configuration examples.",
+
+  "_setup_instructions": [
+    "1. Get your API key from your UITraps subscription dashboard.",
+    "2. Copy the block for your AI client below into its config file.",
+    "3. Replace YOUR_API_KEY_HERE with your actual key.",
+    "4. Replace the URL with your Railway deployment URL (or http://localhost:8080 for local dev).",
+    "5. Restart your AI client."
+  ],
+
+  "claude_desktop": {
+    "_file": "~/Library/Application Support/Claude/claude_desktop_config.json  (Mac)",
+    "_file_win": "%APPDATA%\\Claude\\claude_desktop_config.json  (Windows)",
+    "mcpServers": {
+      "uitraps": {
+        "url": "https://YOUR-APP.railway.app/mcp/sse",
+        "headers": {
+          "Authorization": "Bearer YOUR_API_KEY_HERE"
+        }
+      }
+    }
+  },
+
+  "claude_code": {
+    "_command": "Run this in your terminal, then restart Claude Code:",
+    "_run": "claude mcp add uitraps --transport sse https://YOUR-APP.railway.app/mcp/sse --header 'Authorization: Bearer YOUR_API_KEY_HERE'"
+  },
+
+  "cursor": {
+    "_file": "Cursor → Settings → MCP → Add Server",
+    "name": "UITraps Analyzer",
+    "transport": "sse",
+    "url": "https://YOUR-APP.railway.app/mcp/sse",
+    "headers": {
+      "Authorization": "Bearer YOUR_API_KEY_HERE"
+    }
+  },
+
+  "local_dev": {
+    "_note": "For local development (backend running on port 8080):",
+    "url": "http://localhost:8080/mcp/sse",
+    "headers": {
+      "Authorization": "Bearer YOUR_API_KEY_HERE"
+    }
+  },
+
+  "available_tools": {
+    "analyze_screenshots": "Analyze 1–10 UI screenshots. 1 credit per image.",
+    "analyze_figma": "Analyze a Figma file by URL. 1 credit per frame.",
+    "analyze_pdf": "Analyze a PDF document. 1 credit per page.",
+    "analyze_video": "Analyze a screen recording. 1 credit per extracted frame.",
+    "ask_about_traps": "Ask questions about the UI Traps framework. Free."
+  }
+}

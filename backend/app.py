@@ -69,6 +69,10 @@ from src.chat.chat_service import ChatService
 # NEW: Intent router for unified endpoint
 from src.router import detect_intent, IntentMode
 
+# MCP server — exposes analysis tools for Claude Desktop, Claude Code, Cursor, etc.
+from src.mcp_server import mcp
+from src.mcp_context import mcp_api_key
+
 logger = logging.getLogger(__name__)
 
 # File-based error log so we can capture crashes regardless of terminal
@@ -173,6 +177,51 @@ app.add_middleware(
     allow_methods=["POST", "GET"],
     allow_headers=["*"],
 )
+
+# --- MCP auth middleware ---
+# Validates API keys for all /mcp/* requests before the MCP sub-app sees them.
+# The authenticated key is stored in a contextvar so tools can track usage.
+
+@app.middleware("http")
+async def mcp_auth_middleware(request: Request, call_next):
+    if not request.url.path.startswith("/mcp"):
+        return await call_next(request)
+
+    # Let OPTIONS pass through so CORS preflight works without auth
+    if request.method == "OPTIONS":
+        return await call_next(request)
+
+    # Accept key from Authorization: Bearer header or ?api_key= query param
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        api_key = auth_header[7:].strip()
+    else:
+        api_key = request.query_params.get("api_key", "").strip()
+
+    if not api_key:
+        return JSONResponse(
+            status_code=401,
+            content={"error": "Authentication required. Set Authorization: Bearer <api_key> header."},
+        )
+
+    with Session(engine) as session:
+        if not verify_api_key(api_key, session):
+            return JSONResponse(
+                status_code=403,
+                content={"error": "Invalid or expired API key. Check your UITraps subscription."},
+            )
+
+    # Make the key available to MCP tool functions via contextvar
+    token = mcp_api_key.set(api_key)
+    try:
+        return await call_next(request)
+    finally:
+        mcp_api_key.reset(token)
+
+# --- Mount MCP server ---
+# SSE endpoint: /mcp/sse   (configure this URL in your MCP client)
+# Messages:     /mcp/messages/{session_id}
+app.mount("/mcp", mcp.sse_app())
 
 # Initialize analyzer (reuse instance for efficiency)
 analyzer = None
@@ -360,6 +409,15 @@ async def health_check():
         "status": "healthy",
         "timestamp": datetime.now().isoformat()
     }
+
+# ===========================================================
+# Analysis Endpoints
+#
+# SYNC RULE: When adding a new /analyze-* endpoint below,
+# also add a corresponding @mcp.tool() in src/mcp_server.py.
+# The MCP tools are thin wrappers — all logic stays here in
+# the service classes. See src/mcp_server.py for the checklist.
+# ===========================================================
 
 @app.post("/analyze", response_model=AnalysisResponse)
 async def analyze(
