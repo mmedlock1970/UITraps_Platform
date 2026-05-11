@@ -24,7 +24,6 @@ try:
     from .formatters import parse_claude_response, format_report_as_markdown, format_report_as_html, get_report_statistics
     from .schema import get_ui_analysis_schema, get_interaction_analysis_schema
     from .knowledge_extractor import collect_found_trap_names, extract_trap_sections, extract_trap_images
-    from .knowledge_base import get_chunks_for_traps
 except ImportError:
     # Fallback for direct script execution
     from validators import validate_file_format, validate_context, is_figma_url
@@ -36,7 +35,6 @@ except ImportError:
     from formatters import parse_claude_response, format_report_as_markdown, format_report_as_html, get_report_statistics
     from schema import get_ui_analysis_schema, get_interaction_analysis_schema
     from knowledge_extractor import collect_found_trap_names, extract_trap_sections, extract_trap_images
-    from knowledge_base import get_chunks_for_traps
 
 
 class UITrapsAnalyzer:
@@ -332,8 +330,8 @@ class UITrapsAnalyzer:
             n_imgs = sum(len(v) for v in trap_images.values())
             print(f"[UITraps] Pass 2: including {n_imgs} book illustration(s) for {len(trap_images)} trap(s)")
 
-        # Load structured knowledge base chunks for found traps
-        knowledge_chunks = get_chunks_for_traps(found_trap_names)
+        # knowledge_base module removed (RAG migration) — chunks no longer loaded
+        knowledge_chunks = None
         if knowledge_chunks:
             print(f"[UITraps] Pass 2: loaded structured KB chunks for {len(found_trap_names)} trap(s)")
 
