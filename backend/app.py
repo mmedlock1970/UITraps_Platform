@@ -218,10 +218,12 @@ async def mcp_auth_middleware(request: Request, call_next):
     finally:
         mcp_api_key.reset(token)
 
-# --- Mount MCP server ---
-# SSE endpoint: /mcp/sse   (configure this URL in your MCP client)
-# Messages:     /mcp/messages/{session_id}
-app.mount("/mcp", mcp.sse_app())
+# --- Mount MCP server (optional — depends on fastmcp version) ---
+try:
+    app.mount("/mcp", mcp.sse_app())
+    logger.info("MCP server mounted at /mcp/sse")
+except AttributeError:
+    logger.warning("fastmcp sse_app() not available in this version — MCP endpoint disabled")
 
 # Initialize analyzer (reuse instance for efficiency)
 analyzer = None
