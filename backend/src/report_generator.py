@@ -186,13 +186,6 @@ def generate_site_report_html(analysis_result: Dict[str, Any], url: str) -> str:
     <title>UI Traps Analysis: {domain}</title>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        body {{
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background: #f5f5f5;
-            padding: 20px;
-        }}
         .container {{
             max-width: 1000px;
             margin: 0 auto;
@@ -200,25 +193,6 @@ def generate_site_report_html(analysis_result: Dict[str, Any], url: str) -> str:
             padding: 40px;
             border-radius: 12px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-        }}
-        h1 {{
-            color: #1a1a1a;
-            font-size: 2.2em;
-            margin-bottom: 10px;
-            border-bottom: 3px solid #6366f1;
-            padding-bottom: 15px;
-        }}
-        h2 {{
-            color: #2c3e50;
-            font-size: 1.5em;
-            margin: 30px 0 15px 0;
-            padding-bottom: 8px;
-            border-bottom: 2px solid #e5e7eb;
-        }}
-        h3 {{
-            color: #374151;
-            font-size: 1.3em;
-            margin: 25px 0 10px 0;
         }}
         .meta {{
             background: #f8fafc;

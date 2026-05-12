@@ -481,7 +481,7 @@ class MultiAnalyzer:
         all_minor = []
         all_positive = []
         all_potential = []
-        all_checked_not_found = set()
+        all_checked_not_found = {}  # keyed by trap_name to deduplicate across frames
 
         # Build frame images lookup: frame_index -> image_data
         frame_images = {}
@@ -533,7 +533,10 @@ class MultiAnalyzer:
                 all_potential.append(issue)
 
             for trap in raw.get('traps_checked_not_found', []):
-                all_checked_not_found.add(trap)
+                if isinstance(trap, dict):
+                    all_checked_not_found[trap.get('trap_name', '')] = trap
+                else:
+                    all_checked_not_found[str(trap)] = trap
 
         # Deduplicate similar issues (same trap at same location)
         critical_deduped = self._deduplicate_issues(all_critical)
@@ -554,7 +557,7 @@ class MultiAnalyzer:
             'minor_issues': minor_deduped,
             'positive_observations': list(set(all_positive))[:10],
             'potential_issues': all_potential,
-            'traps_checked_not_found': list(all_checked_not_found),
+            'traps_checked_not_found': list(all_checked_not_found.values()),
             'cross_frame_issues': cross_frame_issues,
             'frame_images': frame_images,  # Include frame images for report embedding
         }
