@@ -719,32 +719,8 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
     html.append("<title>UI Tenets & Traps Analysis Report</title>")
     html.append("<style>")
     html.append("""
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #fff;
-        }
         .ui-traps-report {
             padding: 20px;
-        }
-        h1 {
-            color: #2c3e50;
-            border-bottom: 3px solid #3498db;
-            padding-bottom: 10px;
-        }
-        h2 {
-            color: #2c3e50;
-            margin-top: 30px;
-            border-bottom: 2px solid #ecf0f1;
-            padding-bottom: 8px;
-        }
-        h3 {
-            color: #34495e;
-            margin-top: 20px;
         }
         .timestamp {
             color: #7f8c8d;
