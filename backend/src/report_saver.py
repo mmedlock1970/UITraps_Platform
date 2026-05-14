@@ -44,7 +44,8 @@ class ReportSaver:
         analysis_result: Dict[str, Any],
         analysis_type: str,
         user_context: Optional[Dict[str, Any]] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
+        user_id: Optional[str] = None
     ) -> str:
         """
         Save an analysis report to disk.
@@ -71,6 +72,7 @@ class ReportSaver:
             "timestamp": timestamp.isoformat(),
             "timestamp_readable": timestamp.strftime("%Y-%m-%d %H:%M:%S"),
             "analysis_type": analysis_type,
+            "user_id": user_id,
             "user_context": user_context or {},
             "metadata": metadata or {},
             "analysis_result": analysis_result,
@@ -83,12 +85,13 @@ class ReportSaver:
 
         return str(filepath)
 
-    def list_reports(self, limit: int = 20) -> list[Dict[str, Any]]:
+    def list_reports(self, limit: int = 20, user_id: Optional[str] = None) -> list[Dict[str, Any]]:
         """
-        List recent reports.
+        List recent reports, optionally filtered by user.
 
         Args:
             limit: Maximum number of reports to return
+            user_id: If provided, only return reports belonging to this user
 
         Returns:
             List of report summaries (most recent first)
@@ -100,10 +103,14 @@ class ReportSaver:
         )
 
         summaries = []
-        for filepath in report_files[:limit]:
+        for filepath in report_files:
             try:
                 with open(filepath, 'r', encoding='utf-8') as f:
                     data = json.load(f)
+
+                # Filter by user if specified
+                if user_id is not None and data.get("user_id") != user_id:
+                    continue
 
                 # Extract summary info
                 summary = {
@@ -124,6 +131,8 @@ class ReportSaver:
                     summary["pages_analyzed"] = metadata["pages_analyzed"]
 
                 summaries.append(summary)
+                if len(summaries) >= limit:
+                    break
             except Exception:
                 # Skip corrupted files
                 continue
@@ -187,7 +196,8 @@ def save_analysis_report(
     analysis_result: Dict[str, Any],
     analysis_type: str,
     user_context: Optional[Dict[str, Any]] = None,
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: Optional[Dict[str, Any]] = None,
+    user_id: Optional[str] = None
 ) -> str:
     """
     Convenience function to save a report using the default saver.
@@ -202,4 +212,4 @@ def save_analysis_report(
         Path to saved report file
     """
     saver = get_report_saver()
-    return saver.save_report(analysis_result, analysis_type, user_context, metadata)
+    return saver.save_report(analysis_result, analysis_type, user_context, metadata, user_id)

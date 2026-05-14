@@ -909,12 +909,14 @@ async def get_capabilities():
 
 
 @app.get("/reports")
-async def list_saved_reports(limit: int = 20):
+async def list_saved_reports(
+    limit: int = 20,
+    user: dict = Depends(get_current_user)
+):
     """
-    List saved analysis reports.
+    List saved analysis reports for the authenticated user.
 
-    Returns a list of recently saved reports with metadata.
-    Use this to reference previous analyses for troubleshooting.
+    Requires JWT auth. Returns only reports belonging to the requesting user.
 
     Args:
         limit: Maximum number of reports to return (default 20)
@@ -923,8 +925,9 @@ async def list_saved_reports(limit: int = 20):
         List of report summaries
     """
     try:
+        user_id = str(user.get("userId", ""))
         saver = get_report_saver()
-        reports = saver.list_reports(limit=limit)
+        reports = saver.list_reports(limit=limit, user_id=user_id)
         return {
             "success": True,
             "reports": reports,
@@ -938,9 +941,14 @@ async def list_saved_reports(limit: int = 20):
 
 
 @app.get("/reports/{filename}")
-async def get_saved_report(filename: str):
+async def get_saved_report(
+    filename: str,
+    user: dict = Depends(get_current_user)
+):
     """
     Retrieve a specific saved report by filename.
+
+    Requires JWT auth. Returns 403 if the report belongs to a different user.
 
     Args:
         filename: Report filename (e.g., report_2024-01-15_14-30-00_url.json)
@@ -956,6 +964,15 @@ async def get_saved_report(filename: str):
             raise HTTPException(
                 status_code=404,
                 detail=f"Report not found: {filename}"
+            )
+
+        # Verify the report belongs to this user
+        user_id = str(user.get("userId", ""))
+        report_user_id = str(report.get("user_id", ""))
+        if report_user_id and report_user_id != user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied: this report belongs to a different user."
             )
 
         return {
@@ -1808,6 +1825,15 @@ async def unified_ask(
                 result = get_analyzer().analyze_design(design_file=tmp_path, user_context=user_context, chat_context=chat_context)
                 logger.info("[/api/ask analysis] analyze_design complete")
 
+                user_id = str(user.get("userId", ""))
+                save_analysis_report(
+                    analysis_result=result,
+                    analysis_type="single_image",
+                    user_context=user_context,
+                    metadata={"file_name": image.filename},
+                    user_id=user_id
+                )
+
                 return {
                     "success": True,
                     "mode": "analysis",
@@ -1840,6 +1866,15 @@ async def unified_ask(
 
                 user_context = {"users": users, "tasks": tasks, "format": format, "content_type": content_type}
                 result = get_multi_analyzer().analyze_images(tmp_paths, user_context, chat_context=chat_context)
+
+                user_id = str(user.get("userId", ""))
+                save_analysis_report(
+                    analysis_result=result,
+                    analysis_type="multi_image",
+                    user_context=user_context,
+                    metadata={"file_names": [f.filename for f in files]},
+                    user_id=user_id
+                )
 
                 return {
                     "success": True,
