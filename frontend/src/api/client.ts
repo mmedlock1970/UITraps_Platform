@@ -10,6 +10,7 @@ import {
   PdfEstimateResponse,
   SiteAnalysisResponse,
 } from './types';
+import { compressImageFile, compressImageFiles } from '../utils/imageCompression';
 
 export interface AnalyzeOptions {
   apiEndpoint: string;
@@ -66,8 +67,10 @@ function anySignal(signals: AbortSignal[]): AbortSignal {
 export async function analyzeImage(options: AnalyzeOptions): Promise<AnalysisResponse> {
   const { apiEndpoint, apiKey, file, context, timeout = 120000, signal } = options;
 
+  const compressedFile = await compressImageFile(file);
+
   const formData = new FormData();
-  formData.append('image', file);
+  formData.append('image', compressedFile);
   formData.append('users', context.users);
   formData.append('tasks', context.tasks);
   formData.append('format', context.format);
@@ -118,8 +121,10 @@ export async function analyzeImage(options: AnalyzeOptions): Promise<AnalysisRes
 export async function analyzeMultiImage(options: AnalyzeMultiOptions): Promise<AnalysisResponse> {
   const { apiEndpoint, apiKey, files, context, timeout = 600000, signal } = options;
 
+  const compressedFiles = await compressImageFiles(files);
+
   const formData = new FormData();
-  files.forEach((file) => {
+  compressedFiles.forEach((file) => {
     formData.append('images', file);
   });
   formData.append('users', context.users);
@@ -424,9 +429,14 @@ export async function unifiedAsk(options: UnifiedAskOptions): Promise<UnifiedAsk
   const { apiEndpoint, token, message, files = [], context,
           conversationHistory, chatContext, signal, timeout = 120000 } = options;
 
+  const imageFiles = files.filter(f => f.type.startsWith('image/'));
+  const otherFiles = files.filter(f => !f.type.startsWith('image/'));
+  const compressedImages = await compressImageFiles(imageFiles);
+  const allFiles = [...compressedImages, ...otherFiles];
+
   const formData = new FormData();
   if (message) formData.append('message', message);
-  files.forEach(f => formData.append('files', f));
+  allFiles.forEach(f => formData.append('files', f));
   if (context) {
     formData.append('users', context.users);
     formData.append('tasks', context.tasks);

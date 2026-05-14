@@ -33,8 +33,8 @@ function estimateRunningCost(count: number): string {
   return `${count} screenshot${count > 1 ? 's' : ''} — est. $${cost}, ${mins}`;
 }
 
-// Default API endpoint for development
-const DEFAULT_API_ENDPOINT = 'http://localhost:8000';
+// Default API endpoint — reads from env var in production, falls back to localhost for dev
+const DEFAULT_API_ENDPOINT = import.meta.env.VITE_API_ENDPOINT || 'http://localhost:8000';
 
 /** Helper to normalize time estimates from different sources */
 function normalizeTimeEstimate(estimate: UnifiedEstimate | null): TimeEstimate | undefined {
