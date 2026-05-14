@@ -88,11 +88,14 @@ logging.basicConfig(
 
 # --- Configuration ---
 
-# Allowed origins for CORS (update with your domain)
+# Explicit origins for CORS (localhost for dev; uitraps.com domains covered by regex below)
 ALLOWED_ORIGINS = os.environ.get(
     "ALLOWED_ORIGINS",
-    "https://uitraps.com,https://www.uitraps.com,http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173"
+    "http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173"
 ).split(",")
+
+# Allows uitraps.com and any subdomain (e.g. adrian.uitraps.com, shed.uitraps.com)
+ALLOWED_ORIGIN_REGEX = r"https://([\w-]+\.)?uitraps\.com"
 
 # Monthly analysis limit per API key
 MONTHLY_LIMIT = int(os.environ.get("MONTHLY_LIMIT", "20"))
@@ -169,10 +172,11 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS middleware - allows your website to call this API
+# CORS middleware - allows uitraps.com, all subdomains, and localhost for dev
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=ALLOWED_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["POST", "GET"],
     allow_headers=["*"],
