@@ -113,6 +113,7 @@ export interface UserContext {
   tasks: string;
   format: string;
   contentType?: ContentType;
+  extra_context?: string;
 }
 
 export interface ReportStatistics {

@@ -187,8 +187,12 @@ UI_ANALYSIS_SCHEMA = {
                     "reason": {
                         "type": "string",
                         "description": (
-                            "Required when testable is false: one sentence explaining what "
-                            "information or testing scenario is needed to evaluate this trap."
+                            "REQUIRED when testable is false. One sentence explaining specifically "
+                            "what information, testing scenario, or interaction data is needed to "
+                            "evaluate this trap — e.g. 'Requires comparing this element across "
+                            "multiple screens to confirm visual consistency.' "
+                            "Do NOT omit this field when testable is false. "
+                            "Do NOT use a generic placeholder like 'Requires additional context.'"
                         )
                     }
                 },

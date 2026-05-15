@@ -4,7 +4,7 @@ import styles from './ReportViewer.module.css';
 
 const DARK_MODE_CSS = `
   /* ── Base ── */
-  body, html { background: #1a1a2e !important; color: #e2e8f0 !important; }
+  body, html { background: #1a1a2e !important; color: #e2e8f0 !important; font-family: 'Inter', system-ui, -apple-system, sans-serif !important; }
   body > div, .ui-traps-report, .container, .report-container {
     background: #1a1a2e !important;
   }

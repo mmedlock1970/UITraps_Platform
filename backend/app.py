@@ -1750,6 +1750,7 @@ async def unified_ask(
     content_type: str = Form("website"),
     conversation_history: Optional[str] = Form(None),
     chat_context: Optional[str] = Form(None),
+    extra_context: Optional[str] = Form(None),
 ):
     """
     Unified endpoint: auto-routes to analysis, chat, or hybrid based on input.
@@ -1824,7 +1825,7 @@ async def unified_ask(
                     tmp_path = tmp.name
                 logger.info(f"[/api/ask analysis] temp file written: {tmp_path}")
 
-                user_context = {"users": users, "tasks": tasks, "format": format, "content_type": content_type}
+                user_context = {"users": users, "tasks": tasks, "format": format, "content_type": content_type, "extra_context": extra_context or ""}
                 logger.info("[/api/ask analysis] calling analyze_design")
                 result = get_analyzer().analyze_design(design_file=tmp_path, user_context=user_context, chat_context=chat_context)
                 logger.info("[/api/ask analysis] analyze_design complete")
@@ -1868,7 +1869,7 @@ async def unified_ask(
                         tmp.write(content)
                         tmp_paths.append(tmp.name)
 
-                user_context = {"users": users, "tasks": tasks, "format": format, "content_type": content_type}
+                user_context = {"users": users, "tasks": tasks, "format": format, "content_type": content_type, "extra_context": extra_context or ""}
                 result = get_multi_analyzer().analyze_images(tmp_paths, user_context, chat_context=chat_context)
 
                 user_id = str(user.get("userId", ""))

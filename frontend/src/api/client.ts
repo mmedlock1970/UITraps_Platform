@@ -442,6 +442,7 @@ export async function unifiedAsk(options: UnifiedAskOptions): Promise<UnifiedAsk
     formData.append('tasks', context.tasks);
     formData.append('format', context.format);
     formData.append('content_type', context.contentType || 'website');
+    if (context.extra_context) formData.append('extra_context', context.extra_context);
   }
   if (conversationHistory) formData.append('conversation_history', conversationHistory);
   if (chatContext) formData.append('chat_context', chatContext);

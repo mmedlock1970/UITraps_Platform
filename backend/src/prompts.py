@@ -1038,6 +1038,12 @@ def build_user_message(
 {user_context['expertise']}
 """
 
+    extra_ctx = user_context.get('extra_context', '').strip()
+    extra_context_section = f"""
+ADDITIONAL CONTEXT FROM SUBMITTER:
+{extra_ctx}
+""" if extra_ctx else ""
+
     context_text = f"""Please analyze this UI design using the UI Tenets & Traps framework.
 
 CONTEXT PROVIDED BY USER:
@@ -1051,6 +1057,7 @@ CONTEXT PROVIDED BY USER:
 {"4" if has_expertise else "3"}. DESIGN FORMAT:
 {user_context['format']}
 {content_type_section}
+{extra_context_section}
 {page_context_section}
 {video_section}
 ---

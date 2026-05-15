@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { UITrapsAnalyzerProps } from './api/types';
 import { useAnalyzer } from './hooks/useAnalyzer';
 import { useElapsedTime } from './hooks/useElapsedTime';
-import { AnalyzerForm } from './components/AnalyzerForm';
+import { LegacyAnalyzerForm } from './components/LegacyAnalyzerForm';
 import { AnalysisProgress } from './components/AnalysisProgress';
 import { ReportViewer } from './components/ReportViewer';
 import { EstimatePreview } from './components/EstimatePreview';
@@ -111,7 +111,7 @@ export const UITrapsAnalyzer: React.FC<UITrapsAnalyzerProps> = ({
 
       <main className={`${styles.main} ${showReport ? styles.reportMain : ''}`}>
         {state.view === 'form' && (
-          <AnalyzerForm
+          <LegacyAnalyzerForm
             files={state.files}
             users={state.users}
             tasks={state.tasks}

@@ -380,7 +380,7 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
               mode: 'analysis',
               report_html: result.report_html,
               statistics: result.statistics,
-            }, [analysisName]);
+            }, [analysisName], [], { users: context.users, tasks: context.tasks, format: context.format, contentType: context.contentType || 'website' });
           }
         } else {
           // Website URL analysis is disabled — this branch should not be reached
@@ -409,7 +409,7 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
             mode: 'analysis',
             report_html: result.report_html,
             statistics: result.statistics,
-          }, [pdfFile.name]);
+          }, [pdfFile.name], [pdfFile], { users: context.users, tasks: context.tasks, format: context.format, contentType: context.contentType || 'website' });
         }
         chat.addSystemPrompt(`Analysis completed for ${pdfFile.name}. View the full report above.`);
       } else {

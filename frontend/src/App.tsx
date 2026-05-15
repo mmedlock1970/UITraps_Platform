@@ -10,6 +10,7 @@ import React, { useState, useCallback } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { useUnifiedInput } from './hooks/useUnifiedInput';
 import { useElapsedTime } from './hooks/useElapsedTime';
+import { AnalyzerForm, FormSubmitPayload } from './components/AnalyzerForm';
 import { ConversationPanel } from './components/ConversationPanel';
 import { UnifiedInput } from './components/UnifiedInput';
 import { EstimatePreview } from './components/EstimatePreview';
@@ -115,7 +116,7 @@ function extractContextCorrections(
   return corrected;
 }
 
-type AppView = 'chat' | 'report' | 'history' | 'task-capture';
+type AppView = 'form' | 'chat' | 'report' | 'history' | 'task-capture';
 
 interface ActiveReport {
   html: string;
@@ -129,11 +130,17 @@ interface ActiveReport {
 export const App: React.FC = () => {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [apiEndpoint] = useState(DEFAULT_API_ENDPOINT);
-  const [view, setView] = useState<AppView>('chat');
+  const [view, setView] = useState<AppView>('form');
   const [activeReport, setActiveReport] = useState<ActiveReport | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [isRerunning, setIsRerunning] = useState(false);
   const rerunElapsed = useElapsedTime();
+
+  // Form-specific analysis state
+  const [formAnalysisPhase, setFormAnalysisPhase] = useState<'idle' | 'analyzing'>('idle');
+  const [formFileCount, setFormFileCount] = useState(0);
+  const [formError, setFormError] = useState<string | null>(null);
+  const formElapsed = useElapsedTime();
 
   // Task capture state
   const [taskName, setTaskName] = useState('');
@@ -227,6 +234,51 @@ export const App: React.FC = () => {
       rerunElapsed.reset();
     }
   }, [activeReport, apiEndpoint, effectiveToken, rerunElapsed]);
+
+  const handleFormSubmit = useCallback(async (payload: FormSubmitPayload) => {
+    const { files, url, context } = payload;
+
+    setFormError(null);
+    setFormAnalysisPhase('analyzing');
+    setFormFileCount(files.length || 1);
+    formElapsed.start();
+
+    try {
+      const inputFiles = files.length > 0 ? files : [];
+      const inputMessage = url && files.length === 0 ? url : undefined;
+      const imageTimeout = Math.min(180000 + (files.length || 1) * 120000, 1800000);
+
+      const result = await unifiedAsk({
+        apiEndpoint,
+        token: effectiveToken,
+        message: inputMessage,
+        files: inputFiles,
+        context,
+        timeout: imageTimeout,
+      });
+
+      formElapsed.stop();
+
+      if (result.report_html) {
+        handleAnalysisComplete(
+          result,
+          files.map(f => f.name),
+          files,
+          { users: context.users, tasks: context.tasks, format: context.format, contentType: context.contentType || 'website' }
+        );
+      } else if (result.error) {
+        setFormError(result.error);
+      } else {
+        setFormError('Analysis did not return a report. Please try again.');
+      }
+    } catch (err) {
+      formElapsed.stop();
+      setFormError(err instanceof Error ? err.message : 'An unexpected error occurred.');
+    } finally {
+      setFormAnalysisPhase('idle');
+      formElapsed.reset();
+    }
+  }, [apiEndpoint, effectiveToken, formElapsed, handleAnalysisComplete]);
 
   const handleStartTaskCapture = useCallback((initialTaskName: string) => {
     setTaskName(initialTaskName);
@@ -390,8 +442,8 @@ export const App: React.FC = () => {
               >
                 Chat about Results
               </button>
-              <button className={styles.headerButton} onClick={() => setView('chat')}>
-                Back to Chat
+              <button className={styles.headerButton} onClick={() => setView('form')}>
+                New Analysis
               </button>
               <button className={styles.headerButton} onClick={toggleTheme}>
                 {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
@@ -407,7 +459,7 @@ export const App: React.FC = () => {
                 showUsageInfo={false}
                 isDark={theme === 'dark'}
                 onNewAnalysis={() => {
-                  setView('chat');
+                  setView('form');
                   setActiveReport(null);
                 }}
               />
@@ -437,8 +489,8 @@ export const App: React.FC = () => {
               UI Traps <span className={styles.logoAccent}>Helper</span>
             </div>
             <div className={styles.headerActions}>
-              <button className={styles.headerButton} onClick={() => setView('chat')}>
-                Back to Chat
+              <button className={styles.headerButton} onClick={() => setView('form')}>
+                Back
               </button>
               <button className={styles.headerButton} onClick={toggleTheme}>
                 {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
@@ -449,6 +501,56 @@ export const App: React.FC = () => {
             onViewReport={handleViewHistoryReport}
             onClose={() => setView('chat')}
           />
+        </div>
+      </div>
+    );
+  }
+
+  // ── Form view (default + analysis in progress) ──
+  // AnalyzerForm is always mounted here so its local state survives the analyzing phase.
+  if (view === 'form') {
+    const isAnalyzing = formAnalysisPhase === 'analyzing';
+    return (
+      <div className={`uitraps-viewport-wrapper ${styles.viewportWrapper}`} data-theme={theme}>
+        <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
+          <header className={styles.header}>
+            <div className={styles.logo}>UI Traps <span className={styles.logoAccent}>Helper</span></div>
+            {!isAnalyzing && (
+              <div className={styles.headerActions}>
+                <button className={styles.headerButton} onClick={() => setView('chat')}>Chat</button>
+                {getAnalysisHistory().length > 0 && (
+                  <button className={styles.headerButton} onClick={() => setView('history')}>Past Analyses</button>
+                )}
+                <button className={styles.headerButton} onClick={toggleTheme}>
+                  {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
+                </button>
+              </div>
+            )}
+          </header>
+
+          {/* Progress overlay — visible during analysis */}
+          {isAnalyzing && (
+            <div className={styles.overlayContainer}>
+              <AnalysisProgress
+                elapsedTime={formElapsed.elapsedTime}
+                onCancel={() => { setFormAnalysisPhase('idle'); formElapsed.reset(); }}
+                inputType={formFileCount > 1 ? 'multi_image' : 'single_image'}
+                fileCount={formFileCount}
+              />
+            </div>
+          )}
+
+          {/* Form — always mounted (hidden during analysis) so field values are preserved */}
+          <div style={{ display: isAnalyzing ? 'none' : 'flex', flexDirection: 'column', overflowY: 'auto', flex: 1, paddingTop: '40px' }}>
+            {formError && (
+              <div style={{ maxWidth: 780, margin: '0 auto 0', padding: '0 24px', width: '100%', boxSizing: 'border-box' }}>
+                <div style={{ background: '#fdecea', border: '1px solid #f5c6c6', color: '#c0392b', borderRadius: 8, padding: '12px 16px', fontSize: 13, marginBottom: 16 }}>
+                  {formError}
+                </div>
+              </div>
+            )}
+            <AnalyzerForm onSubmit={handleFormSubmit} disabled={isAnalyzing} />
+          </div>
         </div>
       </div>
     );
@@ -516,6 +618,9 @@ export const App: React.FC = () => {
             UI Traps <span className={styles.logoAccent}>Helper</span>
           </div>
           <div className={styles.headerActions}>
+            <button className={styles.headerButton} onClick={() => setView('form')}>
+              Analyzer
+            </button>
             <button className={styles.headerButton} onClick={() => unified.clearHistory()}>
               New Session
             </button>
