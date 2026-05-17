@@ -82,7 +82,8 @@ class UITrapsAnalyzer:
         timeout: int = 120,
         user_id: Optional[str] = None,
         page_context: Optional[Dict[str, Any]] = None,
-        chat_context: Optional[str] = None
+        chat_context: Optional[str] = None,
+        kb_version: str = "v2",
     ) -> Dict[str, Any]:
         """
         Analyze a UI design using the UI Tenets & Traps framework.
@@ -122,7 +123,7 @@ class UITrapsAnalyzer:
             raise ValueError(f"Invalid file: {file_msg}")
 
         # Step 2: Build prompts
-        system_prompt = build_system_prompt(use_caching=self.use_caching)
+        system_prompt = build_system_prompt(use_caching=self.use_caching, version=kb_version)
 
         # Step 3: Handle different file types
         if is_figma_url(design_file):
@@ -272,7 +273,7 @@ class UITrapsAnalyzer:
 
         # Step 7: Pass 2 — Enrich findings using full book sections
         try:
-            report = self._enrich_report(report, timeout=timeout)
+            report = self._enrich_report(report, timeout=timeout, kb_version=kb_version)
         except Exception as e:
             # Enrichment failure is non-fatal — use Pass 1 report as-is
             print(f"[UITraps] Pass 2 enrichment skipped (non-fatal): {e}")
@@ -301,7 +302,7 @@ class UITrapsAnalyzer:
             "status": "success"
         }
 
-    def _enrich_report(self, pass1_report: Dict[str, Any], timeout: int = 120) -> Dict[str, Any]:
+    def _enrich_report(self, pass1_report: Dict[str, Any], timeout: int = 120, kb_version: str = "v2") -> Dict[str, Any]:
         """
         Pass 2: Enrich Pass 1 findings using full book sections for found traps.
 
@@ -324,10 +325,10 @@ class UITrapsAnalyzer:
         if not found_trap_names:
             return pass1_report
 
-        # Load structured v2 knowledge base chunks for the found traps
-        knowledge_chunks = get_chunks_for_traps(found_trap_names) or None
+        # Load structured knowledge base chunks for the found traps
+        knowledge_chunks = get_chunks_for_traps(found_trap_names, version=kb_version) or None
         if knowledge_chunks:
-            print(f"[UITraps] Pass 2: loaded v2 KB chunks for {len(found_trap_names)} trap(s)")
+            print(f"[UITraps] Pass 2: loaded {kb_version} KB chunks for {len(found_trap_names)} trap(s)")
 
         # Fall back to extracted book sections if KB chunks unavailable
         trap_sections = {} if knowledge_chunks else extract_trap_sections(found_trap_names)

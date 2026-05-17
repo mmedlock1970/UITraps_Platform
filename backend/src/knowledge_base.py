@@ -1,37 +1,46 @@
 """
 Structured knowledge base for UI Tenets & Traps Pass 2 enrichment.
 
-Loads trap_knowledge_base.md (MCP-formatted chunks) once and provides
-fast lookup by trap name for use in the enrichment prompt.
+Loads trap_knowledge_base.md (v2) or trap_knowledge_base_v1.md (v1) once
+and provides fast lookup by trap name for use in the enrichment prompt.
 """
 import re
 from pathlib import Path
 from typing import Optional
 
 _DATA_DIR = Path(__file__).parent.parent / "data"
-_KB_PATH = _DATA_DIR / "trap_knowledge_base.md"
 
-# Maps normalized uppercase names from the analyzer to the names used in the
-# knowledge base chunk headers/metadata. Only entries that differ are listed.
-_CANONICAL_OVERRIDES: dict[str, str] = {
-    "INCORRECT INFO": "INCORRECT INFORMATION",
-    "UNNECESSARY STEP": "UNNECESSARY STEP(S)",
-    "UNNECESSARY STEPS": "UNNECESSARY STEP(S)",
+_KB_PATHS = {
+    "v2": _DATA_DIR / "trap_knowledge_base.md",
+    "v1": _DATA_DIR / "trap_knowledge_base_v1.md",
 }
 
-_chunks: Optional[dict[str, str]] = None
+# Maps normalized uppercase analyzer names → names used in KB chunk headers.
+# Version-specific overrides: outer key is version, inner is the mapping.
+_CANONICAL_OVERRIDES: dict[str, dict[str, str]] = {
+    "v2": {
+        "INCORRECT INFO": "INCORRECT INFORMATION",
+        "UNNECESSARY STEP": "UNNECESSARY STEP(S)",
+        "UNNECESSARY STEPS": "UNNECESSARY STEP(S)",
+    },
+    "v1": {
+        "UNNECESSARY STEP": "UNNECESSARY STEP",  # v1 uses plain name without (S)
+        "UNNECESSARY STEPS": "UNNECESSARY STEP",
+        "POOR AESTHETIC": "UNATTRACTIVE APPEARANCE",  # v2 name → v1 name
+    },
+}
+
+_caches: dict[str, Optional[dict[str, str]]] = {"v1": None, "v2": None}
 
 
-def _load_chunks() -> dict[str, str]:
-    """Parse the knowledge base file into a {UPPERCASE_NAME: chunk_text} dict."""
-    global _chunks
-    if _chunks is not None:
-        return _chunks
+def _load_chunks(version: str) -> dict[str, str]:
+    """Parse the KB file for the given version into a {UPPERCASE_NAME: chunk_text} dict."""
+    if _caches[version] is not None:
+        return _caches[version]
 
-    text = _KB_PATH.read_text(encoding="utf-8")
+    kb_path = _KB_PATHS[version]
+    text = kb_path.read_text(encoding="utf-8")
 
-    # Split on the horizontal rule that separates chunks.
-    # Each chunk starts with "# CHUNK: TRAP — NAME".
     raw_chunks = re.split(r"\n---\n", text)
 
     result: dict[str, str] = {}
@@ -40,7 +49,6 @@ def _load_chunks() -> dict[str, str]:
         if not chunk:
             continue
 
-        # Extract name from "# CHUNK: NAME" header
         match = re.search(r"^#\s+CHUNK:\s+(.+)", chunk, re.MULTILINE)
         if not match:
             continue
@@ -49,33 +57,37 @@ def _load_chunks() -> dict[str, str]:
         key = name_raw.upper()
         result[key] = chunk
 
-    _chunks = result
-    return _chunks
+    _caches[version] = result
+    return result
 
 
-def _normalize(name: str) -> str:
+def _normalize(name: str, version: str) -> str:
     """Convert an analyzer trap name to the uppercase key used in the KB."""
     upper = name.upper().strip()
-    return _CANONICAL_OVERRIDES.get(upper, upper)
+    overrides = _CANONICAL_OVERRIDES.get(version, {})
+    return overrides.get(upper, upper)
 
 
-def get_chunks_for_traps(trap_names: list[str]) -> str:
+def get_chunks_for_traps(trap_names: list[str], version: str = "v2") -> str:
     """
     Return the knowledge base chunks for the given trap names as a single string.
 
     Args:
-        trap_names: List of trap names as used in the analyzer (ALL CAPS OK,
-                    e.g. "INVISIBLE ELEMENT", "INCORRECT INFO").
+        trap_names: List of trap names as used in the analyzer (ALL CAPS OK).
+        version: Knowledge base version — "v1" or "v2" (default "v2").
 
     Returns:
         Concatenated chunk texts separated by horizontal rules, or an empty
         string if none of the requested traps are found.
     """
-    chunks = _load_chunks()
+    if version not in _KB_PATHS:
+        version = "v2"
+
+    chunks = _load_chunks(version)
     parts: list[str] = []
 
     for name in trap_names:
-        key = _normalize(name)
+        key = _normalize(name, version)
         chunk = chunks.get(key)
         if chunk:
             parts.append(chunk)

@@ -397,12 +397,12 @@ A minimalist design with lots of whitespace is NOT a bug.
 '''
 
 
-def load_training_content() -> str:
+def load_training_content(version: str = "v2") -> str:
     """
     Load the condensed AI analysis reference for Pass 1 (detection).
 
-    Uses UI_Traps_Analysis_Reference.md — optimized for trap detection from
-    screenshots. Much smaller token footprint than the full book.
+    Args:
+        version: "v2" (default) or "v1"
 
     Returns:
         Analysis reference content as string
@@ -412,20 +412,44 @@ def load_training_content() -> str:
     except ImportError:
         from knowledge_extractor import load_analysis_reference
 
-    return load_analysis_reference()
+    return load_analysis_reference(version=version)
 
 
-def build_system_prompt(use_caching: bool = True) -> list:
+# v1 uses 26 traps — UNATTRACTIVE APPEARANCE instead of POOR AESTHETIC, no INCORRECT INFORMATION
+_TRAP_NAMES_V1 = (
+    "INVISIBLE ELEMENT, EFFECTIVELY INVISIBLE ELEMENT, DISTRACTION, UNCOMPREHENDED ELEMENT, "
+    "INVITING DEAD END, POOR GROUPING, FORCED SYNTAX, MEMORY CHALLENGE, FEEDBACK FAILURE, "
+    "PHYSICAL CHALLENGE, ACCIDENTAL ACTIVATION, SLOW OR NO RESPONSE, CAPTIVE WAIT, "
+    "UNNECESSARY STEP, SYSTEM AMNESIA, INFORMATION OVERLOAD, BAD PREDICTION, "
+    "IRREVERSIBLE ACTION, UNWANTED DISCLOSURE, DATA LOSS, GRATUITOUS REDUNDANCY, "
+    "VARIABLE OUTCOME, WANDERING ELEMENT, INCONSISTENT APPEARANCE, AMBIGUOUS HOME, "
+    "UNATTRACTIVE APPEARANCE"
+)
+
+# v2 uses 27 traps — POOR AESTHETIC, INCORRECT INFORMATION added
+_TRAP_NAMES_V2 = (
+    "INVISIBLE ELEMENT, EFFECTIVELY INVISIBLE ELEMENT, DISTRACTION, UNCOMPREHENDED ELEMENT, "
+    "INVITING DEAD END, POOR GROUPING, FORCED SYNTAX, MEMORY CHALLENGE, FEEDBACK FAILURE, "
+    "PHYSICAL CHALLENGE, ACCIDENTAL ACTIVATION, SLOW OR NO RESPONSE, CAPTIVE WAIT, "
+    "UNNECESSARY STEP, INFORMATION OVERLOAD, SYSTEM AMNESIA, BAD PREDICTION, INCORRECT INFO, "
+    "IRREVERSIBLE ACTION, UNWANTED DISCLOSURE, DATA LOSS, GRATUITOUS REDUNDANCY, "
+    "VARIABLE OUTCOME, WANDERING ELEMENT, INCONSISTENT APPEARANCE, AMBIGUOUS HOME, POOR AESTHETIC"
+)
+
+
+def build_system_prompt(use_caching: bool = True, version: str = "v2") -> list:
     """
     Build the system prompt for Claude including training content.
 
     Args:
         use_caching: Whether to use prompt caching (recommended for production)
+        version: Knowledge base version — "v1" or "v2" (default "v2")
 
     Returns:
         List of system message blocks for Claude API
     """
-    training_content = load_training_content()
+    training_content = load_training_content(version=version)
+    trap_names_line = _TRAP_NAMES_V1 if version == "v1" else _TRAP_NAMES_V2
 
     system_prompt_intro = """You are an expert UI analyst specializing in the proprietary UI Tenets & Traps heuristic framework.
 
@@ -509,18 +533,12 @@ The training material for this system explicitly states that the following traps
 17. INCONSISTENT APPEARANCE — requires comparing the same element across multiple screens or contexts
 18. AMBIGUOUS HOME — requires seeing the information architecture across multiple pages/sections
 19. UNWANTED DISCLOSURE — requires understanding the social and physical contexts in which the product is used
-20. POOR AESTHETIC — explicitly not reliably detectable through structural analysis; requires cultural and aesthetic judgment
+__UNTESTABLE_AESTHETIC_LINE__
 
 ✅ **`testable: true` only for these traps** (when not flagged as a confirmed issue):
 
 These are the only traps that can be meaningfully evaluated from a single screenshot:
-- POOR GROUPING
-- FORCED SYNTAX
-- INFORMATION OVERLOAD
-- UNNECESSARY STEP(S)
-- GRATUITOUS REDUNDANCY
-- INCORRECT INFORMATION
-- BAD PREDICTION (only the visible content-mismatch exception)
+__TESTABLE_TRUE_LIST__
 
 Do NOT set `testable: true` for any trap outside this list.
 
@@ -699,7 +717,7 @@ When analyzing a page that is part of a larger site, you MUST consider:
    - DO NOT require primary shopping/product CTAs on these pages
 
 **What to Focus On:**
-- Systematically check for all 27 Traps (but respect limitations above)
+- Systematically check for all __TRAP_COUNT__ Traps (but respect limitations above)
 - Use the gated decision procedure for Information Overload (Gates 0-3) as INTERNAL REASONING only
 - Provide specific visual references where traps occur
 - **RESPECT PAGE ROLES** - Don't flag missing elements that belong elsewhere
@@ -777,15 +795,40 @@ The only exception: technical facts visible in the UI (e.g. "the button is not v
 - Note positive design elements
 
 ⚠️ TRAP NAME VALIDATION (CRITICAL):
-You may ONLY use these 27 trap names - do NOT invent new names:
-INVISIBLE ELEMENT, EFFECTIVELY INVISIBLE ELEMENT, DISTRACTION, UNCOMPREHENDED ELEMENT, INVITING DEAD END, POOR GROUPING, FORCED SYNTAX, MEMORY CHALLENGE, FEEDBACK FAILURE, PHYSICAL CHALLENGE, ACCIDENTAL ACTIVATION, SLOW OR NO RESPONSE, CAPTIVE WAIT, UNNECESSARY STEP, INFORMATION OVERLOAD, SYSTEM AMNESIA, BAD PREDICTION, INCORRECT INFO, IRREVERSIBLE ACTION, UNWANTED DISCLOSURE, DATA LOSS, GRATUITOUS REDUNDANCY, VARIABLE OUTCOME, WANDERING ELEMENT, INCONSISTENT APPEARANCE, AMBIGUOUS HOME, POOR AESTHETIC
+You may ONLY use these trap names - do NOT invent new names:
+{trap_names_line}
 
-If an issue doesn't fit one of these 27 traps, it is NOT a UI Trap - do not report it as one.
+If an issue doesn't fit one of these traps, it is NOT a UI Trap - do not report it as one.
 
 ⚠️ VISUAL VERIFICATION REMINDER:
 Before submitting, verify each finding against what you actually see in the image. Do NOT flag elements as missing if they are visible in the screenshot.
 
 You will submit your analysis using the ui_analysis_report tool with all required fields including potential_issues and flagged_for_human_review."""
+
+    # Version-specific substitutions
+    if version == "v1":
+        trap_count = "26"
+        untestable_aesthetic = "20. UNATTRACTIVE APPEARANCE — explicitly not reliably detectable through structural analysis; requires cultural and aesthetic judgment"
+        testable_true = (
+            "- POOR GROUPING\n"
+            "- FORCED SYNTAX\n"
+            "- INFORMATION OVERLOAD\n"
+            "- UNNECESSARY STEP\n"
+            "- GRATUITOUS REDUNDANCY\n"
+            "- BAD PREDICTION (only the visible content-mismatch exception)"
+        )
+    else:
+        trap_count = "27"
+        untestable_aesthetic = "20. POOR AESTHETIC — explicitly not reliably detectable through structural analysis; requires cultural and aesthetic judgment"
+        testable_true = (
+            "- POOR GROUPING\n"
+            "- FORCED SYNTAX\n"
+            "- INFORMATION OVERLOAD\n"
+            "- UNNECESSARY STEP(S)\n"
+            "- GRATUITOUS REDUNDANCY\n"
+            "- INCORRECT INFORMATION\n"
+            "- BAD PREDICTION (only the visible content-mismatch exception)"
+        )
 
     # Build the complete system prompt with all guidance sections
     full_system_prompt = f"""{system_prompt_intro}
@@ -798,6 +841,20 @@ You will submit your analysis using the ui_analysis_report tool with all require
 
 ===== TIER 3: HUMAN JUDGMENT TRAPS GUIDANCE =====
 {HUMAN_REVIEW_TRAPS_GUIDANCE}"""
+
+    # Apply version-specific substitutions to the full prompt
+    full_system_prompt = (
+        full_system_prompt
+        .replace("{trap_names_line}", trap_names_line)
+        .replace("__TRAP_COUNT__", trap_count)
+        .replace("__UNTESTABLE_AESTHETIC_LINE__", untestable_aesthetic)
+        .replace("__TESTABLE_TRUE_LIST__", testable_true)
+    )
+    # v1: rename POOR AESTHETIC references in guidance sections
+    if version == "v1":
+        full_system_prompt = full_system_prompt.replace(
+            "POOR AESTHETIC", "UNATTRACTIVE APPEARANCE"
+        )
 
     # Build system message blocks with optional caching
     if use_caching:
@@ -1065,7 +1122,7 @@ CONTEXT PROVIDED BY USER:
 Perform a complete UI Tenets & Traps analysis following the methodology in your training content.
 
 Remember to:
-- Check all 27 Traps systematically
+- Check all __TRAP_COUNT__ Traps systematically
 - Use the gated decision procedure for Information Overload
 - Provide specific locations where issues occur
 - Classify severity appropriately (Critical/Moderate/Minor)

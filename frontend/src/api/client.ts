@@ -1,6 +1,7 @@
 import {
   AnalysisResponse,
   UserContext,
+  KbVersion,
   EstimateResponse,
   CapabilitiesResponse,
   ChatApiResponse,
@@ -421,13 +422,15 @@ export interface UnifiedAskOptions {
   context?: UserContext;
   conversationHistory?: string;
   chatContext?: string;
+  kbVersion?: KbVersion;
   signal?: AbortSignal;
   timeout?: number;
 }
 
 export async function unifiedAsk(options: UnifiedAskOptions): Promise<UnifiedAskResponse> {
   const { apiEndpoint, token, message, files = [], context,
-          conversationHistory, chatContext, signal, timeout = 120000 } = options;
+          conversationHistory, chatContext, kbVersion, signal } = options;
+  const timeout = (kbVersion === 'both') ? 300000 : (options.timeout ?? 120000);
 
   const imageFiles = files.filter(f => f.type.startsWith('image/'));
   const otherFiles = files.filter(f => !f.type.startsWith('image/'));
@@ -446,6 +449,7 @@ export async function unifiedAsk(options: UnifiedAskOptions): Promise<UnifiedAsk
   }
   if (conversationHistory) formData.append('conversation_history', conversationHistory);
   if (chatContext) formData.append('chat_context', chatContext);
+  if (kbVersion) formData.append('kb_version', kbVersion);
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);

@@ -107,6 +107,8 @@ export function contentTypeToPlatform(contentType: ContentType): PlatformType {
   return mapping[contentType] || 'other';
 }
 
+export type KbVersion = 'v1' | 'v2' | 'both';
+
 export interface UserContext {
   users: string;
   expertise: string;
@@ -114,6 +116,7 @@ export interface UserContext {
   format: string;
   contentType?: ContentType;
   extra_context?: string;
+  kb_version?: KbVersion;
 }
 
 export interface ReportStatistics {
@@ -392,6 +395,11 @@ export interface ReportViewerProps {
   showUsageInfo?: boolean;
   onNewAnalysis: () => void;
   isDark?: boolean;
+  // Dual-report (compare mode) — when both are present a toggle is shown
+  htmlV1?: string;
+  htmlV2?: string;
+  statisticsV1?: ReportStatistics;
+  statisticsV2?: ReportStatistics;
 }
 
 // Analyzer State
@@ -483,12 +491,18 @@ export interface UnifiedAskResponse {
   // Chat fields
   response?: string;
   sources?: string[];
-  // Analysis fields
+  // Analysis fields (single version)
   report_html?: string;
   report_markdown?: string;
   statistics?: ReportStatistics;
   usage?: UsageInfo;
   error?: string;
+  kb_version?: KbVersion;
+  // Dual analysis fields (kb_version="both")
+  report_html_v1?: string;
+  report_html_v2?: string;
+  statistics_v1?: ReportStatistics;
+  statistics_v2?: ReportStatistics;
 }
 
 export interface AuthState {

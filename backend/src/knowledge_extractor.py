@@ -21,6 +21,7 @@ from typing import Dict, List, Optional, Tuple
 # Paths relative to this file
 _DATA_DIR = Path(__file__).parent.parent / "data"
 ANALYSIS_REFERENCE_PATH = _DATA_DIR / "UI_Traps_Analysis_Reference.md"
+ANALYSIS_REFERENCE_PATH_V1 = _DATA_DIR / "trap_knowledge_base_v1.md"
 FULL_BOOK_PATH = _DATA_DIR / "UI_Tenets_Traps.txt"
 BOOK_IMAGES_DIR = _DATA_DIR / "book_images"
 
@@ -63,23 +64,38 @@ TRAP_NAMES = [
 
 # Module-level caches — loaded once per process
 _analysis_reference_cache: str | None = None
+_analysis_reference_cache_v1: str | None = None
 _full_book_cache: str | None = None
 
 
-def load_analysis_reference() -> str:
+def load_analysis_reference(version: str = "v2") -> str:
     """
     Load the condensed AI analysis reference (Pass 1 knowledge base).
     Cached after first load.
+
+    Args:
+        version: "v2" (default) or "v1"
     """
-    global _analysis_reference_cache
-    if _analysis_reference_cache is None:
-        if not ANALYSIS_REFERENCE_PATH.exists():
-            raise FileNotFoundError(
-                f"Analysis reference not found at {ANALYSIS_REFERENCE_PATH}. "
-                f"Ensure UI_Traps_Analysis_Reference.md is in the data/ directory."
-            )
-        _analysis_reference_cache = ANALYSIS_REFERENCE_PATH.read_text(encoding="utf-8")
-    return _analysis_reference_cache
+    global _analysis_reference_cache, _analysis_reference_cache_v1
+
+    if version == "v1":
+        if _analysis_reference_cache_v1 is None:
+            if not ANALYSIS_REFERENCE_PATH_V1.exists():
+                raise FileNotFoundError(
+                    f"v1 analysis reference not found at {ANALYSIS_REFERENCE_PATH_V1}. "
+                    f"Ensure trap_knowledge_base_v1.md is in the data/ directory."
+                )
+            _analysis_reference_cache_v1 = ANALYSIS_REFERENCE_PATH_V1.read_text(encoding="utf-8")
+        return _analysis_reference_cache_v1
+    else:
+        if _analysis_reference_cache is None:
+            if not ANALYSIS_REFERENCE_PATH.exists():
+                raise FileNotFoundError(
+                    f"Analysis reference not found at {ANALYSIS_REFERENCE_PATH}. "
+                    f"Ensure UI_Traps_Analysis_Reference.md is in the data/ directory."
+                )
+            _analysis_reference_cache = ANALYSIS_REFERENCE_PATH.read_text(encoding="utf-8")
+        return _analysis_reference_cache
 
 
 # ---------------------------------------------------------------------------
