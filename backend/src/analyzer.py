@@ -24,6 +24,7 @@ try:
     from .formatters import parse_claude_response, format_report_as_markdown, format_report_as_html, get_report_statistics
     from .schema import get_ui_analysis_schema, get_interaction_analysis_schema
     from .knowledge_extractor import collect_found_trap_names, extract_trap_sections, extract_trap_images
+    from .knowledge_base import get_chunks_for_traps
 except ImportError:
     # Fallback for direct script execution
     from validators import validate_file_format, validate_context, is_figma_url
@@ -35,6 +36,7 @@ except ImportError:
     from formatters import parse_claude_response, format_report_as_markdown, format_report_as_html, get_report_statistics
     from schema import get_ui_analysis_schema, get_interaction_analysis_schema
     from knowledge_extractor import collect_found_trap_names, extract_trap_sections, extract_trap_images
+    from knowledge_base import get_chunks_for_traps
 
 
 class UITrapsAnalyzer:
@@ -322,18 +324,18 @@ class UITrapsAnalyzer:
         if not found_trap_names:
             return pass1_report
 
-        # Extract the relevant book sections and illustrations
-        trap_sections = extract_trap_sections(found_trap_names)
+        # Load structured v2 knowledge base chunks for the found traps
+        knowledge_chunks = get_chunks_for_traps(found_trap_names) or None
+        if knowledge_chunks:
+            print(f"[UITraps] Pass 2: loaded v2 KB chunks for {len(found_trap_names)} trap(s)")
+
+        # Fall back to extracted book sections if KB chunks unavailable
+        trap_sections = {} if knowledge_chunks else extract_trap_sections(found_trap_names)
         trap_images = extract_trap_images(found_trap_names)
 
         if trap_images:
             n_imgs = sum(len(v) for v in trap_images.values())
             print(f"[UITraps] Pass 2: including {n_imgs} book illustration(s) for {len(trap_images)} trap(s)")
-
-        # knowledge_base module removed (RAG migration) — chunks no longer loaded
-        knowledge_chunks = None
-        if knowledge_chunks:
-            print(f"[UITraps] Pass 2: loaded structured KB chunks for {len(found_trap_names)} trap(s)")
 
         # Build Pass 2 prompts
         system_prompt = build_enrichment_system_prompt()
