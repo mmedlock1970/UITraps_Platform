@@ -1836,27 +1836,26 @@ async def unified_ask(
                 user_id = str(user.get("userId", ""))
 
                 if kb_version == "both":
-                    # Run v1 and v2 analyses in parallel using thread pool
                     import asyncio
                     loop = asyncio.get_event_loop()
                     analyzer_instance = get_analyzer()
 
-                    logger.info("[/api/ask analysis] running dual v1+v2 analysis in parallel")
-                    v1_future = loop.run_in_executor(
-                        None,
-                        lambda: analyzer_instance.analyze_design(
-                            design_file=tmp_path, user_context=user_context,
-                            chat_context=chat_context, kb_version="v1"
-                        )
-                    )
-                    v2_future = loop.run_in_executor(
+                    logger.info("[/api/ask analysis] running dual analysis sequentially: v2 first, then v1")
+                    result_v2 = await loop.run_in_executor(
                         None,
                         lambda: analyzer_instance.analyze_design(
                             design_file=tmp_path, user_context=user_context,
                             chat_context=chat_context, kb_version="v2"
                         )
                     )
-                    result_v1, result_v2 = await asyncio.gather(v1_future, v2_future)
+                    logger.info("[/api/ask analysis] v2 analysis complete, starting v1")
+                    result_v1 = await loop.run_in_executor(
+                        None,
+                        lambda: analyzer_instance.analyze_design(
+                            design_file=tmp_path, user_context=user_context,
+                            chat_context=chat_context, kb_version="v1"
+                        )
+                    )
                     logger.info("[/api/ask analysis] dual analysis complete")
 
                     save_analysis_report(

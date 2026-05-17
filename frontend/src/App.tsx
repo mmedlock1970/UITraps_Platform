@@ -276,7 +276,7 @@ export const App: React.FC = () => {
 
       formElapsed.stop();
 
-      if (result.report_html) {
+      if (result.report_html || (result.report_html_v1 && result.report_html_v2)) {
         handleAnalysisComplete(
           result,
           files.map(f => f.name),
