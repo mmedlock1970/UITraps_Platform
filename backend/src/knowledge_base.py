@@ -1,7 +1,7 @@
 """
 Structured knowledge base for UI Tenets & Traps Pass 2 enrichment.
 
-Loads trap_knowledge_base.md (v2) or trap_knowledge_base_v1.md (v1) once
+Loads trap_knowledge_base_v2.md (v2) or trap_knowledge_base_v1.md (v1) once
 and provides fast lookup by trap name for use in the enrichment prompt.
 """
 import re
@@ -11,7 +11,7 @@ from typing import Optional
 _DATA_DIR = Path(__file__).parent.parent / "data"
 
 _KB_PATHS = {
-    "v2": _DATA_DIR / "trap_knowledge_base.md",
+    "v2": _DATA_DIR / "trap_knowledge_base_v2.md",
     "v1": _DATA_DIR / "trap_knowledge_base_v1.md",
 }
 

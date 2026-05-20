@@ -20,11 +20,11 @@ VALID_TRAP_NAMES = [
     "ACCIDENTAL ACTIVATION",
     "SLOW OR NO RESPONSE",
     "CAPTIVE WAIT",
-    "UNNECESSARY STEP",
+    "UNNECESSARY STEP(S)",
     "INFORMATION OVERLOAD",
     "SYSTEM AMNESIA",
     "BAD PREDICTION",
-    "INCORRECT INFO",
+    "INCORRECT INFORMATION",
     "IRREVERSIBLE ACTION",
     "UNWANTED DISCLOSURE",
     "DATA LOSS",
@@ -165,9 +165,11 @@ UI_ANALYSIS_SCHEMA = {
         "traps_checked_not_found": {
             "type": "array",
             "description": (
-                "Every trap not flagged as an issue, categorized as either tested-and-not-found "
-                "or unable-to-test. Include ALL traps from the framework that were not reported "
-                "as confirmed issues."
+                "Traps you actually evaluated, not flagged as confirmed issues. "
+                "Include ONLY: (1) always-evaluable traps not found, with testable:true; "
+                "(2) conditional traps where you applied the rule and have a result to report. "
+                "Do NOT include SLOW OR NO RESPONSE or POOR AESTHETIC — added automatically. "
+                "Do NOT enumerate traps you did not evaluate."
             ),
             "items": {
                 "type": "object",
@@ -296,7 +298,7 @@ UI_ANALYSIS_SCHEMA = {
         },
         "user_issues": {
             "type": "array",
-            "description": "User-facing issues synthesized from detected trap findings. Each issue names an observable user problem in plain language, groups the traps that underlie it, and provides synthesized recommendations. Rank by impact_level (high first). Omit if no confirmed traps were found.",
+            "description": "User-facing issues synthesized from detected trap findings. REQUIRED when confirmed traps exist — do NOT omit or leave empty when there are critical, moderate, or minor issues. Each issue names an observable user problem in plain, relatable language tied specifically to the user context and tasks provided — not generic framework language. Groups the traps that underlie it. Ranks by impact_level (high first). Empty array only when zero confirmed traps were found.",
             "items": {
                 "type": "object",
                 "properties": {
@@ -400,7 +402,8 @@ UI_ANALYSIS_SCHEMA = {
         "minor_issues",
         "positive_observations",
         "potential_issues",
-        "traps_checked_not_found"
+        "traps_checked_not_found",
+        "user_issues"
     ],
     "additionalProperties": False
 }

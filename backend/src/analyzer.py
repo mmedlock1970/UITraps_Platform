@@ -123,7 +123,7 @@ class UITrapsAnalyzer:
             raise ValueError(f"Invalid file: {file_msg}")
 
         # Step 2: Build prompts
-        system_prompt = build_system_prompt(use_caching=self.use_caching, version=kb_version)
+        system_prompt = build_system_prompt(use_caching=self.use_caching, version=kb_version, image_count=1)
 
         # Step 3: Handle different file types
         if is_figma_url(design_file):
@@ -168,6 +168,7 @@ class UITrapsAnalyzer:
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=5000,
+                temperature=0,
                 system=system_prompt,
                 messages=[
                     {
@@ -286,6 +287,11 @@ class UITrapsAnalyzer:
             if not isinstance(report.get(_opt), list):
                 report[_opt] = []
 
+        # Guarantee report completeness across KB versions: backfill the per-trap
+        # "Could Not Evaluate" breakdown and synthesize user_issues from confirmed
+        # traps when the model omitted them. This makes v1 and v2 reports symmetric.
+        self._normalize_report_completeness(report, kb_version=kb_version)
+
         if chat_context and chat_context.strip():
             user_context = dict(user_context)
             user_context['chat_context_used'] = True
@@ -332,7 +338,7 @@ class UITrapsAnalyzer:
 
         # Fall back to extracted book sections if KB chunks unavailable
         trap_sections = {} if knowledge_chunks else extract_trap_sections(found_trap_names)
-        trap_images = extract_trap_images(found_trap_names)
+        trap_images = extract_trap_images(found_trap_names, version=kb_version)
 
         if trap_images:
             n_imgs = sum(len(v) for v in trap_images.values())
@@ -350,6 +356,7 @@ class UITrapsAnalyzer:
         response = self.client.messages.create(
             model=self.enrich_model,
             max_tokens=4096,
+            temperature=0,
             system=system_prompt,
             messages=[{"role": "user", "content": user_message}],
             tools=[
@@ -412,6 +419,174 @@ class UITrapsAnalyzer:
 
         print(f"[UITraps] Pass 2: enrichment complete ({response.usage.input_tokens} input tokens)")
         return enriched
+
+    def _normalize_report_completeness(self, report: Dict[str, Any], kb_version: str = "v2") -> None:
+        """
+        Make v1 and v2 reports structurally symmetric. Mutates report in place.
+
+        Two model-output gaps that this fixes:
+        1. `traps_checked_not_found` sometimes ships with items missing the
+           `testable` flag, missing a `reason`, or not covering every trap in
+           the version's canonical list. We backfill every non-confirmed trap
+           with the right testable flag and a default reason when needed.
+        2. `user_issues` is described in the schema as optional ("omit if no
+           confirmed traps"), so the model sometimes drops it even when traps
+           were confirmed. We synthesize a single fallback user_issue from the
+           confirmed traps in that case so the section always renders.
+        """
+        try:
+            from .prompts import _TRAP_NAMES_V1, _TRAP_NAMES_V2
+            from .formatters import _UNTESTABLE_REASON_DEFAULTS, _normalize_trap_name
+        except ImportError:
+            from prompts import _TRAP_NAMES_V1, _TRAP_NAMES_V2
+            from formatters import _UNTESTABLE_REASON_DEFAULTS, _normalize_trap_name
+
+        src = _TRAP_NAMES_V2 if kb_version == "v2" else _TRAP_NAMES_V1
+        canonical_traps = [t.strip() for t in src.split(",") if t.strip()]
+
+        # Traps that are always evaluable from a single screenshot — default testable:true.
+        testable_true_norm = {
+            "POOR GROUPING", "FORCED SYNTAX", "INFORMATION OVERLOAD",
+            "UNNECESSARY STEP(S)", "UNNECESSARY STEP", "UNNECESSARY STEPS",
+            "GRATUITOUS REDUNDANCY",
+            "INCORRECT INFORMATION", "INCORRECT INFO",
+            "BAD PREDICTION",
+        }
+        # Traps that are never evaluable from a static artifact — force testable:false always,
+        # regardless of what the model output.
+        testable_always_false_norm = {
+            "SLOW OR NO RESPONSE",
+            "POOR AESTHETIC", "UNATTRACTIVE APPEARANCE",
+        }
+
+        confirmed_norm = set()
+        for sev_field in ("critical_issues", "moderate_issues", "minor_issues"):
+            for issue in report.get(sev_field, []):
+                tn = (issue or {}).get("trap_name", "")
+                if tn:
+                    confirmed_norm.add(_normalize_trap_name(tn))
+
+        existing_by_norm: Dict[str, Dict[str, Any]] = {}
+        for item in report.get("traps_checked_not_found", []) or []:
+            if isinstance(item, dict):
+                tn = item.get("trap_name", "")
+                if tn:
+                    existing_by_norm[_normalize_trap_name(tn)] = item
+            elif isinstance(item, str) and item.strip():
+                existing_by_norm[_normalize_trap_name(item)] = {
+                    "trap_name": item, "testable": True
+                }
+
+        def _default_reason(norm: str) -> str:
+            return _UNTESTABLE_REASON_DEFAULTS.get(
+                norm,
+                "Requires additional screenshots, interaction data, or live testing to evaluate."
+            )
+
+        new_tcnf = []
+        for canonical in canonical_traps:
+            norm = _normalize_trap_name(canonical)
+            if norm in confirmed_norm:
+                continue
+            existing = existing_by_norm.get(norm)
+            if existing is not None:
+                item = dict(existing)
+                if norm in testable_always_false_norm:
+                    # Never evaluable — force false regardless of model output
+                    item["testable"] = False
+                    if not (item.get("reason") or "").strip():
+                        item["reason"] = _default_reason(norm)
+                elif norm in testable_true_norm:
+                    # Always evaluable — accept true, fill default if missing
+                    item.setdefault("testable", True)
+                else:
+                    # Conditional trap — respect model's judgment; add reason if false
+                    if not item.get("testable", True):
+                        if not (item.get("reason") or "").strip():
+                            item["reason"] = _default_reason(norm)
+                new_tcnf.append(item)
+            else:
+                if norm in testable_true_norm:
+                    new_tcnf.append({"trap_name": canonical, "testable": True})
+                else:
+                    # Not output by model — default to not-evaluated with standard reason
+                    new_tcnf.append({
+                        "trap_name": canonical,
+                        "testable": False,
+                        "reason": _default_reason(norm),
+                    })
+
+        report["traps_checked_not_found"] = new_tcnf
+
+        # Synthesize user_issues if missing and we have confirmed traps.
+        has_confirmed = bool(
+            report.get("critical_issues") or
+            report.get("moderate_issues") or
+            report.get("minor_issues")
+        )
+        if has_confirmed and not report.get("user_issues"):
+            contributing = []
+            recommendations: list = []
+            for sev_label, sev_field in [
+                ("critical", "critical_issues"),
+                ("moderate", "moderate_issues"),
+                ("minor", "minor_issues"),
+            ]:
+                for issue in report.get(sev_field, []) or []:
+                    tn = (issue or {}).get("trap_name", "")
+                    if not tn:
+                        continue
+                    contribution = (issue.get("problem") or "").strip()
+                    if len(contribution) > 280:
+                        contribution = contribution[:277].rstrip() + "..."
+                    contributing.append({
+                        "trap_name": tn,
+                        "severity": sev_label,
+                        "contribution": contribution or "Contributes to user friction in this design.",
+                    })
+                    rec = (issue.get("recommendation") or "").strip()
+                    if rec and rec not in recommendations:
+                        recommendations.append(rec)
+
+            if contributing:
+                if any(c["severity"] == "critical" for c in contributing):
+                    impact = "high"
+                elif any(c["severity"] == "moderate" for c in contributing):
+                    impact = "medium"
+                else:
+                    impact = "low"
+
+                # Build a specific title and description from the top finding's problem text
+                # rather than a generic placeholder.
+                top = contributing[0]
+                top_problem = top.get("contribution", "").strip()
+                # Use first sentence of the top problem as the title basis
+                first_sentence = top_problem.split(".")[0].strip() if "." in top_problem else top_problem
+                if len(first_sentence) > 110:
+                    first_sentence = first_sentence[:107].rstrip() + "..."
+                n_others = len(contributing) - 1
+                if n_others > 0:
+                    fallback_title = f"{first_sentence}, along with {n_others} other issue{'s' if n_others > 1 else ''}."
+                else:
+                    fallback_title = first_sentence + "."
+
+                trap_names = ", ".join(c["trap_name"] for c in contributing[:3])
+                if len(contributing) > 3:
+                    trap_names += f" and {len(contributing) - 3} more"
+                fallback_description = (
+                    f"The following traps combine to create friction in the user experience: "
+                    f"{trap_names}. Each contributes to the problem described below."
+                )
+
+                report["user_issues"] = [{
+                    "issue_title": fallback_title,
+                    "issue_description": fallback_description,
+                    "impact_level": impact,
+                    "contributing_traps": contributing,
+                    "recommendations": recommendations or [
+                        "Address the contributing Traps identified above."
+                    ],
+                }]
 
     def _load_image(self, image_path: str) -> Dict[str, Any]:
         """
@@ -592,6 +767,7 @@ class UITrapsAnalyzer:
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=4096,
+                temperature=0,
                 system=system_prompt,
                 messages=[
                     {

@@ -18,7 +18,7 @@ TENETS_AND_TRAPS = [
     ]),
     ("COMFORTABLE", ["PHYSICAL CHALLENGE", "ACCIDENTAL ACTIVATION"]),
     ("RESPONSIVE", ["SLOW OR NO RESPONSE", "CAPTIVE WAIT"]),
-    ("EFFICIENT", ["UNNECESSARY STEPS", "INFORMATION OVERLOAD", "SYSTEM AMNESIA"]),
+    ("EFFICIENT", ["UNNECESSARY STEP(S)", "UNNECESSARY STEP", "UNNECESSARY STEPS", "INFORMATION OVERLOAD", "SYSTEM AMNESIA"]),
     ("ACCURATE", ["BAD PREDICTION", "INCORRECT INFORMATION"]),
     ("PROTECTIVE", ["IRREVERSIBLE ACTION", "UNWANTED DISCLOSURE", "DATA LOSS"]),
     ("HABITUATING", [
@@ -52,6 +52,7 @@ _UNTESTABLE_REASON_DEFAULTS: Dict[str, str] = {
     "AMBIGUOUS HOME": "Requires seeing the full information architecture across multiple sections to determine whether the structural 'home' is clear to users.",
     "UNWANTED DISCLOSURE": "Requires understanding the social and physical contexts in which the product is used — who might be able to see the screen, and what information would be inappropriate in those contexts.",
     "POOR AESTHETIC": "Aesthetic quality involves cultural, demographic, and contextual judgement that cannot be reliably assessed through structural analysis of a static design file alone.",
+    "UNATTRACTIVE APPEARANCE": "Aesthetic quality involves cultural, demographic, and contextual judgement that cannot be reliably assessed through structural analysis of a static design file alone.",
 }
 
 
@@ -324,15 +325,16 @@ def format_report_as_markdown(report: Dict[str, Any], user_context: Dict[str, st
         md.append("")
         for issue in report['critical_issues']:
             render_frame_info(issue)
-            md.append(f"**Trap Detected:** **{issue['trap_name'].upper()}**")
+            md.append(f"**Trap Detected:** **{issue.get('trap_name', 'UNKNOWN').upper()}**")
             md.append("")
-            md.append(f"**Tenet Violated:** {issue['tenet'].upper()}")
+            md.append(f"**Tenet Violated:** {issue.get('tenet', '').upper()}")
             md.append("")
-            md.append(f"**Where:** {_cap_terms(issue['location'])}")
+            md.append(f"**Where:** {_cap_terms(issue.get('location', ''))}")
             md.append("")
-            md.append(f"**Problem:** {_cap_terms(issue['problem'])}")
+            md.append(f"**Problem:** {_cap_terms(issue.get('problem', ''))}")
             md.append("")
-            md.append(f"**Recommendation:** {_cap_terms(issue['recommendation'])}")
+            if issue.get('recommendation'):
+                md.append(f"**Recommendation:** {_cap_terms(issue['recommendation'])}")
             md.append("")
             if 'confidence' in issue:
                 md.append(f"*Confidence: {issue['confidence']}*")
@@ -349,15 +351,16 @@ def format_report_as_markdown(report: Dict[str, Any], user_context: Dict[str, st
         md.append("")
         for issue in report['moderate_issues']:
             render_frame_info(issue)
-            md.append(f"**Trap Detected:** **{issue['trap_name'].upper()}**")
+            md.append(f"**Trap Detected:** **{issue.get('trap_name', 'UNKNOWN').upper()}**")
             md.append("")
-            md.append(f"**Tenet Violated:** {issue['tenet'].upper()}")
+            md.append(f"**Tenet Violated:** {issue.get('tenet', '').upper()}")
             md.append("")
-            md.append(f"**Where:** {_cap_terms(issue['location'])}")
+            md.append(f"**Where:** {_cap_terms(issue.get('location', ''))}")
             md.append("")
-            md.append(f"**Problem:** {_cap_terms(issue['problem'])}")
+            md.append(f"**Problem:** {_cap_terms(issue.get('problem', ''))}")
             md.append("")
-            md.append(f"**Recommendation:** {_cap_terms(issue['recommendation'])}")
+            if issue.get('recommendation'):
+                md.append(f"**Recommendation:** {_cap_terms(issue['recommendation'])}")
             md.append("")
             if 'confidence' in issue:
                 md.append(f"*Confidence: {issue['confidence']}*")
@@ -374,15 +377,16 @@ def format_report_as_markdown(report: Dict[str, Any], user_context: Dict[str, st
         md.append("")
         for issue in report['minor_issues']:
             render_frame_info(issue)
-            md.append(f"**Trap Detected:** **{issue['trap_name'].upper()}**")
+            md.append(f"**Trap Detected:** **{issue.get('trap_name', 'UNKNOWN').upper()}**")
             md.append("")
-            md.append(f"**Tenet Violated:** {issue['tenet'].upper()}")
+            md.append(f"**Tenet Violated:** {issue.get('tenet', '').upper()}")
             md.append("")
-            md.append(f"**Where:** {_cap_terms(issue['location'])}")
+            md.append(f"**Where:** {_cap_terms(issue.get('location', ''))}")
             md.append("")
-            md.append(f"**Problem:** {_cap_terms(issue['problem'])}")
+            md.append(f"**Problem:** {_cap_terms(issue.get('problem', ''))}")
             md.append("")
-            md.append(f"**Recommendation:** {_cap_terms(issue['recommendation'])}")
+            if issue.get('recommendation'):
+                md.append(f"**Recommendation:** {_cap_terms(issue['recommendation'])}")
             md.append("")
             if 'confidence' in issue:
                 md.append(f"*Confidence: {issue['confidence']}*")
