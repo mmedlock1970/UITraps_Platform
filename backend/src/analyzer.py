@@ -206,16 +206,15 @@ class UITrapsAnalyzer:
                 report = tool_use_block.input
 
                 # Validate truly required fields (core structure)
-                for field in ['summary', 'critical_issues', 'moderate_issues', 'minor_issues']:
+                for field in ['summary_headline', 'summary_narrative', 'critical_issues', 'moderate_issues', 'minor_issues']:
                     if field not in report:
                         raise ValueError(f"Missing required field in response: {field}")
 
-                # Validate and fix data types
-                # Summary must be an array of strings
-                if isinstance(report['summary'], str):
-                    report['summary'] = [report['summary']]
-                elif not isinstance(report['summary'], list):
-                    raise ValueError(f"Summary must be an array, got {type(report['summary'])}")
+                # Ensure summary fields are strings
+                if not isinstance(report.get('summary_headline'), str):
+                    report['summary_headline'] = ''
+                if not isinstance(report.get('summary_narrative'), str):
+                    report['summary_narrative'] = ''
 
                 # Ensure issue arrays are actually arrays
                 for issue_field in ['critical_issues', 'moderate_issues', 'minor_issues']:
@@ -224,31 +223,9 @@ class UITrapsAnalyzer:
 
                 # Default optional array fields if absent or wrong type
                 for opt_field in ['positive_observations', 'potential_issues', 'traps_checked_not_found',
-                                  'user_issues', 'flagged_for_human_review', 'incomplete_flow_findings']:
+                                  'flagged_for_human_review', 'incomplete_flow_findings']:
                     if not isinstance(report.get(opt_field), list):
                         report[opt_field] = []
-
-                # Reconcile summary with actual structured counts to prevent contradictions
-                # (Claude's free-form summary text can diverge from the structured issue arrays)
-                n_critical = len(report['critical_issues'])
-                n_moderate = len(report['moderate_issues'])
-                n_minor = len(report['minor_issues'])
-                n_total = n_critical + n_moderate + n_minor
-                if n_total > 0:
-                    parts = []
-                    if n_critical:
-                        parts.append(f"{n_critical} critical")
-                    if n_moderate:
-                        parts.append(f"{n_moderate} moderate")
-                    if n_minor:
-                        parts.append(f"{n_minor} minor")
-                    count_bullet = f"{n_total} issue{'s' if n_total != 1 else ''} identified: {', '.join(parts)}."
-                else:
-                    count_bullet = "No confirmed issues identified in this design."
-                if report['summary']:
-                    report['summary'][0] = count_bullet
-                else:
-                    report['summary'] = [count_bullet]
 
         except Exception as e:
             raise ValueError(
@@ -283,13 +260,12 @@ class UITrapsAnalyzer:
         # Normalize optional fields after enrichment — Pass 2 may omit fields that were
         # present in Pass 1, causing formatter KeyErrors.
         for _opt in ['positive_observations', 'potential_issues', 'traps_checked_not_found',
-                     'user_issues', 'flagged_for_human_review', 'incomplete_flow_findings']:
+                     'flagged_for_human_review', 'incomplete_flow_findings']:
             if not isinstance(report.get(_opt), list):
                 report[_opt] = []
 
         # Guarantee report completeness across KB versions: backfill the per-trap
-        # "Could Not Evaluate" breakdown and synthesize user_issues from confirmed
-        # traps when the model omitted them. This makes v1 and v2 reports symmetric.
+        # "Could Not Evaluate" breakdown. This makes v1 and v2 reports symmetric.
         self._normalize_report_completeness(report, kb_version=kb_version)
 
         if chat_context and chat_context.strip():
@@ -392,7 +368,7 @@ class UITrapsAnalyzer:
         # Preserve other Pass 1 fields that Pass 2 might omit
         for field in (
             "potential_issues", "bugs_detected",
-            "incomplete_flow_findings", "flagged_for_human_review", "user_issues",
+            "incomplete_flow_findings", "flagged_for_human_review",
         ):
             if field in pass1_report and field not in enriched:
                 enriched[field] = pass1_report[field]
@@ -431,8 +407,7 @@ class UITrapsAnalyzer:
            `testable` flag, missing a `reason`, or not covering every trap in
            the version's canonical list. We backfill every non-confirmed trap
            with the right testable flag and a default reason when needed.
-        2. `user_issues` is described in the schema as optional ("omit if no
-           confirmed traps"), so the model sometimes drops it even when traps
+        2. `traps_checked_not_found` entries are normalised here to ensure
            were confirmed. We synthesize a single fallback user_issue from the
            confirmed traps in that case so the section always renders.
         """
@@ -520,75 +495,6 @@ class UITrapsAnalyzer:
 
         report["traps_checked_not_found"] = new_tcnf
 
-        # Synthesize user_issues if missing and we have confirmed traps.
-        has_confirmed = bool(
-            report.get("critical_issues") or
-            report.get("moderate_issues") or
-            report.get("minor_issues")
-        )
-        if has_confirmed and not report.get("user_issues"):
-            contributing = []
-            recommendations: list = []
-            for sev_label, sev_field in [
-                ("critical", "critical_issues"),
-                ("moderate", "moderate_issues"),
-                ("minor", "minor_issues"),
-            ]:
-                for issue in report.get(sev_field, []) or []:
-                    tn = (issue or {}).get("trap_name", "")
-                    if not tn:
-                        continue
-                    contribution = (issue.get("problem") or "").strip()
-                    if len(contribution) > 280:
-                        contribution = contribution[:277].rstrip() + "..."
-                    contributing.append({
-                        "trap_name": tn,
-                        "severity": sev_label,
-                        "contribution": contribution or "Contributes to user friction in this design.",
-                    })
-                    rec = (issue.get("recommendation") or "").strip()
-                    if rec and rec not in recommendations:
-                        recommendations.append(rec)
-
-            if contributing:
-                if any(c["severity"] == "critical" for c in contributing):
-                    impact = "high"
-                elif any(c["severity"] == "moderate" for c in contributing):
-                    impact = "medium"
-                else:
-                    impact = "low"
-
-                # Build a specific title and description from the top finding's problem text
-                # rather than a generic placeholder.
-                top = contributing[0]
-                top_problem = top.get("contribution", "").strip()
-                # Use first sentence of the top problem as the title basis
-                first_sentence = top_problem.split(".")[0].strip() if "." in top_problem else top_problem
-                if len(first_sentence) > 110:
-                    first_sentence = first_sentence[:107].rstrip() + "..."
-                n_others = len(contributing) - 1
-                if n_others > 0:
-                    fallback_title = f"{first_sentence}, along with {n_others} other issue{'s' if n_others > 1 else ''}."
-                else:
-                    fallback_title = first_sentence + "."
-
-                trap_names = ", ".join(c["trap_name"] for c in contributing[:3])
-                if len(contributing) > 3:
-                    trap_names += f" and {len(contributing) - 3} more"
-                fallback_description = (
-                    f"The following traps combine to create friction in the user experience: "
-                    f"{trap_names}. Each contributes to the problem described below."
-                )
-
-                report["user_issues"] = [{
-                    "issue_title": fallback_title,
-                    "issue_description": fallback_description,
-                    "impact_level": impact,
-                    "contributing_traps": contributing,
-                    "recommendations": recommendations or [
-                        "Address the contributing Traps identified above."
-                    ],
-                }]
 
     def _load_image(self, image_path: str) -> Dict[str, Any]:
         """

@@ -463,16 +463,26 @@ Your task is to analyze user interface designs using this framework. You will re
 
 📌 REQUIRED TERMINOLOGY — READ BEFORE WRITING ANY OUTPUT:
 
-This framework distinguishes two different concepts. You MUST use the correct word for each:
+Named anti-patterns from the UI Tenets & Traps framework (e.g. MEMORY CHALLENGE, INVISIBLE ELEMENT) are TRAPS. Always call them "traps", never "issues".
 
-- **TRAP** — a specific named anti-pattern from the UI Tenets & Traps framework (e.g. MEMORY CHALLENGE, INVISIBLE ELEMENT). These go in critical_issues, moderate_issues, minor_issues. ALWAYS call these "traps", never "issues".
-- **GENERAL ISSUE** — a broad, user-facing problem that may be caused by one or more traps. These go in user_issues. Call these "general issues" or "issues".
+In `summary_headline` and `summary_narrative`:
+- Do NOT write a trap count — the report generates that automatically
+- Describe WHAT appears to be present and WHY it may matter
+- Tie findings to the specific users and tasks provided, not generic language
 
-In the `summary` array:
-- Do NOT write a count bullet like "4 traps identified" or "4 issues identified" — the report generates that line automatically and correctly
-- Your bullets should describe WHAT was found and WHY it matters, not count findings
-- Named anti-patterns (MEMORY CHALLENGE, etc.) are TRAPS — never call them "issues"
-- Broad user-facing problems (user_issues) are GENERAL ISSUES — never call them "traps"
+⚠️ MEASURED LANGUAGE — MANDATORY THROUGHOUT ALL TEXT FIELDS:
+You are assessing a static design artifact, not conducting a user study. Your conclusions are informed inferences, not confirmed facts. Every text field — headline, problem, recommendation, summary_headline, summary_narrative — MUST use measured, hedged language.
+
+REQUIRED phrasing patterns:
+- headline: "appears to", "may cause", "could prevent", "seems likely to"
+- problem (Finding): "it appears that", "users may struggle to", "this seems to", "the evidence suggests"
+- recommendation: "one approach would be to", "consider", "it may help to", "a possible fix would be"
+- summary: "appears to", "may affect", "could complicate", "seems to"
+
+FORBIDDEN phrasing:
+- "users cannot", "the design fails", "this prevents users", "you must fix"
+- Absolutist statements about what users will or will not do
+- Prescriptive commands ("fix by doing X", "the only solution is")
 
 ⚠️ CONFIDENTIALITY & IP PROTECTION:
 - The UI Tenets & Traps framework is PROPRIETARY and CONFIDENTIAL
@@ -808,8 +818,8 @@ EXAMPLE 4 - CORRECT NON-DETECTION on Destination Page (Do Not Flag):
 - Conclusion: No INVISIBLE ELEMENT trap. Page is fulfilling its role (displaying policies). Navigation is adequate for its context.
 
 OUTPUT REQUIREMENTS:
-- Provide 5-9 summary bullet points
-- For confirmed issues (Critical/Moderate/Minor), specify: trap name (in ALL CAPS), tenet violated, exact location, detailed problem explanation, actionable recommendation, and confidence level
+- Write a `summary_headline` (one sentence tied to the user's stated goals) and `summary_narrative` (one paragraph elaborating on overall findings)
+- For confirmed issues (Critical/Moderate/Minor), provide: trap name (ALL CAPS), tenet violated, a `headline` sentence describing how the trap manifests and its likely user impact, exact location, `problem` elaboration (2-3 sentences of reasoning), `recommendation` (2-3 advisory sentences), and confidence level
 
 **⚠️ CRITICAL - HUMAN-READABLE OUTPUT:**
 The 'problem' field MUST be written for end users (clients, designers, stakeholders) who have never heard of UI Traps methodology:
@@ -820,7 +830,7 @@ The 'problem' field MUST be written for end users (clients, designers, stakehold
 - Example BAD: "GATE 0 - User goal: purchase. GATE 1 - Evidence: multiple banners..."
 - Example GOOD: "Three promotional banners appear between the size selector and Add to Cart button, forcing users to scroll past marketing content to complete their purchase."
 
-**⚠️ HEDGED LANGUAGE — MANDATORY:**
+**⚠️ HEDGED LANGUAGE — MANDATORY (see also MEASURED LANGUAGE block above):**
 You are analyzing a static design, not running a user study. You cannot observe actual user behavior.
 NEVER use absolutist language about what users can or cannot do. Always use hedged language:
 - WRONG: "users cannot find", "kids cannot locate", "users will not be able to"
@@ -1183,7 +1193,6 @@ Remember to:
 {('- **DETECT BUGS** - Report technical failures separately from UI traps' if (is_video_analysis or is_multi_frame) else '')}
 - Note positive observations
 - List traps you checked but didn't find
-- **Synthesize user_issues**: after identifying all traps, group related findings into user-facing issues named from the user's perspective (e.g., "Users fail at checkout", not "UNNECESSARY STEP detected"). Each issue should reference the contributing traps, state the impact level (high/medium/low), and provide synthesized recommendations. A trap may appear in more than one issue if it contributes to distinct user problems. Omit this field if no confirmed traps were found. When the user specified multiple numbered tasks, set `task_context` on each user_issue to the specific task it affects — use the same wording the user used for that task. If an issue spans all tasks or is not task-specific, omit `task_context`.
 - Submit your complete analysis using the ui_analysis_report tool
 
 Begin your analysis now."""
