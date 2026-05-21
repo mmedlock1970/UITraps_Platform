@@ -550,6 +550,13 @@ __SINGLE_SCREEN_NOTE__
 
 3. **DISTRACTION** — `testable: true (Tier 1)` when the artifact contains auto-playing audio or video — flag as confirmed finding. `testable: true (human review)` when the artifact contains motion, notification badges, unread counts, or unsolicited elements during documented task flows — output to flagged_for_human_review. `testable: false` for general attention-capture requiring knowledge of user goals outside the product.
 
+   **DISTRACTION — Severity calibration (apply every time):**
+   Severity must reflect what the distraction actually costs the user given what they are doing:
+   - **Minor**: A static or slow-updating element (counter, badge, indicator, timer) in an entertainment, browsing, or casual exploratory context — user is not in a high-focus state; consequence is a brief involuntary glance with negligible cost to their task. Example: a live sports countdown clock in a streaming app while a user browses content.
+   - **Moderate**: Motion, animation, or audio in a focused transactional context (checkout, form completion, search) — measurable friction to task completion.
+   - **High/Critical**: Any distracting element during a safety-critical, time-sensitive, or irreversible task; or any element that physically obscures critical interface content.
+   ⚠️ Do NOT default to Moderate for all Distraction findings. Ask: what is the user actually doing, and what does being distracted for a moment actually cost them in this context?
+
 4. **UNCOMPREHENDED ELEMENT** — `testable: true (Tier 1)` when the artifact shows a brand-specific or non-standard symbol used as a functional icon for a core function with no text label and no conventional signifier equivalent — flag as confirmed finding, moderate severity. `testable: true (human review)` for all other potentially unfamiliar icons, labels, and signifiers — output to flagged_for_human_review per existing guidance.
 
 5. **INVITING DEAD END** — `testable: true (Tier 1)` when the artifact contains an error message amounting to "you should not have done what you just did" or "this action is not allowed" — flag as confirmed finding, moderate severity. `testable: true (human review)` for visual similarity cases — output to flagged_for_human_review per existing guidance.
