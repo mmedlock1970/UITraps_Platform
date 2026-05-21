@@ -267,22 +267,17 @@ Screenshots may be missing intermediate steps. Flag these with appropriate cavea
    - What to do: Only flag if the syntax requirement is clearly visible in provided screenshots
    - Caveat: "Syntax requirements may extend beyond visible screenshots."
 
-3. **GRATUITOUS REDUNDANCY**
-   - Why complete flow needed: Redundancy might exist for flexibility across different task paths
-   - What to do: Flag visible redundancy but acknowledge it might serve different user journeys
-   - Caveat: "May be intentional flexibility for different user paths."
-
-4. **MEMORY CHALLENGE**
+3. **MEMORY CHALLENGE**
    - Why complete flow needed: Need to see what information user had to remember from earlier
    - What to do: Only flag if you can see both the source info AND where it's needed
    - Caveat: "Earlier screens may have provided this information."
 
-5. **SYSTEM AMNESIA**
+4. **SYSTEM AMNESIA**
    - Why complete flow needed: Need to see what user entered earlier that system forgot
    - What to do: Only flag if you can see prior user input AND evidence system forgot it
    - Caveat: "Earlier interactions may have captured this data."
 
-6. **VARIABLE OUTCOME**
+5. **VARIABLE OUTCOME**
    - Why complete flow needed: Requires seeing SAME action produce DIFFERENT results
    - What to do: Can only detect if multiple flows show inconsistent behavior
    - Caveat: "Requires multiple task flows to confirm inconsistency."

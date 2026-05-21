@@ -1501,19 +1501,17 @@ Implement continuous auto-save wherever technically feasible — the requirement
 ## Definition (verbatim)
 Multiple instances of the same interface element are presented to the user at the same time.
 
-Examples: duplicated instances of controls, links, navigational paths, status indicators, content. The key test is same destination or same function — not same visual form, not "does it add value," not "does it serve a structural purpose." Whether a duplicate feels justified is irrelevant to detection. If two elements on the same screen reach the same destination, this Trap is present.
+The test is: same destination or same function. Visual form is irrelevant — a search field and a search icon that both invoke search are redundant even though they look different. Whether a duplicate "adds value," "serves a structural purpose," or "feels justified" is irrelevant to detection. If two elements on the same screen reach the same destination or invoke the same function, this Trap is present.
 
 ## DISCONFIRMATION — Apply First
-NOT present when:
-(a) Multiple paths serve genuinely different grammatical constructions (object→action AND action→object) that serve different user mental models. This exception is narrow — it applies to paths that approach the same action from structurally opposite starting points, not to elements that merely differ in visual form (icon vs. field vs. button) while invoking the same function.
-(b) Multiple paths exist at genuinely different levels of the site's macro navigation hierarchy — meaning a link on a home page and its counterpart deep inside a section. This does NOT apply to different visual bands or bars on the same screen (e.g., a global nav bar and a sub-nav bar on the same page are the same level for purposes of this Trap).
-(c) Elements that appear similar actually reach different destinations.
+NOT present only when ONE of these clearly applies:
+(a) **Flexible syntax:** The two paths approach the same goal from structurally opposite starting points — one starting from an object (select a file, then choose "Delete"), the other from an action (choose "Delete," then select a file). This is the object→action / action→object distinction that serves genuinely different user mental models. This exception does NOT apply when two elements simply invoke the same function from the same direction in different visual forms. A search field and a standalone search icon are both approached action-first (go to search) — they are redundant, not flexible syntax.
+(b) **Different hierarchy levels:** The two paths exist at genuinely different depth levels of the product — e.g., the same destination linked from the site home page and again from deep within a section three levels down. This does NOT apply to elements on the same screen. A global nav bar and a contextual sub-nav bar are both visible on the same screen; elements in both are redundant if they serve the same function or reach the same destination.
+(c) **Different destinations:** What appears to be the same function actually reaches genuinely different destinations.
 
-**Element identification:** Before comparing destinations, reason about what constitutes a single interactive element vs. separate elements. Components that form a single logical unit (a label and its icon, a field and its submit control) count as one element. Components that are spatially and functionally independent — even if visually similar — count as separate elements. Apply judgment; the question is whether a user would perceive and interact with them as one thing or two.
+**Element identification:** Before comparing destinations, determine whether two items are one element or two. A form field and its directly adjacent submit control (a search box with a Search button immediately beside it) are one element — users interact with them as a unit. Elements at separate locations on the screen — even if they invoke similar functions — are separate elements. Two controls in different interface regions that each independently trigger search are two separate elements.
 
-**Critical distinction from Forced Syntax:** These are mutually exclusive for a given task flow. Forced Syntax provides only one construction; Gratuitous Redundancy provides duplicate paths. Confirm which is present before flagging either.
-
-**Context sensitivity:** This exception is narrow and applies only to *promotional* or *content discovery* paths — for example, a "New Releases" table at the front of a store that also appears on the shelves in its section. It does NOT apply to functional navigation elements (search, home, section links, core nav) — duplicating those is always this Trap regardless of interface type. The question is: is this a promotional surface or a functional navigation element? Promotional = possible exception. Functional = Trap.
+**Forced Syntax distinction:** These are mutually exclusive. Forced Syntax: only one path exists to complete the task. Gratuitous Redundancy: two or more paths to the same destination co-exist.
 
 ## Severity
 **Part A — Consequence:** Slowed habituation is the primary cost. Also generates downstream Traps (Invisible Elements displaced off screen, Unnecessary Steps from scrolling, Information Overload from option proliferation). Compounding effects make cumulative severity higher than any individual instance suggests.
