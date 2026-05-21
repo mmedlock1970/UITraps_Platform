@@ -1501,17 +1501,19 @@ Implement continuous auto-save wherever technically feasible — the requirement
 ## Definition (verbatim)
 Multiple instances of the same interface element are presented to the user at the same time.
 
-Examples: duplicated instances of controls, links, navigational paths, status indicators, content. The key test is same destination or same function — not same visual form. Elements that look different but invoke the same function or reach the same destination are still this Trap.
+Examples: duplicated instances of controls, links, navigational paths, status indicators, content. The key test is same destination or same function — not same visual form, not "does it add value," not "does it serve a structural purpose." Whether a duplicate feels justified is irrelevant to detection. If two elements on the same screen reach the same destination, this Trap is present.
 
 ## DISCONFIRMATION — Apply First
 NOT present when:
 (a) Multiple paths serve genuinely different grammatical constructions (object→action AND action→object) that serve different user mental models. This exception is narrow — it applies to paths that approach the same action from structurally opposite starting points, not to elements that merely differ in visual form (icon vs. field vs. button) while invoking the same function.
-(b) Multiple paths exist on different, non-nested levels of the navigation hierarchy — the Trap applies specifically to the same level or directly nested level.
+(b) Multiple paths exist at genuinely different levels of the site's macro navigation hierarchy — meaning a link on a home page and its counterpart deep inside a section. This does NOT apply to different visual bands or bars on the same screen (e.g., a global nav bar and a sub-nav bar on the same page are the same level for purposes of this Trap).
 (c) Elements that appear similar actually reach different destinations.
+
+**Element identification:** Before comparing destinations, reason about what constitutes a single interactive element vs. separate elements. Components that form a single logical unit (a label and its icon, a field and its submit control) count as one element. Components that are spatially and functionally independent — even if visually similar — count as separate elements. Apply judgment; the question is whether a user would perceive and interact with them as one thing or two.
 
 **Critical distinction from Forced Syntax:** These are mutually exclusive for a given task flow. Forced Syntax provides only one construction; Gratuitous Redundancy provides duplicate paths. Confirm which is present before flagging either.
 
-**Context sensitivity:** In shopping and discovery interfaces where users may have unclear goals, redundant promotional paths may enhance rather than detract from the experience. This Trap most reliably applies in task-focused interfaces where users know what they want.
+**Context sensitivity:** This exception is narrow and applies only to *promotional* or *content discovery* paths — for example, a "New Releases" table at the front of a store that also appears on the shelves in its section. It does NOT apply to functional navigation elements (search, home, section links, core nav) — duplicating those is always this Trap regardless of interface type. The question is: is this a promotional surface or a functional navigation element? Promotional = possible exception. Functional = Trap.
 
 ## Severity
 **Part A — Consequence:** Slowed habituation is the primary cost. Also generates downstream Traps (Invisible Elements displaced off screen, Unnecessary Steps from scrolling, Information Overload from option proliferation). Compounding effects make cumulative severity higher than any individual instance suggests.
@@ -1519,7 +1521,7 @@ NOT present when:
 **Combination rule:** High severity when consequence is task failure or worse, regardless of likelihood.
 
 ## Confidence Tiers
-- **Tier 1:** Multiple links or controls pointing to the same destination — directly detectable by auditing design for duplicate navigation targets. One of the most automatable Traps.
+- **Tier 1:** Multiple elements visually appearing to reach the same destination or invoke the same function — detectable from the screen. Note: from a screenshot alone, destination identity is inferred, not confirmed. Flag as Tier 1 suspected when visual evidence is strong; note that destination confirmation requires code inspection or live testing.
 
 ## Root Cause Confirmation (U4)
 - **Downstream Traps** (Invisible Element, Unnecessary Steps, Information Overload): Confirm each independently before attributing to Gratuitous Redundancy. Content displaced off screen, scrolling required, and excess option count each require their own evidence. Gratuitous Redundancy is more often a contributor to these Traps than sole cause.
@@ -1541,9 +1543,9 @@ NOT present when:
 - **Forced Syntax** (distinguish): Mutually exclusive — see Disconfirmation above.
 
 ## Report Language (U6)
-**Finding:** [N] separate elements on [screen/level] lead to the same destination — [destination]. The duplicates add decision overhead without adding functionality.
+**Finding:** [N] separate elements on [screen/level] appear to reach the same destination — [destination]. The duplicates add decision overhead without adding functionality.
 **Why it matters:** Duplicate paths multiply the choices users must evaluate without multiplying destinations, slowing both decision-making and the development of automatic navigation habits.
-**Confidence:** [Tier 1: Confirmed — duplicate destinations are directly auditable]
+**Confidence:** [Tier 1: Suspected — visual evidence of duplicate destinations is strong; confirm destination identity via code inspection or live testing]
 
 ## Remediation (U7)
 Consolidate to one path per destination for a given grammatical construction. Audit the code for duplicate destination links — the most reliable detection method. When the motivation for adding a duplicate was poor discoverability of the original, fix the visibility of the original element rather than adding a copy. Caution: do not confuse Gratuitous Redundancy with useful flexible syntax — supporting both object→action and action→object constructions is valuable and should be preserved.
