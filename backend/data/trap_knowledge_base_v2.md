@@ -240,7 +240,6 @@ NOT present when:
 - **[Example 1.3] Hulu mobile scroll:** No scroll indicator; users missed content below fold. → *Rule: Scroll affordances cannot be assumed. When content extends beyond view, a visible continuation cue is necessary unless users have strong established prior learning for scrolling in that specific context.*
 - **[Example 1.4] BMW M-car DCT:** No visible Park control; foot-on-brake shutdown was invisible. → *Rule: In safety-critical interactions, the absence of a visible control is unacceptable regardless of the elegance of the invisible alternative.*
 - **[Example 1.5] Tesla door release:** Unlabeled emergency door releases caused people to be trapped after accidents. → *Rule: Emergency and fallback interactions — needed precisely when users are most stressed — must be the most visibly communicated interactions, not the least.*
-- **[Example 1.6] Apple 3D Touch:** Firm-press gesture required for hotspot with no visual indicator; most users never discovered it. → *Rule: When a non-standard physical gesture is the sole path to a function and no indicator communicates its existence, the function is effectively unavailable to most users.*
 
 ## Rules (consolidated)
 - [definition] Both conditions must be true for the Trap to be present: no cue exists AND user lacks prior learning. Prior learning can compensate for absence, but only when it reliably exists in the user population.
@@ -851,6 +850,7 @@ NOT present when:
 - **[Example 11.1] iPhone screenshot (side button + volume up):** Side button inadvertently created screenshot gesture at natural grip points; Apple mitigations left underlying cause untouched; iPhone 16 Camera Control added analogous problem in same zone. → *Rule: Controls placed at natural grip points will be accidentally activated regardless of design intent. Grip zone analysis must precede control placement decisions.*
 - **[Example 11.2] Kinect gesture interface:** Navigational swipe and natural behaviors (scratching ear) could not be distinguished by recognition system. → *Rule: When a gesture or voice vocabulary overlaps with natural human behaviors in the context of use, accidental activations will occur regardless of recognition system sophistication.*
 - **[Example 11.3] Gemalto Smart USB token:** Many users experienced accidental activation simply from how the token was held or carried. → *Rule: Controls on portable devices must account for all physical interactions during transport and storage, not only during intentional use.*
+- **[Example 11.4] Wayfair Megamenu:** The Wayfair shopping site includes a “mega menu” that can be accidently activated if users unintentionally hover their mouse pointer over the tabs at the top. → *Rule: Controls that automatically engage on hover must account for what happens when user did not intend to take advantage of the automatically deployed interface element.*
 
 ## Rules (consolidated)
 - [definition] The relationship with Physical Challenge is a source of tension: larger targets reduce Physical Challenge but increase Accidental Activation risk. No universal resolution — the right balance depends on context, stakes, and reversibility.
@@ -972,6 +972,8 @@ NOT present when:
 ## Examples → Rules
 - **[Example 13.1] YouTube pre-roll ads (unskippable):** Users cannot advance to content during mandatory ad viewing. → *Rule: Any process that prevents users from advancing to their goal for organizational or business reasons — not technical necessity — is this Trap. The business justification does not resolve the user experience failure.*
 - **[Example 13.2] Self-cleaning oven locked during cycle (Seow example):** System unavailable during cleaning; no indication of when it will end. → *Rule: When a system must be unavailable, communicating duration upfront and notifying when complete does not eliminate the Trap but meaningfully reduces its severity. No information about duration compounds frustration disproportionately.*
+- **[Example 13.3] Ragnorök video game:** Players of the acclaimed God of War Ragnarök are prevented from skipping these sequences. This is especially frustrating when a player wants to re-attempt a challenging battle that follows the cutscene – to do so, they must watch the entire scene again→ *Rule: Designs should allow users to advance through cutscenes especially if the user has already been exposed to the content before.*
+
 
 ## Rules (consolidated)
 - [definition] Two distinct causes: (1) organizational — business models depending on forced exposure; (2) design — mandatory flows imposed to ensure information delivery without considering user autonomy.
@@ -1031,6 +1033,7 @@ NOT present when:
 - **[Example 14.3] Workday field-by-field confirmation:** Required OK/Cancel after every individual field entry in profile setup. → *Rule: When steps are applied uniformly to all fields regardless of their consequence, the confirmation mechanism is not calibrated to risk — it is a Trap for low-consequence fields.*
 - **[Example 14.4] iPhone 2019 message deletion:** Functions (delete, flag, move) nested under reply function — one additional step away. → *Rule: When frequently used functions are nested under infrequently used functions for organizational convenience, users bear the inefficiency cost on every use.*
 - **[Example 14.5] Android Auto one-touch apps:** Added physical shortcuts to replace voice+wake+speak sequence. → *Rule: Reducing step count can simultaneously address Invisible Element (hidden capability becomes visible) and Memory Challenge (commands no longer need to be recalled). Step reduction often resolves multiple Traps at once.*
+- **[Example 14.5] Figma Auto Layout:** This feature reduced many of the steps needed to layout components. → *Rule: Step reduction is a powerful means of streamlining manual processes.*
 
 ## Rules (consolidated)
 - [definition] The goal is the right number of steps, not the minimum. Steps serving legitimate purposes (security, safety, legal, cognitive load management) are not this Trap.
@@ -1084,6 +1087,8 @@ NOT present when:
 ## Examples → Rules
 - **[Example 15.1] Jeep dealer search (2002 → 2007):** Lengthy paragraph describing how to enter zip code replaced with just the input field. → *Rule: When a task requires only simple input, extensive explanatory text around it is Information Overload. The redesign demonstrates the extent to which information can be reduced without loss of usability — far more than teams typically assume is possible.*
 - **[Example 15.2] Amazon Accounts & Lists reduction over time:** Substantially reduced options presented under this tab. → *Rule: Hick's Law: each doubling of choices adds a roughly constant increment of decision time. Reducing option count has disproportionately positive impact on decision speed. Audit interfaces that have grown over time.*
+- **[Example 15.3] Amazon Alexa Voice Assistant:** Users complained voice responses were too wordy. A ‘brief mode’ setting was added to address this problem. → *Rule: Information overload extends to voice interfaces and allowing users to control a system's verbosity is critical.*
+
 
 ## Rules (consolidated)
 - [definition] Specifically about comprehensible information in excess. Unclear information is Uncomprehended Element — a different Trap.
@@ -1142,6 +1147,8 @@ NOT present when:
 - **[Example 16.2] Alexa Mobile App re-asking criteria:** Made users re-state criteria they had already provided in the same session. → *Rule: Information provided earlier in the same session must be available throughout the session. Re-prompting within a single session is one of the strongest signals of this Trap.*
 - **[Example 16.3] Vending machine credit card question:** Asked users if they knew it accepted credit cards while processing a purchase just made with a credit card. → *Rule: When a system's current action demonstrates it already has information, prompting for that information is a Tier 1 instance. The evidence of the Trap is present on the same screen.*
 - **[Example 16.4] Workday address re-entry:** Required re-entering address in subsequent modules despite having been entered in earlier ones. → *Rule: User data provided in one module of a product should be available across all modules of the same product. Siloed data architecture is not a user's problem — it is a design failure.*
+- **[Example 16.5] Medical form re-entry of info:** Patients are often asked to enter the same information into both paper and digital medical forms prior to every healthcare visit, even when this information was previously captured. → *Rule: While it is important to ensure certain kinds of information, like medical history, is up-to-date, more efficient solutions only require users to edit or confirm previously entered data, rather than re-enter it.*
+
 
 ## Rules (consolidated)
 - [definition] Two forms: (1) actively re-prompting for information already provided; (2) passively failing to use prior work, preferences, or context.
@@ -1204,8 +1211,8 @@ NOT present when:
 - **Inviting Dead End** (downstream consequence): Incorrect information suggesting a wrong path forward is actually correct (mislabeled button, outdated instructions) functions as Inviting Dead End, but Incorrect Information is root cause. If a signifier is merely visually confusing but not factually wrong, it's only Inviting Dead End.
 
 ## Examples → Rules
-- **[Example 18.1] ChatGPT hallucinated legal cases (2023):** Lawyer filed brief citing cases that did not exist; lawyer and firm sanctioned by FTC. → *Rule: AI-generated content presented as authoritative fact creates this Trap structurally, regardless of the specific content. The structural indicator — AI generation without disclosure — is sufficient to flag at Tier 2.*
-- **[Example 18.2] Canada Airlines chatbot (AI):** Chatbot gave incorrect refund policy information; airline held liable. → *Rule: When AI-generated information about policies, procedures, or entitlements is incorrect and users act on it in good faith, both user harm and organizational liability result. Disclosure and human verification paths are required for high-stakes domains.*
+- **[Example 17.1] ChatGPT hallucinated legal cases (2023):** Lawyer filed brief citing cases that did not exist; lawyer and firm sanctioned by FTC. → *Rule: AI-generated content presented as authoritative fact creates this Trap structurally, regardless of the specific content. The structural indicator — AI generation without disclosure — is sufficient to flag at Tier 2.*
+- **[Example 17.2] Canada Airlines chatbot (AI):** Chatbot gave incorrect refund policy information; airline held liable. → *Rule: When AI-generated information about policies, procedures, or entitlements is incorrect and users act on it in good faith, both user harm and organizational liability result. Disclosure and human verification paths are required for high-stakes domains.*
 
 ## Rules (consolidated)
 - [definition] Unlike most Traps, this one produces no user friction at the moment of encounter — making it especially dangerous in high-stakes domains.
@@ -1264,10 +1271,12 @@ NOT present when:
 - **Unnecessary Steps** (downstream effect): Confirm that wrong prediction actually results in user having to take additional steps. Do not infer from poor predictions alone.
 
 ## Examples → Rules
-- **[Example 17.1] Smartphone autocorrect:** Incorrect substitutions range from irritating to embarrassing to insulting. → *Rule: The severity of individual wrong predictions varies enormously by the nature of the substitution — not just frequency. An error rate produces very different user experiences depending on what is being substituted. Evaluate error type, not just error rate.*
-- **[Example 17.2] Apple iPhone proximity-sensor voice recorder (2016):** Feature automatically started voice recorder when proximity sensor detected phone near ear; prone to accidental activation when phone simply held at different angles; problem persisted as of 2026. → *Rule: When passive sensor-based activation triggers a recording function, the acceptable false-positive rate is near zero — any activation without clear intent is a severe instance due to privacy implications.*
-- **[Example 17.3] Amazon humidifier recommendation spam:** Correctly predicting a purchase led to repeated, irrelevant humidifier recommendations — the model treated the purchase as indicating a collecting interest rather than a one-time need. → *Rule: Prediction models trained on behavioral patterns can get the inference logic wrong even when the underlying data is accurate. The symptom is recommendations that feel insulting or tone-deaf to the user.*
-- **[Example 17.4] Hover cover in UI (Office, TV guides):** Hover-triggered content occludes the content the user was trying to read. → *Rule: Proactively surfaced content that covers the content users are actively attending to is a Bad Prediction — the system inferred the user wanted the surfaced content when they wanted to continue reading.*
+- **[Example 18.1] Smartphone autocorrect:** Incorrect substitutions range from irritating to embarrassing to insulting. → *Rule: The severity of individual wrong predictions varies enormously by the nature of the substitution — not just frequency. An error rate produces very different user experiences depending on what is being substituted. Evaluate error type, not just error rate.*
+- **[Example 18.2] Apple iPhone proximity-sensor voice recorder (2016):** Feature automatically started voice recorder when proximity sensor detected phone near ear; prone to accidental activation when phone simply held at different angles; problem persisted as of 2026. → *Rule: When passive sensor-based activation triggers a recording function, the acceptable false-positive rate is near zero — any activation without clear intent is a severe instance due to privacy implications.*
+- **[Example 18.3] Amazon humidifier recommendation spam:** Correctly predicting a purchase led to repeated, irrelevant humidifier recommendations — the model treated the purchase as indicating a collecting interest rather than a one-time need. → *Rule: Prediction models trained on behavioral patterns can get the inference logic wrong even when the underlying data is accurate. The symptom is recommendations that feel insulting or tone-deaf to the user.*
+- **[Example 18.4] Hover cover in UI (Office, TV guides):** Hover-triggered content occludes the content the user was trying to read. → *Rule: Proactively surfaced content that covers the content users are actively attending to is a Bad Prediction — the system inferred the user wanted the surfaced content when they wanted to continue reading.*
+- **[Example 18.5] Amazon Alexa "By the way" promotions:** Amazon’s Alexa voice assistant
+began adding unsolicited "By the way..." messages after replies to promote other features. Users judged these messages to be irrelevant or ill-timed leading Amazon to reduce these prompts. → *Rule: Proactively surfaced content must not only be relevant but timely - and only presented to users when you can be certain they are open to suggestion.*
 
 ## Rules (consolidated)
 - [definition] The question is not whether prediction is perfect, but whether the benefit of acting on imperfect prediction outweighs the cost of getting it wrong in this context.
@@ -1390,6 +1399,9 @@ NOT present when:
 - **[Example 20.1] Facebook Beacon:** Shared users' partner-site purchase activities on news feed on opt-out basis; revealed gift surprises; class action lawsuit; shut down. → *Rule: Opt-out sharing defaults create this Trap for all users who do not notice or understand the opt-out. Default settings should reflect what users would choose if fully informed — not what maximizes data sharing. Retrospective confirmation: shutdown in response to user backlash and legal action confirms Trap at scale.*
 - **[Example 20.2] Amazon Echo Show purchase/shipping notifications:** Visible to household visitors; customers reported purchasing elsewhere to avoid revealed gift surprises. → *Rule: Data collected in one context (private purchase history) that surfaces in a different context (ambient display in shared home) creates this Trap. The disclosure context determines whether sharing is unwanted, not whether the data itself is "private."*
 - **[Example 20.3] Mobile apps with high-precision location tracking:** Many current apps collect data allowing precision location tracking without user awareness. → *Rule: Data collection that enables tracking without explicit user awareness constitutes this Trap structurally — the Trap exists before any specific disclosure occurs.*
+- **[Example 20.4] Venmo public-by default sharing of transactions:** Venmo removed its global feed that made users' payments visible to strangers worldwide. However, transactions remain public by default, with anyone able to view them by visiting a user's profile. → *Rule: Data collection that enables tracking without explicit user awareness constitutes this Trap structurally — the Trap exists before any specific disclosure occurs.*
+- **[Example 20.5] Zoom saves private chats when it saves meetings:** As of 2026, when a user saves Zoom meeting chats locally, it saves chats sent to everyone in the meeting, as well as the users' private messages. Users who copy-paste the entire chat log into emails or shared documents may inadvertently expose private conversations to everyone with access. → *Rule: Data collection that enables exposure of communications assumed to be constitutes this Trap structurally.*
+
 
 ## Rules (consolidated)
 - [definition] "Public" includes any audience the user did not intend — not only the general public. Sharing with friends, household members, or third-party advertisers without user intent all qualify.
@@ -1489,15 +1501,15 @@ Implement continuous auto-save wherever technically feasible — the requirement
 ## Definition (verbatim)
 Multiple instances of the same interface element are presented to the user at the same time.
 
-Examples: duplicated instances of controls, links, navigational paths, status indicators, content. Applies to duplicate entry points to the same destination via the same grammatical construction.
+Examples: duplicated instances of controls, links, navigational paths, status indicators, content. The key test is same destination or same function — not same visual form. Elements that look different but invoke the same function or reach the same destination are still this Trap.
 
 ## DISCONFIRMATION — Apply First
 NOT present when:
-(a) Multiple paths follow different grammatical constructions (object→action AND action→object) — this is useful flexible syntax, not Gratuitous Redundancy.
+(a) Multiple paths serve genuinely different grammatical constructions (object→action AND action→object) that serve different user mental models. This exception is narrow — it applies to paths that approach the same action from structurally opposite starting points, not to elements that merely differ in visual form (icon vs. field vs. button) while invoking the same function.
 (b) Multiple paths exist on different, non-nested levels of the navigation hierarchy — the Trap applies specifically to the same level or directly nested level.
 (c) Elements that appear similar actually reach different destinations.
 
-**Critical distinction from Forced Syntax:** These are mutually exclusive for a given task flow. Forced Syntax provides only one construction; Gratuitous Redundancy provides duplicate paths via the same construction. Confirm which is present before flagging either.
+**Critical distinction from Forced Syntax:** These are mutually exclusive for a given task flow. Forced Syntax provides only one construction; Gratuitous Redundancy provides duplicate paths. Confirm which is present before flagging either.
 
 **Context sensitivity:** In shopping and discovery interfaces where users may have unclear goals, redundant promotional paths may enhance rather than detract from the experience. This Trap most reliably applies in task-focused interfaces where users know what they want.
 
@@ -1515,9 +1527,9 @@ NOT present when:
 ## Examples → Rules
 - **[Example 22.1] Healthcare.gov three (then four) duplicate links (2014):** Three links on homepage all went to same destination; added a fourth, exacerbating the issue. → *Rule: Adding more duplicates to address discoverability problems worsens the Trap. The correct response to poor discoverability is to improve the visibility of the existing element, not add copies.*
 - **[Example 22.2] Swedish medical site 30+ duplicated links:** As of 2020, "find a location" link appeared 6 times on home screen; 30+ duplicate links total. → *Rule: In large organizational products built incrementally by different teams, Gratuitous Redundancy accumulates over time without anyone intending it. Periodic systematic audit is required.*
-
 ## Rules (consolidated)
-- [definition] Gratuitous Redundancy is different from flexible syntax. The distinction is grammatical: object→action AND action→object is useful; object→action AND object→action is this Trap.
+- [definition] Gratuitous Redundancy is different from flexible syntax. The distinction is purpose: paths serving genuinely different mental models or interaction approaches are useful; paths that reach the same destination serving the same mental model are this Trap — regardless of visual form.
+- [definition] Same destination is the test, not same appearance. Elements that look different but invoke the same function or navigate to the same place are still this Trap.
 - [definition] Power Law of Practice: when users can reach a destination by multiple routes, practice is divided across routes rather than concentrated. Curve toward automaticity flattens. Mastery takes longer.
 - [related concepts] Hick's Law: more choices adds decision time at every encounter. Gratuitous Redundancy increases choices without adding destinations.
 - [related concepts] Raskin's "monotony": one way to do things. Not dogmatic but directionally correct — resist the instinct toward variety at the cost of habit formation.
@@ -1746,7 +1758,6 @@ NOT present when:
 ## Examples → Rules
 - **[Example 26.1] Windows 8 dual home experiences:** Mouse/keyboard and touch had different Start/Home experiences; much was same, some was different; confusion resulted; mitigated in later versions. → *Rule: When a product has two distinct Home experiences for different input modes that partially overlap, users cannot determine whether behavior expected in one mode will apply in the other. Partial overlap is more confusing than two fully distinct experiences. A single, consistent home across all input modes is required.*
 - **[Example 26.2] Oculus Rift 2017 (3 separate homes):** Library, Explore (with house icon!), and Home — users couldn't get oriented. → *Rule: Using a universally recognized home symbol (house icon) for a destination that is not the primary home creates an Inviting Dead End that directly compounds Ambiguous Home. Home iconography must be reserved exclusively for the primary home.*
-- **[Example 26.3] Early Meta VR headsets:** Library (most users' mental home), Explore (labeled home but discovery feed), Home (VR space). → *Rule: When different teams design sections of a product independently, each may establish its own starting point until the product accumulates multiple competing homes no single team intended to create. Cross-team governance of home is required.*
 
 ## Rules (consolidated)
 - [definition] A clear single home makes returning to it one of the most deeply automatic actions a user can perform. Without it, users must reason their way back — the opposite of what a Habituating interface should require.

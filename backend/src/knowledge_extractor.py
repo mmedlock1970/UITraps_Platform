@@ -108,6 +108,38 @@ def _trap_name_to_slug(name: str) -> str:
     return name.lower().replace(" ", "_")
 
 
+# v1 folders use a numeric prefix for easy sorting — must match book_images/v1/ on disk
+# 26 traps: same as v2 minus INCORRECT INFORMATION; UNNECESSARY STEP is singular
+_V1_SLUG_MAP: dict[str, str] = {
+    "INVISIBLE ELEMENT":              "01_invisible_element",
+    "EFFECTIVELY INVISIBLE ELEMENT":  "02_effectively_invisible_element",
+    "DISTRACTION":                    "03_distraction",
+    "UNCOMPREHENDED ELEMENT":         "04_uncomprehended_element",
+    "INVITING DEAD END":              "05_inviting_dead_end",
+    "POOR GROUPING":                  "06_poor_grouping",
+    "FORCED SYNTAX":                  "07_forced_syntax",
+    "MEMORY CHALLENGE":               "08_memory_challenge",
+    "FEEDBACK FAILURE":               "09_feedback_failure",
+    "PHYSICAL CHALLENGE":             "10_physical_challenge",
+    "ACCIDENTAL ACTIVATION":          "11_accidental_activation",
+    "SLOW OR NO RESPONSE":            "12_slow_or_no_response",
+    "CAPTIVE WAIT":                   "13_captive_wait",
+    "UNNECESSARY STEP":               "14_unnecessary_step",
+    "UNNECESSARY STEP(S)":            "14_unnecessary_step",
+    "INFORMATION OVERLOAD":           "15_information_overload",
+    "SYSTEM AMNESIA":                 "16_system_amnesia",
+    "BAD PREDICTION":                 "17_bad_prediction",
+    "IRREVERSIBLE ACTION":            "18_irreversible_action",
+    "UNWANTED DISCLOSURE":            "19_unwanted_disclosure",
+    "DATA LOSS":                      "20_data_loss",
+    "GRATUITOUS REDUNDANCY":          "21_gratuitous_redundancy",
+    "VARIABLE OUTCOME":               "22_variable_outcome",
+    "WANDERING ELEMENT":              "23_wandering_element",
+    "INCONSISTENT APPEARANCE":        "24_inconsistent_appearance",
+    "AMBIGUOUS HOME":                 "25_ambiguous_home",
+    "POOR AESTHETIC":                 "26_poor_aesthetic",
+}
+
 # v2 folders use a numeric prefix for easy sorting — must match book_images/v2/ on disk
 _V2_SLUG_MAP: dict[str, str] = {
     "INVISIBLE ELEMENT":              "01_invisible_element",
@@ -126,8 +158,8 @@ _V2_SLUG_MAP: dict[str, str] = {
     "UNNECESSARY STEP(S)":            "14_unnecessary_steps",
     "INFORMATION OVERLOAD":           "15_information_overload",
     "SYSTEM AMNESIA":                 "16_system_amnesia",
-    "BAD PREDICTION":                 "17_bad_prediction",
-    "INCORRECT INFORMATION":          "18_incorrect_information",
+    "INCORRECT INFORMATION":          "17_incorrect_information",
+    "BAD PREDICTION":                 "18_bad_prediction",
     "IRREVERSIBLE ACTION":            "19_irreversible_action",
     "UNWANTED DISCLOSURE":            "20_unwanted_disclosure",
     "DATA LOSS":                      "21_data_loss",
@@ -349,7 +381,10 @@ def extract_trap_sections(trap_names: List[str]) -> Dict[str, str]:
     return sections
 
 
-def extract_trap_images(trap_names: List[str], version: str = "v1") -> Dict[str, List[str]]:
+_EXAMPLE_LABEL_RE = re.compile(r'^(\d+\.\d+)\.png$', re.IGNORECASE)
+
+
+def extract_trap_images(trap_names: List[str], version: str = "v1") -> Dict[str, List[tuple]]:
     """
     Load saved example images for the specified traps.
 
@@ -358,10 +393,11 @@ def extract_trap_images(trap_names: List[str], version: str = "v1") -> Dict[str,
         version: "v1" or "v2" — selects the versioned image directory
 
     Returns:
-        Dict mapping trap_name -> list of base64-encoded PNG strings.
+        Dict mapping trap_name -> list of (label, base64) tuples.
+        label is "Example X.Y" when the filename matches X.Y.png, else "".
         Traps with no saved images are omitted.
     """
-    result: Dict[str, List[str]] = {}
+    result: Dict[str, List[tuple]] = {}
 
     images_dir = BOOK_IMAGES_DIR_V2 if version == "v2" else BOOK_IMAGES_DIR_V1
     if not images_dir.exists():
@@ -371,15 +407,18 @@ def extract_trap_images(trap_names: List[str], version: str = "v1") -> Dict[str,
         if version == "v2":
             slug = _V2_SLUG_MAP.get(trap_name.upper(), _trap_name_to_slug(trap_name))
         else:
-            slug = _trap_name_to_slug(trap_name)
+            slug = _V1_SLUG_MAP.get(trap_name.upper(), _trap_name_to_slug(trap_name))
         trap_dir = images_dir / slug
         if not trap_dir.exists():
             continue
 
-        images = [
-            base64.b64encode(img_file.read_bytes()).decode("utf-8")
-            for img_file in sorted(trap_dir.glob("*.png"))
-        ]
+        images = []
+        for img_file in sorted(trap_dir.glob("*.png")):
+            m = _EXAMPLE_LABEL_RE.match(img_file.name)
+            label = f"Example {m.group(1)}" if m else ""
+            b64 = base64.b64encode(img_file.read_bytes()).decode("utf-8")
+            images.append((label, b64))
+
         if images:
             result[trap_name] = images
 

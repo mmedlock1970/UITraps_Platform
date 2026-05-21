@@ -1762,7 +1762,7 @@ def build_enrichment_user_message(
     Args:
         pass1_report: The structured report from Pass 1 detection
         trap_sections: Dict of trap_name -> book section text for each found trap
-        trap_images: Optional dict of trap_name -> list of base64 PNG strings (book illustrations)
+        trap_images: Optional dict of trap_name -> list of (label, base64) tuples (book illustrations)
         knowledge_chunks: Optional pre-formatted structured knowledge base content for found traps
 
     Returns:
@@ -1807,12 +1807,15 @@ def build_enrichment_user_message(
     if trap_images:
         content.append({
             "type": "text",
-            "text": "\nBOOK ILLUSTRATIONS — visual examples from the UI Traps framework:",
+            "text": "\nBOOK ILLUSTRATIONS — visual examples from the UI Traps framework. "
+                    "Labels like [Example 17.1] correspond to the numbered examples in the knowledge base above:",
         })
         for trap_name, images in trap_images.items():
             if images:
                 content.append({"type": "text", "text": f"\n[{trap_name}]"})
-                for img_b64 in images:
+                for label, img_b64 in images:
+                    if label:
+                        content.append({"type": "text", "text": f"[{label}]"})
                     content.append({
                         "type": "image",
                         "source": {

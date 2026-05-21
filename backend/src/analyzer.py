@@ -339,6 +339,8 @@ class UITrapsAnalyzer:
         # Fall back to extracted book sections if KB chunks unavailable
         trap_sections = {} if knowledge_chunks else extract_trap_sections(found_trap_names)
         trap_images = extract_trap_images(found_trap_names, version=kb_version)
+        if kb_version == "v1":
+            trap_images = {k: v[:1] for k, v in trap_images.items()}
 
         if trap_images:
             n_imgs = sum(len(v) for v in trap_images.values())

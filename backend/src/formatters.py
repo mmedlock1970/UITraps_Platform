@@ -1548,9 +1548,6 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
         html.append("<p>All traps were either found or not fully evaluated</p>")
     html.append("</div>")
 
-    # Trap Coverage Matrix
-    html.append(_build_trap_matrix_html(report))
-
     # Footer
     html.append("<div class='footer confidentiality-notice'>")
     html.append("<p><em>Generated using UI Tenets & Traps proprietary framework</em></p>")
