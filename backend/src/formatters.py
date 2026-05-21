@@ -391,7 +391,6 @@ def format_report_as_markdown(report: Dict[str, Any], user_context: Dict[str, st
         md.append("*These are technical issues or broken states, not UI Traps. They represent system failures that should be fixed regardless of usability.*")
         md.append("")
         for bug in report['bugs_detected']:
-            render_frame_info(bug)
             md.append(f"**Bug Type:** {bug.get('bug_type', 'unknown').replace('_', ' ').title()}")
             md.append("")
             md.append(f"**Where:** {bug.get('location', 'N/A')}")
@@ -411,7 +410,6 @@ def format_report_as_markdown(report: Dict[str, Any], user_context: Dict[str, st
         md.append("*These items might be traps but require human judgment to confirm. The AI observed something potentially problematic but lacks context to definitively classify it.*")
         md.append("")
         for issue in report['potential_issues']:
-            render_frame_info(issue)
             md.append(f"**Trap Detected:** **{issue.get('trap_name', 'UNKNOWN').upper()}** (Potential)")
             md.append("")
             md.append(f"**Tenet:** {issue.get('tenet', 'N/A').upper()}")
@@ -1389,7 +1387,6 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
         [('minor', i) for i in report.get('minor_issues', [])]
     )
     # Already in severity order; sort within each severity by confidence
-    from itertools import groupby as _groupby
     sorted_confirmed = []
     for sev in ('critical', 'moderate', 'minor'):
         group = [(s, i) for s, i in all_confirmed if s == sev]
