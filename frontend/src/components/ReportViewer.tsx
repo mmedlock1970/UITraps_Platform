@@ -73,6 +73,7 @@ const DARK_MODE_CSS = `
 
   /* ── Meta / muted text ── */
   .task-context, .timestamp { color: #a0aec0 !important; }
+  .meta-label, .meta-confidence, .meta-tenet { color: #a0aec0 !important; }
   em, i { color: #a0aec0 !important; }
 
   /* ── Summary ── */
