@@ -161,6 +161,7 @@
   border-radius: 8px;
   resize: none;
   outline: none;
+  min-height: 38px;
   max-height: 160px;
   overflow-y: auto;
   color: var(--uitraps-text);
