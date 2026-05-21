@@ -611,38 +611,82 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
     html.append("<meta charset='UTF-8'>")
     html.append("<meta name='viewport' content='width=device-width, initial-scale=1.0'>")
     html.append("<title>UI Tenets & Traps Analysis Report</title>")
+    html.append("<link rel='preconnect' href='https://fonts.googleapis.com'>")
+    html.append("<link rel='preconnect' href='https://fonts.gstatic.com' crossorigin>")
+    html.append("<link href='https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap' rel='stylesheet'>")
     html.append("<style>")
     html.append("""
         /* ── Base ── */
         html, body {
             margin: 0; padding: 0;
-            font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-family: 'Montserrat', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             font-size: 15px;
             line-height: 1.65;
             color: #111111;
-            background: #f7f6f4;
+            background: #f0eeea;
         }
         h1, h2, h3, h4, h5, h6 {
-            font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-family: 'Montserrat', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             color: #111111;
-            letter-spacing: -0.3px;
         }
         .ui-traps-report {
-            padding: 32px 28px;
+            padding: 40px 32px 60px;
             max-width: 860px;
             margin: 0 auto;
         }
         .timestamp {
             color: #8a8680;
             font-size: 0.85em;
+            display: block;
+            margin-bottom: 28px;
         }
         .context-section {
-            padding: 20px 24px;
-            border-radius: 12px;
-            margin: 20px 0;
-            border: 1px solid #e8e6e2;
+            padding: 0;
+            border-radius: 14px;
+            margin: 0 0 16px;
+            border: 1px solid #e4e1dc;
             background: #ffffff;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
+            overflow: hidden;
+        }
+        .context-section > h2 {
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: #8a8680;
+            padding: 16px 24px;
+            margin: 0;
+            border-bottom: 1px solid #e4e1dc;
+        }
+        .context-body {
+            padding: 20px 24px;
+            font-size: 14px;
+        }
+        .context-body p { margin: 0 0 8px; }
+        .context-body p:last-child { margin-bottom: 0; }
+        .context-body ul { margin: 4px 0 8px; padding-left: 20px; }
+        .summary-section {
+            padding: 0;
+            border-radius: 14px;
+            border: 1px solid #e4e1dc;
+            background: #ffffff;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
+            margin: 0 0 24px;
+            overflow: hidden;
+        }
+        .summary-section > h2 {
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: #8a8680;
+            padding: 16px 24px;
+            margin: 0;
+            border-bottom: 1px solid #e4e1dc;
+        }
+        .summary-inner {
+            padding: 20px 24px;
         }
         .summary-section ul {
             padding: 16px 24px 16px 40px;
@@ -669,32 +713,34 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
             border-collapse: collapse;
             border-radius: 10px;
             overflow: hidden;
-            border: 1px solid #e8e6e2;
+            border: 1px solid #e4e1dc;
             margin: 0 0 20px 0;
             font-size: 0.9em;
         }
         .scorecard-table thead th {
-            background: #111111;
-            color: #ffffff;
+            background: #f7f6f4;
+            color: #8a8680;
             padding: 9px 14px;
             text-align: center;
             font-weight: 600;
-            font-size: 0.82em;
-            letter-spacing: 0.04em;
+            font-size: 0.75em;
+            letter-spacing: 0.07em;
+            text-transform: uppercase;
+            border-bottom: 1px solid #e4e1dc;
         }
-        .scorecard-table thead th:first-child { text-align: left; }
+        .scorecard-table thead th:first-child { text-align: left; color: #4a4744; }
         .scorecard-label {
             padding: 10px 14px;
-            font-size: 0.88em;
+            font-size: 0.85em;
             font-weight: 600;
             color: #4a4744;
-            border-bottom: 1px solid #e8e6e2;
-            background: #f7f6f4;
+            border-bottom: 1px solid #e4e1dc;
+            background: #faf9f7;
         }
         .scorecard-col {
             text-align: center;
             padding: 10px 14px;
-            border-bottom: 1px solid #e8e6e2;
+            border-bottom: 1px solid #e4e1dc;
             font-weight: 700;
             font-size: 1em;
         }
@@ -702,7 +748,7 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
         .scorecard-moderate { color: #e05c1a; }
         .scorecard-low      { color: #2980b9; }
         .scorecard-potential{ color: #7f8c8d; }
-        .scorecard-total    { color: #111111; border-left: 1px solid #e8e6e2; }
+        .scorecard-total    { color: #111111; border-left: 1px solid #e4e1dc; }
         /* Summary headline + narrative */
         .summary-headline {
             font-size: 1.05em;
@@ -769,8 +815,8 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
             font-size: 0.78em;
             font-weight: 600;
             color: #4a4744;
-            background: #f7f6f4;
-            border: 1px solid #e8e6e2;
+            background: #f0eeea;
+            border: 1px solid #e4e1dc;
             border-radius: 100px;
             padding: 3px 10px;
             letter-spacing: 0.02em;
@@ -796,12 +842,12 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
         .sev-minor    { background: #3498db; }
         .issue-card {
             background: #ffffff;
-            border: 1px solid #e8e6e2;
+            border: 1px solid #e4e1dc;
             border-left: 4px solid #d0cdc8;
-            padding: 20px 22px;
+            padding: 22px 24px;
             margin: 12px 0;
-            border-radius: 10px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            border-radius: 14px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
         }
         .issue-card.critical {
             border-left-color: #c0392b;
@@ -830,7 +876,7 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
         .issue-card .frame-info {
             background: #f7f6f4;
             color: #4a4744;
-            border: 1px solid #e8e6e2;
+            border: 1px solid #e4e1dc;
             padding: 6px 12px;
             border-radius: 6px;
             margin: 0 0 14px 0;
@@ -848,7 +894,7 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
             background: #f7f6f4;
             padding: 12px;
             border-radius: 8px;
-            border: 1px solid #e8e6e2;
+            border: 1px solid #e4e1dc;
         }
         .section-intro {
             color: #8a8680;
@@ -861,35 +907,41 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
             font-style: italic;
         }
         .positive-section {
-            padding: 20px 24px;
-            border-radius: 12px;
-            border: 1px solid #e8e6e2;
+            padding: 22px 24px;
+            border-radius: 14px;
+            border: 1px solid #e4e1dc;
             border-left: 4px solid #27ae60;
             background: #ffffff;
             margin: 20px 0;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
         }
+        .positive-section h2 { margin: 0 0 12px; padding: 0; border: none; font-size: 1em; font-weight: 700; letter-spacing: -0.2px; }
         .positive-item { color: #1a7a40; }
-        h1 { font-size: 1.6em; font-weight: 800; color: #111111; border-bottom: 2px solid #e8e6e2; padding-bottom: 12px; margin-bottom: 20px; }
-        h2 { font-size: 1.15em; font-weight: 700; color: #111111; border-bottom: 1px solid #e8e6e2; padding-bottom: 10px; margin: 28px 0 16px; }
-        h3 { font-size: 1em; font-weight: 700; color: #111111; margin: 20px 0 10px; }
-        h4 { font-size: 0.92em; font-weight: 600; color: #4a4744; margin: 16px 0 8px; }
+        h1 { font-size: 1.85em; font-weight: 800; color: #111111; letter-spacing: -0.7px; line-height: 1.2; border-bottom: none; padding-bottom: 0; margin: 0 0 6px; }
+        h2 { font-size: 1.05em; font-weight: 700; color: #111111; letter-spacing: -0.2px; border-bottom: none; padding-bottom: 0; margin: 28px 0 14px; }
+        h3 { font-size: 1em; font-weight: 700; color: #111111; margin: 16px 0 8px; letter-spacing: -0.1px; }
+        h4 { font-size: 0.92em; font-weight: 600; color: #4a4744; margin: 12px 0 6px; }
         .potential-issues-section {
-            padding: 20px 24px;
-            border-radius: 12px;
+            padding: 22px 24px;
+            border-radius: 14px;
             border-left: 4px solid #e05c1a;
-            border: 1px solid #e8e6e2;
+            border: 1px solid #e4e1dc;
             background: #ffffff;
             margin: 20px 0;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
         }
         .potential-issues-section .issue-card.potential {
             border-left-color: #e05c1a;
         }
         .traps-not-found {
-            padding: 20px 24px;
-            border-radius: 12px;
-            border: 1px solid #e8e6e2;
+            padding: 22px 24px;
+            border-radius: 14px;
+            border: 1px solid #e4e1dc;
             background: #ffffff;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
+            margin: 0 0 16px;
         }
+        .traps-not-found h2 { margin: 0 0 8px; font-size: 1.05em; font-weight: 700; }
         .traps-not-found h3 {
             font-size: 0.92em;
             margin: 16px 0 8px;
@@ -910,7 +962,7 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
         }
         .untestable-list li {
             padding: 7px 0;
-            border-bottom: 1px solid #e8e6e2;
+            border-bottom: 1px solid #e4e1dc;
             font-size: 0.87em;
             color: #4a4744;
         }
@@ -925,16 +977,17 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
             margin: 0 0 8px;
         }
         .footer {
-            margin-top: 40px;
-            padding-top: 20px;
-            border-top: 1px solid #e8e6e2;
+            margin-top: 48px;
+            padding-top: 24px;
+            border-top: 1px solid #e4e1dc;
         }
         .confidentiality-notice {
-            border: 1px solid #e8e6e2;
+            border: 1px solid #e4e1dc;
             padding: 20px 24px;
-            border-radius: 12px;
+            border-radius: 14px;
             margin-top: 20px;
             background: #ffffff;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
         }
         .confidentiality-notice h3 {
             color: #8a6500;
@@ -944,41 +997,48 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
         .confidentiality-notice li { margin: 5px 0; }
         hr {
             border: none;
-            border-top: 1px solid #e8e6e2;
+            border-top: 1px solid #e4e1dc;
             margin: 24px 0;
+        }
+        .issues-section h2, .traps-not-found h2 { margin: 0 0 4px; }
+        .issues-section { margin: 24px 0; }
+        .issues-section > h2, .potential-issues-section > h2 {
+            margin: 0 0 4px;
         }
         .trap-matrix { margin: 30px 0; }
         .trap-matrix-table {
             width: 100%;
             border-collapse: collapse;
             font-size: 0.87em;
-            border-radius: 10px;
+            border-radius: 14px;
             overflow: hidden;
-            border: 1px solid #e8e6e2;
+            border: 1px solid #e4e1dc;
         }
         .trap-matrix-table thead th {
-            background: #111111;
-            color: #ffffff;
+            background: #f7f6f4;
+            color: #8a8680;
             padding: 10px 14px;
             text-align: left;
             font-weight: 600;
-            font-size: 0.85em;
-            letter-spacing: 0.02em;
+            font-size: 0.75em;
+            letter-spacing: 0.07em;
+            text-transform: uppercase;
+            border-bottom: 1px solid #e4e1dc;
         }
         .trap-matrix-table thead th.count-col { text-align: center; }
         .trap-matrix-table td {
             padding: 7px 14px;
-            border-bottom: 1px solid #e8e6e2;
+            border-bottom: 1px solid #e4e1dc;
             vertical-align: middle;
         }
         .trap-matrix-table .tenet-cell {
             font-weight: 700;
             font-size: 0.75em;
             letter-spacing: 0.06em;
-            background: #f7f6f4;
+            background: #faf9f7;
             color: #4a4744;
             text-align: center;
-            border-right: 1px solid #e8e6e2;
+            border-right: 1px solid #e4e1dc;
             white-space: nowrap;
             text-transform: uppercase;
         }
@@ -992,7 +1052,7 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
         .trap-matrix-table .count.minor { color: #2980b9; }
         .trap-matrix-table .count.total {
             color: #111111;
-            border-left: 1px solid #e8e6e2;
+            border-left: 1px solid #e4e1dc;
         }
         .trap-matrix-table tr.has-issues td.trap-name { font-weight: 600; color: #111111; }
 
@@ -1001,7 +1061,7 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
             margin: 30px 0;
             padding: 24px 28px;
             border-radius: 12px;
-            border: 1px solid #e8e6e2;
+            border: 1px solid #e4e1dc;
             background: #ffffff;
             box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
@@ -1013,7 +1073,7 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
             padding: 18px 20px;
             margin: 12px 0;
             border-left: 4px solid #d0cdc8;
-            border: 1px solid #e8e6e2;
+            border: 1px solid #e4e1dc;
             box-shadow: none;
         }
         .user-issue-card.impact-high   { border-left-color: #c0392b; }
@@ -1042,7 +1102,7 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
         .user-issue-recs strong { font-size: 0.9em; color: #111111; }
         .user-issue-recs ul { margin: 6px 0 0; padding-left: 20px; }
         .user-issue-recs li { margin: 3px 0; font-size: 0.93em; }
-        .task-group-header { font-size: 0.95em; color: #4a4744; font-weight: 700; margin: 22px 0 8px; padding-bottom: 6px; border-bottom: 1px solid #e8e6e2; letter-spacing: -0.1px; }
+        .task-group-header { font-size: 0.95em; color: #4a4744; font-weight: 700; margin: 22px 0 8px; padding-bottom: 6px; border-bottom: 1px solid #e4e1dc; letter-spacing: -0.1px; }
     """)
     html.append("</style>")
     html.append("</head>")
@@ -1050,11 +1110,11 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
     html.append("<div class='ui-traps-report'>")
 
     # Header
-    html.append(f"<h1>UI Tenets & Traps Analysis Report</h1>")
+    html.append(f"<h1>UI Tenets &amp; Traps<br>Analysis Report</h1>")
 
     # Design name/title
     if user_context and user_context.get('design_name'):
-        html.append(f"<h2>{user_context['design_name']}</h2>")
+        html.append(f"<p style='font-size:1.05em;font-weight:600;color:#4a4744;letter-spacing:-0.2px;margin:6px 0 0;'>{user_context['design_name']}</p>")
 
     html.append(f"<p class='timestamp'>Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}</p>")
 
@@ -1062,6 +1122,7 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
     if user_context:
         html.append("<div class='context-section'>")
         html.append("<h2>Context</h2>")
+        html.append("<div class='context-body'>")
         if user_context.get('chat_context_used'):
             html.append("<p class='chat-context-badge'>&#x21BA; Re-analyzed with chat clarifications</p>")
         html.append(f"<p><strong>Users:</strong> {user_context.get('users', 'N/A')}</p>")
@@ -1077,10 +1138,12 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
 
         html.append(f"<p><strong>Materials Tested:</strong> {user_context.get('format', 'N/A')}</p>")
         html.append("</div>")
+        html.append("</div>")
 
     # Summary
     html.append("<div class='summary-section'>")
     html.append("<h2>Summary</h2>")
+    html.append("<div class='summary-inner'>")
 
     # Scorecard table — confirmed (higher confidence) + potential (lower confidence)
     n_high = len(report.get('critical_issues', []))
@@ -1123,6 +1186,7 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
     if narrative:
         html.append(f"<p class='summary-narrative'>{narrative}</p>")
 
+    html.append("</div>")
     html.append("</div>")
 
     # Get frame images from report if available (for video/multi-image analysis)
