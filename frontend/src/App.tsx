@@ -535,66 +535,8 @@ export const App: React.FC = () => {
     );
   }
 
-  // ── Form view (default + analysis in progress) ──
-  // AnalyzerForm is always mounted here so its local state survives the analyzing phase.
-  if (view === 'form') {
-    const isAnalyzing = formAnalysisPhase === 'analyzing';
-    return (
-      <div className={`uitraps-viewport-wrapper ${styles.viewportWrapper}`} data-theme={theme}>
-        <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
-          <header className={styles.header}>
-            <div className={styles.logo}>UI Traps <span className={styles.logoAccent}>Helper</span></div>
-            {!isAnalyzing && (
-              <div className={styles.headerActions}>
-                {getAnalysisHistory().length > 0 && (
-                  <button className={styles.headerButton} onClick={() => setView('history')}>Past Analyses</button>
-                )}
-                <button className={`${styles.headerButton} ${styles.themeToggle}`} onClick={toggleTheme} title={theme === 'light' ? 'Dark mode' : 'Light mode'}>
-                  {theme === 'light'
-                ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-                : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>}
-                </button>
-              </div>
-            )}
-          </header>
-
-          {!isAnalyzing && (
-            <div className={styles.tabRow}>
-              <button type="button" className={`${styles.tab} ${styles.tabActive}`}>Analyze a design</button>
-              <button type="button" className={styles.tab} onClick={() => setView('chat')}>Ask general questions</button>
-            </div>
-          )}
-
-          {/* Progress overlay — visible during analysis */}
-          {isAnalyzing && (
-            <div className={styles.overlayContainer}>
-              <AnalysisProgress
-                elapsedTime={formElapsed.elapsedTime}
-                onCancel={() => { setFormAnalysisPhase('idle'); formElapsed.reset(); }}
-                inputType={formFileCount > 1 ? 'multi_image' : 'single_image'}
-                fileCount={formFileCount}
-              />
-            </div>
-          )}
-
-          {/* Form — always mounted (hidden during analysis) so field values are preserved */}
-          <div style={{ display: isAnalyzing ? 'none' : 'flex', flexDirection: 'column', overflowY: 'auto', flex: 1, paddingTop: '24px' }}>
-            {formError && (
-              <div style={{ maxWidth: 900, margin: '0 auto 0', padding: '0 24px', width: '100%', boxSizing: 'border-box' }}>
-                <div style={{ background: '#fdecea', border: '1px solid #f5c6c6', color: '#c0392b', borderRadius: 8, padding: '12px 16px', fontSize: 13, marginBottom: 16 }}>
-                  {formError}
-                </div>
-              </div>
-            )}
-            <AnalyzerForm onSubmit={handleFormSubmit} disabled={isAnalyzing} />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // ── Estimate preview overlay ──
-  if (unified.analysisPhase === 'previewing' && unified.estimate) {
+  if (view === 'chat' && unified.analysisPhase === 'previewing' && unified.estimate) {
     return (
       <div className={`uitraps-viewport-wrapper ${styles.viewportWrapper}`} data-theme={theme}>
         <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
@@ -621,7 +563,7 @@ export const App: React.FC = () => {
   }
 
   // ── Analysis in progress ──
-  if (unified.analysisPhase === 'analyzing') {
+  if (view === 'chat' && unified.analysisPhase === 'analyzing') {
     return (
       <div className={`uitraps-viewport-wrapper ${styles.viewportWrapper}`} data-theme={theme}>
         <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
@@ -644,98 +586,126 @@ export const App: React.FC = () => {
     );
   }
 
-  // ── Main chat view ──
+  // ── Form + Chat views — single tree so header/tabs never unmount ──
+  const isFormAnalyzing = view === 'form' && formAnalysisPhase === 'analyzing';
   const isEmpty = unified.messages.length === 0 && !unified.isLoading;
 
   return (
     <div className={`uitraps-viewport-wrapper ${styles.viewportWrapper}`} data-theme={theme}>
       <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
         <header className={styles.header}>
-          <div className={styles.logo}>
-            UI Traps <span className={styles.logoAccent}>Helper</span>
-          </div>
-          <div className={styles.headerActions}>
-            <button className={styles.headerButton} onClick={() => unified.clearHistory()}>
-              New Session
-            </button>
-            {getAnalysisHistory().length > 0 && (
-              <button className={styles.headerButton} onClick={() => setView('history')}>
-                Past Analyses
+          <div className={styles.logo}>UI Traps <span className={styles.logoAccent}>Helper</span></div>
+          {!isFormAnalyzing && (
+            <div className={styles.headerActions}>
+              <button className={`${styles.headerButton} ${styles.themeToggle}`} onClick={toggleTheme} title={theme === 'light' ? 'Dark mode' : 'Light mode'}>
+                {theme === 'light'
+                  ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                  : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>}
               </button>
-            )}
-            <button className={`${styles.headerButton} ${styles.themeToggle}`} onClick={toggleTheme} title={theme === 'light' ? 'Dark mode' : 'Light mode'}>
-              {theme === 'light'
-                ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-                : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>}
-            </button>
-          </div>
+            </div>
+          )}
         </header>
 
-        <div className={styles.tabRow}>
-          <button type="button" className={styles.tab} onClick={() => setView('form')}>Analyze a design</button>
-          <button type="button" className={`${styles.tab} ${styles.tabActive}`}>Ask general questions</button>
-        </div>
-
-        {isEmpty ? (
-          <div className={styles.centeredLayout}>
-            <div className={styles.chatPageIntro}>
-              <h1 className={styles.chatPageTitle}>Ask me anything...</h1>
-              <div className={styles.chatPageSubtitle}>
-                <ul>
-                  <li>Ask any question about UI Tenets &amp; Traps</li>
-                  <li>Describe an interface issue, it will identify Traps for you</li>
-                </ul>
-              </div>
-            </div>
-            <UnifiedInput
-              centered
-              placeholder=""
-              inputText={unified.inputText}
-              onInputTextChange={unified.setInputText}
-              files={unified.files}
-              onFilesChange={unified.setFiles}
-              users={unified.users}
-              onUsersChange={unified.setUsers}
-              tasks={unified.tasks}
-              onTasksChange={unified.setTasks}
-              format={unified.format}
-              onFormatChange={unified.setFormat}
-              contentType={unified.contentType}
-              onContentTypeChange={unified.setContentType}
-              contextExpanded={unified.contextExpanded}
-              onContextExpandedChange={unified.setContextExpanded}
-              detectedMode={unified.detectedMode}
-              isLoading={unified.isLoading}
-              onSubmit={unified.submit}
-            />
+        {!isFormAnalyzing && (
+          <div className={styles.tabRow}>
+            <button type="button" className={`${styles.tab} ${view === 'form' ? styles.tabActive : ''}`} onClick={() => setView('form')}>Analyze a design</button>
+            <button type="button" className={`${styles.tab} ${view === 'chat' ? styles.tabActive : ''}`} onClick={() => setView('chat')}>Ask a question</button>
           </div>
-        ) : (
+        )}
+
+        {!isFormAnalyzing && (
+          <div className={styles.subTabActions}>
+            {view === 'form' && getAnalysisHistory().length > 0 && (
+              <button className={styles.headerButton} onClick={() => setView('history')}>Past Analyses</button>
+            )}
+            {view === 'chat' && (
+              <button className={styles.headerButton} onClick={() => unified.clearHistory()}>New Session</button>
+            )}
+          </div>
+        )}
+
+        {view === 'form' && (
           <>
-            <ConversationPanel
-              messages={unified.messages}
-              isLoading={unified.isLoading}
-              onWidgetChoice={unified.handleWidgetChoice}
-            />
-            <UnifiedInput
-              inputText={unified.inputText}
-              onInputTextChange={unified.setInputText}
-              files={unified.files}
-              onFilesChange={unified.setFiles}
-              users={unified.users}
-              onUsersChange={unified.setUsers}
-              tasks={unified.tasks}
-              onTasksChange={unified.setTasks}
-              format={unified.format}
-              onFormatChange={unified.setFormat}
-              contentType={unified.contentType}
-              onContentTypeChange={unified.setContentType}
-              contextExpanded={unified.contextExpanded}
-              onContextExpandedChange={unified.setContextExpanded}
-              detectedMode={unified.detectedMode}
-              isLoading={unified.isLoading}
-              onSubmit={unified.submit}
-            />
+            {isFormAnalyzing && (
+              <div className={styles.overlayContainer}>
+                <AnalysisProgress
+                  elapsedTime={formElapsed.elapsedTime}
+                  onCancel={() => { setFormAnalysisPhase('idle'); formElapsed.reset(); }}
+                  inputType={formFileCount > 1 ? 'multi_image' : 'single_image'}
+                  fileCount={formFileCount}
+                />
+              </div>
+            )}
+            <div style={{ display: isFormAnalyzing ? 'none' : 'flex', flexDirection: 'column', overflowY: 'auto', flex: 1, paddingTop: '24px' }}>
+              {formError && (
+                <div style={{ maxWidth: 900, margin: '0 auto 0', padding: '0 24px', width: '100%', boxSizing: 'border-box' }}>
+                  <div style={{ background: '#fdecea', border: '1px solid #f5c6c6', color: '#c0392b', borderRadius: 8, padding: '12px 16px', fontSize: 13, marginBottom: 16 }}>
+                    {formError}
+                  </div>
+                </div>
+              )}
+              <AnalyzerForm onSubmit={handleFormSubmit} disabled={isFormAnalyzing} />
+            </div>
           </>
+        )}
+
+        {view === 'chat' && (
+          isEmpty ? (
+            <div className={styles.centeredLayout}>
+              <div className={styles.chatPageIntro}>
+                <h1 className={styles.chatPageTitle}>Ask me anything...</h1>
+                <p className={styles.chatPageSubtitle}>Ask anything about UI Tenets &amp; Traps, or describe an interface issue and I'll identify the relevant Traps.</p>
+              </div>
+              <UnifiedInput
+                centered
+                placeholder=""
+                inputText={unified.inputText}
+                onInputTextChange={unified.setInputText}
+                files={unified.files}
+                onFilesChange={unified.setFiles}
+                users={unified.users}
+                onUsersChange={unified.setUsers}
+                tasks={unified.tasks}
+                onTasksChange={unified.setTasks}
+                format={unified.format}
+                onFormatChange={unified.setFormat}
+                contentType={unified.contentType}
+                onContentTypeChange={unified.setContentType}
+                contextExpanded={unified.contextExpanded}
+                onContextExpandedChange={unified.setContextExpanded}
+                detectedMode={unified.detectedMode}
+                isLoading={unified.isLoading}
+                onSubmit={unified.submit}
+              />
+            </div>
+          ) : (
+            <>
+              <ConversationPanel
+                messages={unified.messages}
+                isLoading={unified.isLoading}
+                onWidgetChoice={unified.handleWidgetChoice}
+              />
+              <UnifiedInput
+                inputText={unified.inputText}
+                onInputTextChange={unified.setInputText}
+                files={unified.files}
+                onFilesChange={unified.setFiles}
+                users={unified.users}
+                onUsersChange={unified.setUsers}
+                tasks={unified.tasks}
+                onTasksChange={unified.setTasks}
+                format={unified.format}
+                onFormatChange={unified.setFormat}
+                contentType={unified.contentType}
+                onContentTypeChange={unified.setContentType}
+                contextExpanded={unified.contextExpanded}
+                onContextExpandedChange={unified.setContextExpanded}
+                detectedMode={unified.detectedMode}
+                isLoading={unified.isLoading}
+                onSubmit={unified.submit}
+              />
+            </>
+          )
         )}
       </div>
     </div>
