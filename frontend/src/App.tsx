@@ -24,7 +24,6 @@ import { unifiedAsk } from './api/client';
 import { ChatPanel } from './components/ChatPanel';
 import './styles/variables.css';
 import styles from './App.module.css';
-import cardsImage from './assets/cards.png';
 
 /** Estimate running cost based on screenshot count (rough calculation) */
 function estimateRunningCost(count: number): string {
@@ -543,7 +542,6 @@ export const App: React.FC = () => {
             <div className={styles.logo}>UI Traps <span className={styles.logoAccent}>Helper</span></div>
             {!isAnalyzing && (
               <div className={styles.headerActions}>
-                <button className={styles.headerButton} onClick={() => setView('chat')}>Chat</button>
                 {getAnalysisHistory().length > 0 && (
                   <button className={styles.headerButton} onClick={() => setView('history')}>Past Analyses</button>
                 )}
@@ -553,6 +551,13 @@ export const App: React.FC = () => {
               </div>
             )}
           </header>
+
+          {!isAnalyzing && (
+            <div className={styles.tabRow}>
+              <button type="button" className={`${styles.tab} ${styles.tabActive}`}>Analyze a design</button>
+              <button type="button" className={styles.tab} onClick={() => setView('chat')}>Ask general questions</button>
+            </div>
+          )}
 
           {/* Progress overlay — visible during analysis */}
           {isAnalyzing && (
@@ -567,7 +572,7 @@ export const App: React.FC = () => {
           )}
 
           {/* Form — always mounted (hidden during analysis) so field values are preserved */}
-          <div style={{ display: isAnalyzing ? 'none' : 'flex', flexDirection: 'column', overflowY: 'auto', flex: 1, paddingTop: '40px' }}>
+          <div style={{ display: isAnalyzing ? 'none' : 'flex', flexDirection: 'column', overflowY: 'auto', flex: 1, paddingTop: '24px' }}>
             {formError && (
               <div style={{ maxWidth: 900, margin: '0 auto 0', padding: '0 24px', width: '100%', boxSizing: 'border-box' }}>
                 <div style={{ background: '#fdecea', border: '1px solid #f5c6c6', color: '#c0392b', borderRadius: 8, padding: '12px 16px', fontSize: 13, marginBottom: 16 }}>
@@ -644,9 +649,6 @@ export const App: React.FC = () => {
             UI Traps <span className={styles.logoAccent}>Helper</span>
           </div>
           <div className={styles.headerActions}>
-            <button className={styles.headerButton} onClick={() => setView('form')}>
-              Analyzer
-            </button>
             <button className={styles.headerButton} onClick={() => unified.clearHistory()}>
               New Session
             </button>
@@ -661,23 +663,21 @@ export const App: React.FC = () => {
           </div>
         </header>
 
+        <div className={styles.tabRow}>
+          <button type="button" className={styles.tab} onClick={() => setView('form')}>Analyze a design</button>
+          <button type="button" className={`${styles.tab} ${styles.tabActive}`}>Ask general questions</button>
+        </div>
+
         {isEmpty ? (
           <div className={styles.centeredLayout}>
-            <img
-              src={cardsImage}
-              alt="UI Tenets & Traps Cards"
-              className={styles.welcomeImage}
-            />
-            <div className={styles.welcomeTitle}>
-              UI Traps <span className={styles.logoAccent}>Helper</span>
-            </div>
-            <div className={styles.welcomeSubtitle}>
-              <ul>
-                <li>Ask any question about UI Tenets & Traps</li>
-                <li>Describe an interface issue, it will identify Traps for you</li>
-                <li>Analyze screenshots, Figma designs, or websites</li>
-                <li>Get detailed reports with findings and recommendations</li>
-              </ul>
+            <div className={styles.chatPageIntro}>
+              <h1 className={styles.chatPageTitle}>Ask me anything...</h1>
+              <div className={styles.chatPageSubtitle}>
+                <ul>
+                  <li>Ask any question about UI Tenets &amp; Traps</li>
+                  <li>Describe an interface issue, it will identify Traps for you</li>
+                </ul>
+              </div>
             </div>
             <UnifiedInput
               centered

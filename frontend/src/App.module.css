@@ -215,3 +215,70 @@
   overflow-y: auto;
   min-width: 0;
 }
+
+/* ── Page tab navigation (shared by form + chat views) ── */
+.tabRow {
+  display: flex;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--uitraps-border);
+  background: var(--uitraps-bg);
+  flex-shrink: 0;
+}
+
+.tab {
+  padding: 12px 0;
+  margin-right: 28px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--uitraps-text-secondary);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.tab:hover {
+  color: var(--uitraps-text);
+}
+
+.tabActive {
+  color: var(--uitraps-text);
+  font-weight: 600;
+  border-bottom-color: var(--uitraps-text);
+}
+
+/* ── Chat page empty state ── */
+.chatPageIntro {
+  max-width: 520px;
+  text-align: left;
+  margin-bottom: 32px;
+}
+
+.chatPageTitle {
+  font-size: 36px;
+  font-weight: 800;
+  letter-spacing: -0.8px;
+  line-height: 1.15;
+  color: var(--uitraps-text);
+  margin: 0 0 18px 0;
+}
+
+.chatPageSubtitle {
+  font-size: 16px;
+  color: var(--uitraps-text-secondary);
+  line-height: 1.65;
+  margin: 0;
+}
+
+.chatPageSubtitle ul {
+  list-style: disc;
+  padding-left: 1.2em;
+  margin: 0;
+}
+
+.chatPageSubtitle li {
+  margin-bottom: 6px;
+}
