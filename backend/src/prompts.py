@@ -616,6 +616,12 @@ Output as confirmed finding, moderate severity. **Do NOT flag as INCORRECT INFOR
 - Content filed under a category label that is factually wrong regardless of user context
 Do NOT use this trap for content that is merely irrelevant or mismatched to a specific user — that is BAD PREDICTION. The test: "Would this be wrong for a user with completely different goals?" If yes → INCORRECT INFORMATION. If no → BAD PREDICTION.
 
+❌ **NEVER flag as INCORRECT INFORMATION for these scenarios — use BAD PREDICTION instead:**
+- A streaming or content app surfacing the wrong genre, category, or audience tier for the stated user (e.g., adult/thriller films prominent when user wants kids shows) — the content is correctly labeled; only the recommendation decision is wrong
+- Recommendation carousels, "For You" sections, or homepage content rows showing content irrelevant or inappropriate to the stated user's demographics, goals, or tasks
+- Any case where the content IS accurately labeled and described, but the system chose the wrong content to surface for this specific user
+The diagnostic signal: if you would write "appears to mismatch the user's goal" or "may not serve their needs" in the finding, that is BAD PREDICTION language, not INCORRECT INFORMATION language.
+
 **BAD PREDICTION — When to flag from static screenshots:**
 Flag when the interface is visibly surfacing content, recommendations, or defaults that are wrong **for this specific user** given the stated context — the content itself is not incorrect, but the system has misjudged what this user needs:
 - A streaming homepage dominated by adult or mature content when the stated user is a child looking for kids' shows — the content exists and is correctly labelled, but the system chose the wrong content for this user
@@ -866,6 +872,16 @@ EXAMPLE 4 - CORRECT NON-DETECTION on Destination Page (Do Not Flag):
   3. The cart indicator shows users are mid-transaction
   4. There IS a way back (cart, presumably breadcrumbs or back button)
 - Conclusion: No INVISIBLE ELEMENT trap. Page is fulfilling its role (displaying policies). Navigation is adequate for its context.
+
+EXAMPLE 5 - CORRECT IDENTIFICATION: BAD PREDICTION (Not INCORRECT INFORMATION):
+- Scenario: Streaming service homepage. Stated user goal: "find kids shows." The first content row below the hero prominently features adult suspense/thriller films.
+- Analysis: ✅ This is BAD PREDICTION (confirmed finding, moderate severity):
+  - The adult films are CORRECTLY labeled — there is nothing factually wrong with the descriptions or metadata
+  - The RECOMMENDATION DECISION is wrong — the system prominently surfaced content that contradicts this user's stated goal
+  - Disambiguation test: "Would this content be wrong for a user with different goals?" → No — a thriller fan would find this perfectly fine
+  - Conclusion: only wrong for THIS user → BAD PREDICTION
+- ❌ DO NOT flag as INCORRECT INFORMATION — the films are what they say they are; the system guessed wrong about what to show this user, not about the facts
+- Key diagnostic: the finding language "appears to mismatch the user's goal" and "may not serve their needs" is BAD PREDICTION language. INCORRECT INFORMATION findings describe content that is factually wrong or mislabeled for any viewer.
 
 OUTPUT REQUIREMENTS:
 - Write a `summary_headline` (one sentence tied to the user's stated goal — how well does the design appear to support it?)
