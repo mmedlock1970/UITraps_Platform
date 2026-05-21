@@ -302,13 +302,13 @@ def format_report_as_markdown(report: Dict[str, Any], user_context: Dict[str, st
     n_high = len(report.get('critical_issues', []))
     n_moderate = len(report.get('moderate_issues', []))
     n_low = len(report.get('minor_issues', []))
-    n_confirmed = n_high + n_moderate + n_low
     n_potential = len(report.get('potential_issues', []))
+    n_positive = len(report.get('positive_observations', []))
 
-    md.append("| | High | Moderate | Low | Total |")
+    md.append("| | High Severity | Moderate Severity | Low Severity | Positives |")
     md.append("|---|:---:|:---:|:---:|:---:|")
-    md.append(f"| Higher confidence | {n_high or '—'} | {n_moderate or '—'} | {n_low or '—'} | {n_confirmed or '—'} |")
-    md.append(f"| Lower confidence | — | — | {n_potential or '—'} | {n_potential or '—'} |")
+    md.append(f"| Higher confidence | {n_high or '—'} | {n_moderate or '—'} | {n_low or '—'} | {n_positive or '—'} |")
+    md.append(f"| Lower confidence | — | — | {n_potential or '—'} | — |")
     md.append("")
 
     headline = report.get('summary_headline', '')
@@ -656,7 +656,7 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
             font-size: 15px;
             line-height: 1.65;
             color: #111111;
-            background: #f0eeea;
+            background: #f5f4f2;
         }
         h1, h2, h3, h4, h5, h6 {
             font-family: 'Montserrat', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -762,6 +762,10 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
             border-bottom: 1px solid #e4e1dc;
         }
         .scorecard-table thead th:first-child { text-align: left; color: #4a4744; }
+        .scorecard-th-high     { color: #c0392b !important; }
+        .scorecard-th-moderate { color: #e05c1a !important; }
+        .scorecard-th-low      { color: #2980b9 !important; }
+        .scorecard-th-positive { color: #27ae60 !important; }
         .scorecard-label {
             padding: 10px 14px;
             font-size: 0.85em;
@@ -777,11 +781,13 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
             font-weight: 700;
             font-size: 1em;
         }
-        .scorecard-high     { color: #c0392b; }
-        .scorecard-moderate { color: #e05c1a; }
-        .scorecard-low      { color: #2980b9; }
-        .scorecard-potential{ color: #7f8c8d; }
-        .scorecard-total    { color: #111111; border-left: 1px solid #e4e1dc; }
+        /* Value cell color coding — tinted background + matching text */
+        .scorecard-val-high     { background: rgba(192,57,43,0.07);  color: #c0392b; }
+        .scorecard-val-moderate { background: rgba(224,92,26,0.07);  color: #e05c1a; }
+        .scorecard-val-low      { background: rgba(41,128,185,0.07); color: #2980b9; }
+        .scorecard-val-positive { background: rgba(39,174,96,0.07);  color: #27ae60; }
+        .scorecard-val-potential{ background: rgba(127,140,141,0.07);color: #7f8c8d; }
+        .scorecard-empty        { color: #d0cdc8; }
         /* Summary headline + narrative */
         .summary-headline {
             font-size: 1.05em;
@@ -1178,31 +1184,34 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
     n_high = len(report.get('critical_issues', []))
     n_moderate = len(report.get('moderate_issues', []))
     n_low = len(report.get('minor_issues', []))
-    n_confirmed = n_high + n_moderate + n_low
     n_potential = len(report.get('potential_issues', []))
+    n_positive = len(report.get('positive_observations', []))
+
+    def _sc(val, cls):
+        return f"<td class='scorecard-col {cls}'>{val if val else '<span class=\"scorecard-empty\">—</span>'}</td>"
 
     html.append("<table class='scorecard-table'>")
     html.append("<thead><tr>")
     html.append("<th></th>")
-    html.append("<th class='scorecard-col'>High</th>")
-    html.append("<th class='scorecard-col'>Moderate</th>")
-    html.append("<th class='scorecard-col'>Low</th>")
-    html.append("<th class='scorecard-col scorecard-total'>Total</th>")
+    html.append("<th class='scorecard-col scorecard-th-high'>High Severity</th>")
+    html.append("<th class='scorecard-col scorecard-th-moderate'>Moderate Severity</th>")
+    html.append("<th class='scorecard-col scorecard-th-low'>Low Severity</th>")
+    html.append("<th class='scorecard-col scorecard-th-positive'>Positives</th>")
     html.append("</tr></thead>")
     html.append("<tbody>")
     html.append("<tr>")
     html.append("<td class='scorecard-label'>Higher confidence</td>")
-    html.append(f"<td class='scorecard-col scorecard-high'>{n_high or '—'}</td>")
-    html.append(f"<td class='scorecard-col scorecard-moderate'>{n_moderate or '—'}</td>")
-    html.append(f"<td class='scorecard-col scorecard-low'>{n_low or '—'}</td>")
-    html.append(f"<td class='scorecard-col scorecard-total'>{n_confirmed or '—'}</td>")
+    html.append(_sc(n_high, 'scorecard-val-high'))
+    html.append(_sc(n_moderate, 'scorecard-val-moderate'))
+    html.append(_sc(n_low, 'scorecard-val-low'))
+    html.append(_sc(n_positive, 'scorecard-val-positive'))
     html.append("</tr>")
     html.append("<tr>")
     html.append("<td class='scorecard-label'>Lower confidence</td>")
-    html.append("<td class='scorecard-col'>—</td>")
-    html.append("<td class='scorecard-col'>—</td>")
-    html.append(f"<td class='scorecard-col scorecard-potential'>{n_potential or '—'}</td>")
-    html.append(f"<td class='scorecard-col scorecard-total'>{n_potential or '—'}</td>")
+    html.append(_sc(0, 'scorecard-empty'))
+    html.append(_sc(0, 'scorecard-empty'))
+    html.append(_sc(n_potential, 'scorecard-val-potential'))
+    html.append(_sc(0, 'scorecard-empty'))
     html.append("</tr>")
     html.append("</tbody>")
     html.append("</table>")

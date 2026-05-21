@@ -120,16 +120,12 @@ const DARK_MODE_CSS = `
 
 export const ReportViewer: React.FC<ReportViewerProps> = ({
   html,
-  statistics,
   usage,
-  showStatistics = true,
   showUsageInfo = false,
   onNewAnalysis,
   isDark = false,
   htmlV1,
   htmlV2,
-  statisticsV1,
-  statisticsV2,
 }) => {
   const isDualReport = !!(htmlV1 && htmlV2);
   const [activeVersion, setActiveVersion] = useState<'v1' | 'v2'>('v2');
@@ -137,9 +133,6 @@ export const ReportViewer: React.FC<ReportViewerProps> = ({
   const activeHtml = isDualReport
     ? (activeVersion === 'v1' ? htmlV1! : htmlV2!)
     : html;
-  const activeStats = isDualReport
-    ? (activeVersion === 'v1' ? statisticsV1 : statisticsV2)
-    : statistics;
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
@@ -224,27 +217,6 @@ export const ReportViewer: React.FC<ReportViewerProps> = ({
         </div>
       )}
 
-      {/* Statistics Summary */}
-      {showStatistics && activeStats && (
-        <div className={styles.statsGrid}>
-          <div className={`${styles.statCard} ${styles.critical}`}>
-            <span className={styles.statValue}>{activeStats.critical_count}</span>
-            <span className={styles.statLabel}>High Severity</span>
-          </div>
-          <div className={`${styles.statCard} ${styles.moderate}`}>
-            <span className={styles.statValue}>{activeStats.moderate_count}</span>
-            <span className={styles.statLabel}>Moderate Severity</span>
-          </div>
-          <div className={`${styles.statCard} ${styles.minor}`}>
-            <span className={styles.statValue}>{activeStats.minor_count}</span>
-            <span className={styles.statLabel}>Low Severity</span>
-          </div>
-          <div className={`${styles.statCard} ${styles.positive}`}>
-            <span className={styles.statValue}>{activeStats.positive_count}</span>
-            <span className={styles.statLabel}>Positives</span>
-          </div>
-        </div>
-      )}
 
       {/* Usage Info */}
       {showUsageInfo && usage && (
