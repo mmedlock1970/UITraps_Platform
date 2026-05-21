@@ -9,6 +9,17 @@ import re
 from typing import Dict, Any, Optional
 from datetime import datetime
 
+TENET_COLORS = {
+    "UNDERSTANDABLE": "#2B4C6F",
+    "COMFORTABLE":    "#D1492E",
+    "RESPONSIVE":     "#E0AE22",
+    "EFFICIENT":      "#AF1C66",
+    "ACCURATE":       "#45A24C",
+    "PROTECTIVE":     "#642FA1",
+    "HABITUATING":    "#1F7DA8",
+    "BEAUTIFUL":      "#E37209",
+}
+
 # Canonical tenet → trap ordering for the coverage matrix
 TENETS_AND_TRAPS = [
     ("UNDERSTANDABLE", [
@@ -69,6 +80,30 @@ def _normalize_trap_name(name: str) -> str:
     name = re.sub(r'\(S\)', 'S', name)           # STEP(S) -> STEPS
     name = re.sub(r'\s*\([^)]*\)\s*', ' ', name) # strip other parentheticals
     return re.sub(r'\s+', ' ', name).strip()
+
+
+# Reverse lookup: normalized trap name → tenet name (upper)
+_TRAP_TO_TENET: Dict[str, str] = {
+    _normalize_trap_name(trap): tenet
+    for tenet, traps in TENETS_AND_TRAPS
+    for trap in traps
+}
+
+
+def _tenet_for(trap_name: str, fallback_tenet: str = '') -> str:
+    """Return the tenet name (upper) for a given trap name, using fallback if not found."""
+    if fallback_tenet:
+        return fallback_tenet.upper()
+    return _TRAP_TO_TENET.get(_normalize_trap_name(trap_name), '')
+
+
+def _tenet_pill_html(trap_name: str, tenet: str) -> str:
+    """Render a trap name as a tenet-colored pill span."""
+    color = TENET_COLORS.get(tenet.upper(), '#4a4744')
+    return (
+        f"<span class='tenet-pill' style='background:{color};'>"
+        f"{trap_name.upper()}</span>"
+    )
 
 
 def _cap_terms(text: str) -> str:
@@ -771,15 +806,28 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
             margin: 0 0 10px;
             line-height: 1.45;
         }
+        /* Tenet-colored pill — used for trap names in cards and not-found lists */
+        .tenet-pill {
+            display: inline-block;
+            font-size: 0.72em;
+            font-weight: 700;
+            font-family: 'Montserrat', 'Inter', system-ui, sans-serif;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #ffffff;
+            border-radius: 100px;
+            padding: 3px 10px;
+            white-space: nowrap;
+            line-height: 1.5;
+        }
         .issue-meta {
             display: flex;
             flex-wrap: wrap;
             align-items: center;
-            gap: 4px 0;
+            gap: 6px 0;
             margin: 0 0 14px;
             font-size: 0.82em;
         }
-        .meta-trap    { font-weight: 700; color: #111111; letter-spacing: 0.03em; }
         .meta-tenet   { color: #4a4744; }
         .meta-sep     { color: #d0cdc8; margin: 0 6px; }
         .meta-severity { font-weight: 600; }
@@ -810,16 +858,6 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
             display: flex;
             flex-wrap: wrap;
             gap: 6px;
-        }
-        .trap-name-list li {
-            font-size: 0.78em;
-            font-weight: 600;
-            color: #4a4744;
-            background: #f0eeea;
-            border: 1px solid #e4e1dc;
-            border-radius: 100px;
-            padding: 3px 10px;
-            letter-spacing: 0.02em;
         }
         /* Frame ref */
         .frame-ref-text {
@@ -947,13 +985,6 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
             margin: 16px 0 8px;
             color: #111111;
             font-weight: 600;
-        }
-        .trap-list {
-            column-count: 2;
-            column-gap: 20px;
-        }
-        .trap-list li {
-            break-inside: avoid;
         }
         .untestable-list {
             list-style: none;
@@ -1321,13 +1352,14 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
         headline_text = _cap_terms(issue.get('headline', ''))
         if headline_text:
             html.append(f"<p class='issue-headline'>{headline_text}</p>")
-        # Meta row: trap name | tenet | severity badge | confidence
+        # Meta row: trap name pill (tenet-colored) | tenet | severity | confidence
         conf = issue.get('confidence', '')
+        tenet = issue.get('tenet', '')
         sev_label = {'critical': 'High', 'moderate': 'Moderate', 'minor': 'Low'}.get(severity_class, severity_class.title())
         html.append("<div class='issue-meta'>")
-        html.append(f"<span class='meta-trap'>{issue.get('trap_name','').upper()}</span>")
+        html.append(_tenet_pill_html(issue.get('trap_name', ''), tenet))
         html.append(f"<span class='meta-sep'>·</span>")
-        html.append(f"<span class='meta-tenet'>{issue.get('tenet','').upper()}</span>")
+        html.append(f"<span class='meta-tenet'>{tenet.upper()}</span>")
         html.append(f"<span class='meta-sep'>·</span>")
         html.append(f"<span class='meta-severity sev-{severity_class}'>{sev_label} severity</span>")
         if conf:
@@ -1574,9 +1606,10 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
         html.append("<div class='traps-not-found'>")
         html.append("<h2>Traps Not Found</h2>")
         html.append("<p class='section-intro'>The following traps were specifically evaluated and do not appear to be present in the submitted design.</p>")
-        html.append("<ul class='trap-list'>")
+        html.append("<ul class='trap-name-list'>")
         for trap in tested_ok:
-            html.append(f"<li>{trap}</li>")
+            tenet = _tenet_for(trap)
+            html.append(f"<li>{_tenet_pill_html(trap, tenet)}</li>")
         html.append("</ul>")
         html.append("</div>")
 
@@ -1586,7 +1619,8 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
         html.append("<p class='section-intro'>The following traps could not be fully evaluated from the submitted materials. To investigate further, consider testing the live product with representative users, reviewing additional screens in the task flow, or inspecting the underlying code.</p>")
         html.append("<ul class='trap-name-list'>")
         for item in untestable:
-            html.append(f"<li>{item['trap_name'].upper()}</li>")
+            tenet = _tenet_for(item['trap_name'])
+            html.append(f"<li>{_tenet_pill_html(item['trap_name'], tenet)}</li>")
         html.append("</ul>")
         html.append("</div>")
 
