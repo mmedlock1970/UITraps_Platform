@@ -19,7 +19,7 @@ import { ReportViewer } from './components/ReportViewer';
 import { PastAnalyses } from './components/PastAnalyses';
 import { TaskCaptureScreen, CapturedStep } from './components/TaskCaptureScreen';
 import { saveAnalysis, getAnalysisHistory, StoredAnalysis } from './services/analysisHistory';
-import { ReportStatistics, UsageInfo, UnifiedAskResponse, TimeEstimate, ContentType, isFigmaEstimate, isUrlEstimate, isFileEstimate, UnifiedEstimate } from './api/types';
+import { ReportStatistics, UsageInfo, UnifiedAskResponse, TimeEstimate, UserContext, isFigmaEstimate, isUrlEstimate, isFileEstimate, UnifiedEstimate } from './api/types';
 import { unifiedAsk } from './api/client';
 import { ChatPanel } from './components/ChatPanel';
 import './styles/variables.css';
@@ -77,8 +77,8 @@ const CORRECTION_SIGNALS = [
  */
 function extractContextCorrections(
   messages: Array<{ role: string; content: string }>,
-  original: { users: string; tasks: string; format: string; contentType: ContentType }
-): { users: string; tasks: string; format: string; contentType: ContentType } {
+  original: UserContext
+): UserContext {
   const corrected = { ...original };
 
   for (const msg of messages) {
@@ -124,7 +124,7 @@ interface ActiveReport {
   statistics?: ReportStatistics;
   usage?: UsageInfo;
   originalFiles?: File[];
-  originalContext?: { users: string; tasks: string; format: string; contentType: ContentType };
+  originalContext?: UserContext;
   // Dual-report compare mode
   htmlV1?: string;
   htmlV2?: string;
@@ -162,11 +162,13 @@ export const App: React.FC = () => {
     }
   }, [tokenInput, auth]);
 
-  // Skip auth in dev mode — allow usage without token
-  const [devMode, setDevMode] = useState(false);
+  // Skip auth in dev mode — default true for local dev (localhost), false in production
+  const [devMode, setDevMode] = useState(() =>
+    window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  );
   const effectiveToken = auth.token || (devMode ? 'dev-mode' : '');
 
-  const handleAnalysisComplete = useCallback((result: UnifiedAskResponse, fileNames: string[], files?: File[], context?: { users: string; tasks: string; format: string; contentType: ContentType }) => {
+  const handleAnalysisComplete = useCallback((result: UnifiedAskResponse, fileNames: string[], files?: File[], context?: UserContext) => {
     // Dual-report (compare mode) — report_html_v1 and report_html_v2 are both present
     const isDualReport = !!(result.report_html_v1 && result.report_html_v2);
     if (isDualReport || result.report_html) {
@@ -284,7 +286,7 @@ export const App: React.FC = () => {
           result,
           files.map(f => f.name),
           files,
-          { users: context.users, tasks: context.tasks, format: context.format, contentType: context.contentType || 'website' }
+          context
         );
       } else if (result.error) {
         setFormError(result.error);
@@ -567,7 +569,7 @@ export const App: React.FC = () => {
           {/* Form — always mounted (hidden during analysis) so field values are preserved */}
           <div style={{ display: isAnalyzing ? 'none' : 'flex', flexDirection: 'column', overflowY: 'auto', flex: 1, paddingTop: '40px' }}>
             {formError && (
-              <div style={{ maxWidth: 780, margin: '0 auto 0', padding: '0 24px', width: '100%', boxSizing: 'border-box' }}>
+              <div style={{ maxWidth: 900, margin: '0 auto 0', padding: '0 24px', width: '100%', boxSizing: 'border-box' }}>
                 <div style={{ background: '#fdecea', border: '1px solid #f5c6c6', color: '#c0392b', borderRadius: 8, padding: '12px 16px', fontSize: 13, marginBottom: 16 }}>
                   {formError}
                 </div>

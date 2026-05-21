@@ -111,7 +111,7 @@ export type KbVersion = 'v1' | 'v2' | 'both';
 
 export interface UserContext {
   users: string;
-  expertise: string;
+  expertise?: string;
   tasks: string;
   format: string;
   design_name?: string;

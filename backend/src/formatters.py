@@ -337,18 +337,18 @@ def format_report_as_markdown(report: Dict[str, Any], user_context: Dict[str, st
         if user_context.get('chat_context_used'):
             md.append("_↺ Re-analyzed with chat clarifications_")
             md.append("")
+        if user_context.get('design_name'):
+            md.append(f"**Name of analysis:** {user_context['design_name']}")
+            md.append("")
         md.append(f"**Users:** {user_context.get('users', 'N/A')}")
         md.append("")
 
         # Format tasks as bulleted list
         raw_tasks = user_context.get('tasks', 'N/A')
         task_list = parse_tasks(raw_tasks)
-        md.append("**Key Tasks:**")
+        md.append("**User's goal(s):**")
         for task in task_list:
             md.append(f"- {task}")
-        md.append("")
-
-        md.append(f"**Materials Tested:** {user_context.get('format', 'N/A')}")
         md.append("")
         md.append("---")
         md.append("")
@@ -798,6 +798,15 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
             font-weight: 600;
             letter-spacing: 0.03em;
         }
+        /* Scorecard table title */
+        .scorecard-title {
+            font-size: 0.72em;
+            font-weight: 700;
+            letter-spacing: 0.07em;
+            text-transform: uppercase;
+            color: #8a8680;
+            margin: 0 0 8px;
+        }
         /* Scorecard table */
         .scorecard-table {
             width: 100%;
@@ -956,11 +965,22 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
         }
         /* Trap card image — fixed-width left column */
         .card-img-float {
-            width: 160px;
+            width: 130px;
             flex-shrink: 0;
             margin: 0 22px 0 0;
             border-radius: 8px;
             display: block;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.18);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            cursor: zoom-in;
+            position: relative;
+            z-index: 1;
+        }
+        .card-img-float:hover {
+            transform: scale(1.8);
+            transform-origin: top left;
+            z-index: 100;
+            box-shadow: 0 8px 28px rgba(0,0,0,0.28);
         }
         /* Content column — takes remaining width, never wraps under image */
         .issue-card-body {
@@ -1036,7 +1056,7 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
         }
         .positive-card ul { margin: 0; padding-left: 20px; }
         .positive-card li { margin: 4px 0; font-size: 0.93em; }
-        .positive-item { color: #1a7a40; }
+        .positive-item { color: #111111; }
         h1 { font-size: 1.85em; font-weight: 800; color: #111111; letter-spacing: -0.7px; line-height: 1.2; border-bottom: none; padding-bottom: 0; margin: 0 0 6px; }
         h2 { font-size: 1.05em; font-weight: 700; color: #111111; letter-spacing: -0.2px; border-bottom: none; padding-bottom: 0; margin: 28px 0 14px; }
         h3 { font-size: 1em; font-weight: 700; color: #111111; margin: 16px 0 8px; letter-spacing: -0.1px; }
@@ -1243,33 +1263,31 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
 
     html.append(f"<p class='timestamp'>Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}</p>")
 
-    # Evaluation Criteria
+    # Evaluation Details
     if user_context:
         html.append("<div class='context-section'>")
-        html.append("<h2>Evaluation Criteria</h2>")
+        html.append("<h2>Evaluation Details</h2>")
         html.append("<div class='context-body'>")
         if user_context.get('chat_context_used'):
             html.append("<p class='chat-context-badge'>&#x21BA; Re-analyzed with chat clarifications</p>")
         if user_context.get('design_name'):
-            html.append(f"<p><strong>Product / Interface:</strong> {user_context['design_name']}</p>")
+            html.append(f"<p><strong>Name of analysis:</strong> {user_context['design_name']}</p>")
         html.append(f"<p><strong>Users:</strong> {user_context.get('users', 'N/A')}</p>")
 
         # Format tasks as bulleted list
         raw_tasks = user_context.get('tasks', 'N/A')
         task_list = parse_tasks(raw_tasks)
-        html.append("<p><strong>Key Tasks:</strong></p>")
+        html.append("<p><strong>User's goal(s):</strong></p>")
         html.append("<ul>")
         for task in task_list:
             html.append(f"<li>{task}</li>")
         html.append("</ul>")
-
-        html.append(f"<p><strong>Materials Tested:</strong> {user_context.get('format', 'N/A')}</p>")
         html.append("</div>")
         html.append("</div>")
 
     # Summary
     html.append("<div class='summary-section'>")
-    html.append("<h2>Summary</h2>")
+    html.append("<h2>Summary of Findings</h2>")
     html.append("<div class='summary-inner'>")
 
     # Scorecard: high confidence = confidence:'high' only; low = 'medium'|'low'|missing + potentials
@@ -1289,6 +1307,7 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
     def _sc(val, cls):
         return f"<td class='scorecard-col {cls}'>{val if val else '<span class=\"scorecard-empty\">—</span>'}</td>"
 
+    html.append("<p class='scorecard-title'>Number of Traps Identified</p>")
     html.append("<table class='scorecard-table'>")
     html.append("<thead><tr>")
     html.append("<th></th>")
@@ -1457,13 +1476,13 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
         # Content column — never wraps under image
         html.append("<div class='issue-card-body'>")
         render_frame_ref(issue)
-        # Finding number + headline
+        # Finding number + headline + meta row
         if finding_num is not None:
             html.append(f"<p class='finding-num'>Finding {finding_num}</p>")
         headline_text = _cap_terms(issue.get('headline', ''))
         if headline_text:
             html.append(f"<p class='issue-headline'>{headline_text}</p>")
-        # Meta row: "Severity: ● High | Confidence: High"
+        # Meta row: "Severity: ● High | Confidence: High" — below headline
         conf = issue.get('confidence', '')
         sev_label = {'critical': 'High', 'moderate': 'Moderate', 'minor': 'Low'}.get(severity_class, severity_class.title())
         html.append("<div class='issue-meta'>")

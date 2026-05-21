@@ -30,10 +30,13 @@ const DARK_MODE_CSS = `
     border-color: #2d3748 !important;
     color: #e2e8f0 !important;
   }
-  /* Preserve severity left-border accent colors */
-  .issue-card.critical  { border-left-color: #fc8181 !important; }
-  .issue-card.moderate  { border-left-color: #f6ad55 !important; }
-  .issue-card.minor     { border-left-color: #63b3ed !important; }
+
+  /* ── Frame info / issue frames inside cards ── */
+  .issue-card .frame-info, .issue-frames {
+    background: #0f3460 !important;
+    color: #a0aec0 !important;
+    border-color: #2d3748 !important;
+  }
 
   /* ── General issue cards ── */
   .user-issue-card {
@@ -42,9 +45,6 @@ const DARK_MODE_CSS = `
     color: #e2e8f0 !important;
     box-shadow: none !important;
   }
-  .user-issue-card.impact-high   { border-left-color: #fc8181 !important; }
-  .user-issue-card.impact-medium { border-left-color: #f6ad55 !important; }
-  .user-issue-card.impact-low    { border-left-color: #63b3ed !important; }
   .user-issue-title { color: #e2e8f0 !important; }
   .user-issues-intro { color: #a0aec0 !important; }
 
@@ -53,10 +53,15 @@ const DARK_MODE_CSS = `
   .impact-badge.medium { background: rgba(246,173,85,0.15)  !important; color: #f6ad55 !important; }
   .impact-badge.low    { background: rgba(99,179,237,0.15)  !important; color: #63b3ed !important; }
 
-  /* ── Severity badges in trap cards ── */
-  .sev-critical { background: #c53030 !important; }
-  .sev-moderate { background: #c05621 !important; }
-  .sev-minor    { background: #2b6cb0 !important; }
+  /* ── Severity dots (colored circles) ── */
+  .sev-dot.sev-critical { background: #fc8181 !important; }
+  .sev-dot.sev-moderate { background: #f6ad55 !important; }
+  .sev-dot.sev-minor    { background: #63b3ed !important; }
+
+  /* ── Severity text labels in meta row ── */
+  .meta-severity.sev-critical { color: #fc8181 !important; }
+  .meta-severity.sev-moderate { color: #f6ad55 !important; }
+  .meta-severity.sev-minor    { color: #63b3ed !important; }
 
   /* ── Contributing trap pills ── */
   .trap-pill, .contributing-traps span {
@@ -76,13 +81,35 @@ const DARK_MODE_CSS = `
     color: #a0aec0 !important;
     border-color: #2d3748 !important;
   }
-  .summary-section ul { border-left-color: #4a90d9 !important; }
+  .summary-section ul { border-left-color: #4a90d9 !important; background: #0f3460 !important; }
 
-  /* ── Chat context badge ── */
+  /* ── Scorecard ── */
+  .scorecard-title { color: #718096 !important; }
+  .scorecard-label { background: #16213e !important; color: #a0aec0 !important; border-color: #2d3748 !important; }
+  .scorecard-table thead th { background: #0d2137 !important; border-color: #2d3748 !important; }
+  .scorecard-table thead th:first-child { color: #a0aec0 !important; }
+  .scorecard-th-high     { color: #fc8181 !important; }
+  .scorecard-th-moderate { color: #f6ad55 !important; }
+  .scorecard-th-low      { color: #63b3ed !important; }
+  .scorecard-th-positive { color: #68d391 !important; }
+  .scorecard-val-high     { background: rgba(252,129,129,0.12) !important; color: #fc8181 !important; }
+  .scorecard-val-moderate { background: rgba(246,173,85,0.12)  !important; color: #f6ad55 !important; }
+  .scorecard-val-low      { background: rgba(99,179,237,0.12)  !important; color: #63b3ed !important; }
+  .scorecard-val-positive { background: rgba(104,211,145,0.12) !important; color: #68d391 !important; }
+  .scorecard-val-potential{ background: rgba(160,174,192,0.12) !important; color: #a0aec0 !important; }
+  .scorecard-col { border-color: #2d3748 !important; }
+  .scorecard-empty { color: #4a5568 !important; }
+
+  /* ── Chat context badge / frame ── */
   .chat-context-badge {
     background: #1e3a5f !important;
     color: #63b3ed !important;
     border-color: #2b6cb0 !important;
+  }
+  .chat-context-frame {
+    background: #1e3a5f !important;
+    border-color: #2b6cb0 !important;
+    color: #90cdf4 !important;
   }
 
   /* ── Tables (generic) ── */
@@ -106,14 +133,38 @@ const DARK_MODE_CSS = `
   /* ── Confidence group headers ── */
   .confidence-group-header { color: #718096 !important; border-bottom-color: #2d3748 !important; }
 
+  /* ── Positive observations ── */
+  .positive-card {
+    background: #16213e !important;
+    border-color: #2d3748 !important;
+    border-left-color: #48bb78 !important;
+    box-shadow: none !important;
+  }
+  .positive-item { color: #68d391 !important; }
+
+  /* ── Potential issues section ── */
+  .potential-issues-section {
+    background: #16213e !important;
+    border-color: #2d3748 !important;
+  }
+
   /* ── Traps not found / untestable ── */
+  .traps-not-found {
+    background: #16213e !important;
+    border-color: #2d3748 !important;
+  }
   .traps-not-found h3 { color: #e2e8f0 !important; }
   .untestable-list li { border-bottom-color: #2d3748 !important; color: #a0aec0 !important; }
   .untestable-list .trap-label { color: #e2e8f0 !important; }
   .untestable-note { color: #718096 !important; }
 
-  /* ── Positive observations ── */
-  .positive-item { color: #68d391 !important; }
+  /* ── Confidentiality notice ── */
+  .confidentiality-notice {
+    background: #16213e !important;
+    border-color: #2d3748 !important;
+  }
+  .confidentiality-notice h3 { color: #f6ad55 !important; }
+  .confidentiality-notice p, .confidentiality-notice li { color: #a0aec0 !important; }
 
   /* ── Misc ── */
   a { color: #63b3ed !important; }
@@ -193,7 +244,7 @@ export const ReportViewer: React.FC<ReportViewerProps> = ({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [html]);
+  }, [activeHtml]);
 
   return (
     <div className={styles.container}>

@@ -67,9 +67,9 @@ function getCurrentPhase(elapsedTime: number, phases: Phase[]): Phase {
 
 function calculateProgress(elapsedTime: number, isComplete?: boolean): number {
   if (isComplete) return 100;
-  // Exponential decay: starts visibly moving, decelerates toward 70% asymptote.
-  // t=10s ≈ 18%  |  t=30s ≈ 42%  |  t=60s ≈ 59%  |  t=90s ≈ 65%  |  t=120s ≈ 68%
-  return 70 * (1 - Math.exp(-0.03 * elapsedTime));
+  // Curve fitted to: t=60s → 50%, t=120s → 90%, holds at 90% thereafter.
+  // Derived: A=250, k=ln(1.25)/60  |  t=30s ≈ 26%  |  t=90s ≈ 71%
+  return Math.min(90, 250 * (1 - Math.exp(-Math.log(1.25) / 60 * elapsedTime)));
 }
 
 function getInputTypeLabel(inputType?: InputType, fileCount?: number): string {
@@ -85,16 +85,16 @@ function getInputTypeLabel(inputType?: InputType, fileCount?: number): string {
 
 function getHelpText(inputType?: InputType, estimatedTime?: TimeEstimate): string {
   if (estimatedTime) {
-    return 'Analysis may take up to several minutes. Please keep this window open.';
+    return 'Analysis may take several minutes. Please keep this window open.';
   }
 
   switch (inputType) {
     case 'video':
-      return 'Video analysis may take up to several minutes. Please keep this window open.';
+      return 'Video analysis may take several minutes. Please keep this window open.';
     case 'multi_image':
-      return 'Multi-screenshot analysis may take up to several minutes. Please keep this window open.';
+      return 'Multi-screenshot analysis may take several minutes. Please keep this window open.';
     default:
-      return 'Analysis may take up to several minutes. Please keep this window open.';
+      return 'Analysis may take several minutes. Please keep this window open.';
   }
 }
 

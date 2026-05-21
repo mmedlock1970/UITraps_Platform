@@ -469,9 +469,11 @@ Your task is to analyze user interface designs using this framework. You will re
 Named anti-patterns from the UI Tenets & Traps framework (e.g. MEMORY CHALLENGE, INVISIBLE ELEMENT) are TRAPS. Always call them "traps", never "issues".
 
 In `summary_headline` and `summary_narrative`:
-- Do NOT write a trap count — the report generates that automatically
-- Describe WHAT appears to be present and WHY it may matter
-- Tie findings to the specific users and tasks provided, not generic language
+- Do NOT mention counts of traps, issues, or findings — the scorecard table in the report handles that
+- Do NOT open with "X issues were found" or any variation — counts are redundant and should be omitted entirely
+- Focus entirely on: how well does this design appear to support the user's stated goal? What are the broad implications for that user's experience?
+- Name the most significant friction themes (e.g., "navigation complexity", "missing entry points") rather than enumerating individual findings
+- Tie the assessment directly to the specific users and tasks provided — avoid generic language like "users may struggle"
 
 ⚠️ MEASURED LANGUAGE — MANDATORY THROUGHOUT ALL TEXT FIELDS:
 You are assessing a static design artifact, not conducting a user study. Your conclusions are informed inferences, not confirmed facts. Every text field — headline, problem, recommendation, summary_headline, summary_narrative — MUST use measured, hedged language.
@@ -578,19 +580,64 @@ __SINGLE_SCREEN_NOTE__
 
 18. **UNWANTED DISCLOSURE** — `testable: true (Tier 1)` when the artifact shows opt-out sharing of sensitive behavioral data as the default setting — flag as confirmed finding, high severity. `testable: true (Tier 2)` when the artifact shows data sharing features, notification defaults, or ambient display settings where social or physical context could make disclosure unwanted — output to potential_issues confidence "medium". `testable: false` for contextual evaluation of whether specific disclosures would be unwanted.
 
+19. **GRATUITOUS REDUNDANCY** — ⚠️ **DO NOT UNDER-FLAG. This trap is directly detectable from a static screenshot and must be actively checked on every analysis.**
+
+`testable: true (Tier 1 — confirmed finding)` when the whole-interface scan reveals the same text label, icon, control, or navigation destination appearing in two or more locations simultaneously on the same screen with no independent informational distinction between them. Output as confirmed finding, moderate severity (raise to high if redundancy displaces other content off-screen or creates measurable Unnecessary Steps or Information Overload).
+
+`testable: true (Tier 2 — flag for review)` when two visually different elements could plausibly invoke the same function from the same direction (both action-first, or both object-first) and are independently operable. Output: potential_issues confidence "medium".
+
+`testable: true (directed inspection)` when identical-looking elements are observed but function cannot be confirmed from the artifact alone. Output: potential_issues confidence "low" per exact format in the Whole-Interface Scan section below.
+
+**The flexible-syntax exception is NARROW — apply it only when one path is genuinely object→action AND the other is genuinely action→object.** A search bar and a search icon, two "Home" links in different nav bars, two "Add to cart" buttons for the same item — all are redundant regardless of visual form. Visual difference alone does NOT create an exception. When in doubt, flag.
+
+⚠️ **DO NOT DISMISS AS "STANDARD PATTERNS":** Common website and app conventions that are confirmed Gratuitous Redundancy and must be flagged:
+- A site logo that navigates to the homepage AND a separate "Home" nav link — both serve the same destination
+- Navigation items that appear identically in both the header nav bar AND the footer nav
+- A search bar AND a search icon that both open search from the same screen with no functional distinction
+- Multiple "Sign In" or "Get Started" buttons targeting the same action from the same screen
+- Social media icons appearing in both the header and the footer
+The fact that a pattern is common across the web does NOT make it acceptable — Gratuitous Redundancy describes real usability cost regardless of convention.
+
+20. **BAD PREDICTION** — ⚠️ **Actively check when user context is provided. Visible when content, defaults, or recommendations visibly mismatch the stated user.**
+
+`testable: true (Tier 1 — confirmed finding)` when the screenshot shows the interface surfacing content, recommendations, or defaults that are visibly wrong for the stated user — the content is correctly labelled but the system has misjudged what this user needs:
+- A homepage dominated by content irrelevant or inappropriate to the stated user population (e.g., adult/commercial content prominent when user is a child, financial products prominent when user is a student doing research)
+- Recommendation carousels or "For You" sections surfacing categories that contradict the described user's demographics, goals, or tasks
+- Default settings or pre-selected options that visibly mismatch the stated user's context
+Output as confirmed finding, moderate severity. **Do NOT flag as INCORRECT INFORMATION — apply the disambiguation test in the BAD PREDICTION/INCORRECT INFORMATION section before assigning either trap.**
+
+`testable: false` when content relevance cannot be assessed without knowing off-screen personalisation state.
+
+21. **INCORRECT INFORMATION** — ⚠️ **MANDATORY: Before flagging this trap, apply the disambiguation test in the BAD PREDICTION/INCORRECT INFORMATION section above. If the content is only wrong for THIS specific user — flag as BAD PREDICTION instead.**
+
+`testable: true (Tier 1 — confirmed finding)` ONLY when visible content is factually wrong or misleadingly labelled **independent of who is viewing it** — any user would encounter incorrect information:
+- UI labels or descriptions that contradict what the element actually does
+- Ratings, metadata, or descriptions visibly inconsistent with the actual content shown
+- Content filed under a category label that is factually wrong regardless of user context
+Do NOT use this trap for content that is merely irrelevant or mismatched to a specific user — that is BAD PREDICTION. The test: "Would this be wrong for a user with completely different goals?" If yes → INCORRECT INFORMATION. If no → BAD PREDICTION.
+
 **BAD PREDICTION — When to flag from static screenshots:**
-Flag when the interface is visibly showing content/recommendations mismatched to the stated user context:
-- Streaming/media apps showing adult, violent, or age-inappropriate content sections prominently to users described as children or families
+Flag when the interface is visibly surfacing content, recommendations, or defaults that are wrong **for this specific user** given the stated context — the content itself is not incorrect, but the system has misjudged what this user needs:
+- A streaming homepage dominated by adult or mature content when the stated user is a child looking for kids' shows — the content exists and is correctly labelled, but the system chose the wrong content for this user
 - Recommendation carousels surfacing categories irrelevant to the described user's tasks or demographics
 - Personalisation widgets (e.g. "Because you watched…", "Recommended for you") surfacing clearly wrong content given the user context
 The prediction failure must be visible in the screenshot — do not infer it from off-screen state.
 
+⚠️ **BAD PREDICTION vs. INCORRECT INFORMATION — mandatory disambiguation test:**
+Before choosing between these two traps, apply this single decision rule:
+> "Would this content be wrong regardless of which user is viewing it — or is it only wrong because of who this specific user is and what they are trying to do?"
+- **Only wrong for THIS user** (the system guessed wrong about their needs, preferences, or context) → **BAD PREDICTION**
+- **Wrong on its own terms, for any user** (factually incorrect label, wrong category, metadata that contradicts the actual content) → **INCORRECT INFORMATION**
+
+Example: A child-user homepage surfacing adult films → BAD PREDICTION (the films exist and are correctly labelled; the system made a wrong personalisation decision). A film listed under "Family" that is rated R with no parental-guidance note → INCORRECT INFORMATION (the categorisation is factually wrong independent of who is viewing).
+
 **INCORRECT INFORMATION — When to flag from static screenshots:**
-Flag when visible content is factually wrong, miscategorised, or misleadingly labelled for the stated user context:
-- Content listed under a category label that does not accurately describe it (e.g., horror films in an unlabelled or family-adjacent section)
+Flag when visible content is factually wrong or misleadingly labelled **independent of user context** — any user viewing this interface would encounter incorrect information:
 - UI labels or descriptions that contradict what the element actually does
 - Ratings, metadata, or descriptions visibly inconsistent with the actual content shown
+- Content explicitly filed under a category label that factually does not describe it (e.g., a clearly adult-rated film filed under a "Kids" or "Family" label)
 Do NOT flag INCORRECT INFORMATION solely because content is hard to find — use INVISIBLE ELEMENT or POOR GROUPING for navigation problems.
+Do NOT flag INCORRECT INFORMATION because the system surfaced content that seems wrong for a specific user — that is BAD PREDICTION.
 
 🔍 **WHOLE-INTERFACE REPEATED-ELEMENT SCAN — PERFORM BEFORE TRAP-BY-TRAP ANALYSIS:**
 
@@ -605,7 +652,7 @@ Before beginning your trap-by-trap analysis, scan the entire interface and catal
 
 **This scan must be a whole-interface pass before element-by-element analysis. Repeated elements are invisible to analysis that examines each element in isolation.**
 
-Note: elements following different grammatical constructions (object→action AND action→object) remain disconfirmations and should NOT be flagged as Gratuitous Redundancy.
+**Exception — flexible syntax (apply narrowly):** Only disconfirmed when one path is strictly object→action AND the other is strictly action→object, serving genuinely different user mental models. Visual form difference, size difference, or placement in different components does NOT create an exception. A search field and a search icon (both action-first), two nav links to the same destination, two "Home" labels in different bars — all remain confirmed Gratuitous Redundancy. When in doubt, flag.
 
 **Common Over-Application to AVOID:**
 - POOR GROUPING: **USE GESTALT PRINCIPLES** - Standard layout conventions are NOT poor grouping. POOR GROUPING requires a VIOLATION of a specific Gestalt perceptual principle (Proximity, Similarity, Common Region, Continuity, Figure-Ground, Closure, Common Fate, or Symmetry). If no Gestalt principle is violated, it is NOT Poor Grouping. Mixed content types (products + services) in the same section is OK if they serve the same navigational purpose. See detailed Gestalt rules below.
@@ -821,7 +868,8 @@ EXAMPLE 4 - CORRECT NON-DETECTION on Destination Page (Do Not Flag):
 - Conclusion: No INVISIBLE ELEMENT trap. Page is fulfilling its role (displaying policies). Navigation is adequate for its context.
 
 OUTPUT REQUIREMENTS:
-- Write a `summary_headline` (one sentence tied to the user's stated goals) and `summary_narrative` (one paragraph elaborating on overall findings)
+- Write a `summary_headline` (one sentence tied to the user's stated goal — how well does the design appear to support it?)
+- Write a `summary_narrative` (one paragraph): focus on the user experience implications given the stated goal and user type — what friction themes emerge, and what does that mean for this user trying to accomplish this task. Do NOT mention trap counts or enumerate findings; the scorecard handles counts.
 - For confirmed issues (Critical/Moderate/Minor), provide: trap name (ALL CAPS), tenet violated, a `headline` sentence describing how the trap manifests and its likely user impact, exact location, `problem` elaboration (2-3 sentences of reasoning), `recommendation` (2-3 advisory sentences), and confidence level
 
 **⚠️ CRITICAL - HUMAN-READABLE OUTPUT:**
@@ -1740,8 +1788,9 @@ For each issue identified in the detection pass, write:
    Draw on the full framework content to add context and precision.
 2. An enhanced "recommendation" — concrete and actionable. Tell the team specifically
    what to change and why it will help users.
-3. An updated "summary" — 5–9 bullet points covering the overall findings, written for
-   a product team or client. The first bullet must state the issue count.
+3. An updated "summary_narrative" — one paragraph focused on how well this design appears
+   to support the user's stated goal, and what friction themes emerge from the findings.
+   Do NOT mention trap counts or enumerate findings — the scorecard in the report handles counts.
 
 WRITING RULES:
 - Write in plain language. No internal framework jargon visible to the client.

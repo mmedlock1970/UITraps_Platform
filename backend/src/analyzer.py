@@ -314,13 +314,20 @@ class UITrapsAnalyzer:
 
         # Fall back to extracted book sections if KB chunks unavailable
         trap_sections = {} if knowledge_chunks else extract_trap_sections(found_trap_names)
-        trap_images = extract_trap_images(found_trap_names, version=kb_version)
-        if kb_version == "v1":
-            trap_images = {k: v[:1] for k, v in trap_images.items()}
 
-        if trap_images:
-            n_imgs = sum(len(v) for v in trap_images.values())
-            print(f"[UITraps] Pass 2: including {n_imgs} book illustration(s) for {len(trap_images)} trap(s)")
+        # Only fetch book illustration images when KB text chunks are unavailable —
+        # images are redundant and expensive (input tokens) when text chunks already
+        # supply the same knowledge for enrichment.
+        if not knowledge_chunks:
+            trap_images = extract_trap_images(found_trap_names, version=kb_version)
+            if kb_version == "v1":
+                trap_images = {k: v[:1] for k, v in trap_images.items()}
+            if trap_images:
+                n_imgs = sum(len(v) for v in trap_images.values())
+                print(f"[UITraps] Pass 2: including {n_imgs} book illustration(s) for {len(trap_images)} trap(s)")
+        else:
+            trap_images = {}
+            print(f"[UITraps] Pass 2: skipping book images — KB text chunks sufficient")
 
         # Build Pass 2 prompts
         system_prompt = build_enrichment_system_prompt()
@@ -333,7 +340,7 @@ class UITrapsAnalyzer:
 
         response = self.client.messages.create(
             model=self.enrich_model,
-            max_tokens=4096,
+            max_tokens=3500,
             temperature=0,
             system=system_prompt,
             messages=[{"role": "user", "content": user_message}],
@@ -373,27 +380,7 @@ class UITrapsAnalyzer:
             if field in pass1_report and field not in enriched:
                 enriched[field] = pass1_report[field]
 
-        # Re-apply the count reconciliation on the enriched summary
-        n_critical = len(enriched.get("critical_issues", []))
-        n_moderate = len(enriched.get("moderate_issues", []))
-        n_minor = len(enriched.get("minor_issues", []))
-        n_total = n_critical + n_moderate + n_minor
-        if n_total > 0:
-            parts = []
-            if n_critical:
-                parts.append(f"{n_critical} critical")
-            if n_moderate:
-                parts.append(f"{n_moderate} moderate")
-            if n_minor:
-                parts.append(f"{n_minor} minor")
-            count_bullet = f"{n_total} issue{'s' if n_total != 1 else ''} identified: {', '.join(parts)}."
-        else:
-            count_bullet = "No confirmed issues identified in this design."
 
-        if enriched.get("summary"):
-            enriched["summary"][0] = count_bullet
-        else:
-            enriched["summary"] = [count_bullet]
 
         print(f"[UITraps] Pass 2: enrichment complete ({response.usage.input_tokens} input tokens)")
         return enriched

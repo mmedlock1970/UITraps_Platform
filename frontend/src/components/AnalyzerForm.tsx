@@ -23,17 +23,16 @@ function platformToContentType(platform: string, productDomain: string): Content
 }
 
 function assembleContext(fields: {
-  platform: string; productDomain: string; screenName: string; screenDesc: string;
+  platform: string; productDomain: string; screenName: string;
   expLevel: string; techSavvy: string; frequency: string; userGoal: string;
   priorProducts: string; userDesc: string; extraContext: string; kbVersion: KbVersion;
 }): UserContext {
-  const { platform, productDomain, screenName, screenDesc, expLevel, techSavvy,
+  const { platform, productDomain, screenName, expLevel, techSavvy,
           frequency, userGoal, priorProducts, userDesc, extraContext, kbVersion } = fields;
 
   const formatParts = [
     platform && productDomain ? `${platform} — ${productDomain}` : platform || productDomain,
     screenName ? `Screen: ${screenName}` : '',
-    screenDesc ? `User goals: ${screenDesc}` : '',
   ].filter(Boolean);
 
   const userParts = [
@@ -45,7 +44,7 @@ function assembleContext(fields: {
     priorProducts ? `Products they use regularly: ${priorProducts}` : '',
   ].filter(Boolean);
 
-  const designName = [screenName, productDomain].filter(Boolean).join(' — ');
+  const designName = screenName.trim() || undefined;
 
   return {
     users: userParts.join('. '),
@@ -75,7 +74,6 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
   const [screenName, setScreenName] = useState('');
   const [platform, setPlatform] = useState('');
   const [productDomain, setProductDomain] = useState('');
-  const [screenDesc, setScreenDesc] = useState('');
   const [isDragover, setIsDragover] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -106,23 +104,22 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
     if (!screenName.trim()) e.screenName = 'Required';
     if (!platform) e.platform = 'Required';
     if (!productDomain) e.productDomain = 'Required';
-    if (!screenDesc.trim()) e.screenDesc = 'Required';
     if (!expLevel) e.expLevel = 'Required';
     if (!techSavvy) e.techSavvy = 'Required';
     if (!frequency) e.frequency = 'Required';
     if (!userGoal.trim()) e.userGoal = 'Required';
     setErrors(e);
     return Object.keys(e).length === 0;
-  }, [files, url, screenName, platform, productDomain, screenDesc, expLevel, techSavvy, frequency, userGoal]);
+  }, [files, url, screenName, platform, productDomain, expLevel, techSavvy, frequency, userGoal]);
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (disabled) return;
     if (!validate()) return;
-    const context = assembleContext({ platform, productDomain, screenName, screenDesc,
+    const context = assembleContext({ platform, productDomain, screenName,
       expLevel, techSavvy, frequency, userGoal, priorProducts, userDesc, extraContext, kbVersion });
     onSubmit({ files, url, context });
-  }, [disabled, validate, files, url, platform, productDomain, screenName, screenDesc,
+  }, [disabled, validate, files, url, platform, productDomain, screenName,
       expLevel, techSavvy, frequency, userGoal, priorProducts, userDesc, extraContext, kbVersion, onSubmit]);
 
   const handleFileChange = useCallback((newFiles: FileList | null) => {
@@ -162,6 +159,23 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
           </div>
         </div>
         <div className={styles.cardBody}>
+
+          <div className={styles.field}>
+            <label className={styles.fieldLabel} htmlFor="screenName">
+              <span className={styles.req} />
+              Provide a name for what is being analyzed
+            </label>
+            <input
+              id="screenName"
+              type="text"
+              className={`${styles.input} ${errors.screenName ? styles.inputError : ''}`}
+              placeholder="e.g., Product X onboarding flow, screen 1"
+              value={screenName}
+              onChange={e => setScreenName(e.target.value)}
+              disabled={disabled}
+            />
+            {errors.screenName && <p className={styles.fieldError}>{errors.screenName}</p>}
+          </div>
 
           <div className={styles.field}>
             <label className={styles.fieldLabel}>
@@ -238,24 +252,6 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
           </div>
 
           <div className={`${styles.fieldGrid} ${styles.twoCol}`}>
-            <div className={`${styles.field} ${styles.span2}`}>
-              <label className={styles.fieldLabel} htmlFor="screenName">
-                <span className={styles.req} />
-                Screen or flow name
-              </label>
-              <input
-                id="screenName"
-                type="text"
-                className={`${styles.input} ${errors.screenName ? styles.inputError : ''}`}
-                placeholder="e.g., Checkout — Payment step, Onboarding flow screens 1–4"
-                value={screenName}
-                onChange={e => setScreenName(e.target.value)}
-                disabled={disabled}
-              />
-              {errors.screenName && <p className={styles.fieldError}>{errors.screenName}</p>}
-              <p className={styles.fieldHint}>Name the specific screen or flow so findings can be precisely located in the report.</p>
-            </div>
-
             <div className={styles.field}>
               <label className={styles.fieldLabel} htmlFor="platform">
                 <span className={styles.req} />
@@ -324,33 +320,17 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
               {errors.productDomain && <p className={styles.fieldError}>{errors.productDomain}</p>}
             </div>
 
-            <div className={`${styles.field} ${styles.span2}`}>
-              <label className={styles.fieldLabel} htmlFor="screenDesc">
-                <span className={styles.req} />
-                What user goals is this UI designed to support?
-              </label>
-              <textarea
-                id="screenDesc"
-                className={`${styles.textarea} ${errors.screenDesc ? styles.inputError : ''}`}
-                rows={3}
-                placeholder="e.g., Users want to review their order, enter payment details, and complete the purchase with confidence."
-                value={screenDesc}
-                onChange={e => setScreenDesc(e.target.value)}
-                disabled={disabled}
-              />
-              {errors.screenDesc && <p className={styles.fieldError}>{errors.screenDesc}</p>}
-            </div>
           </div>
 
         </div>
       </div>
 
-      {/* ── Card 2: The User ── */}
+      {/* ── Card 2: The User and their goals ── */}
       <div className={styles.card}>
         <div className={styles.cardHeader}>
           <div className={styles.cardNum}>2</div>
           <div className={styles.cardHeaderText}>
-            <h2>The User</h2>
+            <h2>The User and their goals</h2>
             <p>Who will use this interface, and what do they already know?</p>
           </div>
         </div>
@@ -381,6 +361,24 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
                 disabled={disabled}
               />
               <p className={styles.fieldHint}>Age, occupation, cognitive load, accessibility needs, domain expertise — anything relevant to how they'll interact with this UI.</p>
+            </div>
+
+            <div className={`${styles.field} ${styles.span2}`}>
+              <label className={styles.fieldLabel} htmlFor="userGoal">
+                <span className={styles.req} />
+                Outcome the user is trying to achieve
+              </label>
+              <input
+                id="userGoal"
+                type="text"
+                className={`${styles.input} ${errors.userGoal ? styles.inputError : ''}`}
+                placeholder="e.g., Complete a purchase, Find and book a flight, Set up smart home routines"
+                value={userGoal}
+                onChange={e => setUserGoal(e.target.value)}
+                disabled={disabled}
+              />
+              {errors.userGoal && <p className={styles.fieldError}>{errors.userGoal}</p>}
+              <p className={styles.fieldHint}>The specific outcome most users are trying to achieve when they reach this screen or flow.</p>
             </div>
 
             <div className={styles.field}>
@@ -449,24 +447,6 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
                 <option>Continuously — multiple times per day</option>
               </select>
               {errors.frequency && <p className={styles.fieldError}>{errors.frequency}</p>}
-            </div>
-
-            <div className={`${styles.field} ${styles.span2}`}>
-              <label className={styles.fieldLabel} htmlFor="userGoal">
-                <span className={styles.req} />
-                Outcome user is trying to achieve
-              </label>
-              <input
-                id="userGoal"
-                type="text"
-                className={`${styles.input} ${errors.userGoal ? styles.inputError : ''}`}
-                placeholder="e.g., Complete a purchase, Find and book a flight, Set up smart home routines"
-                value={userGoal}
-                onChange={e => setUserGoal(e.target.value)}
-                disabled={disabled}
-              />
-              {errors.userGoal && <p className={styles.fieldError}>{errors.userGoal}</p>}
-              <p className={styles.fieldHint}>The specific outcome most users are trying to achieve when they reach this screen or flow.</p>
             </div>
 
             <div className={`${styles.field} ${styles.span2}`}>
@@ -594,7 +574,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
       <div className={styles.submitCard}>
         <div className={styles.submitText}>
           <h3>Ready to analyze.</h3>
-          <p>High-severity findings only, ranked by likely user impact. Analysis typically takes 15–30 seconds.</p>
+          <p>High-severity findings only, ranked by likely user impact. Analysis typically takes 2–3 minutes.</p>
         </div>
         <button type="submit" className={styles.btnSubmit} disabled={disabled}>
           Run Analysis

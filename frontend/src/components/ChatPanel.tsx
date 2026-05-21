@@ -30,7 +30,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ apiEndpoint, apiKey, repor
   const [input, setInput] = useState('');
   const [copied, setCopied] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const atBottomRef = useRef(true);
+
+  const handleMessagesScroll = useCallback(() => {
+    const el = messagesRef.current;
+    if (!el) return;
+    atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  }, []);
 
   const handleCopy = useCallback(() => {
     if (messages.length === 0) return;
@@ -43,15 +51,27 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ apiEndpoint, apiKey, repor
     });
   }, [messages]);
 
+  // Auto-scroll only when the user is already at the bottom
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (atBottomRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages, isLoading]);
+
+  // Auto-grow textarea
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+  }, [input]);
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     const msg = input.trim();
     if (!msg || isLoading) return;
     setInput('');
+    atBottomRef.current = true; // always scroll to bottom when user sends
 
     // Intercept re-run requests — route to the structured pipeline, not inline chat
     if (canRerun && onRerunAnalysis && RERUN_PATTERNS.some(p => p.test(msg))) {
@@ -119,7 +139,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ apiEndpoint, apiKey, repor
         )}
       </div>
 
-      <div className={styles.messages}>
+      <div className={styles.messages} ref={messagesRef} onScroll={handleMessagesScroll}>
         {messages.length === 0 && (
           <div className={styles.emptyState}>
             <p>Ask a question about any finding, or re-run analysis after providing any needed clarifications.</p>
@@ -156,7 +176,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ apiEndpoint, apiKey, repor
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Ask a question… (Enter to send)"
-          rows={2}
+          rows={1}
           disabled={isLoading || !reportMarkdown}
         />
         <button

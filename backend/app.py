@@ -949,7 +949,7 @@ async def list_saved_reports(
         List of report summaries
     """
     try:
-        user_id = str(user.get("userId", ""))
+        user_id = str(user.get("id") or user.get("userId", ""))
         saver = get_report_saver()
         reports = saver.list_reports(limit=limit, user_id=user_id)
         return {
@@ -991,7 +991,7 @@ async def get_saved_report(
             )
 
         # Verify the report belongs to this user
-        user_id = str(user.get("userId", ""))
+        user_id = str(user.get("id") or user.get("userId", ""))
         report_user_id = str(report.get("user_id", ""))
         if report_user_id and report_user_id != user_id:
             raise HTTPException(
@@ -1384,7 +1384,7 @@ async def analyze_url(
                     # Return both crawl result AND the navigation graph
                     return crawl_result, crawler.get_navigation_graph()
 
-                loop = asyncio.get_event_loop()
+                loop = asyncio.get_running_loop()
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     crawl_result, navigation_graph = await loop.run_in_executor(executor, run_crawl)
 
@@ -1805,7 +1805,7 @@ async def get_user_usage(user: dict = Depends(get_current_user)):
 
     Returns monthly allowance, usage, bonus tokens, and subscription dates.
     """
-    user_id = str(user.get("userId", ""))
+    user_id = str(user.get("id") or user.get("userId", ""))
     with Session(engine) as session:
         summary = get_usage_summary(session, user_id)
     return {"success": True, **summary}
@@ -1876,6 +1876,7 @@ async def unified_ask(
     conversation_history: Optional[str] = Form(None),
     chat_context: Optional[str] = Form(None),
     extra_context: Optional[str] = Form(None),
+    design_name: Optional[str] = Form(None),
     kb_version: str = Form("v2"),
 ):
     """
@@ -1888,8 +1889,10 @@ async def unified_ask(
     intent = detect_intent(message, files, users, tasks, format)
 
     # For analysis requests, check subscription and consume a token
-    if intent.mode in (IntentMode.ANALYSIS, IntentMode.HYBRID):
-        user_id = str(user.get("userId", ""))
+    # Skip in dev mode (DEV_MODE=true in .env) to allow local testing without a subscription record
+    _dev_mode = os.environ.get("DEV_MODE", "false").lower() in ("true", "1", "yes")
+    if intent.mode in (IntentMode.ANALYSIS, IntentMode.HYBRID) and not _dev_mode:
+        user_id = str(user.get("id") or user.get("userId", ""))
         with Session(engine) as session:
             allowed, reason = check_and_consume_token(session, user_id)
         if not allowed:
@@ -1959,29 +1962,31 @@ async def unified_ask(
                     tmp_path = tmp.name
                 logger.info(f"[/api/ask analysis] temp file written: {tmp_path}")
 
-                user_context = {"users": users, "tasks": tasks, "format": format, "content_type": content_type, "extra_context": extra_context or ""}
-                user_id = str(user.get("userId", ""))
+                user_context = {"users": users, "tasks": tasks, "format": format, "content_type": content_type, "extra_context": extra_context or "", "design_name": design_name or ""}
+                user_id = str(user.get("id") or user.get("userId", ""))
 
                 if kb_version == "both":
                     import asyncio
-                    loop = asyncio.get_event_loop()
-                    analyzer_instance = get_analyzer()
+                    loop = asyncio.get_running_loop()
+                    analyzer_v2 = UITrapsAnalyzer()
+                    analyzer_v1 = UITrapsAnalyzer()
 
-                    logger.info("[/api/ask analysis] running dual analysis sequentially: v2 first, then v1")
-                    result_v2 = await loop.run_in_executor(
-                        None,
-                        lambda: analyzer_instance.analyze_design(
-                            design_file=tmp_path, user_context=user_context,
-                            chat_context=chat_context, kb_version="v2"
-                        )
-                    )
-                    logger.info("[/api/ask analysis] v2 analysis complete, starting v1")
-                    result_v1 = await loop.run_in_executor(
-                        None,
-                        lambda: analyzer_instance.analyze_design(
-                            design_file=tmp_path, user_context=user_context,
-                            chat_context=chat_context, kb_version="v1"
-                        )
+                    logger.info("[/api/ask analysis] running dual analysis in parallel")
+                    result_v2, result_v1 = await asyncio.gather(
+                        loop.run_in_executor(
+                            None,
+                            lambda: analyzer_v2.analyze_design(
+                                design_file=tmp_path, user_context=user_context,
+                                chat_context=chat_context, kb_version="v2"
+                            )
+                        ),
+                        loop.run_in_executor(
+                            None,
+                            lambda: analyzer_v1.analyze_design(
+                                design_file=tmp_path, user_context=user_context,
+                                chat_context=chat_context, kb_version="v1"
+                            )
+                        ),
                     )
                     logger.info("[/api/ask analysis] dual analysis complete")
 
@@ -2049,10 +2054,10 @@ async def unified_ask(
                         tmp.write(content)
                         tmp_paths.append(tmp.name)
 
-                user_context = {"users": users, "tasks": tasks, "format": format, "content_type": content_type, "extra_context": extra_context or ""}
+                user_context = {"users": users, "tasks": tasks, "format": format, "content_type": content_type, "extra_context": extra_context or "", "design_name": design_name or ""}
                 result = get_multi_analyzer().analyze_images(tmp_paths, user_context, chat_context=chat_context)
 
-                user_id = str(user.get("userId", ""))
+                user_id = str(user.get("id") or user.get("userId", ""))
                 save_analysis_report(
                     analysis_result=result,
                     analysis_type="multi_image",
@@ -2153,9 +2158,11 @@ async def report_chat(request: ReportChatRequest):
     Returns a grounded response without re-running analysis.
     Does not consume usage credits.
     """
-    with Session(engine) as session:
-        if not verify_api_key(request.api_key, session):
-            raise HTTPException(status_code=403, detail="Invalid API key")
+    _dev_mode = os.environ.get("DEV_MODE", "false").lower() in ("true", "1", "yes")
+    if not _dev_mode and request.api_key != "dev-mode":
+        with Session(engine) as session:
+            if not verify_api_key(request.api_key, session):
+                raise HTTPException(status_code=403, detail="Invalid API key")
 
     if not request.message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")

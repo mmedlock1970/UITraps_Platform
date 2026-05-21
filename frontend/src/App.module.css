@@ -10,7 +10,7 @@
   flex-direction: column;
   min-height: 100vh;
   width: 100%;
-  max-width: 900px;
+  max-width: 1200px;
   margin: 0 auto;
   font-family: var(--uitraps-font-family);
   font-size: var(--uitraps-font-size-base);
@@ -196,7 +196,7 @@
 .reportContainer {
   flex: 1;
   overflow-y: auto;
-  padding: var(--uitraps-spacing-md);
+  padding: 8px;
 }
 
 /* Report + chat side-by-side layout */
@@ -206,7 +206,7 @@
   display: flex;
   gap: 16px;
   overflow: hidden;
-  padding: var(--uitraps-spacing-md);
+  padding: 8px;
   align-items: stretch;
 }
 
