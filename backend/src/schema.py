@@ -20,11 +20,11 @@ VALID_TRAP_NAMES = [
     "ACCIDENTAL ACTIVATION",
     "SLOW OR NO RESPONSE",
     "CAPTIVE WAIT",
-    "UNNECESSARY STEP",
+    "UNNECESSARY STEP(S)",
     "INFORMATION OVERLOAD",
     "SYSTEM AMNESIA",
     "BAD PREDICTION",
-    "INCORRECT INFO",
+    "INCORRECT INFORMATION",
     "IRREVERSIBLE ACTION",
     "UNWANTED DISCLOSURE",
     "DATA LOSS",
@@ -54,15 +54,13 @@ VALID_TENET_NAMES = [
 UI_ANALYSIS_SCHEMA = {
     "type": "object",
     "properties": {
-        "summary": {
-            "type": "array",
-            "description": "4-8 bullet points summarizing the key findings. DO NOT write a count bullet (e.g. '4 traps identified') — the report generates that automatically. Focus on describing what was found and why it matters. Named anti-patterns (MEMORY CHALLENGE, INVISIBLE ELEMENT, etc.) are TRAPS. Broad user-facing problems are GENERAL ISSUES. Never call a trap an 'issue'.",
-            "items": {
-                "type": "string",
-                "description": "A single complete bullet point describing a finding or pattern. Do NOT start with a trap/issue count — that is generated automatically."
-            },
-            "minItems": 5,
-            "maxItems": 9
+        "summary_headline": {
+            "type": "string",
+            "description": "One sentence capturing the most significant finding in relation to the user's stated goals. Tie it to the specific tasks and users provided — not generic. Use measured language: 'appears to', 'may affect', 'could prevent'. Example: 'Several usability issues appear to complicate the path to checkout for first-time buyers, with the most significant concerns clustering around navigation and feedback.' Do NOT write a count."
+        },
+        "summary_narrative": {
+            "type": "string",
+            "description": "A single paragraph (3-5 sentences) elaborating on overall findings — patterns observed, tenets most affected, notable context. Written for a reader who has not yet seen the detailed findings. Use measured, hedged language throughout: 'appears to', 'may', 'seems likely', 'could'. Do NOT use absolutist language like 'users cannot' or 'the design fails'."
         },
         "critical_issues": {
             "type": "array",
@@ -80,17 +78,21 @@ UI_ANALYSIS_SCHEMA = {
                         "enum": VALID_TENET_NAMES,
                         "description": "Parent tenet violated - MUST be one of the 9 valid tenets"
                     },
+                    "headline": {
+                        "type": "string",
+                        "description": "One sentence describing how this trap appears to manifest in this specific design and how it may affect the user. Write from the user's perspective, tied to the context and tasks provided. Use measured language: 'appears to', 'may cause', 'could prevent'. Example: 'Dense promotional content between the size selector and checkout button may require users to scroll past irrelevant material to complete their purchase.'"
+                    },
                     "location": {
                         "type": "string",
                         "description": "Specific location in the design where trap occurs"
                     },
                     "problem": {
                         "type": "string",
-                        "description": "Human-readable explanation for end users. Describe the specific UI element causing the issue and how it impacts the user experience. Do NOT include internal reasoning steps, gate numbers, or analytical framework terminology. Write as if explaining to a client who has never heard of UI Traps methodology."
+                        "description": "2-3 sentences elaborating on the headline and the reasoning used to conclude this trap appears present. Include what was observed and why it suggests this trap. Write for a reader unfamiliar with UI Traps methodology. Use measured language: 'appears to', 'seems likely', 'may'. Do NOT include gate numbers or internal reasoning labels."
                     },
                     "recommendation": {
                         "type": "string",
-                        "description": "How to fix the issue"
+                        "description": "2-3 sentences suggesting how this trap might be addressed. Use measured, advisory language: 'one approach would be', 'consider', 'it may help to'. Do NOT use imperative commands like 'you must' or 'fix by'."
                     },
                     "confidence": {
                         "type": "string",
@@ -98,7 +100,7 @@ UI_ANALYSIS_SCHEMA = {
                         "description": "Confidence level in this finding"
                     }
                 },
-                "required": ["trap_name", "tenet", "location", "problem", "recommendation", "confidence"]
+                "required": ["trap_name", "tenet", "headline", "location", "problem", "recommendation", "confidence"]
             }
         },
         "moderate_issues": {
@@ -109,15 +111,19 @@ UI_ANALYSIS_SCHEMA = {
                 "properties": {
                     "trap_name": {"type": "string", "enum": VALID_TRAP_NAMES},
                     "tenet": {"type": "string", "enum": VALID_TENET_NAMES},
+                    "headline": {
+                        "type": "string",
+                        "description": "One sentence describing how this trap appears to manifest in this specific design and how it may affect the user. Use measured language: 'appears to', 'may cause', 'could prevent'."
+                    },
                     "location": {"type": "string"},
-                    "problem": {"type": "string", "description": "Human-readable explanation for end users. Describe the issue and its impact without internal reasoning steps or framework terminology."},
-                    "recommendation": {"type": "string"},
+                    "problem": {"type": "string", "description": "2-3 sentences elaborating on the headline and the reasoning used to conclude this trap appears present. Use measured language. Do NOT include internal reasoning steps or framework terminology."},
+                    "recommendation": {"type": "string", "description": "2-3 sentences suggesting how this trap might be addressed. Use advisory language: 'one approach would be', 'consider', 'it may help to'."},
                     "confidence": {
                         "type": "string",
                         "enum": ["high", "medium", "low"]
                     }
                 },
-                "required": ["trap_name", "tenet", "location", "problem", "recommendation", "confidence"]
+                "required": ["trap_name", "tenet", "headline", "location", "problem", "recommendation", "confidence"]
             }
         },
         "minor_issues": {
@@ -128,15 +134,19 @@ UI_ANALYSIS_SCHEMA = {
                 "properties": {
                     "trap_name": {"type": "string", "enum": VALID_TRAP_NAMES},
                     "tenet": {"type": "string", "enum": VALID_TENET_NAMES},
+                    "headline": {
+                        "type": "string",
+                        "description": "One sentence describing how this trap appears to manifest in this specific design and how it may affect the user. Use measured language: 'appears to', 'may cause', 'could prevent'."
+                    },
                     "location": {"type": "string"},
-                    "problem": {"type": "string", "description": "Human-readable explanation for end users. Describe the issue and its impact without internal reasoning steps or framework terminology."},
-                    "recommendation": {"type": "string"},
+                    "problem": {"type": "string", "description": "2-3 sentences elaborating on the headline and the reasoning used to conclude this trap appears present. Use measured language. Do NOT include internal reasoning steps or framework terminology."},
+                    "recommendation": {"type": "string", "description": "2-3 sentences suggesting how this trap might be addressed. Use advisory language: 'one approach would be', 'consider', 'it may help to'."},
                     "confidence": {
                         "type": "string",
                         "enum": ["high", "medium", "low"]
                     }
                 },
-                "required": ["trap_name", "tenet", "location", "problem", "recommendation", "confidence"]
+                "required": ["trap_name", "tenet", "headline", "location", "problem", "recommendation", "confidence"]
             }
         },
         "positive_observations": {
@@ -165,9 +175,11 @@ UI_ANALYSIS_SCHEMA = {
         "traps_checked_not_found": {
             "type": "array",
             "description": (
-                "Every trap not flagged as an issue, categorized as either tested-and-not-found "
-                "or unable-to-test. Include ALL traps from the framework that were not reported "
-                "as confirmed issues."
+                "Traps you actually evaluated, not flagged as confirmed issues. "
+                "Include ONLY: (1) always-evaluable traps not found, with testable:true; "
+                "(2) conditional traps where you applied the rule and have a result to report. "
+                "Do NOT include SLOW OR NO RESPONSE or POOR AESTHETIC — added automatically. "
+                "Do NOT enumerate traps you did not evaluate."
             ),
             "items": {
                 "type": "object",
@@ -294,63 +306,6 @@ UI_ANALYSIS_SCHEMA = {
                 "required": ["trap_name", "tenet", "location", "observation", "why_human_review_needed", "question_for_reviewer"]
             }
         },
-        "user_issues": {
-            "type": "array",
-            "description": "User-facing issues synthesized from detected trap findings. Each issue names an observable user problem in plain language, groups the traps that underlie it, and provides synthesized recommendations. Rank by impact_level (high first). Omit if no confirmed traps were found.",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "issue_title": {
-                        "type": "string",
-                        "description": "Short, user-centric title describing ONE unified problem users experience (e.g., 'Users cannot find the checkout button', 'Setup fails silently without feedback'). CRITICAL: do NOT use 'and' to join two separate problems into one title — if two problems feel distinct, create two separate issues. Write from the user's perspective, not the framework's."
-                    },
-                    "issue_description": {
-                        "type": "string",
-                        "description": "Plain-language description of the user experience and its consequence. No framework terminology."
-                    },
-                    "impact_level": {
-                        "type": "string",
-                        "enum": ["high", "medium", "low"],
-                        "description": "high = blocks or severely disrupts important tasks; medium = significant frustration or inefficiency; low = minor annoyance"
-                    },
-                    "task_context": {
-                        "type": "string",
-                        "description": "The specific user task this issue affects. When the user provided multiple numbered tasks, use the exact task wording they used (e.g., 'find kids shows', 'find a specific kids movie'). For general issues that span all tasks or are not task-specific, omit this field."
-                    },
-                    "contributing_traps": {
-                        "type": "array",
-                        "description": "The traps that underlie this issue, each with a brief explanation of its contribution",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "trap_name": {
-                                    "type": "string",
-                                    "enum": VALID_TRAP_NAMES,
-                                    "description": "MUST be one of the 27 valid trap names"
-                                },
-                                "severity": {
-                                    "type": "string",
-                                    "enum": ["critical", "moderate", "minor"]
-                                },
-                                "contribution": {
-                                    "type": "string",
-                                    "description": "One sentence: how this trap contributes to the user-facing issue"
-                                }
-                            },
-                            "required": ["trap_name", "severity", "contribution"]
-                        },
-                        "minItems": 1
-                    },
-                    "recommendations": {
-                        "type": "array",
-                        "description": "Prioritized fixes for this issue, synthesized across all contributing traps",
-                        "items": {"type": "string"},
-                        "minItems": 1
-                    }
-                },
-                "required": ["issue_title", "issue_description", "impact_level", "contributing_traps", "recommendations"]
-            }
-        },
         "incomplete_flow_findings": {
             "type": "array",
             "description": "Tier 2 traps that AI can assess but require complete task flows. These findings are flagged with caveats because screenshots may be missing intermediate steps. AI can detect these traps but confidence is limited without seeing the full user journey.",
@@ -394,7 +349,8 @@ UI_ANALYSIS_SCHEMA = {
         }
     },
     "required": [
-        "summary",
+        "summary_headline",
+        "summary_narrative",
         "critical_issues",
         "moderate_issues",
         "minor_issues",

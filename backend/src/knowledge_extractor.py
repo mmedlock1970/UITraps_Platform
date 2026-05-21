@@ -5,7 +5,7 @@ Copyright © 2009-present UI Traps LLC. All Rights Reserved.
 PROPRIETARY & CONFIDENTIAL - UI Tenets & Traps Framework
 
 Manages loading and extraction from two knowledge sources:
-- UI_Traps_Analysis_Reference.md  →  Pass 1 (detection, condensed, AI-optimized)
+- trap_knowledge_base_v2.md / trap_knowledge_base_v1.md  →  Pass 1 (detection, condensed, AI-optimized)
 - UI_Tenets_Traps.txt             →  Pass 2 (enrichment, full book content)
 
 Book images are extracted from the source PDF and stored in data/book_images/
@@ -20,9 +20,12 @@ from typing import Dict, List, Optional, Tuple
 
 # Paths relative to this file
 _DATA_DIR = Path(__file__).parent.parent / "data"
-ANALYSIS_REFERENCE_PATH = _DATA_DIR / "UI_Traps_Analysis_Reference.md"
+ANALYSIS_REFERENCE_PATH = _DATA_DIR / "trap_knowledge_base_v2.md"
+ANALYSIS_REFERENCE_PATH_V1 = _DATA_DIR / "trap_knowledge_base_v1.md"
 FULL_BOOK_PATH = _DATA_DIR / "UI_Tenets_Traps.txt"
 BOOK_IMAGES_DIR = _DATA_DIR / "book_images"
+BOOK_IMAGES_DIR_V1 = BOOK_IMAGES_DIR / "v1"
+BOOK_IMAGES_DIR_V2 = BOOK_IMAGES_DIR / "v2"
 
 # Max characters to extract per trap section (avoids token bloat for verbose traps)
 MAX_SECTION_CHARS = 6000
@@ -45,11 +48,11 @@ TRAP_NAMES = [
     "ACCIDENTAL ACTIVATION",
     "SLOW OR NO RESPONSE",
     "CAPTIVE WAIT",
-    "UNNECESSARY STEP",
+    "UNNECESSARY STEP(S)",
     "INFORMATION OVERLOAD",
     "SYSTEM AMNESIA",
     "BAD PREDICTION",
-    "INCORRECT INFO",
+    "INCORRECT INFORMATION",
     "IRREVERSIBLE ACTION",
     "UNWANTED DISCLOSURE",
     "DATA LOSS",
@@ -63,23 +66,38 @@ TRAP_NAMES = [
 
 # Module-level caches — loaded once per process
 _analysis_reference_cache: str | None = None
+_analysis_reference_cache_v1: str | None = None
 _full_book_cache: str | None = None
 
 
-def load_analysis_reference() -> str:
+def load_analysis_reference(version: str = "v2") -> str:
     """
     Load the condensed AI analysis reference (Pass 1 knowledge base).
     Cached after first load.
+
+    Args:
+        version: "v2" (default) or "v1"
     """
-    global _analysis_reference_cache
-    if _analysis_reference_cache is None:
-        if not ANALYSIS_REFERENCE_PATH.exists():
-            raise FileNotFoundError(
-                f"Analysis reference not found at {ANALYSIS_REFERENCE_PATH}. "
-                f"Ensure UI_Traps_Analysis_Reference.md is in the data/ directory."
-            )
-        _analysis_reference_cache = ANALYSIS_REFERENCE_PATH.read_text(encoding="utf-8")
-    return _analysis_reference_cache
+    global _analysis_reference_cache, _analysis_reference_cache_v1
+
+    if version == "v1":
+        if _analysis_reference_cache_v1 is None:
+            if not ANALYSIS_REFERENCE_PATH_V1.exists():
+                raise FileNotFoundError(
+                    f"v1 analysis reference not found at {ANALYSIS_REFERENCE_PATH_V1}. "
+                    f"Ensure trap_knowledge_base_v1.md is in the data/ directory."
+                )
+            _analysis_reference_cache_v1 = ANALYSIS_REFERENCE_PATH_V1.read_text(encoding="utf-8")
+        return _analysis_reference_cache_v1
+    else:
+        if _analysis_reference_cache is None:
+            if not ANALYSIS_REFERENCE_PATH.exists():
+                raise FileNotFoundError(
+                    f"Analysis reference not found at {ANALYSIS_REFERENCE_PATH}. "
+                    f"Ensure trap_knowledge_base_v2.md is in the data/ directory."
+                )
+            _analysis_reference_cache = ANALYSIS_REFERENCE_PATH.read_text(encoding="utf-8")
+        return _analysis_reference_cache
 
 
 # ---------------------------------------------------------------------------
@@ -88,6 +106,70 @@ def load_analysis_reference() -> str:
 
 def _trap_name_to_slug(name: str) -> str:
     return name.lower().replace(" ", "_")
+
+
+# v1 folders use a numeric prefix for easy sorting — must match book_images/v1/ on disk
+# 26 traps: same as v2 minus INCORRECT INFORMATION; UNNECESSARY STEP is singular
+_V1_SLUG_MAP: dict[str, str] = {
+    "INVISIBLE ELEMENT":              "01_invisible_element",
+    "EFFECTIVELY INVISIBLE ELEMENT":  "02_effectively_invisible_element",
+    "DISTRACTION":                    "03_distraction",
+    "UNCOMPREHENDED ELEMENT":         "04_uncomprehended_element",
+    "INVITING DEAD END":              "05_inviting_dead_end",
+    "POOR GROUPING":                  "06_poor_grouping",
+    "FORCED SYNTAX":                  "07_forced_syntax",
+    "MEMORY CHALLENGE":               "08_memory_challenge",
+    "FEEDBACK FAILURE":               "09_feedback_failure",
+    "PHYSICAL CHALLENGE":             "10_physical_challenge",
+    "ACCIDENTAL ACTIVATION":          "11_accidental_activation",
+    "SLOW OR NO RESPONSE":            "12_slow_or_no_response",
+    "CAPTIVE WAIT":                   "13_captive_wait",
+    "UNNECESSARY STEP":               "14_unnecessary_step",
+    "UNNECESSARY STEP(S)":            "14_unnecessary_step",
+    "INFORMATION OVERLOAD":           "15_information_overload",
+    "SYSTEM AMNESIA":                 "16_system_amnesia",
+    "BAD PREDICTION":                 "17_bad_prediction",
+    "IRREVERSIBLE ACTION":            "18_irreversible_action",
+    "UNWANTED DISCLOSURE":            "19_unwanted_disclosure",
+    "DATA LOSS":                      "20_data_loss",
+    "GRATUITOUS REDUNDANCY":          "21_gratuitous_redundancy",
+    "VARIABLE OUTCOME":               "22_variable_outcome",
+    "WANDERING ELEMENT":              "23_wandering_element",
+    "INCONSISTENT APPEARANCE":        "24_inconsistent_appearance",
+    "AMBIGUOUS HOME":                 "25_ambiguous_home",
+    "POOR AESTHETIC":                 "26_poor_aesthetic",
+}
+
+# v2 folders use a numeric prefix for easy sorting — must match book_images/v2/ on disk
+_V2_SLUG_MAP: dict[str, str] = {
+    "INVISIBLE ELEMENT":              "01_invisible_element",
+    "EFFECTIVELY INVISIBLE ELEMENT":  "02_effectively_invisible_element",
+    "DISTRACTION":                    "03_distraction",
+    "UNCOMPREHENDED ELEMENT":         "04_uncomprehended_element",
+    "INVITING DEAD END":              "05_inviting_dead_end",
+    "POOR GROUPING":                  "06_poor_grouping",
+    "FORCED SYNTAX":                  "07_forced_syntax",
+    "MEMORY CHALLENGE":               "08_memory_challenge",
+    "FEEDBACK FAILURE":               "09_feedback_failure",
+    "PHYSICAL CHALLENGE":             "10_physical_challenge",
+    "ACCIDENTAL ACTIVATION":          "11_accidental_activation",
+    "SLOW OR NO RESPONSE":            "12_slow_or_no_response",
+    "CAPTIVE WAIT":                   "13_captive_wait",
+    "UNNECESSARY STEP(S)":            "14_unnecessary_steps",
+    "INFORMATION OVERLOAD":           "15_information_overload",
+    "SYSTEM AMNESIA":                 "16_system_amnesia",
+    "INCORRECT INFORMATION":          "17_incorrect_information",
+    "BAD PREDICTION":                 "18_bad_prediction",
+    "IRREVERSIBLE ACTION":            "19_irreversible_action",
+    "UNWANTED DISCLOSURE":            "20_unwanted_disclosure",
+    "DATA LOSS":                      "21_data_loss",
+    "GRATUITOUS REDUNDANCY":          "22_gratuitous_redundancy",
+    "VARIABLE OUTCOME":               "23_variable_outcome",
+    "WANDERING ELEMENT":              "24_wandering_element",
+    "INCONSISTENT APPEARANCE":        "25_inconsistent_appearance",
+    "AMBIGUOUS HOME":                 "26_ambiguous_home",
+    "POOR AESTHETIC":                 "27_poor_aesthetic",
+}
 
 
 def _extract_pdf_content(pdf_path: Path) -> Tuple[str, Dict[str, List[bytes]]]:
@@ -219,6 +301,18 @@ def _sync_book_from_source() -> bool:
         return False
 
     source_path = Path(source)
+    if "*" in source_path.name:
+        # Glob pattern — pick the highest version number found
+        import re as _re
+        candidates = list(source_path.parent.glob(source_path.name))
+        if not candidates:
+            return False
+        def _version_key(p: Path) -> int:
+            m = _re.search(r'v(\d+)', p.stem, _re.IGNORECASE)
+            return int(m.group(1)) if m else 0
+        source_path = max(candidates, key=_version_key)
+        print(f"[UITraps] Using book: {source_path.name}")
+
     if not source_path.exists():
         return False
 
@@ -232,9 +326,9 @@ def _sync_book_from_source() -> bool:
         return False
 
     print(f"[UITraps] Extracting from {source_path.name}…")
-    pdf_text, trap_images = _extract_pdf_content(source_path)
+    pdf_text, _ = _extract_pdf_content(source_path)
     _write_training_file(pdf_text)
-    _save_trap_images(trap_images)
+    # Images in book_images/v2/ are managed manually — never overwrite them on sync.
 
     _full_book_cache = None
     return True
@@ -287,31 +381,44 @@ def extract_trap_sections(trap_names: List[str]) -> Dict[str, str]:
     return sections
 
 
-def extract_trap_images(trap_names: List[str]) -> Dict[str, List[str]]:
+_EXAMPLE_LABEL_RE = re.compile(r'^(\d+\.\d+)\.png$', re.IGNORECASE)
+
+
+def extract_trap_images(trap_names: List[str], version: str = "v1") -> Dict[str, List[tuple]]:
     """
-    Load saved book images for the specified traps.
+    Load saved example images for the specified traps.
 
     Args:
         trap_names: List of trap names to load images for
+        version: "v1" or "v2" — selects the versioned image directory
 
     Returns:
-        Dict mapping trap_name -> list of base64-encoded PNG strings.
+        Dict mapping trap_name -> list of (label, base64) tuples.
+        label is "Example X.Y" when the filename matches X.Y.png, else "".
         Traps with no saved images are omitted.
     """
-    result: Dict[str, List[str]] = {}
+    result: Dict[str, List[tuple]] = {}
 
-    if not BOOK_IMAGES_DIR.exists():
+    images_dir = BOOK_IMAGES_DIR_V2 if version == "v2" else BOOK_IMAGES_DIR_V1
+    if not images_dir.exists():
         return result
 
     for trap_name in trap_names:
-        trap_dir = BOOK_IMAGES_DIR / _trap_name_to_slug(trap_name)
+        if version == "v2":
+            slug = _V2_SLUG_MAP.get(trap_name.upper(), _trap_name_to_slug(trap_name))
+        else:
+            slug = _V1_SLUG_MAP.get(trap_name.upper(), _trap_name_to_slug(trap_name))
+        trap_dir = images_dir / slug
         if not trap_dir.exists():
             continue
 
-        images = [
-            base64.b64encode(img_file.read_bytes()).decode("utf-8")
-            for img_file in sorted(trap_dir.glob("img_*.png"))
-        ]
+        images = []
+        for img_file in sorted(trap_dir.glob("*.png")):
+            m = _EXAMPLE_LABEL_RE.match(img_file.name)
+            label = f"Example {m.group(1)}" if m else ""
+            b64 = base64.b64encode(img_file.read_bytes()).decode("utf-8")
+            images.append((label, b64))
+
         if images:
             result[trap_name] = images
 

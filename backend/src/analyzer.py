@@ -24,6 +24,7 @@ try:
     from .formatters import parse_claude_response, format_report_as_markdown, format_report_as_html, get_report_statistics
     from .schema import get_ui_analysis_schema, get_interaction_analysis_schema
     from .knowledge_extractor import collect_found_trap_names, extract_trap_sections, extract_trap_images
+    from .knowledge_base import get_chunks_for_traps
 except ImportError:
     # Fallback for direct script execution
     from validators import validate_file_format, validate_context, is_figma_url
@@ -35,6 +36,7 @@ except ImportError:
     from formatters import parse_claude_response, format_report_as_markdown, format_report_as_html, get_report_statistics
     from schema import get_ui_analysis_schema, get_interaction_analysis_schema
     from knowledge_extractor import collect_found_trap_names, extract_trap_sections, extract_trap_images
+    from knowledge_base import get_chunks_for_traps
 
 
 class UITrapsAnalyzer:
@@ -80,7 +82,8 @@ class UITrapsAnalyzer:
         timeout: int = 120,
         user_id: Optional[str] = None,
         page_context: Optional[Dict[str, Any]] = None,
-        chat_context: Optional[str] = None
+        chat_context: Optional[str] = None,
+        kb_version: str = "v2",
     ) -> Dict[str, Any]:
         """
         Analyze a UI design using the UI Tenets & Traps framework.
@@ -120,7 +123,7 @@ class UITrapsAnalyzer:
             raise ValueError(f"Invalid file: {file_msg}")
 
         # Step 2: Build prompts
-        system_prompt = build_system_prompt(use_caching=self.use_caching)
+        system_prompt = build_system_prompt(use_caching=self.use_caching, version=kb_version, image_count=1)
 
         # Step 3: Handle different file types
         if is_figma_url(design_file):
@@ -165,6 +168,7 @@ class UITrapsAnalyzer:
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=5000,
+                temperature=0,
                 system=system_prompt,
                 messages=[
                     {
@@ -202,16 +206,15 @@ class UITrapsAnalyzer:
                 report = tool_use_block.input
 
                 # Validate truly required fields (core structure)
-                for field in ['summary', 'critical_issues', 'moderate_issues', 'minor_issues']:
+                for field in ['summary_headline', 'summary_narrative', 'critical_issues', 'moderate_issues', 'minor_issues']:
                     if field not in report:
                         raise ValueError(f"Missing required field in response: {field}")
 
-                # Validate and fix data types
-                # Summary must be an array of strings
-                if isinstance(report['summary'], str):
-                    report['summary'] = [report['summary']]
-                elif not isinstance(report['summary'], list):
-                    raise ValueError(f"Summary must be an array, got {type(report['summary'])}")
+                # Ensure summary fields are strings
+                if not isinstance(report.get('summary_headline'), str):
+                    report['summary_headline'] = ''
+                if not isinstance(report.get('summary_narrative'), str):
+                    report['summary_narrative'] = ''
 
                 # Ensure issue arrays are actually arrays
                 for issue_field in ['critical_issues', 'moderate_issues', 'minor_issues']:
@@ -220,31 +223,9 @@ class UITrapsAnalyzer:
 
                 # Default optional array fields if absent or wrong type
                 for opt_field in ['positive_observations', 'potential_issues', 'traps_checked_not_found',
-                                  'user_issues', 'flagged_for_human_review', 'incomplete_flow_findings']:
+                                  'flagged_for_human_review', 'incomplete_flow_findings']:
                     if not isinstance(report.get(opt_field), list):
                         report[opt_field] = []
-
-                # Reconcile summary with actual structured counts to prevent contradictions
-                # (Claude's free-form summary text can diverge from the structured issue arrays)
-                n_critical = len(report['critical_issues'])
-                n_moderate = len(report['moderate_issues'])
-                n_minor = len(report['minor_issues'])
-                n_total = n_critical + n_moderate + n_minor
-                if n_total > 0:
-                    parts = []
-                    if n_critical:
-                        parts.append(f"{n_critical} critical")
-                    if n_moderate:
-                        parts.append(f"{n_moderate} moderate")
-                    if n_minor:
-                        parts.append(f"{n_minor} minor")
-                    count_bullet = f"{n_total} issue{'s' if n_total != 1 else ''} identified: {', '.join(parts)}."
-                else:
-                    count_bullet = "No confirmed issues identified in this design."
-                if report['summary']:
-                    report['summary'][0] = count_bullet
-                else:
-                    report['summary'] = [count_bullet]
 
         except Exception as e:
             raise ValueError(
@@ -270,7 +251,7 @@ class UITrapsAnalyzer:
 
         # Step 7: Pass 2 — Enrich findings using full book sections
         try:
-            report = self._enrich_report(report, timeout=timeout)
+            report = self._enrich_report(report, timeout=timeout, kb_version=kb_version)
         except Exception as e:
             # Enrichment failure is non-fatal — use Pass 1 report as-is
             print(f"[UITraps] Pass 2 enrichment skipped (non-fatal): {e}")
@@ -279,9 +260,13 @@ class UITrapsAnalyzer:
         # Normalize optional fields after enrichment — Pass 2 may omit fields that were
         # present in Pass 1, causing formatter KeyErrors.
         for _opt in ['positive_observations', 'potential_issues', 'traps_checked_not_found',
-                     'user_issues', 'flagged_for_human_review', 'incomplete_flow_findings']:
+                     'flagged_for_human_review', 'incomplete_flow_findings']:
             if not isinstance(report.get(_opt), list):
                 report[_opt] = []
+
+        # Guarantee report completeness across KB versions: backfill the per-trap
+        # "Could Not Evaluate" breakdown. This makes v1 and v2 reports symmetric.
+        self._normalize_report_completeness(report, kb_version=kb_version)
 
         if chat_context and chat_context.strip():
             user_context = dict(user_context)
@@ -299,7 +284,7 @@ class UITrapsAnalyzer:
             "status": "success"
         }
 
-    def _enrich_report(self, pass1_report: Dict[str, Any], timeout: int = 120) -> Dict[str, Any]:
+    def _enrich_report(self, pass1_report: Dict[str, Any], timeout: int = 120, kb_version: str = "v2") -> Dict[str, Any]:
         """
         Pass 2: Enrich Pass 1 findings using full book sections for found traps.
 
@@ -322,18 +307,20 @@ class UITrapsAnalyzer:
         if not found_trap_names:
             return pass1_report
 
-        # Extract the relevant book sections and illustrations
-        trap_sections = extract_trap_sections(found_trap_names)
-        trap_images = extract_trap_images(found_trap_names)
+        # Load structured knowledge base chunks for the found traps
+        knowledge_chunks = get_chunks_for_traps(found_trap_names, version=kb_version) or None
+        if knowledge_chunks:
+            print(f"[UITraps] Pass 2: loaded {kb_version} KB chunks for {len(found_trap_names)} trap(s)")
+
+        # Fall back to extracted book sections if KB chunks unavailable
+        trap_sections = {} if knowledge_chunks else extract_trap_sections(found_trap_names)
+        trap_images = extract_trap_images(found_trap_names, version=kb_version)
+        if kb_version == "v1":
+            trap_images = {k: v[:1] for k, v in trap_images.items()}
 
         if trap_images:
             n_imgs = sum(len(v) for v in trap_images.values())
             print(f"[UITraps] Pass 2: including {n_imgs} book illustration(s) for {len(trap_images)} trap(s)")
-
-        # knowledge_base module removed (RAG migration) — chunks no longer loaded
-        knowledge_chunks = None
-        if knowledge_chunks:
-            print(f"[UITraps] Pass 2: loaded structured KB chunks for {len(found_trap_names)} trap(s)")
 
         # Build Pass 2 prompts
         system_prompt = build_enrichment_system_prompt()
@@ -347,6 +334,7 @@ class UITrapsAnalyzer:
         response = self.client.messages.create(
             model=self.enrich_model,
             max_tokens=4096,
+            temperature=0,
             system=system_prompt,
             messages=[{"role": "user", "content": user_message}],
             tools=[
@@ -380,7 +368,7 @@ class UITrapsAnalyzer:
         # Preserve other Pass 1 fields that Pass 2 might omit
         for field in (
             "potential_issues", "bugs_detected",
-            "incomplete_flow_findings", "flagged_for_human_review", "user_issues",
+            "incomplete_flow_findings", "flagged_for_human_review",
         ):
             if field in pass1_report and field not in enriched:
                 enriched[field] = pass1_report[field]
@@ -409,6 +397,104 @@ class UITrapsAnalyzer:
 
         print(f"[UITraps] Pass 2: enrichment complete ({response.usage.input_tokens} input tokens)")
         return enriched
+
+    def _normalize_report_completeness(self, report: Dict[str, Any], kb_version: str = "v2") -> None:
+        """
+        Make v1 and v2 reports structurally symmetric. Mutates report in place.
+
+        Two model-output gaps that this fixes:
+        1. `traps_checked_not_found` sometimes ships with items missing the
+           `testable` flag, missing a `reason`, or not covering every trap in
+           the version's canonical list. We backfill every non-confirmed trap
+           with the right testable flag and a default reason when needed.
+        2. `traps_checked_not_found` entries are normalised here to ensure
+           were confirmed. We synthesize a single fallback user_issue from the
+           confirmed traps in that case so the section always renders.
+        """
+        try:
+            from .prompts import _TRAP_NAMES_V1, _TRAP_NAMES_V2
+            from .formatters import _UNTESTABLE_REASON_DEFAULTS, _normalize_trap_name
+        except ImportError:
+            from prompts import _TRAP_NAMES_V1, _TRAP_NAMES_V2
+            from formatters import _UNTESTABLE_REASON_DEFAULTS, _normalize_trap_name
+
+        src = _TRAP_NAMES_V2 if kb_version == "v2" else _TRAP_NAMES_V1
+        canonical_traps = [t.strip() for t in src.split(",") if t.strip()]
+
+        # Traps that are always evaluable from a single screenshot — default testable:true.
+        testable_true_norm = {
+            "POOR GROUPING", "FORCED SYNTAX", "INFORMATION OVERLOAD",
+            "UNNECESSARY STEP(S)", "UNNECESSARY STEP", "UNNECESSARY STEPS",
+            "GRATUITOUS REDUNDANCY",
+            "INCORRECT INFORMATION", "INCORRECT INFO",
+            "BAD PREDICTION",
+        }
+        # Traps that are never evaluable from a static artifact — force testable:false always,
+        # regardless of what the model output.
+        testable_always_false_norm = {
+            "SLOW OR NO RESPONSE",
+            "POOR AESTHETIC", "UNATTRACTIVE APPEARANCE",
+        }
+
+        confirmed_norm = set()
+        for sev_field in ("critical_issues", "moderate_issues", "minor_issues"):
+            for issue in report.get(sev_field, []):
+                tn = (issue or {}).get("trap_name", "")
+                if tn:
+                    confirmed_norm.add(_normalize_trap_name(tn))
+
+        existing_by_norm: Dict[str, Dict[str, Any]] = {}
+        for item in report.get("traps_checked_not_found", []) or []:
+            if isinstance(item, dict):
+                tn = item.get("trap_name", "")
+                if tn:
+                    existing_by_norm[_normalize_trap_name(tn)] = item
+            elif isinstance(item, str) and item.strip():
+                existing_by_norm[_normalize_trap_name(item)] = {
+                    "trap_name": item, "testable": True
+                }
+
+        def _default_reason(norm: str) -> str:
+            return _UNTESTABLE_REASON_DEFAULTS.get(
+                norm,
+                "Requires additional screenshots, interaction data, or live testing to evaluate."
+            )
+
+        new_tcnf = []
+        for canonical in canonical_traps:
+            norm = _normalize_trap_name(canonical)
+            if norm in confirmed_norm:
+                continue
+            existing = existing_by_norm.get(norm)
+            if existing is not None:
+                item = dict(existing)
+                if norm in testable_always_false_norm:
+                    # Never evaluable — force false regardless of model output
+                    item["testable"] = False
+                    if not (item.get("reason") or "").strip():
+                        item["reason"] = _default_reason(norm)
+                elif norm in testable_true_norm:
+                    # Always evaluable — accept true, fill default if missing
+                    item.setdefault("testable", True)
+                else:
+                    # Conditional trap — respect model's judgment; add reason if false
+                    if not item.get("testable", True):
+                        if not (item.get("reason") or "").strip():
+                            item["reason"] = _default_reason(norm)
+                new_tcnf.append(item)
+            else:
+                if norm in testable_true_norm:
+                    new_tcnf.append({"trap_name": canonical, "testable": True})
+                else:
+                    # Not output by model — default to not-evaluated with standard reason
+                    new_tcnf.append({
+                        "trap_name": canonical,
+                        "testable": False,
+                        "reason": _default_reason(norm),
+                    })
+
+        report["traps_checked_not_found"] = new_tcnf
+
 
     def _load_image(self, image_path: str) -> Dict[str, Any]:
         """
@@ -589,6 +675,7 @@ class UITrapsAnalyzer:
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=4096,
+                temperature=0,
                 system=system_prompt,
                 messages=[
                     {

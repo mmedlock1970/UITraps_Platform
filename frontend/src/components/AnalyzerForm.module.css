@@ -452,3 +452,48 @@
 .btnSubmit:hover:not(:disabled) .btnArrow {
   transform: translateX(3px);
 }
+
+/* ── KB Version Selector ── */
+
+.kbVersionGroup {
+  display: flex;
+  gap: 0;
+  border: 1.5px solid #e8e6e2;
+  border-radius: 6px;
+  overflow: hidden;
+  width: fit-content;
+}
+
+.kbVersionBtn {
+  background: #f7f6f4;
+  color: #4a4744;
+  border: none;
+  border-right: 1.5px solid #e8e6e2;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 18px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  white-space: nowrap;
+}
+
+.kbVersionBtn:last-child {
+  border-right: none;
+}
+
+.kbVersionBtn:hover:not(:disabled) {
+  background: #f0eeeb;
+  color: #111111;
+}
+
+.kbVersionBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.kbVersionBtnActive {
+  background: #111111 !important;
+  color: #ffffff !important;
+  font-weight: 600;
+}

@@ -267,22 +267,17 @@ Screenshots may be missing intermediate steps. Flag these with appropriate cavea
    - What to do: Only flag if the syntax requirement is clearly visible in provided screenshots
    - Caveat: "Syntax requirements may extend beyond visible screenshots."
 
-3. **GRATUITOUS REDUNDANCY**
-   - Why complete flow needed: Redundancy might exist for flexibility across different task paths
-   - What to do: Flag visible redundancy but acknowledge it might serve different user journeys
-   - Caveat: "May be intentional flexibility for different user paths."
-
-4. **MEMORY CHALLENGE**
+3. **MEMORY CHALLENGE**
    - Why complete flow needed: Need to see what information user had to remember from earlier
    - What to do: Only flag if you can see both the source info AND where it's needed
    - Caveat: "Earlier screens may have provided this information."
 
-5. **SYSTEM AMNESIA**
+4. **SYSTEM AMNESIA**
    - Why complete flow needed: Need to see what user entered earlier that system forgot
    - What to do: Only flag if you can see prior user input AND evidence system forgot it
    - Caveat: "Earlier interactions may have captured this data."
 
-6. **VARIABLE OUTCOME**
+5. **VARIABLE OUTCOME**
    - Why complete flow needed: Requires seeing SAME action produce DIFFERENT results
    - What to do: Can only detect if multiple flows show inconsistent behavior
    - Caveat: "Requires multiple task flows to confirm inconsistency."
@@ -311,7 +306,8 @@ they are definitely traps.
    - What AI CANNOT do: Know whether target users would actually be confused
    - **COMMON MISTAKE:** Do NOT use this trap for filter/dropdown state visibility issues.
      "Price" and "Rating" are clear labels - if users can't see the CURRENT STATE, that's FEEDBACK FAILURE.
-   - Flag for human review with: "Would your target users understand what [term/element] means?"
+   - **EXCEPTION (Tier 1 — confirmed finding):** A brand-specific or non-standard symbol used as a functional icon for a core function with no text label and no conventional signifier equivalent — flag directly as confirmed finding, moderate severity.
+   - Flag all other cases for human review with: "Would your target users understand what [term/element] means?"
 
 2. **INVITING DEAD END**
    - Why AI can't assess: Whether a CTA "misleads" depends on human expectations formed by years of
@@ -319,14 +315,16 @@ they are definitely traps.
    - What AI CAN do: Identify where CTA text might not match destination content
    - What AI CANNOT do: Know whether users' expectations match the actual destination
    - Example: Product image cards leading to categories - AI cannot know if users expect this convention
-   - Flag for human review with: "Do your users expect [CTA text] to lead to [destination type]?"
+   - **EXCEPTION (Tier 1 — confirmed finding):** An error message in the artifact amounting to "you should not have done what you just did" or "this action is not allowed" confirms users followed a plausible wrong path — flag directly as confirmed finding, moderate severity.
+   - Flag all other cases for human review with: "Do your users expect [CTA text] to lead to [destination type]?"
 
 3. **DISTRACTION**
    - Why AI can't assess: What captures human attention depends on cognitive patterns, visual salience
      relative to the task, and individual differences
    - What AI CAN do: Identify visually prominent elements that aren't task-related
    - What AI CANNOT do: Know whether these actually distract real users during real tasks
-   - Flag for human review with: "Does [element] pull user attention away from [primary task]?"
+   - **EXCEPTION (Tier 1 — confirmed finding):** Auto-playing audio or video elements are universally distracting during focused tasks — flag directly as confirmed finding without human review.
+   - Flag all other cases for human review with: "Does [element] pull user attention away from [primary task]?"
 
 4. **EFFECTIVELY INVISIBLE ELEMENT**
    - Why AI can't assess: Whether users "notice" something depends on attention patterns, scanning
@@ -348,6 +346,11 @@ Include:
 - observation: Factual description of what you see (no claims about user confusion)
 - why_human_review_needed: What human knowledge is required to confirm
 - question_for_reviewer: Specific yes/no question for the human to answer
+
+**EXCEPTIONS — flag directly as confirmed finding (do not route to human review) for:**
+- UNCOMPREHENDED ELEMENT: brand-specific or non-standard symbol as unlabeled functional icon for a core function
+- DISTRACTION: auto-playing audio or video elements
+- INVITING DEAD END: error messages confirming users followed a plausible wrong path
 
 **IMPORTANT: DO NOT flag as critical/moderate/minor issues unless you have OBJECTIVE evidence.**
 Theoretical confusion ≠ Actual confusion. When in doubt, flag for human review.
@@ -397,12 +400,12 @@ A minimalist design with lots of whitespace is NOT a bug.
 '''
 
 
-def load_training_content() -> str:
+def load_training_content(version: str = "v2") -> str:
     """
     Load the condensed AI analysis reference for Pass 1 (detection).
 
-    Uses UI_Traps_Analysis_Reference.md — optimized for trap detection from
-    screenshots. Much smaller token footprint than the full book.
+    Args:
+        version: "v2" (default) or "v1"
 
     Returns:
         Analysis reference content as string
@@ -412,20 +415,44 @@ def load_training_content() -> str:
     except ImportError:
         from knowledge_extractor import load_analysis_reference
 
-    return load_analysis_reference()
+    return load_analysis_reference(version=version)
 
 
-def build_system_prompt(use_caching: bool = True) -> list:
+# v1 uses 26 traps — UNATTRACTIVE APPEARANCE instead of POOR AESTHETIC, no INCORRECT INFORMATION
+_TRAP_NAMES_V1 = (
+    "INVISIBLE ELEMENT, EFFECTIVELY INVISIBLE ELEMENT, DISTRACTION, UNCOMPREHENDED ELEMENT, "
+    "INVITING DEAD END, POOR GROUPING, FORCED SYNTAX, MEMORY CHALLENGE, FEEDBACK FAILURE, "
+    "PHYSICAL CHALLENGE, ACCIDENTAL ACTIVATION, SLOW OR NO RESPONSE, CAPTIVE WAIT, "
+    "UNNECESSARY STEP, SYSTEM AMNESIA, INFORMATION OVERLOAD, BAD PREDICTION, "
+    "IRREVERSIBLE ACTION, UNWANTED DISCLOSURE, DATA LOSS, GRATUITOUS REDUNDANCY, "
+    "VARIABLE OUTCOME, WANDERING ELEMENT, INCONSISTENT APPEARANCE, AMBIGUOUS HOME, "
+    "UNATTRACTIVE APPEARANCE"
+)
+
+# v2 uses 27 traps — POOR AESTHETIC, INCORRECT INFORMATION added
+_TRAP_NAMES_V2 = (
+    "INVISIBLE ELEMENT, EFFECTIVELY INVISIBLE ELEMENT, DISTRACTION, UNCOMPREHENDED ELEMENT, "
+    "INVITING DEAD END, POOR GROUPING, FORCED SYNTAX, MEMORY CHALLENGE, FEEDBACK FAILURE, "
+    "PHYSICAL CHALLENGE, ACCIDENTAL ACTIVATION, SLOW OR NO RESPONSE, CAPTIVE WAIT, "
+    "UNNECESSARY STEP(S), INFORMATION OVERLOAD, SYSTEM AMNESIA, BAD PREDICTION, INCORRECT INFORMATION, "
+    "IRREVERSIBLE ACTION, UNWANTED DISCLOSURE, DATA LOSS, GRATUITOUS REDUNDANCY, "
+    "VARIABLE OUTCOME, WANDERING ELEMENT, INCONSISTENT APPEARANCE, AMBIGUOUS HOME, POOR AESTHETIC"
+)
+
+
+def build_system_prompt(use_caching: bool = True, version: str = "v2", image_count: int = 1) -> list:
     """
     Build the system prompt for Claude including training content.
 
     Args:
         use_caching: Whether to use prompt caching (recommended for production)
+        version: Knowledge base version — "v1" or "v2" (default "v2")
 
     Returns:
         List of system message blocks for Claude API
     """
-    training_content = load_training_content()
+    training_content = load_training_content(version=version)
+    trap_names_line = _TRAP_NAMES_V1 if version == "v1" else _TRAP_NAMES_V2
 
     system_prompt_intro = """You are an expert UI analyst specializing in the proprietary UI Tenets & Traps heuristic framework.
 
@@ -436,16 +463,26 @@ Your task is to analyze user interface designs using this framework. You will re
 
 📌 REQUIRED TERMINOLOGY — READ BEFORE WRITING ANY OUTPUT:
 
-This framework distinguishes two different concepts. You MUST use the correct word for each:
+Named anti-patterns from the UI Tenets & Traps framework (e.g. MEMORY CHALLENGE, INVISIBLE ELEMENT) are TRAPS. Always call them "traps", never "issues".
 
-- **TRAP** — a specific named anti-pattern from the UI Tenets & Traps framework (e.g. MEMORY CHALLENGE, INVISIBLE ELEMENT). These go in critical_issues, moderate_issues, minor_issues. ALWAYS call these "traps", never "issues".
-- **GENERAL ISSUE** — a broad, user-facing problem that may be caused by one or more traps. These go in user_issues. Call these "general issues" or "issues".
+In `summary_headline` and `summary_narrative`:
+- Do NOT write a trap count — the report generates that automatically
+- Describe WHAT appears to be present and WHY it may matter
+- Tie findings to the specific users and tasks provided, not generic language
 
-In the `summary` array:
-- Do NOT write a count bullet like "4 traps identified" or "4 issues identified" — the report generates that line automatically and correctly
-- Your bullets should describe WHAT was found and WHY it matters, not count findings
-- Named anti-patterns (MEMORY CHALLENGE, etc.) are TRAPS — never call them "issues"
-- Broad user-facing problems (user_issues) are GENERAL ISSUES — never call them "traps"
+⚠️ MEASURED LANGUAGE — MANDATORY THROUGHOUT ALL TEXT FIELDS:
+You are assessing a static design artifact, not conducting a user study. Your conclusions are informed inferences, not confirmed facts. Every text field — headline, problem, recommendation, summary_headline, summary_narrative — MUST use measured, hedged language.
+
+REQUIRED phrasing patterns:
+- headline: "appears to", "may cause", "could prevent", "seems likely to"
+- problem (Finding): "it appears that", "users may struggle to", "this seems to", "the evidence suggests"
+- recommendation: "one approach would be to", "consider", "it may help to", "a possible fix would be"
+- summary: "appears to", "may affect", "could complicate", "seems to"
+
+FORBIDDEN phrasing:
+- "users cannot", "the design fails", "this prevents users", "you must fix"
+- Absolutist statements about what users will or will not do
+- Prescriptive commands ("fix by doing X", "the only solution is")
 
 ⚠️ CONFIDENTIALITY & IP PROTECTION:
 - The UI Tenets & Traps framework is PROPRIETARY and CONFIDENTIAL
@@ -482,47 +519,61 @@ Before flagging ANY trap, you MUST:
 **Traps You CANNOT Detect from Static Screenshots (DO NOT FLAG THESE AS ISSUES):**
 6. BAD PREDICTION - Generally requires seeing actual personalisation/predictions respond incorrectly. **EXCEPTION: Flag BAD PREDICTION from a static screenshot when the interface is visibly surfacing content, recommendations, or categories that are clearly wrong for the user context you've been given** (e.g., a streaming app showing horror/adult movies prominently to users described as children or families, a news app recommending irrelevant categories to users with a stated niche interest). The prediction failure must be directly visible in the screenshot.
 
-**For `traps_checked_not_found` — MANDATORY RULES:**
+**For `traps_checked_not_found` — TESTABILITY RULES:**
 
-Include every trap not flagged as a confirmed issue. For each, set `testable` as follows:
+**Output only entries you actually evaluated.** Do NOT enumerate the entire trap list:
+- Always-evaluable traps: include each as testable:true (unless already a confirmed issue)
+- Conditional traps: include an entry only when you applied the rule and have a result to report
+- OMIT SLOW OR NO RESPONSE and POOR AESTHETIC/UNATTRACTIVE APPEARANCE — added automatically
+- OMIT conditional traps whose conditions clearly cannot apply (e.g., multi-screen traps for a single screenshot)
 
-🚫 **ALWAYS `testable: false` for single static screenshots — no exceptions:**
+Apply the per-trap rule below to determine `testable` for each entry you include.
 
-The training material for this system explicitly states that the following traps cannot be evaluated from static design files. You MUST set `testable: false` for ALL of these when only a single screenshot is provided:
+🚫 **ALWAYS `testable: false` (no evaluable cases from static artifact):**
 
-1. INVISIBLE ELEMENT — requires a complete inventory of all system interactions, not just visible ones; static analysis is explicitly insufficient per training material
-2. EFFECTIVELY INVISIBLE ELEMENT — requires knowledge of users' prior learning and moment-to-moment attentional goals; not determinable from a screenshot
-3. DISTRACTION — requires knowing users' goals both within and outside the product; context-dependent, not visually determinable
-4. UNCOMPREHENDED ELEMENT — comprehensibility is user-dependent, not interface-inherent; requires knowing what users have and have not learned
-5. INVITING DEAD END — what constitutes a plausible wrong path is user-dependent; requires knowledge of user mental models
-6. MEMORY CHALLENGE — requires knowledge of what users have previously learned and must retain across sessions
-7. PHYSICAL CHALLENGE — explicitly not detectable from static design files; requires testing on real hardware in real environments
-8. ACCIDENTAL ACTIVATION — explicitly not detectable from static design files; requires testing on real hardware during realistic use
-9. FEEDBACK FAILURE — requires performing actions and observing system responses; cannot be assessed from a before-state screenshot
-10. SLOW OR NO RESPONSE — actual response times require live performance measurement; perceived slowness requires user observation
-11. CAPTIVE WAIT — requires attempting to skip or advance through the wait; not observable from a static state
-12. IRREVERSIBLE ACTION — requires observing the consequences of actions taken; not determinable from a single before-state
-13. DATA LOSS — requires testing failure modes (unexpected shutdowns, timeouts, network interruptions)
-14. SYSTEM AMNESIA — requires knowledge of the underlying data architecture and what information the system has access to
-15. VARIABLE OUTCOME — requires testing the same interaction across different modes, states, or contexts
-16. WANDERING ELEMENT — requires seeing the same element across multiple pages or screens
-17. INCONSISTENT APPEARANCE — requires comparing the same element across multiple screens or contexts
-18. AMBIGUOUS HOME — requires seeing the information architecture across multiple pages/sections
-19. UNWANTED DISCLOSURE — requires understanding the social and physical contexts in which the product is used
-20. POOR AESTHETIC — explicitly not reliably detectable through structural analysis; requires cultural and aesthetic judgment
+- **SLOW OR NO RESPONSE** — actual response times require live performance measurement; perceived slowness requires user observation.
+__UNTESTABLE_AESTHETIC_LINE__
 
-✅ **`testable: true` only for these traps** (when not flagged as a confirmed issue):
+✅ **Always evaluable from a single screenshot** (when not flagged as a confirmed issue):
+__TESTABLE_TRUE_LIST__
 
-These are the only traps that can be meaningfully evaluated from a single screenshot:
-- POOR GROUPING
-- FORCED SYNTAX
-- INFORMATION OVERLOAD
-- UNNECESSARY STEP(S)
-- GRATUITOUS REDUNDANCY
-- INCORRECT INFORMATION
-- BAD PREDICTION (only the visible content-mismatch exception)
+🔀 **Conditional testability — apply the specific rule for each trap:**
+__SINGLE_SCREEN_NOTE__
+1. **INVISIBLE ELEMENT** — `testable: true (Tier 2)` when a core task identified in the user context has no visible means of completion anywhere in the artifact AND no alternative visible path exists. Flag: "No visible cue signals how to achieve [goal]. If users lack prior learning for an alternative interaction, this is a candidate Invisible Element." Output: potential_issues confidence "medium". `testable: false` for all other instances.
 
-Do NOT set `testable: true` for any trap outside this list.
+2. **EFFECTIVELY INVISIBLE ELEMENT** — `testable: true (human review)` when an element critical to task completion is present but measurably peripheral, low-contrast, or misaligned with the dominant interaction pattern of the interface. Flag for human review: "Would your users notice [element] in its current location and styling during this task?" Output: flagged_for_human_review. `testable: false` for general cases where attentional focus cannot be assessed.
+
+3. **DISTRACTION** — `testable: true (Tier 1)` when the artifact contains auto-playing audio or video — flag as confirmed finding. `testable: true (human review)` when the artifact contains motion, notification badges, unread counts, or unsolicited elements during documented task flows — output to flagged_for_human_review. `testable: false` for general attention-capture requiring knowledge of user goals outside the product.
+
+4. **UNCOMPREHENDED ELEMENT** — `testable: true (Tier 1)` when the artifact shows a brand-specific or non-standard symbol used as a functional icon for a core function with no text label and no conventional signifier equivalent — flag as confirmed finding, moderate severity. `testable: true (human review)` for all other potentially unfamiliar icons, labels, and signifiers — output to flagged_for_human_review per existing guidance.
+
+5. **INVITING DEAD END** — `testable: true (Tier 1)` when the artifact contains an error message amounting to "you should not have done what you just did" or "this action is not allowed" — flag as confirmed finding, moderate severity. `testable: true (human review)` for visual similarity cases — output to flagged_for_human_review per existing guidance.
+
+6. **MEMORY CHALLENGE** — `testable: true (Tier 2)` when the artifact explicitly reveals users must recall prior-session information with no retrieval cue (e.g., instructions to recall a security question, blank credential fields with no hint). Flag: "This screen requires users to recall [information] from a prior session with no retrieval cue visible." Output: potential_issues confidence "medium". Also `testable: true` when multiple screens show both the source info AND the recall demand — output as confirmed finding. `testable: false` when memory demand can only be inferred from knowing what earlier screens contained.
+
+7. **PHYSICAL CHALLENGE** — `testable: true (Tier 1)` for measurable violations: touch targets visibly below 12mm, text contrast below WCAG minimums, text size below legibility thresholds — flag as confirmed finding. `testable: false (risk noted)` for non-measurable properties (weight, thermal comfort, VR motion sickness, one-handed reach) — output to potential_issues confidence "low" noting hardware testing required.
+
+8. **ACCIDENTAL ACTIVATION** — `testable: true (Tier 3 — risk noted)` when controls are visibly positioned at natural grip points for the device type shown (e.g., controls at the edges or back of a phone, gesture-activated surfaces covering the full device). Output: potential_issues confidence "low" with explicit note that hardware testing is required. `testable: false` for all other instances.
+
+9. **FEEDBACK FAILURE** — `testable: true (Tier 1)` for: (a) error messages visible in the artifact that fail to answer both "what happened?" AND "what should I do?" — answering only one of the two questions is this Trap; (b) interactive elements (buttons, form submissions, controls) where the artifact shows no visible response state, loading indicator, or confirmation — absence of any response state is directly observable. `testable: false` for assessing whether feedback is noticeable or comprehensible to real users.
+
+10. **CAPTIVE WAIT** — `testable: true (Tier 2)` when the artifact shows a mandatory sequence, interstitial, or process with no visible skip option, no visible duration indicator, and no visible means of backing out. Flag: "This sequence appears to prevent users from advancing or exiting — confirm whether a skip option or duration disclosure exists." Output: potential_issues confidence "medium". `testable: false` for assessing whether the duration and purpose justify the captive period.
+
+11. **IRREVERSIBLE ACTION** — `testable: true (Tier 2)` when a consequential action (delete, send, purchase, submit, publish) is visible with no visible undo mechanism, cancel option, time-limited recovery window, or non-habituating confirmation. Note: standard OK/Cancel dialogs alone do NOT resolve this Trap — flag even when present if the action is consequential. Flag: "This action appears to have no recovery path — confirm whether reversal is technically feasible." Output: potential_issues confidence "medium". `testable: false` for assessing whether an action could technically be made reversible.
+
+12. **DATA LOSS** — `testable: true (Tier 2)` when the artifact shows user-generated content (form fields, text input, creative work, multi-step data entry) with no visible auto-save indicator AND no explicit save mechanism AND context where failure modes are foreseeable (session timeout, navigation away, crash). Flag: "User-generated content in this flow may be lost if [failure mode] occurs — confirm whether auto-save is implemented." Output: potential_issues confidence "medium". `testable: false` for confirming actual data loss.
+
+13. **SYSTEM AMNESIA** — `testable: true (Tier 1)` when the artifact shows the system displaying information it demonstrably possesses while simultaneously requesting it or acting contrary to it — visible on a single screen. Examples: recommending a product the user's profile shows they already own; asking for information already shown elsewhere on the same screen; prompting for a preference the interface shows has already been set. Flag as confirmed finding, moderate severity. `testable: false` for re-prompting across screens requiring knowledge of prior-session data.
+
+14. **VARIABLE OUTCOME (temporal case)** — the standard form requires testing the same interaction across different modes, states, or contexts. **Exception — spatial case: testable from static screenshot.** When you observe two or more visually identical elements at the same or directly nested level during your whole-interface scan, apply the directed inspection protocol: flag for review and instruct the analyst to test each element. If functions differ → Variable Outcome. If functions are the same → Gratuitous Redundancy. Do NOT suppress this case under the testable: false rule — set testable: true for the spatial case.
+
+15. **WANDERING ELEMENT** — `testable: true (Tier 1)` when multiple screens are provided — cross-context placement consistency is directly auditable by comparing control positions across screens. `testable: false` for single screenshot analyses.
+
+16. **INCONSISTENT APPEARANCE** — `testable: true (Tier 1)` when multiple screens are provided — cross-context visual consistency is directly auditable by comparing visual representation of recurring controls across screens. `testable: false` for single screenshot analyses.
+
+17. **AMBIGUOUS HOME** — `testable: true (Tier 2)` when the artifact shows two or more elements that could plausibly serve as the primary home or starting point with no single clearly designated home destination. Flag: "Multiple elements could plausibly serve as home — confirm whether users agree on a single starting point." Output: potential_issues confidence "medium". `testable: false` for single-screen artifacts where home ambiguity requires cross-section navigation knowledge.
+
+18. **UNWANTED DISCLOSURE** — `testable: true (Tier 1)` when the artifact shows opt-out sharing of sensitive behavioral data as the default setting — flag as confirmed finding, high severity. `testable: true (Tier 2)` when the artifact shows data sharing features, notification defaults, or ambient display settings where social or physical context could make disclosure unwanted — output to potential_issues confidence "medium". `testable: false` for contextual evaluation of whether specific disclosures would be unwanted.
 
 **BAD PREDICTION — When to flag from static screenshots:**
 Flag when the interface is visibly showing content/recommendations mismatched to the stated user context:
@@ -538,8 +589,22 @@ Flag when visible content is factually wrong, miscategorised, or misleadingly la
 - Ratings, metadata, or descriptions visibly inconsistent with the actual content shown
 Do NOT flag INCORRECT INFORMATION solely because content is hard to find — use INVISIBLE ELEMENT or POOR GROUPING for navigation problems.
 
+🔍 **WHOLE-INTERFACE REPEATED-ELEMENT SCAN — PERFORM BEFORE TRAP-BY-TRAP ANALYSIS:**
+
+Before beginning your trap-by-trap analysis, scan the entire interface and catalog:
+1. Every text string, label, icon, and interactive control that appears more than once **anywhere on the same screen** — regardless of which navigation bar, panel, or component each instance appears in. Record location of each instance. Do NOT filter or pre-judge based on visual proximity or component hierarchy — catalog all repetitions visible simultaneously.
+2. For each repeated element cataloged, apply:
+   - Same text/icon/label/control, visible simultaneously, no independent informational distinction → **Gratuitous Redundancy, Tier 1** (confirmed from artifact). "Same level" means "visible at the same time on the same screen" — do NOT dismiss cross-component repetitions (e.g. same label in two different nav bars) as different levels.
+   - Two elements differ visually but a reasonable user could expect both to trigger the same function, spatially separate and independently operable → **Gratuitous Redundancy candidate, Tier 2** (flag for review)
+   - Identical elements observed but functions unverifiable from artifact → **Directed inspection**: output to `potential_issues` with `trap_name`: "GRATUITOUS REDUNDANCY", `why_uncertain`: "Cannot confirm from this artifact whether [element A at location] and [element B at location] trigger the same function — analyst must test each. If same function → Gratuitous Redundancy. If different functions → Variable Outcome.", confidence: "low".
+3. A single interface may contain multiple independent instances — catalog and assess each separately.
+4. Severity: Moderate in most cases unless downstream effects (Information Overload, displaced content, Unnecessary Steps) raise it.
+
+**This scan must be a whole-interface pass before element-by-element analysis. Repeated elements are invisible to analysis that examines each element in isolation.**
+
+Note: elements following different grammatical constructions (object→action AND action→object) remain disconfirmations and should NOT be flagged as Gratuitous Redundancy.
+
 **Common Over-Application to AVOID:**
-- GRATUITOUS REDUNDANCY: Multiple navigation options ≠ redundancy. Flexible starting points (noun→verb or verb→noun) are OK. Only flag true duplicates visible simultaneously. If flagged, usually Moderate or Minor severity, NOT Critical.
 - POOR GROUPING: **USE GESTALT PRINCIPLES** - Standard layout conventions are NOT poor grouping. POOR GROUPING requires a VIOLATION of a specific Gestalt perceptual principle (Proximity, Similarity, Common Region, Continuity, Figure-Ground, Closure, Common Fate, or Symmetry). If no Gestalt principle is violated, it is NOT Poor Grouping. Mixed content types (products + services) in the same section is OK if they serve the same navigational purpose. See detailed Gestalt rules below.
 - PHYSICAL CHALLENGE: Standard-sized interface elements are NOT traps. Only flag if below WCAG minimums (touch targets <44px, click targets <24px, text <12px) OR if clearly problematic. Navigation menus with standard sizing are fine.
 
@@ -595,12 +660,14 @@ Do NOT flag INCORRECT INFORMATION solely because content is hard to find — use
   - Regional conventions learned over a lifetime
   - Industry knowledge the AI cannot verify
 
-  **ALWAYS output to `flagged_for_human_review` - NO EXCEPTIONS:**
+  **EXCEPTION (Tier 1 — confirmed finding):** When the artifact shows a brand-specific or non-standard symbol used as a functional icon for a core function, with no text label and no conventional signifier equivalent — flag directly as confirmed finding, moderate severity. No human review needed for this case.
+
+  **For all other instances, output to `flagged_for_human_review`:**
   - observation: "The term/icon [X] appears in [location]"
   - why_human_review_needed: "I cannot determine if target users would understand this"
   - question_for_reviewer: "Would your target users understand what [term/icon] means?"
 
-  **DO NOT flag UNCOMPREHENDED ELEMENT as critical/moderate/minor. It MUST go to human review.**
+  **DO NOT flag other UNCOMPREHENDED ELEMENT cases as critical/moderate/minor. They MUST go to human review.**
 
 - INVITING DEAD END: **⚠️ REQUIRES HUMAN JUDGMENT - FLAG FOR REVIEW**
 
@@ -617,6 +684,7 @@ Do NOT flag INCORRECT INFORMATION solely because content is hard to find — use
   **EXCEPTION - Only flag directly when:**
   - You have VERIFIED the destination (in multi-page analysis) and it objectively mismatches the CTA text
   - The CTA text makes a specific promise that is objectively not kept (e.g., "Free Download" leads to payment)
+  - An error message in the artifact amounts to "you should not have done what you just did" or "this action is not allowed" — the error confirms users followed a plausible wrong path (Tier 1 confirmed finding, moderate severity)
 
 **Severity Guidelines:**
 - Critical = Blocks core user tasks, prevents goal completion (e.g., regional jargon on primary actions, missing essential controls)
@@ -699,7 +767,7 @@ When analyzing a page that is part of a larger site, you MUST consider:
    - DO NOT require primary shopping/product CTAs on these pages
 
 **What to Focus On:**
-- Systematically check for all 27 Traps (but respect limitations above)
+- Systematically check for all __TRAP_COUNT__ Traps (but respect limitations above)
 - Use the gated decision procedure for Information Overload (Gates 0-3) as INTERNAL REASONING only
 - Provide specific visual references where traps occur
 - **RESPECT PAGE ROLES** - Don't flag missing elements that belong elsewhere
@@ -750,8 +818,8 @@ EXAMPLE 4 - CORRECT NON-DETECTION on Destination Page (Do Not Flag):
 - Conclusion: No INVISIBLE ELEMENT trap. Page is fulfilling its role (displaying policies). Navigation is adequate for its context.
 
 OUTPUT REQUIREMENTS:
-- Provide 5-9 summary bullet points
-- For confirmed issues (Critical/Moderate/Minor), specify: trap name (in ALL CAPS), tenet violated, exact location, detailed problem explanation, actionable recommendation, and confidence level
+- Write a `summary_headline` (one sentence tied to the user's stated goals) and `summary_narrative` (one paragraph elaborating on overall findings)
+- For confirmed issues (Critical/Moderate/Minor), provide: trap name (ALL CAPS), tenet violated, a `headline` sentence describing how the trap manifests and its likely user impact, exact location, `problem` elaboration (2-3 sentences of reasoning), `recommendation` (2-3 advisory sentences), and confidence level
 
 **⚠️ CRITICAL - HUMAN-READABLE OUTPUT:**
 The 'problem' field MUST be written for end users (clients, designers, stakeholders) who have never heard of UI Traps methodology:
@@ -762,7 +830,7 @@ The 'problem' field MUST be written for end users (clients, designers, stakehold
 - Example BAD: "GATE 0 - User goal: purchase. GATE 1 - Evidence: multiple banners..."
 - Example GOOD: "Three promotional banners appear between the size selector and Add to Cart button, forcing users to scroll past marketing content to complete their purchase."
 
-**⚠️ HEDGED LANGUAGE — MANDATORY:**
+**⚠️ HEDGED LANGUAGE — MANDATORY (see also MEASURED LANGUAGE block above):**
 You are analyzing a static design, not running a user study. You cannot observe actual user behavior.
 NEVER use absolutist language about what users can or cannot do. Always use hedged language:
 - WRONG: "users cannot find", "kids cannot locate", "users will not be able to"
@@ -777,15 +845,40 @@ The only exception: technical facts visible in the UI (e.g. "the button is not v
 - Note positive design elements
 
 ⚠️ TRAP NAME VALIDATION (CRITICAL):
-You may ONLY use these 27 trap names - do NOT invent new names:
-INVISIBLE ELEMENT, EFFECTIVELY INVISIBLE ELEMENT, DISTRACTION, UNCOMPREHENDED ELEMENT, INVITING DEAD END, POOR GROUPING, FORCED SYNTAX, MEMORY CHALLENGE, FEEDBACK FAILURE, PHYSICAL CHALLENGE, ACCIDENTAL ACTIVATION, SLOW OR NO RESPONSE, CAPTIVE WAIT, UNNECESSARY STEP, INFORMATION OVERLOAD, SYSTEM AMNESIA, BAD PREDICTION, INCORRECT INFO, IRREVERSIBLE ACTION, UNWANTED DISCLOSURE, DATA LOSS, GRATUITOUS REDUNDANCY, VARIABLE OUTCOME, WANDERING ELEMENT, INCONSISTENT APPEARANCE, AMBIGUOUS HOME, POOR AESTHETIC
+You may ONLY use these trap names - do NOT invent new names:
+{trap_names_line}
 
-If an issue doesn't fit one of these 27 traps, it is NOT a UI Trap - do not report it as one.
+If an issue doesn't fit one of these traps, it is NOT a UI Trap - do not report it as one.
 
 ⚠️ VISUAL VERIFICATION REMINDER:
 Before submitting, verify each finding against what you actually see in the image. Do NOT flag elements as missing if they are visible in the screenshot.
 
 You will submit your analysis using the ui_analysis_report tool with all required fields including potential_issues and flagged_for_human_review."""
+
+    # Version-specific substitutions
+    if version == "v1":
+        trap_count = "26"
+        untestable_aesthetic = "20. UNATTRACTIVE APPEARANCE — explicitly not reliably detectable through structural analysis; requires cultural and aesthetic judgment"
+        testable_true = (
+            "- POOR GROUPING\n"
+            "- FORCED SYNTAX\n"
+            "- INFORMATION OVERLOAD\n"
+            "- UNNECESSARY STEP\n"
+            "- GRATUITOUS REDUNDANCY\n"
+            "- BAD PREDICTION (only the visible content-mismatch exception)"
+        )
+    else:
+        trap_count = "27"
+        untestable_aesthetic = "20. POOR AESTHETIC — explicitly not reliably detectable through structural analysis; requires cultural and aesthetic judgment"
+        testable_true = (
+            "- POOR GROUPING\n"
+            "- FORCED SYNTAX\n"
+            "- INFORMATION OVERLOAD\n"
+            "- UNNECESSARY STEP(S)\n"
+            "- GRATUITOUS REDUNDANCY\n"
+            "- INCORRECT INFORMATION\n"
+            "- BAD PREDICTION (only the visible content-mismatch exception)"
+        )
 
     # Build the complete system prompt with all guidance sections
     full_system_prompt = f"""{system_prompt_intro}
@@ -799,13 +892,37 @@ You will submit your analysis using the ui_analysis_report tool with all require
 ===== TIER 3: HUMAN JUDGMENT TRAPS GUIDANCE =====
 {HUMAN_REVIEW_TRAPS_GUIDANCE}"""
 
+    # Single-screenshot shortcut note — injected into the conditional testability block
+    single_screen_note = (
+        "\n⚡ **Single-screenshot shortcut:** WANDERING ELEMENT and INCONSISTENT APPEARANCE "
+        "are always testable:false for single screenshots — omit these from your output, "
+        "they are added automatically.\n"
+    ) if image_count == 1 else ""
+
+    # Apply version-specific substitutions to the full prompt
+    full_system_prompt = (
+        full_system_prompt
+        .replace("{trap_names_line}", trap_names_line)
+        .replace("__TRAP_COUNT__", trap_count)
+        .replace("__UNTESTABLE_AESTHETIC_LINE__", untestable_aesthetic)
+        .replace("__TESTABLE_TRUE_LIST__", testable_true)
+        .replace("__SINGLE_SCREEN_NOTE__", single_screen_note)
+    )
+    # v1: rename POOR AESTHETIC references in guidance sections
+    if version == "v1":
+        full_system_prompt = full_system_prompt.replace(
+            "POOR AESTHETIC", "UNATTRACTIVE APPEARANCE"
+        )
+
     # Build system message blocks with optional caching
     if use_caching:
-        # Use prompt caching for the training content (saves 90% on repeated calls)
+        # Cache both blocks: instructions get the same 5-minute TTL as the KB.
+        # Repeated analyses in the same session (e.g. multi-page site) hit both from cache.
         return [
             {
                 "type": "text",
-                "text": full_system_prompt
+                "text": full_system_prompt,
+                "cache_control": {"type": "ephemeral"}
             },
             {
                 "type": "text",
@@ -1065,7 +1182,8 @@ CONTEXT PROVIDED BY USER:
 Perform a complete UI Tenets & Traps analysis following the methodology in your training content.
 
 Remember to:
-- Check all 27 Traps systematically
+- **WHOLE-INTERFACE SCAN FIRST (before any trap analysis)**: Scan the entire screen for every text label, icon, and interactive control that appears more than once anywhere on screen — regardless of which nav bar, panel, or component each instance is in. For each repeated element apply the GR scan protocol from your instructions (Tier 1 confirmed / Tier 2 candidate / directed inspection to potential_issues).
+- Check all __TRAP_COUNT__ Traps systematically
 - Use the gated decision procedure for Information Overload
 - Provide specific locations where issues occur
 - Classify severity appropriately (Critical/Moderate/Minor)
@@ -1075,7 +1193,6 @@ Remember to:
 {('- **DETECT BUGS** - Report technical failures separately from UI traps' if (is_video_analysis or is_multi_frame) else '')}
 - Note positive observations
 - List traps you checked but didn't find
-- **Synthesize user_issues**: after identifying all traps, group related findings into user-facing issues named from the user's perspective (e.g., "Users fail at checkout", not "UNNECESSARY STEP detected"). Each issue should reference the contributing traps, state the impact level (high/medium/low), and provide synthesized recommendations. A trap may appear in more than one issue if it contributes to distinct user problems. Omit this field if no confirmed traps were found. When the user specified multiple numbered tasks, set `task_context` on each user_issue to the specific task it affects — use the same wording the user used for that task. If an issue spans all tasks or is not task-specific, omit `task_context`.
 - Submit your complete analysis using the ui_analysis_report tool
 
 Begin your analysis now."""
@@ -1649,7 +1766,7 @@ def build_enrichment_user_message(
     Args:
         pass1_report: The structured report from Pass 1 detection
         trap_sections: Dict of trap_name -> book section text for each found trap
-        trap_images: Optional dict of trap_name -> list of base64 PNG strings (book illustrations)
+        trap_images: Optional dict of trap_name -> list of (label, base64) tuples (book illustrations)
         knowledge_chunks: Optional pre-formatted structured knowledge base content for found traps
 
     Returns:
@@ -1694,12 +1811,15 @@ def build_enrichment_user_message(
     if trap_images:
         content.append({
             "type": "text",
-            "text": "\nBOOK ILLUSTRATIONS — visual examples from the UI Traps framework:",
+            "text": "\nBOOK ILLUSTRATIONS — visual examples from the UI Traps framework. "
+                    "Labels like [Example 17.1] correspond to the numbered examples in the knowledge base above:",
         })
         for trap_name, images in trap_images.items():
             if images:
                 content.append({"type": "text", "text": f"\n[{trap_name}]"})
-                for img_b64 in images:
+                for label, img_b64 in images:
+                    if label:
+                        content.append({"type": "text", "text": f"[{label}]"})
                     content.append({
                         "type": "image",
                         "source": {

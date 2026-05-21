@@ -18,7 +18,7 @@ TENETS_AND_TRAPS = [
     ]),
     ("COMFORTABLE", ["PHYSICAL CHALLENGE", "ACCIDENTAL ACTIVATION"]),
     ("RESPONSIVE", ["SLOW OR NO RESPONSE", "CAPTIVE WAIT"]),
-    ("EFFICIENT", ["UNNECESSARY STEPS", "INFORMATION OVERLOAD", "SYSTEM AMNESIA"]),
+    ("EFFICIENT", ["UNNECESSARY STEP(S)", "UNNECESSARY STEP", "UNNECESSARY STEPS", "INFORMATION OVERLOAD", "SYSTEM AMNESIA"]),
     ("ACCURATE", ["BAD PREDICTION", "INCORRECT INFORMATION"]),
     ("PROTECTIVE", ["IRREVERSIBLE ACTION", "UNWANTED DISCLOSURE", "DATA LOSS"]),
     ("HABITUATING", [
@@ -52,6 +52,7 @@ _UNTESTABLE_REASON_DEFAULTS: Dict[str, str] = {
     "AMBIGUOUS HOME": "Requires seeing the full information architecture across multiple sections to determine whether the structural 'home' is clear to users.",
     "UNWANTED DISCLOSURE": "Requires understanding the social and physical contexts in which the product is used — who might be able to see the screen, and what information would be inappropriate in those contexts.",
     "POOR AESTHETIC": "Aesthetic quality involves cultural, demographic, and contextual judgement that cannot be reliably assessed through structural analysis of a static design file alone.",
+    "UNATTRACTIVE APPEARANCE": "Aesthetic quality involves cultural, demographic, and contextual judgement that cannot be reliably assessed through structural analysis of a static design file alone.",
 }
 
 
@@ -201,8 +202,8 @@ def parse_claude_response(response_text: str) -> Dict[str, Any]:
         raise ValueError(f"Failed to parse Claude response as JSON: {e}\n\nResponse: {response_text[:500]}")
 
     # Validate required fields
-    required_fields = ['summary', 'critical_issues', 'moderate_issues', 'minor_issues',
-                      'positive_observations', 'traps_checked_not_found']
+    required_fields = ['summary_headline', 'summary_narrative', 'critical_issues', 'moderate_issues',
+                       'minor_issues', 'positive_observations', 'traps_checked_not_found']
 
     for field in required_fields:
         if field not in report:
@@ -259,138 +260,82 @@ def format_report_as_markdown(report: Dict[str, Any], user_context: Dict[str, st
         md.append("---")
         md.append("")
 
-    # Summary
+    # Summary — scorecard + headline + narrative
     md.append("## Summary")
     md.append("")
-    n_issues = len(report.get('user_issues', []))
+
     n_high = len(report.get('critical_issues', []))
     n_moderate = len(report.get('moderate_issues', []))
     n_low = len(report.get('minor_issues', []))
-    n_traps = n_high + n_moderate + n_low
-    trap_breakdown = ", ".join(filter(None, [
-        f"{n_high} high severity" if n_high else "",
-        f"{n_moderate} moderate" if n_moderate else "",
-        f"{n_low} low severity" if n_low else "",
-    ]))
-    trap_summary = f"{n_traps} trap{'s' if n_traps != 1 else ''}"
-    if trap_breakdown:
-        trap_summary += f" ({trap_breakdown})"
-    md.append(f"**Found:** {n_issues} general issue{'s' if n_issues != 1 else ''} • {trap_summary}")
+    n_confirmed = n_high + n_moderate + n_low
+    n_potential = len(report.get('potential_issues', []))
+
+    md.append("| | High | Moderate | Low | Total |")
+    md.append("|---|:---:|:---:|:---:|:---:|")
+    md.append(f"| Higher confidence | {n_high or '—'} | {n_moderate or '—'} | {n_low or '—'} | {n_confirmed or '—'} |")
+    md.append(f"| Lower confidence | — | — | {n_potential or '—'} | {n_potential or '—'} |")
     md.append("")
 
-    # Programmatic count bullet
-    import re as _re
-    _count_pattern = _re.compile(r'^\d+\s+(trap|issue)s?\s+identified', _re.IGNORECASE)
-    count_bullet = f"{n_traps} trap{'s' if n_traps != 1 else ''} identified"
-    if trap_breakdown:
-        count_bullet += f": {trap_breakdown}."
-    else:
-        count_bullet += "."
-    if n_issues:
-        count_bullet += f" {n_issues} general issue{'s' if n_issues != 1 else ''} identified."
-    md.append(f"- {count_bullet}")
-    for bullet in report['summary']:
-        if _count_pattern.match(bullet.strip()):
-            continue  # skip AI-generated count bullet
-        md.append(f"- {bullet}")
+    headline = report.get('summary_headline', '')
+    narrative = report.get('summary_narrative', '')
+    if headline:
+        md.append(f"**{headline}**")
+        md.append("")
+    if narrative:
+        md.append(narrative)
+        md.append("")
+
+    # Traps Found — sorted by severity, then confidence within severity
+    conf_order = {"high": 0, "medium": 1, "low": 2}
+    all_confirmed_md = (
+        [('critical', 'High', i) for i in report.get('critical_issues', [])] +
+        [('moderate', 'Moderate', i) for i in report.get('moderate_issues', [])] +
+        [('minor', 'Low', i) for i in report.get('minor_issues', [])]
+    )
+    sorted_md = []
+    for sev_key in ('critical', 'moderate', 'minor'):
+        group = [(s, sl, i) for s, sl, i in all_confirmed_md if s == sev_key]
+        group.sort(key=lambda x: conf_order.get(x[2].get('confidence', 'low'), 2))
+        sorted_md.extend(group)
+
+    md.append("## Traps Found")
     md.append("")
-
-    # Helper to render frame info for an issue
-    def render_frame_info(issue):
-        if 'appears_in' in issue and len(issue.get('appears_in', [])) > 1:
-            frame_indices = issue.get('frame_indices', [])
-            if frame_indices:
-                frames_display = ', '.join([f"Frame {idx}" for idx in frame_indices[:5]])
-                if len(frame_indices) > 5:
-                    frames_display += f" (+{len(frame_indices) - 5} more)"
-            else:
-                frames_display = ', '.join(issue['appears_in'][:5])
-                if len(issue['appears_in']) > 5:
-                    frames_display += f" (+{len(issue['appears_in']) - 5} more)"
-            md.append(f"**📍 See:** {frames_display}")
-            md.append("")
-        elif 'frame_index' in issue:
-            frame_idx = issue['frame_index']
-            frame_label = issue.get('frame', f"Frame {frame_idx}")
-            md.append(f"**📍 See Frame {frame_idx}** ({frame_label})")
-            md.append("")
-        elif 'frame' in issue:
-            md.append(f"**📍 Found in:** {issue['frame']}")
-            md.append("")
-
-    # Critical Issues
-    if report['critical_issues']:
-        md.append("## 🔴 Critical Issues")
-        md.append("")
-        for issue in report['critical_issues']:
-            render_frame_info(issue)
-            md.append(f"**Trap Detected:** **{issue['trap_name'].upper()}**")
-            md.append("")
-            md.append(f"**Tenet Violated:** {issue['tenet'].upper()}")
-            md.append("")
-            md.append(f"**Where:** {_cap_terms(issue['location'])}")
-            md.append("")
-            md.append(f"**Problem:** {_cap_terms(issue['problem'])}")
-            md.append("")
-            md.append(f"**Recommendation:** {_cap_terms(issue['recommendation'])}")
-            md.append("")
-            if 'confidence' in issue:
-                md.append(f"*Confidence: {issue['confidence']}*")
+    if sorted_md:
+        for sev_class, sev_label, issue in sorted_md:
+            # Frame reference
+            if 'frame_index' in issue:
+                md.append(f"*Frame {issue['frame_index']}*")
                 md.append("")
-    else:
-        md.append("## 🔴 Critical Issues")
-        md.append("")
-        md.append("*None found* ✓")
-        md.append("")
-
-    # Moderate Issues
-    if report['moderate_issues']:
-        md.append("## 🟡 Moderate Issues")
-        md.append("")
-        for issue in report['moderate_issues']:
-            render_frame_info(issue)
-            md.append(f"**Trap Detected:** **{issue['trap_name'].upper()}**")
-            md.append("")
-            md.append(f"**Tenet Violated:** {issue['tenet'].upper()}")
-            md.append("")
-            md.append(f"**Where:** {_cap_terms(issue['location'])}")
-            md.append("")
-            md.append(f"**Problem:** {_cap_terms(issue['problem'])}")
-            md.append("")
-            md.append(f"**Recommendation:** {_cap_terms(issue['recommendation'])}")
-            md.append("")
-            if 'confidence' in issue:
-                md.append(f"*Confidence: {issue['confidence']}*")
+            elif 'frame' in issue:
+                md.append(f"*{issue['frame']}*")
                 md.append("")
-    else:
-        md.append("## 🟡 Moderate Issues")
-        md.append("")
-        md.append("*None found* ✓")
-        md.append("")
-
-    # Minor Issues
-    if report['minor_issues']:
-        md.append("## 🔵 Minor Issues")
-        md.append("")
-        for issue in report['minor_issues']:
-            render_frame_info(issue)
-            md.append(f"**Trap Detected:** **{issue['trap_name'].upper()}**")
-            md.append("")
-            md.append(f"**Tenet Violated:** {issue['tenet'].upper()}")
-            md.append("")
-            md.append(f"**Where:** {_cap_terms(issue['location'])}")
-            md.append("")
-            md.append(f"**Problem:** {_cap_terms(issue['problem'])}")
-            md.append("")
-            md.append(f"**Recommendation:** {_cap_terms(issue['recommendation'])}")
-            md.append("")
-            if 'confidence' in issue:
-                md.append(f"*Confidence: {issue['confidence']}*")
+            # Headline
+            if issue.get('headline'):
+                md.append(f"### {_cap_terms(issue['headline'])}")
                 md.append("")
+            # Meta
+            conf = issue.get('confidence', '')
+            meta = f"{issue.get('trap_name','').upper()} · {issue.get('tenet','').upper()} · {sev_label} severity"
+            if conf:
+                meta += f" · {conf.title()} confidence"
+            md.append(f"*{meta}*")
+            md.append("")
+            # Finding
+            if issue.get('problem'):
+                md.append("**Finding**")
+                md.append("")
+                md.append(_cap_terms(issue['problem']))
+                md.append("")
+            # Recommendation
+            if issue.get('recommendation'):
+                md.append("**Recommendation**")
+                md.append("")
+                md.append(_cap_terms(issue['recommendation']))
+                md.append("")
+            md.append("---")
+            md.append("")
     else:
-        md.append("## 🔵 Minor Issues")
-        md.append("")
-        md.append("*None found* ✓")
+        md.append("*No confirmed traps found ✓*")
         md.append("")
 
     # Positive Observations
@@ -500,91 +445,7 @@ def format_report_as_markdown(report: Dict[str, Any], user_context: Dict[str, st
                 md.append(f"- **Frame {note.get('frame_index', '?')}**: {issue_label} - {note.get('description', 'Skipped')}")
         md.append("")
 
-    # General Issues (synthesis layer)
-    user_issues = report.get('user_issues', [])
-    if user_issues:
-        impact_order = {"high": 0, "medium": 1, "low": 2}
-        md.append("## General Issues")
-        md.append("")
-        md.append("*General issues are broad problems experienced by users. Each may stem from one or more specific traps listed below.*")
-        md.append("")
-
-        def _render_md_issue(issue):
-            impact = issue.get('impact_level', 'low').upper()
-            md.append(f"### {issue.get('issue_title', 'Untitled Issue')} [{impact} IMPACT]")
-            md.append("")
-            md.append(issue.get('issue_description', ''))
-            md.append("")
-            traps = issue.get('contributing_traps', [])
-            if traps:
-                trap_names = ", ".join(t.get('trap_name', '') for t in traps if t.get('trap_name'))
-                md.append(f"**Underlying traps:** {trap_names}")
-                md.append("")
-            recs = issue.get('recommendations', [])
-            if recs:
-                md.append("**How to fix:**")
-                for rec in recs:
-                    md.append(f"- {rec}")
-                md.append("")
-
-        raw_tasks = user_context.get('tasks', 'N/A') if user_context else 'N/A'
-        task_list = parse_tasks(raw_tasks)
-        multi_task = len(task_list) > 1 and task_list != ['N/A']
-
-        if multi_task:
-            # Group issues by task_context; bucket unmatched as general
-            def _best_task_match(tc, tasks):
-                if not tc:
-                    return None
-                tc_lower = tc.lower()
-                for t in tasks:
-                    if tc_lower == t.lower() or tc_lower in t.lower() or t.lower() in tc_lower:
-                        return t
-                return tc  # keep original label if no match found
-
-            task_buckets = {t: [] for t in task_list}
-            general_bucket = []
-            other_buckets = {}
-            for issue in user_issues:
-                tc = issue.get('task_context', '').strip()
-                matched = _best_task_match(tc, task_list)
-                if matched is None:
-                    general_bucket.append(issue)
-                elif matched in task_buckets:
-                    task_buckets[matched].append(issue)
-                else:
-                    other_buckets.setdefault(matched, []).append(issue)
-
-            for task in task_list:
-                bucket = task_buckets[task]
-                if bucket:
-                    bucket = sorted(bucket, key=lambda x: impact_order.get(x.get('impact_level', 'low'), 3))
-                    md.append(f"**Task: {task}**")
-                    md.append("")
-                    for issue in bucket:
-                        _render_md_issue(issue)
-
-            for label, bucket in other_buckets.items():
-                bucket = sorted(bucket, key=lambda x: impact_order.get(x.get('impact_level', 'low'), 3))
-                md.append(f"**Task: {label}**")
-                md.append("")
-                for issue in bucket:
-                    _render_md_issue(issue)
-
-            if general_bucket:
-                general_bucket = sorted(general_bucket, key=lambda x: impact_order.get(x.get('impact_level', 'low'), 3))
-                md.append("**General (applies to all tasks)**")
-                md.append("")
-                for issue in general_bucket:
-                    _render_md_issue(issue)
-        else:
-            user_issues = sorted(user_issues, key=lambda x: impact_order.get(x.get('impact_level', 'low'), 3))
-            for issue in user_issues:
-                _render_md_issue(issue)
-
-    # Traps Checked but Not Found — split into tested-clean vs could-not-test
-    md.append("## Traps Checked But Not Found")
-    md.append("")
+    # Traps Not Found + Needs More Context
     raw_items = report.get('traps_checked_not_found', [])
     md_tested_ok = []
     md_untestable = []
@@ -597,22 +458,21 @@ def format_report_as_markdown(report: Dict[str, Any], user_context: Dict[str, st
             md_untestable.append(item)
 
     if md_tested_ok:
-        md.append("### ✓ Evaluated — Not Present")
+        md.append("## Traps Not Found")
+        md.append("")
+        md.append("*The following traps were specifically evaluated and do not appear to be present in the submitted design.*")
         md.append("")
         for trap in md_tested_ok:
             md.append(f"- {trap}")
         md.append("")
 
     if md_untestable:
-        md.append("### ⚠ Could Not Evaluate — Insufficient Information")
+        md.append("## Needs More Context")
+        md.append("")
+        md.append("*The following traps could not be fully evaluated from the submitted materials. To investigate further, consider testing the live product with representative users, reviewing additional screens in the task flow, or inspecting the underlying code.*")
         md.append("")
         for item in md_untestable:
-            reason = _untestable_reason(item.get('trap_name', ''), item.get('reason'))
-            md.append(f"- **{item['trap_name'].upper()}** — {reason}")
-        md.append("")
-
-    if not md_tested_ok and not md_untestable:
-        md.append("*All traps were either found or not fully evaluated*")
+            md.append(f"- {item['trap_name'].upper()}")
         md.append("")
 
     # Footer
@@ -803,14 +663,123 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
             font-weight: 600;
             letter-spacing: 0.03em;
         }
-        .findings-overview {
+        /* Scorecard table */
+        .scorecard-table {
+            width: 100%;
+            border-collapse: collapse;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid #e8e6e2;
+            margin: 0 0 20px 0;
+            font-size: 0.9em;
+        }
+        .scorecard-table thead th {
+            background: #111111;
+            color: #ffffff;
+            padding: 9px 14px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 0.82em;
+            letter-spacing: 0.04em;
+        }
+        .scorecard-table thead th:first-child { text-align: left; }
+        .scorecard-label {
+            padding: 10px 14px;
+            font-size: 0.88em;
+            font-weight: 600;
+            color: #4a4744;
+            border-bottom: 1px solid #e8e6e2;
+            background: #f7f6f4;
+        }
+        .scorecard-col {
+            text-align: center;
+            padding: 10px 14px;
+            border-bottom: 1px solid #e8e6e2;
+            font-weight: 700;
+            font-size: 1em;
+        }
+        .scorecard-high     { color: #c0392b; }
+        .scorecard-moderate { color: #e05c1a; }
+        .scorecard-low      { color: #2980b9; }
+        .scorecard-potential{ color: #7f8c8d; }
+        .scorecard-total    { color: #111111; border-left: 1px solid #e8e6e2; }
+        /* Summary headline + narrative */
+        .summary-headline {
+            font-size: 1.05em;
+            font-weight: 700;
+            color: #111111;
+            margin: 4px 0 10px;
+            line-height: 1.5;
+        }
+        .summary-narrative {
             font-size: 0.93em;
             color: #4a4744;
-            margin: 0 0 16px 0;
-            padding: 12px 16px;
+            margin: 0 0 4px;
+            line-height: 1.65;
+        }
+        /* Trap card — new layout */
+        .issue-headline {
+            font-size: 1em;
+            font-weight: 700;
+            color: #111111;
+            margin: 0 0 10px;
+            line-height: 1.45;
+        }
+        .issue-meta {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 4px 0;
+            margin: 0 0 14px;
+            font-size: 0.82em;
+        }
+        .meta-trap    { font-weight: 700; color: #111111; letter-spacing: 0.03em; }
+        .meta-tenet   { color: #4a4744; }
+        .meta-sep     { color: #d0cdc8; margin: 0 6px; }
+        .meta-severity { font-weight: 600; }
+        .meta-severity.sev-critical { color: #c0392b; }
+        .meta-severity.sev-moderate { color: #e05c1a; }
+        .meta-severity.sev-minor    { color: #2980b9; }
+        .meta-confidence { color: #8a8680; }
+        .issue-section { margin: 10px 0 0; }
+        .issue-section-label {
+            font-size: 0.78em;
+            font-weight: 700;
+            letter-spacing: 0.07em;
+            text-transform: uppercase;
+            color: #8a8680;
+            margin: 0 0 4px;
+        }
+        .issue-section-body {
+            font-size: 0.93em;
+            color: #2c2c2c;
+            margin: 0;
+            line-height: 1.6;
+        }
+        /* Not-found list */
+        .trap-name-list {
+            list-style: none;
+            padding: 0;
+            margin: 8px 0 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .trap-name-list li {
+            font-size: 0.78em;
+            font-weight: 600;
+            color: #4a4744;
             background: #f7f6f4;
-            border-radius: 8px;
             border: 1px solid #e8e6e2;
+            border-radius: 100px;
+            padding: 3px 10px;
+            letter-spacing: 0.02em;
+        }
+        /* Frame ref */
+        .frame-ref-text {
+            margin: 0;
+            color: #8a8680;
+            font-size: 0.85em;
         }
         /* CSS-only severity dots — explicit color, no emoji rendering */
         .sev-dot {
@@ -1113,43 +1082,47 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
     html.append("<div class='summary-section'>")
     html.append("<h2>Summary</h2>")
 
-    # Findings overview — distinguishes general issues from traps
-    n_issues = len(report.get('user_issues', []))
+    # Scorecard table — confirmed (higher confidence) + potential (lower confidence)
     n_high = len(report.get('critical_issues', []))
     n_moderate = len(report.get('moderate_issues', []))
     n_low = len(report.get('minor_issues', []))
-    n_traps = n_high + n_moderate + n_low
-    trap_breakdown = ", ".join(filter(None, [
-        f"{n_high} high severity" if n_high else "",
-        f"{n_moderate} moderate" if n_moderate else "",
-        f"{n_low} low severity" if n_low else "",
-    ]))
-    trap_summary = f"{n_traps} trap{'s' if n_traps != 1 else ''}"
-    if trap_breakdown:
-        trap_summary += f" ({trap_breakdown})"
-    issue_summary = f"{n_issues} general issue{'s' if n_issues != 1 else ''}"
+    n_confirmed = n_high + n_moderate + n_low
+    n_potential = len(report.get('potential_issues', []))
 
-    html.append(f"<p class='findings-overview'><strong>Found:</strong> {issue_summary} &bull; {trap_summary}</p>")
+    html.append("<table class='scorecard-table'>")
+    html.append("<thead><tr>")
+    html.append("<th></th>")
+    html.append("<th class='scorecard-col'>High</th>")
+    html.append("<th class='scorecard-col'>Moderate</th>")
+    html.append("<th class='scorecard-col'>Low</th>")
+    html.append("<th class='scorecard-col scorecard-total'>Total</th>")
+    html.append("</tr></thead>")
+    html.append("<tbody>")
+    html.append("<tr>")
+    html.append("<td class='scorecard-label'>Higher confidence</td>")
+    html.append(f"<td class='scorecard-col scorecard-high'>{n_high or '—'}</td>")
+    html.append(f"<td class='scorecard-col scorecard-moderate'>{n_moderate or '—'}</td>")
+    html.append(f"<td class='scorecard-col scorecard-low'>{n_low or '—'}</td>")
+    html.append(f"<td class='scorecard-col scorecard-total'>{n_confirmed or '—'}</td>")
+    html.append("</tr>")
+    html.append("<tr>")
+    html.append("<td class='scorecard-label'>Lower confidence</td>")
+    html.append("<td class='scorecard-col'>—</td>")
+    html.append("<td class='scorecard-col'>—</td>")
+    html.append(f"<td class='scorecard-col scorecard-potential'>{n_potential or '—'}</td>")
+    html.append(f"<td class='scorecard-col scorecard-total'>{n_potential or '—'}</td>")
+    html.append("</tr>")
+    html.append("</tbody>")
+    html.append("</table>")
 
-    # Programmatic count bullet — never trust the AI to get the terminology right
-    count_bullet = f"{n_traps} trap{'s' if n_traps != 1 else ''} identified"
-    if trap_breakdown:
-        count_bullet += f": {trap_breakdown}."
-    else:
-        count_bullet += "."
-    if n_issues:
-        count_bullet += f" {n_issues} general issue{'s' if n_issues != 1 else ''} identified."
+    # Summary headline + narrative
+    headline = report.get('summary_headline', '')
+    narrative = report.get('summary_narrative', '')
+    if headline:
+        html.append(f"<p class='summary-headline'>{headline}</p>")
+    if narrative:
+        html.append(f"<p class='summary-narrative'>{narrative}</p>")
 
-    import re as _re
-    _count_pattern = _re.compile(r'^\d+\s+(trap|issue)s?\s+identified', _re.IGNORECASE)
-
-    html.append("<ul>")
-    html.append(f"<li>{count_bullet}</li>")
-    for bullet in report['summary']:
-        if _count_pattern.match(bullet.strip()):
-            continue  # skip AI-generated count bullet
-        html.append(f"<li>{bullet}</li>")
-    html.append("</ul>")
     html.append("</div>")
 
     # Get frame images from report if available (for video/multi-image analysis)
@@ -1239,94 +1212,105 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
                 </a>
             """
 
-    # Helper function for issue sections
-    def render_issues(issues, severity_emoji, severity_class):
-        if issues:
-            for issue in issues:
-                html.append(f"<div class='issue-card {severity_class}'>")
+    # Helper: render frame reference block
+    def render_frame_ref(issue):
+        has_frame_info = 'frame_index' in issue or 'frame_indices' in issue or 'frame' in issue
+        if not has_frame_info:
+            return
+        html.append("<div class='issue-frames'>")
+        if frame_images and ('frame_index' in issue or 'frame_indices' in issue):
+            html.append("<div style='display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;'>")
+            if 'frame_indices' in issue and len(issue.get('frame_indices', [])) > 1:
+                for idx in issue['frame_indices'][:5]:
+                    html.append(render_frame_thumbnail(idx, 'small'))
+                if len(issue['frame_indices']) > 5:
+                    html.append(f"<span style='align-self:center;color:#8a8680;margin-left:8px;font-size:0.85em;'>+{len(issue['frame_indices'])-5} more</span>")
+            elif 'frame_index' in issue:
+                html.append(render_frame_thumbnail(issue['frame_index'], 'small'))
+            html.append("</div>")
+        if 'frame_indices' in issue and len(issue.get('frame_indices', [])) > 1:
+            frame_labels = []
+            for idx in issue['frame_indices'][:5]:
+                if idx in frame_images and frame_images[idx].get('timestamp') is not None:
+                    frame_labels.append(f"Frame {idx} ({frame_images[idx]['timestamp']:.1f}s)")
+                else:
+                    frame_labels.append(f"Frame {idx}")
+            label_text = ", ".join(frame_labels)
+            if len(issue['frame_indices']) > 5:
+                label_text += f" +{len(issue['frame_indices'])-5} more"
+            html.append(f"<p class='frame-ref-text'>{label_text}</p>")
+        elif 'frame_index' in issue:
+            idx = issue['frame_index']
+            ts_str = f" ({frame_images[idx]['timestamp']:.1f}s)" if idx in frame_images and frame_images[idx].get('timestamp') is not None else ""
+            html.append(f"<p class='frame-ref-text'>Frame {idx}{ts_str}</p>")
+        elif 'frame' in issue:
+            html.append(f"<p class='frame-ref-text'>{issue['frame']}</p>")
+        html.append("</div>")
 
-                # Always show frame reference for video/multi-image analysis
-                has_frame_info = 'frame_index' in issue or 'frame_indices' in issue or 'frame' in issue
+    # Helper: render a single trap card
+    confidence_order = {"high": 0, "medium": 1, "low": 2}
 
-                if has_frame_info:
-                    html.append("<div class='issue-frames' style='margin-bottom: 12px;'>")
-                    html.append("<p style='margin: 0 0 8px 0; font-weight: 600; color: #2c3e50;'>📍 Found in:</p>")
+    def render_trap_card(issue, severity_class):
+        html.append(f"<div class='issue-card {severity_class}'>")
+        render_frame_ref(issue)
+        # Headline
+        headline_text = _cap_terms(issue.get('headline', ''))
+        if headline_text:
+            html.append(f"<p class='issue-headline'>{headline_text}</p>")
+        # Meta row: trap name | tenet | severity badge | confidence
+        conf = issue.get('confidence', '')
+        sev_label = {'critical': 'High', 'moderate': 'Moderate', 'minor': 'Low'}.get(severity_class, severity_class.title())
+        html.append("<div class='issue-meta'>")
+        html.append(f"<span class='meta-trap'>{issue.get('trap_name','').upper()}</span>")
+        html.append(f"<span class='meta-sep'>·</span>")
+        html.append(f"<span class='meta-tenet'>{issue.get('tenet','').upper()}</span>")
+        html.append(f"<span class='meta-sep'>·</span>")
+        html.append(f"<span class='meta-severity sev-{severity_class}'>{sev_label} severity</span>")
+        if conf:
+            html.append(f"<span class='meta-sep'>·</span>")
+            html.append(f"<span class='meta-confidence'>{conf.title()} confidence</span>")
+        html.append("</div>")
+        # Finding
+        problem_text = _cap_terms(issue.get('problem', ''))
+        if problem_text:
+            html.append("<div class='issue-section'>")
+            html.append("<p class='issue-section-label'>Finding</p>")
+            html.append(f"<p class='issue-section-body'>{problem_text}</p>")
+            html.append("</div>")
+        # Recommendation
+        rec_text = _cap_terms(issue.get('recommendation', ''))
+        if rec_text:
+            html.append("<div class='issue-section'>")
+            html.append("<p class='issue-section-label'>Recommendation</p>")
+            html.append(f"<p class='issue-section-body'>{rec_text}</p>")
+            html.append("</div>")
+        html.append("</div>")
 
-                    # Show thumbnails if we have frame_images data
-                    if frame_images and ('frame_index' in issue or 'frame_indices' in issue):
-                        html.append("<div style='display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px;'>")
+    # Collect and sort all confirmed issues: severity order, then confidence within severity
+    all_confirmed = (
+        [('critical', i) for i in report.get('critical_issues', [])] +
+        [('moderate', i) for i in report.get('moderate_issues', [])] +
+        [('minor', i) for i in report.get('minor_issues', [])]
+    )
+    # Already in severity order; sort within each severity by confidence
+    from itertools import groupby as _groupby
+    sorted_confirmed = []
+    for sev in ('critical', 'moderate', 'minor'):
+        group = [(s, i) for s, i in all_confirmed if s == sev]
+        group.sort(key=lambda x: confidence_order.get(x[1].get('confidence', 'low'), 2))
+        sorted_confirmed.extend(group)
 
-                        if 'frame_indices' in issue and len(issue.get('frame_indices', [])) > 1:
-                            # Multiple frames - show thumbnails for each (up to 5)
-                            for idx in issue['frame_indices'][:5]:
-                                html.append(render_frame_thumbnail(idx, 'small'))
-                            if len(issue['frame_indices']) > 5:
-                                html.append(f"<span style='align-self: center; color: #7f8c8d; margin-left: 8px;'>+{len(issue['frame_indices']) - 5} more</span>")
-                        elif 'frame_index' in issue:
-                            # Single frame - show thumbnail
-                            html.append(render_frame_thumbnail(issue['frame_index'], 'small'))
-
-                        html.append("</div>")
-
-                    # ALWAYS show text reference with timestamp (in case thumbnails fail)
-                    if 'frame_indices' in issue and len(issue.get('frame_indices', [])) > 1:
-                        # Multiple frames
-                        frame_labels = []
-                        for idx in issue['frame_indices'][:5]:
-                            if idx in frame_images and frame_images[idx].get('timestamp') is not None:
-                                ts = frame_images[idx]['timestamp']
-                                frame_labels.append(f"Frame {idx} ({ts:.1f}s)")
-                            else:
-                                frame_labels.append(f"Frame {idx}")
-                        label_text = ", ".join(frame_labels)
-                        if len(issue['frame_indices']) > 5:
-                            label_text += f" +{len(issue['frame_indices']) - 5} more"
-                        html.append(f"<p style='margin: 0; color: #555; font-size: 0.9em;'>{label_text}</p>")
-                    elif 'frame_index' in issue:
-                        # Single frame
-                        idx = issue['frame_index']
-                        if idx in frame_images and frame_images[idx].get('timestamp') is not None:
-                            ts = frame_images[idx]['timestamp']
-                            html.append(f"<p style='margin: 0; color: #555; font-size: 0.9em;'>Frame {idx} ({ts:.1f}s)</p>")
-                        else:
-                            html.append(f"<p style='margin: 0; color: #555; font-size: 0.9em;'>Frame {idx}</p>")
-                    elif 'frame' in issue:
-                        # Just frame label, no index
-                        html.append(f"<p style='margin: 0; color: #555; font-size: 0.9em;'>{issue['frame']}</p>")
-
-                    html.append("</div>")
-
-                html.append(f"<p><strong>Trap Detected:</strong> <strong>{issue['trap_name'].upper()}</strong></p>")
-                html.append(f"<p class='tenet'><strong>Tenet Violated:</strong> {issue['tenet'].upper()}</p>")
-                html.append(f"<p><strong>Where:</strong> {_cap_terms(issue['location'])}</p>")
-                html.append(f"<p><strong>Problem:</strong> {_cap_terms(issue['problem'])}</p>")
-                html.append(f"<p><strong>Recommendation:</strong> {_cap_terms(issue['recommendation'])}</p>")
-                if 'confidence' in issue:
-                    html.append(f"<p class='confidence'><em>Confidence: {issue['confidence']}</em></p>")
-                html.append("</div>")
-        else:
-            html.append(f"<p class='none-found'>None found ✓</p>")
-
-    # General Issues (synthesis layer)
-    html.append(_build_user_issues_html(report, user_context))
-
-    # Critical Issues
-    html.append("<div class='issues-section critical'>")
-    html.append("<h2><span class='sev-dot sev-critical'></span>High Severity Traps</h2>")
-    render_issues(report['critical_issues'], "", "critical")
-    html.append("</div>")
-
-    # Moderate Issues
-    html.append("<div class='issues-section moderate'>")
-    html.append("<h2><span class='sev-dot sev-moderate'></span>Moderate Severity Traps</h2>")
-    render_issues(report['moderate_issues'], "", "moderate")
-    html.append("</div>")
-
-    # Minor Issues
-    html.append("<div class='issues-section minor'>")
-    html.append("<h2><span class='sev-dot sev-minor'></span>Low Severity Traps</h2>")
-    render_issues(report['minor_issues'], "", "minor")
-    html.append("</div>")
+    if sorted_confirmed:
+        html.append("<div class='issues-section'>")
+        html.append("<h2>Traps Found</h2>")
+        for sev_class, issue in sorted_confirmed:
+            render_trap_card(issue, sev_class)
+        html.append("</div>")
+    else:
+        html.append("<div class='issues-section'>")
+        html.append("<h2>Traps Found</h2>")
+        html.append("<p class='none-found'>No confirmed traps found ✓</p>")
+        html.append("</div>")
 
     # Positive Observations
     html.append("<div class='positive-section'>")
@@ -1510,42 +1494,37 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
         html.append("</ul>")
         html.append("</div>")
 
-    # Traps Not Found — split into tested-clean vs could-not-test
-    html.append("<div class='traps-not-found'>")
-    html.append("<h2>Traps Checked But Not Found</h2>")
+    # Traps Not Found + Cannot Assess — two compact sections
     raw_items = report.get('traps_checked_not_found', [])
     tested_ok = []
     untestable = []
     for item in raw_items:
         if isinstance(item, str):
-            tested_ok.append(item)           # backward compat with old string format
+            tested_ok.append(item)
         elif item.get('testable', True):
             tested_ok.append(item['trap_name'])
         else:
             untestable.append(item)
 
     if tested_ok:
-        html.append("<h3>✓ Evaluated — Not Present</h3>")
+        html.append("<div class='traps-not-found'>")
+        html.append("<h2>Traps Not Found</h2>")
+        html.append("<p class='section-intro'>The following traps were specifically evaluated and do not appear to be present in the submitted design.</p>")
         html.append("<ul class='trap-list'>")
         for trap in tested_ok:
             html.append(f"<li>{trap}</li>")
         html.append("</ul>")
+        html.append("</div>")
 
     if untestable:
-        html.append("<h3>⚠ Could Not Evaluate — Insufficient Information</h3>")
-        html.append("<p class='untestable-note'>These Traps require additional screenshots, interaction data, or session context to assess:</p>")
-        html.append("<ul class='untestable-list'>")
+        html.append("<div class='traps-not-found'>")
+        html.append("<h2>Needs More Context</h2>")
+        html.append("<p class='section-intro'>The following traps could not be fully evaluated from the submitted materials. To investigate further, consider testing the live product with representative users, reviewing additional screens in the task flow, or inspecting the underlying code.</p>")
+        html.append("<ul class='trap-name-list'>")
         for item in untestable:
-            reason = _cap_terms(_untestable_reason(item.get('trap_name', ''), item.get('reason')))
-            html.append(f"<li><span class='trap-label'>{item['trap_name'].upper()}</span> — {reason}</li>")
+            html.append(f"<li>{item['trap_name'].upper()}</li>")
         html.append("</ul>")
-
-    if not tested_ok and not untestable:
-        html.append("<p>All traps were either found or not fully evaluated</p>")
-    html.append("</div>")
-
-    # Trap Coverage Matrix
-    html.append(_build_trap_matrix_html(report))
+        html.append("</div>")
 
     # Footer
     html.append("<div class='footer confidentiality-notice'>")
@@ -1580,7 +1559,6 @@ def get_report_statistics(report: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dictionary with report statistics
     """
-    user_issues = report.get('user_issues', [])
     return {
         'total_issues': len(report['critical_issues']) + len(report['moderate_issues']) + len(report['minor_issues']),
         'critical_count': len(report['critical_issues']),
@@ -1588,11 +1566,7 @@ def get_report_statistics(report: Dict[str, Any]) -> Dict[str, Any]:
         'minor_count': len(report['minor_issues']),
         'positive_count': len(report['positive_observations']),
         'traps_not_found_count': len(report.get('traps_checked_not_found', [])),
-        'summary_length': len(report['summary']),
-        'user_issues_count': len(user_issues),
-        'user_issues_high': sum(1 for i in user_issues if i.get('impact_level') == 'high'),
-        'user_issues_medium': sum(1 for i in user_issues if i.get('impact_level') == 'medium'),
-        'user_issues_low': sum(1 for i in user_issues if i.get('impact_level') == 'low'),
+        'potential_count': len(report.get('potential_issues', [])),
     }
 
 

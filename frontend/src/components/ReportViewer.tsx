@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ReportViewerProps } from '../api/types';
 import styles from './ReportViewer.module.css';
 
@@ -126,7 +126,21 @@ export const ReportViewer: React.FC<ReportViewerProps> = ({
   showUsageInfo = false,
   onNewAnalysis,
   isDark = false,
+  htmlV1,
+  htmlV2,
+  statisticsV1,
+  statisticsV2,
 }) => {
+  const isDualReport = !!(htmlV1 && htmlV2);
+  const [activeVersion, setActiveVersion] = useState<'v1' | 'v2'>('v2');
+
+  const activeHtml = isDualReport
+    ? (activeVersion === 'v1' ? htmlV1! : htmlV2!)
+    : html;
+  const activeStats = isDualReport
+    ? (activeVersion === 'v1' ? statisticsV1 : statisticsV2)
+    : statistics;
+
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const applyDarkMode = useCallback((doc: Document, dark: boolean) => {
@@ -163,7 +177,7 @@ export const ReportViewer: React.FC<ReportViewerProps> = ({
       onLoad();
     }
     return () => iframe.removeEventListener('load', onLoad);
-  }, [html, isDark, applyDarkMode]);
+  }, [activeHtml, isDark, applyDarkMode]);
 
   // Toggle dark mode without reloading the iframe
   useEffect(() => {
@@ -174,7 +188,7 @@ export const ReportViewer: React.FC<ReportViewerProps> = ({
   }, [isDark, applyDarkMode]);
 
   const handleDownload = useCallback(() => {
-    const blob = new Blob([html], { type: 'text/html' });
+    const blob = new Blob([activeHtml], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -187,23 +201,46 @@ export const ReportViewer: React.FC<ReportViewerProps> = ({
 
   return (
     <div className={styles.container}>
+      {/* Dual-report version toggle */}
+      {isDualReport && (
+        <div className={styles.versionToggle}>
+          <span className={styles.versionToggleLabel}>Knowledge base:</span>
+          <div className={styles.versionToggleGroup}>
+            <button
+              type="button"
+              className={`${styles.versionToggleBtn} ${activeVersion === 'v2' ? styles.versionToggleBtnActive : ''}`}
+              onClick={() => setActiveVersion('v2')}
+            >
+              V2 (current)
+            </button>
+            <button
+              type="button"
+              className={`${styles.versionToggleBtn} ${activeVersion === 'v1' ? styles.versionToggleBtnActive : ''}`}
+              onClick={() => setActiveVersion('v1')}
+            >
+              V1 (previous)
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Statistics Summary */}
-      {showStatistics && statistics && (
+      {showStatistics && activeStats && (
         <div className={styles.statsGrid}>
           <div className={`${styles.statCard} ${styles.critical}`}>
-            <span className={styles.statValue}>{statistics.critical_count}</span>
+            <span className={styles.statValue}>{activeStats.critical_count}</span>
             <span className={styles.statLabel}>High Severity</span>
           </div>
           <div className={`${styles.statCard} ${styles.moderate}`}>
-            <span className={styles.statValue}>{statistics.moderate_count}</span>
+            <span className={styles.statValue}>{activeStats.moderate_count}</span>
             <span className={styles.statLabel}>Moderate Severity</span>
           </div>
           <div className={`${styles.statCard} ${styles.minor}`}>
-            <span className={styles.statValue}>{statistics.minor_count}</span>
+            <span className={styles.statValue}>{activeStats.minor_count}</span>
             <span className={styles.statLabel}>Low Severity</span>
           </div>
           <div className={`${styles.statCard} ${styles.positive}`}>
-            <span className={styles.statValue}>{statistics.positive_count}</span>
+            <span className={styles.statValue}>{activeStats.positive_count}</span>
             <span className={styles.statLabel}>Positives</span>
           </div>
         </div>
@@ -222,7 +259,7 @@ export const ReportViewer: React.FC<ReportViewerProps> = ({
       <iframe
         ref={iframeRef}
         className={styles.reportFrame}
-        srcDoc={html}
+        srcDoc={activeHtml}
         title="Analysis Report"
         sandbox="allow-same-origin"
         style={{ width: '100%', border: 'none', minHeight: '400px' }}

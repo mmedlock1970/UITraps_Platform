@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { ContentType, UserContext } from '../api/types';
+import { ContentType, KbVersion, UserContext } from '../api/types';
 import styles from './AnalyzerForm.module.css';
 
 export interface FormSubmitPayload {
@@ -25,10 +25,10 @@ function platformToContentType(platform: string, productDomain: string): Content
 function assembleContext(fields: {
   platform: string; productDomain: string; screenName: string; screenDesc: string;
   expLevel: string; techSavvy: string; frequency: string; userGoal: string;
-  priorProducts: string; userDesc: string; extraContext: string;
+  priorProducts: string; userDesc: string; extraContext: string; kbVersion: KbVersion;
 }): UserContext {
   const { platform, productDomain, screenName, screenDesc, expLevel, techSavvy,
-          frequency, userGoal, priorProducts, userDesc, extraContext } = fields;
+          frequency, userGoal, priorProducts, userDesc, extraContext, kbVersion } = fields;
 
   const formatParts = [
     platform && productDomain ? `${platform} — ${productDomain}` : platform || productDomain,
@@ -52,6 +52,7 @@ function assembleContext(fields: {
     format: formatParts.join('. '),
     contentType: platformToContentType(platform, productDomain),
     extra_context: extraContext || undefined,
+    kb_version: kbVersion,
   };
 }
 
@@ -85,6 +86,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
 
   // Card 4 — Analysis Scope
   const [extraContext, setExtraContext] = useState('');
+  const [kbVersion, setKbVersion] = useState<KbVersion>('v2');
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -115,10 +117,10 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
     if (disabled) return;
     if (!validate()) return;
     const context = assembleContext({ platform, productDomain, screenName, screenDesc,
-      expLevel, techSavvy, frequency, userGoal, priorProducts, userDesc, extraContext });
+      expLevel, techSavvy, frequency, userGoal, priorProducts, userDesc, extraContext, kbVersion });
     onSubmit({ files, url, context });
   }, [disabled, validate, files, url, platform, productDomain, screenName, screenDesc,
-      expLevel, techSavvy, frequency, userGoal, priorProducts, userDesc, extraContext, onSubmit]);
+      expLevel, techSavvy, frequency, userGoal, priorProducts, userDesc, extraContext, kbVersion, onSubmit]);
 
   const handleFileChange = useCallback((newFiles: FileList | null) => {
     if (!newFiles || newFiles.length === 0) return;
@@ -534,6 +536,33 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
               </label>
               <p className={styles.fieldHint}>Select specific Tenets to focus the analysis, or keep all selected for a full review.</p>
             </div>
+          </div>
+
+          <hr className={styles.fieldDivider} />
+
+          {/* Knowledge base version selector */}
+          <div className={styles.field}>
+            <label className={styles.fieldLabel}>
+              Knowledge base version
+            </label>
+            <div className={styles.kbVersionGroup}>
+              {(['v2', 'v1', 'both'] as KbVersion[]).map(v => (
+                <button
+                  key={v}
+                  type="button"
+                  className={`${styles.kbVersionBtn} ${kbVersion === v ? styles.kbVersionBtnActive : ''}`}
+                  onClick={() => setKbVersion(v)}
+                  disabled={disabled}
+                >
+                  {v === 'both' ? 'Compare v1 vs v2' : v.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            <p className={styles.fieldHint}>
+              {kbVersion === 'v2' && 'Current knowledge engine (recommended).'}
+              {kbVersion === 'v1' && 'Previous knowledge engine.'}
+              {kbVersion === 'both' && 'Runs two parallel analyses — one with each engine. Results are shown side-by-side with a toggle. Takes roughly twice as long.'}
+            </p>
           </div>
 
           <hr className={styles.fieldDivider} />

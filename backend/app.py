@@ -406,12 +406,18 @@ class UnifiedAskResponse(BaseModel):
     # Chat fields
     response: Optional[str] = None
     sources: Optional[list[str]] = None
-    # Analysis fields
+    # Analysis fields (single version)
     report_html: Optional[str] = None
     report_markdown: Optional[str] = None
     statistics: Optional[dict] = None
     usage: Optional[dict] = None
     error: Optional[str] = None
+    # Dual analysis fields (kb_version="both")
+    report_html_v1: Optional[str] = None
+    report_html_v2: Optional[str] = None
+    statistics_v1: Optional[dict] = None
+    statistics_v2: Optional[dict] = None
+    kb_version: Optional[str] = None
 
 
 # --- Endpoints ---
@@ -1870,6 +1876,7 @@ async def unified_ask(
     conversation_history: Optional[str] = Form(None),
     chat_context: Optional[str] = Form(None),
     extra_context: Optional[str] = Form(None),
+    kb_version: str = Form("v2"),
 ):
     """
     Unified endpoint: auto-routes to analysis, chat, or hybrid based on input.
@@ -1946,33 +1953,79 @@ async def unified_ask(
 
             suffix = ".png" if image.content_type == "image/png" else ".jpg"
             try:
-                logger.info(f"[/api/ask analysis] start — file={image.filename} size={len(contents)}")
+                logger.info(f"[/api/ask analysis] start — file={image.filename} size={len(contents)} kb_version={kb_version}")
                 with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
                     tmp.write(contents)
                     tmp_path = tmp.name
                 logger.info(f"[/api/ask analysis] temp file written: {tmp_path}")
 
                 user_context = {"users": users, "tasks": tasks, "format": format, "content_type": content_type, "extra_context": extra_context or ""}
-                logger.info("[/api/ask analysis] calling analyze_design")
-                result = get_analyzer().analyze_design(design_file=tmp_path, user_context=user_context, chat_context=chat_context)
-                logger.info("[/api/ask analysis] analyze_design complete")
-
                 user_id = str(user.get("userId", ""))
-                save_analysis_report(
-                    analysis_result=result,
-                    analysis_type="single_image",
-                    user_context=user_context,
-                    metadata={"file_name": image.filename},
-                    user_id=user_id
-                )
 
-                return {
-                    "success": True,
-                    "mode": "analysis",
-                    "report_html": result.get("html"),
-                    "report_markdown": result.get("markdown"),
-                    "statistics": result.get("statistics"),
-                }
+                if kb_version == "both":
+                    import asyncio
+                    loop = asyncio.get_event_loop()
+                    analyzer_instance = get_analyzer()
+
+                    logger.info("[/api/ask analysis] running dual analysis sequentially: v2 first, then v1")
+                    result_v2 = await loop.run_in_executor(
+                        None,
+                        lambda: analyzer_instance.analyze_design(
+                            design_file=tmp_path, user_context=user_context,
+                            chat_context=chat_context, kb_version="v2"
+                        )
+                    )
+                    logger.info("[/api/ask analysis] v2 analysis complete, starting v1")
+                    result_v1 = await loop.run_in_executor(
+                        None,
+                        lambda: analyzer_instance.analyze_design(
+                            design_file=tmp_path, user_context=user_context,
+                            chat_context=chat_context, kb_version="v1"
+                        )
+                    )
+                    logger.info("[/api/ask analysis] dual analysis complete")
+
+                    save_analysis_report(
+                        analysis_result=result_v2,
+                        analysis_type="single_image",
+                        user_context=user_context,
+                        metadata={"file_name": image.filename, "kb_version": "both"},
+                        user_id=user_id
+                    )
+
+                    return {
+                        "success": True,
+                        "mode": "analysis",
+                        "kb_version": "both",
+                        "report_html_v1": result_v1.get("html"),
+                        "report_html_v2": result_v2.get("html"),
+                        "statistics_v1": result_v1.get("statistics"),
+                        "statistics_v2": result_v2.get("statistics"),
+                    }
+                else:
+                    logger.info(f"[/api/ask analysis] calling analyze_design (kb_version={kb_version})")
+                    result = get_analyzer().analyze_design(
+                        design_file=tmp_path, user_context=user_context,
+                        chat_context=chat_context, kb_version=kb_version
+                    )
+                    logger.info("[/api/ask analysis] analyze_design complete")
+
+                    save_analysis_report(
+                        analysis_result=result,
+                        analysis_type="single_image",
+                        user_context=user_context,
+                        metadata={"file_name": image.filename},
+                        user_id=user_id
+                    )
+
+                    return {
+                        "success": True,
+                        "mode": "analysis",
+                        "kb_version": kb_version,
+                        "report_html": result.get("html"),
+                        "report_markdown": result.get("markdown"),
+                        "statistics": result.get("statistics"),
+                    }
             except Exception as e:
                 logger.error(f"[/api/ask analysis] error: {e}\n{traceback.format_exc()}")
                 raise _friendly_api_error(e)
