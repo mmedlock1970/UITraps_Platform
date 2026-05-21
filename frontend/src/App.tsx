@@ -184,6 +184,7 @@ export const App: React.FC = () => {
       };
       setActiveReport(report);
       setView('report');
+      setChatOpen(false);
 
       // Save to history
       saveAnalysis({
@@ -207,14 +208,16 @@ export const App: React.FC = () => {
 
     try {
       const correctedContext = extractContextCorrections(chatMessages, activeReport.originalContext);
-      const { users, tasks, format, contentType } = correctedContext;
       const imageTimeout = Math.min(180000 + activeReport.originalFiles.length * 120000, 1800000);
 
       const result = await unifiedAsk({
         apiEndpoint,
         token: effectiveToken,
         files: activeReport.originalFiles,
-        context: { users, tasks, format, contentType, expertise: '' },
+        context: {
+          ...activeReport.originalContext,
+          ...correctedContext,
+        },
         chatContext,
         timeout: imageTimeout,
       });
@@ -485,7 +488,7 @@ export const App: React.FC = () => {
                 }}
               />
             </div>
-            {chatOpen && (
+            <div style={{ display: chatOpen ? undefined : 'none' }}>
               <ChatPanel
                 apiEndpoint={apiEndpoint}
                 apiKey={effectiveToken}
@@ -493,7 +496,7 @@ export const App: React.FC = () => {
                 canRerun={!!activeReport.originalFiles?.length && !!activeReport.originalContext}
                 onRerunAnalysis={handleRerunAnalysis}
               />
-            )}
+            </div>
           </div>
         </div>
       </div>

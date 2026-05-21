@@ -206,8 +206,36 @@
   cursor: not-allowed;
 }
 
-.rerunButton {
+.copyButton {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--uitraps-text-secondary);
+  background: transparent;
+  border: 1px solid var(--uitraps-border);
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s, color 0.15s;
+  flex-shrink: 0;
   margin-left: auto;
+}
+
+.copyButton:hover:not(:disabled) {
+  background: var(--uitraps-bg-hover);
+  color: var(--uitraps-text);
+}
+
+.copyButton:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.rerunButton {
+  margin-left: 6px;
   display: flex;
   align-items: center;
   gap: 5px;

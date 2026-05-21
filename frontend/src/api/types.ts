@@ -114,6 +114,7 @@ export interface UserContext {
   expertise: string;
   tasks: string;
   format: string;
+  design_name?: string;
   contentType?: ContentType;
   extra_context?: string;
   kb_version?: KbVersion;

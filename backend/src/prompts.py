@@ -5,6 +5,7 @@ Copyright © 2009-present UI Traps LLC. All Rights Reserved.
 PROPRIETARY & CONFIDENTIAL - UI Tenets & Traps Framework
 """
 import os
+from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
@@ -400,9 +401,11 @@ A minimalist design with lots of whitespace is NOT a bug.
 '''
 
 
+@lru_cache(maxsize=4)
 def load_training_content(version: str = "v2") -> str:
     """
     Load the condensed AI analysis reference for Pass 1 (detection).
+    Result is cached per version to avoid repeated file I/O across requests.
 
     Args:
         version: "v2" (default) or "v1"
@@ -1719,6 +1722,7 @@ def build_enrichment_system_prompt() -> list:
     return [
         {
             "type": "text",
+            "cache_control": {"type": "ephemeral"},
             "text": """You are a senior UI analyst writing the final client report for a UI Tenets & Traps analysis.
 
 A detection pass has already identified which traps are present in the design.
@@ -1774,16 +1778,12 @@ def build_enrichment_user_message(
     """
     import json
 
-    # Format the Pass 1 findings compactly
+    # Pass 2 only needs confirmed issues to enrich — strip everything else to save tokens
     findings_text = json.dumps({
-        "summary": pass1_report.get("summary", []),
         "critical_issues": pass1_report.get("critical_issues", []),
         "moderate_issues": pass1_report.get("moderate_issues", []),
         "minor_issues": pass1_report.get("minor_issues", []),
-        "potential_issues": pass1_report.get("potential_issues", []),
-        "positive_observations": pass1_report.get("positive_observations", []),
-        "traps_checked_not_found": pass1_report.get("traps_checked_not_found", []),
-    }, indent=2)
+    }, separators=(',', ':'))
 
     # Prefer structured knowledge base chunks; fall back to raw book sections
     if knowledge_chunks:

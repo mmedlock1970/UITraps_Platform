@@ -4,8 +4,10 @@ Response formatting and parsing for UI Traps Analyzer
 Copyright © 2009-present UI Traps LLC. All Rights Reserved.
 PROPRIETARY & CONFIDENTIAL - UI Tenets & Traps Framework
 """
+import base64
 import json
 import re
+from pathlib import Path
 from typing import Dict, Any, Optional
 from datetime import datetime
 
@@ -104,6 +106,62 @@ def _tenet_pill_html(trap_name: str, tenet: str) -> str:
         f"<span class='tenet-pill' style='background:{color};'>"
         f"{trap_name.upper()}</span>"
     )
+
+
+# ── Trap card images ──────────────────────────────────────────────────────────
+_TRAP_CARDS_DIR = Path(__file__).parent.parent / 'data' / 'trap_cards'
+
+_TRAP_CARD_FILENAMES: Dict[str, str] = {
+    "INVISIBLE ELEMENT":             "Final_op1_understandable_01_front.png",
+    "EFFECTIVELY INVISIBLE ELEMENT": "Final_op1_understandable_02_front.png",
+    "DISTRACTION":                   "Final_op1_understandable_03_front.png",
+    "UNCOMPREHENDED ELEMENT":        "Final_op1_understandable_04_front.png",
+    "INVITING DEAD END":             "Final_op1_understandable_05_front.png",
+    "POOR GROUPING":                 "Final_op1_understandable_06_front.png",
+    "FORCED SYNTAX":                 "Final_op1_understandable_07_front.png",
+    "MEMORY CHALLENGE":              "Final_op1_understandable_08_front.png",
+    "FEEDBACK FAILURE":              "Final_op1_understandable_09_front.png",
+    "PHYSICAL CHALLENGE":            "Final_op1_comfortable_01_front.png",
+    "ACCIDENTAL ACTIVATION":         "Final_op1_comfortable_02_front.png",
+    "SLOW OR NO RESPONSE":           "Final_op1_responsive_01_front.png",
+    "CAPTIVE WAIT":                  "Final_op1_responsive_02_front.png",
+    "UNNECESSARY STEPS":             "Final_op1_efficient_01_front.png",
+    "INFORMATION OVERLOAD":          "Final_op1_efficient_02_front.png",
+    "SYSTEM AMNESIA":                "Final_op1_efficient_03_front.png",
+    "BAD PREDICTION":                "Final_op1_accurate_01_front.png",
+    "INCORRECT INFORMATION":         "Final_op1_accurate_02_front.png",
+    "IRREVERSIBLE ACTION":           "Final_op1_protective_01_front.png",
+    "UNWANTED DISCLOSURE":           "Final_op1_protective_02_front.png",
+    "DATA LOSS":                     "Final_op1_protective_03_front.png",
+    "GRATUITOUS REDUNDANCY":         "Final_op1_habituating_01_front.png",
+    "VARIABLE OUTCOME":              "Final_op1_habituating_02_front.png",
+    "WANDERING ELEMENT":             "Final_op1_habituating_03_front.png",
+    "INCONSISTENT APPEARANCE":       "Final_op1_habituating_04_front.png",
+    "AMBIGUOUS HOME":                "Final_op1_habituating_05_front.png",
+    "POOR AESTHETIC":                "Final_op1_beautiful_01_front.png",
+}
+
+
+def _load_trap_card_images() -> Dict[str, str]:
+    """Load all trap card PNGs as base64 data URIs at module import time."""
+    result: Dict[str, str] = {}
+    for raw_name, filename in _TRAP_CARD_FILENAMES.items():
+        norm = _normalize_trap_name(raw_name)
+        path = _TRAP_CARDS_DIR / filename
+        try:
+            data = base64.b64encode(path.read_bytes()).decode('ascii')
+            result[norm] = f"data:image/png;base64,{data}"
+        except OSError:
+            pass
+    return result
+
+
+_TRAP_CARD_B64: Dict[str, str] = _load_trap_card_images()
+
+
+def _get_card_img(trap_name: str) -> Optional[str]:
+    """Return the base64 data URI for a trap card image, or None if not found."""
+    return _TRAP_CARD_B64.get(_normalize_trap_name(trap_name))
 
 
 def _cap_terms(text: str) -> str:
@@ -305,10 +363,10 @@ def format_report_as_markdown(report: Dict[str, Any], user_context: Dict[str, st
     n_potential = len(report.get('potential_issues', []))
     n_positive = len(report.get('positive_observations', []))
 
-    md.append("| | High Severity | Moderate Severity | Low Severity | Positives |")
-    md.append("|---|:---:|:---:|:---:|:---:|")
-    md.append(f"| Higher confidence | {n_high or '—'} | {n_moderate or '—'} | {n_low or '—'} | {n_positive or '—'} |")
-    md.append(f"| Lower confidence | — | — | {n_potential or '—'} | — |")
+    md.append("| | High Severity | Moderate Severity | Low Severity |")
+    md.append("|---|:---:|:---:|:---:|")
+    md.append(f"| Higher confidence | {n_high or '—'} | {n_moderate or '—'} | {n_low or '—'} |")
+    md.append(f"| Lower confidence | — | — | {n_potential or '—'} |")
     md.append("")
 
     headline = report.get('summary_headline', '')
@@ -376,7 +434,7 @@ def format_report_as_markdown(report: Dict[str, Any], user_context: Dict[str, st
     # Positive Observations
     md.append("## ✅ Positive Observations")
     md.append("")
-    if report['positive_observations']:
+    if report.get('positive_observations'):
         for obs in report['positive_observations']:
             md.append(f"- {obs}")
         md.append("")
@@ -763,7 +821,7 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
         }
         .scorecard-table thead th:first-child { text-align: left; color: #4a4744; }
         .scorecard-th-high     { color: #c0392b !important; }
-        .scorecard-th-moderate { color: #e05c1a !important; }
+        .scorecard-th-moderate { color: #9a7000 !important; }
         .scorecard-th-low      { color: #2980b9 !important; }
         .scorecard-th-positive { color: #27ae60 !important; }
         .scorecard-label {
@@ -782,9 +840,9 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
             font-size: 1em;
         }
         /* Value cell color coding — tinted background + matching text */
-        .scorecard-val-high     { background: rgba(192,57,43,0.07);  color: #c0392b; }
-        .scorecard-val-moderate { background: rgba(224,92,26,0.07);  color: #e05c1a; }
-        .scorecard-val-low      { background: rgba(41,128,185,0.07); color: #2980b9; }
+        .scorecard-val-high     { background: rgba(192,57,43,0.08);   color: #c0392b; }
+        .scorecard-val-moderate { background: rgba(154,112,0,0.08);   color: #9a7000; }
+        .scorecard-val-low      { background: rgba(41,128,185,0.08);  color: #2980b9; }
         .scorecard-val-positive { background: rgba(39,174,96,0.07);  color: #27ae60; }
         .scorecard-val-potential{ background: rgba(127,140,141,0.07);color: #7f8c8d; }
         .scorecard-empty        { color: #d0cdc8; }
@@ -828,17 +886,20 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
             display: flex;
             flex-wrap: wrap;
             align-items: center;
-            gap: 6px 0;
+            gap: 0 4px;
             margin: 0 0 14px;
             font-size: 0.82em;
+            color: #4a4744;
         }
-        .meta-tenet   { color: #4a4744; }
+        .meta-label   { color: #4a4744; }
+        .meta-pipe    { color: #d0cdc8; margin: 0 4px; }
         .meta-sep     { color: #d0cdc8; margin: 0 6px; }
+        .meta-tenet   { color: #4a4744; }
         .meta-severity { font-weight: 600; }
         .meta-severity.sev-critical { color: #c0392b; }
-        .meta-severity.sev-moderate { color: #e05c1a; }
+        .meta-severity.sev-moderate { color: #9a7000; }
         .meta-severity.sev-minor    { color: #2980b9; }
-        .meta-confidence { color: #8a8680; }
+        .meta-confidence { color: #4a4744; }
         .issue-section { margin: 10px 0 0; }
         .issue-section-label {
             font-size: 0.78em;
@@ -869,36 +930,51 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
             color: #8a8680;
             font-size: 0.85em;
         }
-        /* CSS-only severity dots — explicit color, no emoji rendering */
+        /* CSS-only severity dots — background scoped to .sev-dot only */
         .sev-dot {
             display: inline-block;
             width: 10px;
             height: 10px;
             border-radius: 50%;
-            margin-right: 8px;
+            margin-right: 6px;
             vertical-align: middle;
             flex-shrink: 0;
         }
-        .sev-critical { background: #c0392b; }
-        .sev-moderate { background: #e05c1a; }
-        .sev-minor    { background: #3498db; }
+        .sev-dot.sev-critical { background: #c0392b; }
+        .sev-dot.sev-moderate { background: #c49200; }
+        .sev-dot.sev-minor    { background: #3498db; }
         .issue-card {
             background: #ffffff;
             border: 1px solid #e4e1dc;
-            border-left: 4px solid #d0cdc8;
             padding: 22px 24px;
             margin: 12px 0;
             border-radius: 14px;
             box-shadow: 0 1px 4px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
+            display: flex;
+            align-items: flex-start;
+            gap: 0;
         }
-        .issue-card.critical {
-            border-left-color: #c0392b;
+        /* Trap card image — fixed-width left column */
+        .card-img-float {
+            width: 160px;
+            flex-shrink: 0;
+            margin: 0 22px 0 0;
+            border-radius: 8px;
+            display: block;
         }
-        .issue-card.moderate {
-            border-left-color: #e05c1a;
+        /* Content column — takes remaining width, never wraps under image */
+        .issue-card-body {
+            flex: 1;
+            min-width: 0;
         }
-        .issue-card.minor {
-            border-left-color: #3498db;
+        /* Finding number above headline */
+        .finding-num {
+            font-size: 0.72em;
+            font-weight: 700;
+            letter-spacing: 0.07em;
+            text-transform: uppercase;
+            color: #8a8680;
+            margin: 0 0 4px;
         }
         .issue-card h3 {
             margin-top: 0;
@@ -948,16 +1024,18 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
             color: #8a8680;
             font-style: italic;
         }
-        .positive-section {
-            padding: 22px 24px;
+        .positive-section { display: none; } /* replaced by .positives-section */
+        .positives-section { margin: 24px 0; }
+        .positive-card {
+            padding: 18px 22px;
             border-radius: 14px;
             border: 1px solid #e4e1dc;
             border-left: 4px solid #27ae60;
             background: #ffffff;
-            margin: 20px 0;
             box-shadow: 0 1px 4px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
         }
-        .positive-section h2 { margin: 0 0 12px; padding: 0; border: none; font-size: 1em; font-weight: 700; letter-spacing: -0.2px; }
+        .positive-card ul { margin: 0; padding-left: 20px; }
+        .positive-card li { margin: 4px 0; font-size: 0.93em; }
         .positive-item { color: #1a7a40; }
         h1 { font-size: 1.85em; font-weight: 800; color: #111111; letter-spacing: -0.7px; line-height: 1.2; border-bottom: none; padding-bottom: 0; margin: 0 0 6px; }
         h2 { font-size: 1.05em; font-weight: 700; color: #111111; letter-spacing: -0.2px; border-bottom: none; padding-bottom: 0; margin: 28px 0 14px; }
@@ -975,6 +1053,18 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
         .potential-issues-section .issue-card.potential {
             border-left-color: #e05c1a;
         }
+        /* Confidence group headers inside Traps Found */
+        .confidence-group-header {
+            font-size: 0.78em;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #8a8680;
+            margin: 28px 0 4px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e4e1dc;
+        }
+        .confidence-group-header:first-of-type { margin-top: 8px; }
         .traps-not-found {
             padding: 22px 24px;
             border-radius: 14px;
@@ -1083,7 +1173,7 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
         }
         .trap-matrix-table .count { text-align: center; font-weight: 600; min-width: 60px; }
         .trap-matrix-table .count.critical { color: #c0392b; }
-        .trap-matrix-table .count.moderate { color: #e05c1a; }
+        .trap-matrix-table .count.moderate { color: #9a7000; }
         .trap-matrix-table .count.minor { color: #2980b9; }
         .trap-matrix-table .count.total {
             color: #111111;
@@ -1153,13 +1243,15 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
 
     html.append(f"<p class='timestamp'>Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}</p>")
 
-    # Context
+    # Evaluation Criteria
     if user_context:
         html.append("<div class='context-section'>")
-        html.append("<h2>Context</h2>")
+        html.append("<h2>Evaluation Criteria</h2>")
         html.append("<div class='context-body'>")
         if user_context.get('chat_context_used'):
             html.append("<p class='chat-context-badge'>&#x21BA; Re-analyzed with chat clarifications</p>")
+        if user_context.get('design_name'):
+            html.append(f"<p><strong>Product / Interface:</strong> {user_context['design_name']}</p>")
         html.append(f"<p><strong>Users:</strong> {user_context.get('users', 'N/A')}</p>")
 
         # Format tasks as bulleted list
@@ -1180,12 +1272,19 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
     html.append("<h2>Summary</h2>")
     html.append("<div class='summary-inner'>")
 
-    # Scorecard table — confirmed (higher confidence) + potential (lower confidence)
-    n_high = len(report.get('critical_issues', []))
-    n_moderate = len(report.get('moderate_issues', []))
-    n_low = len(report.get('minor_issues', []))
-    n_potential = len(report.get('potential_issues', []))
+    # Scorecard: high confidence = confidence:'high' only; low = 'medium'|'low'|missing + potentials
     n_positive = len(report.get('positive_observations', []))
+
+    def _is_high(issue):
+        return issue.get('confidence', '').lower() == 'high'
+
+    hc_critical = sum(1 for i in report.get('critical_issues', []) if _is_high(i))
+    hc_moderate = sum(1 for i in report.get('moderate_issues', []) if _is_high(i))
+    hc_low      = sum(1 for i in report.get('minor_issues',    []) if _is_high(i))
+    lc_critical = sum(1 for i in report.get('critical_issues', []) if not _is_high(i))
+    lc_moderate = sum(1 for i in report.get('moderate_issues', []) if not _is_high(i))
+    lc_low      = (sum(1 for i in report.get('minor_issues',   []) if not _is_high(i))
+                   + len(report.get('potential_issues', [])))
 
     def _sc(val, cls):
         return f"<td class='scorecard-col {cls}'>{val if val else '<span class=\"scorecard-empty\">—</span>'}</td>"
@@ -1196,22 +1295,19 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
     html.append("<th class='scorecard-col scorecard-th-high'>High Severity</th>")
     html.append("<th class='scorecard-col scorecard-th-moderate'>Moderate Severity</th>")
     html.append("<th class='scorecard-col scorecard-th-low'>Low Severity</th>")
-    html.append("<th class='scorecard-col scorecard-th-positive'>Positives</th>")
     html.append("</tr></thead>")
     html.append("<tbody>")
     html.append("<tr>")
     html.append("<td class='scorecard-label'>Higher confidence</td>")
-    html.append(_sc(n_high, 'scorecard-val-high'))
-    html.append(_sc(n_moderate, 'scorecard-val-moderate'))
-    html.append(_sc(n_low, 'scorecard-val-low'))
-    html.append(_sc(n_positive, 'scorecard-val-positive'))
+    html.append(_sc(hc_critical, 'scorecard-val-high'))
+    html.append(_sc(hc_moderate, 'scorecard-val-moderate'))
+    html.append(_sc(hc_low, 'scorecard-val-low'))
     html.append("</tr>")
     html.append("<tr>")
     html.append("<td class='scorecard-label'>Lower confidence</td>")
-    html.append(_sc(0, 'scorecard-empty'))
-    html.append(_sc(0, 'scorecard-empty'))
-    html.append(_sc(n_potential, 'scorecard-val-potential'))
-    html.append(_sc(0, 'scorecard-empty'))
+    html.append(_sc(lc_critical, 'scorecard-val-high'))
+    html.append(_sc(lc_moderate, 'scorecard-val-moderate'))
+    html.append(_sc(lc_low, 'scorecard-val-low'))
     html.append("</tr>")
     html.append("</tbody>")
     html.append("</table>")
@@ -1352,61 +1448,94 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
     # Helper: render a single trap card
     confidence_order = {"high": 0, "medium": 1, "low": 2}
 
-    def render_trap_card(issue, severity_class):
+    def render_trap_card(issue, severity_class, finding_num=None):
         html.append(f"<div class='issue-card {severity_class}'>")
+        # Trap card image — fixed-width left column
+        card_img = _get_card_img(issue.get('trap_name', ''))
+        if card_img:
+            html.append(f"<img class='card-img-float' src='{card_img}' alt='{issue.get('trap_name','').upper()} trap card' />")
+        # Content column — never wraps under image
+        html.append("<div class='issue-card-body'>")
         render_frame_ref(issue)
-        # Headline
+        # Finding number + headline
+        if finding_num is not None:
+            html.append(f"<p class='finding-num'>Finding {finding_num}</p>")
         headline_text = _cap_terms(issue.get('headline', ''))
         if headline_text:
             html.append(f"<p class='issue-headline'>{headline_text}</p>")
-        # Meta row: trap name pill (tenet-colored) | tenet | severity | confidence
+        # Meta row: "Severity: ● High | Confidence: High"
         conf = issue.get('confidence', '')
-        tenet = issue.get('tenet', '')
         sev_label = {'critical': 'High', 'moderate': 'Moderate', 'minor': 'Low'}.get(severity_class, severity_class.title())
         html.append("<div class='issue-meta'>")
-        html.append(_tenet_pill_html(issue.get('trap_name', ''), tenet))
-        html.append(f"<span class='meta-sep'>·</span>")
-        html.append(f"<span class='meta-tenet'>{tenet.upper()}</span>")
-        html.append(f"<span class='meta-sep'>·</span>")
-        html.append(f"<span class='meta-severity sev-{severity_class}'>{sev_label} severity</span>")
+        html.append(f"<span class='meta-label'>Severity:</span>")
+        html.append(f"<span class='sev-dot sev-{severity_class}'></span>")
+        html.append(f"<span class='meta-severity sev-{severity_class}'>{sev_label}</span>")
         if conf:
-            html.append(f"<span class='meta-sep'>·</span>")
-            html.append(f"<span class='meta-confidence'>{conf.title()} confidence</span>")
+            html.append(f"<span class='meta-pipe'> | </span>")
+            html.append(f"<span class='meta-label'>Confidence:</span>")
+            html.append(f"<span class='meta-confidence'>{conf.title()}</span>")
         html.append("</div>")
-        # Finding
+        # Finding body (no label — keep it clean)
         problem_text = _cap_terms(issue.get('problem', ''))
         if problem_text:
             html.append("<div class='issue-section'>")
-            html.append("<p class='issue-section-label'>Finding</p>")
             html.append(f"<p class='issue-section-body'>{problem_text}</p>")
             html.append("</div>")
-        # Recommendation
+        # Recommendation (keep label)
         rec_text = _cap_terms(issue.get('recommendation', ''))
         if rec_text:
             html.append("<div class='issue-section'>")
             html.append("<p class='issue-section-label'>Recommendation</p>")
             html.append(f"<p class='issue-section-body'>{rec_text}</p>")
             html.append("</div>")
-        html.append("</div>")
+        # Why uncertain note (only present on folded-in potential issues)
+        why = issue.get('why_uncertain', '')
+        if why:
+            html.append(f"<p class='issue-section-body' style='margin-top:10px;font-style:italic;color:#8a8680;font-size:0.9em;'>{_cap_terms(why)}</p>")
+        html.append("</div>")  # close issue-card-body
+        html.append("</div>")  # close issue-card
 
-    # Collect and sort all confirmed issues: severity order, then confidence within severity
+    # Partition all issues: high confidence (confidence='high') vs. lower (everything else + potentials)
     all_confirmed = (
         [('critical', i) for i in report.get('critical_issues', [])] +
         [('moderate', i) for i in report.get('moderate_issues', [])] +
         [('minor', i) for i in report.get('minor_issues', [])]
     )
-    # Already in severity order; sort within each severity by confidence
-    sorted_confirmed = []
-    for sev in ('critical', 'moderate', 'minor'):
-        group = [(s, i) for s, i in all_confirmed if s == sev]
-        group.sort(key=lambda x: confidence_order.get(x[1].get('confidence', 'low'), 2))
-        sorted_confirmed.extend(group)
+    sev_order = {'critical': 0, 'moderate': 1, 'minor': 2}
 
-    if sorted_confirmed:
+    high_conf = sorted(
+        [(s, i) for s, i in all_confirmed if i.get('confidence', '').lower() == 'high'],
+        key=lambda x: sev_order.get(x[0], 2)
+    )
+    low_conf = sorted(
+        [(s, i) for s, i in all_confirmed if i.get('confidence', '').lower() != 'high'],
+        key=lambda x: sev_order.get(x[0], 2)
+    )
+    # Fold potential_issues into low_conf as minor severity
+    for p in report.get('potential_issues', []):
+        norm = dict(p)
+        if 'problem' not in norm and 'observation' in norm:
+            norm['problem'] = norm.pop('observation')
+        norm.setdefault('confidence', 'low')
+        # Generate a headline from trap name if none provided
+        if not norm.get('headline') and norm.get('trap_name'):
+            norm['headline'] = norm['trap_name'].title()
+        low_conf.append(('minor', norm))
+
+    if high_conf or low_conf:
         html.append("<div class='issues-section'>")
         html.append("<h2>Traps Found</h2>")
-        for sev_class, issue in sorted_confirmed:
-            render_trap_card(issue, sev_class)
+        finding_num = 0
+        if high_conf:
+            html.append("<h3 class='confidence-group-header'>Higher confidence</h3>")
+            for sev_class, issue in high_conf:
+                finding_num += 1
+                render_trap_card(issue, sev_class, finding_num)
+        if low_conf:
+            html.append("<h3 class='confidence-group-header'>Lower confidence</h3>")
+            for sev_class, issue in low_conf:
+                finding_num += 1
+                render_trap_card(issue, sev_class, finding_num)
         html.append("</div>")
     else:
         html.append("<div class='issues-section'>")
@@ -1415,15 +1544,17 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
         html.append("</div>")
 
     # Positive Observations
-    html.append("<div class='positive-section'>")
+    html.append("<div class='positives-section'>")
     html.append("<h2>Positives</h2>")
-    if report['positive_observations']:
+    html.append("<div class='positive-card'>")
+    if report.get('positive_observations'):
         html.append("<ul>")
         for obs in report['positive_observations']:
-            html.append(f"<li>{obs}</li>")
+            html.append(f"<li class='positive-item'>{obs}</li>")
         html.append("</ul>")
     else:
-        html.append("<p>None noted</p>")
+        html.append("<p class='none-found'>None noted</p>")
+    html.append("</div>")
     html.append("</div>")
 
     # Bugs Detected (Technical Issues)
@@ -1461,69 +1592,6 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
             if bug.get('possible_cause'):
                 html.append(f"<p><strong>Possible Cause:</strong> {bug['possible_cause']}</p>")
             html.append(f"<p class='confidence'><em>Confidence: {bug.get('confidence', 'medium')}</em></p>")
-            html.append("</div>")
-        html.append("</div>")
-
-    # Potential Traps / Items for Review
-    if report.get('potential_issues') and len(report['potential_issues']) > 0:
-        html.append("<div class='potential-issues-section'>")
-        html.append("<h2>⚠️ Potential Traps - Items for Review</h2>")
-        html.append("<p><em>These items might be traps but require human judgment to confirm. The AI observed something potentially problematic but lacks context to definitively classify it.</em></p>")
-        for issue in report['potential_issues']:
-            html.append("<div class='issue-card potential'>")
-
-            # Always show frame reference for video/multi-image analysis
-            has_frame_info = 'frame_index' in issue or 'frame_indices' in issue or 'frame' in issue
-
-            if has_frame_info:
-                html.append("<div class='issue-frames' style='margin-bottom: 12px;'>")
-                html.append("<p style='margin: 0 0 8px 0; font-weight: 600; color: #2c3e50;'>📍 Found in:</p>")
-
-                # Show thumbnails if we have frame_images data
-                if frame_images and ('frame_index' in issue or 'frame_indices' in issue):
-                    html.append("<div style='display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px;'>")
-
-                    if 'frame_indices' in issue and len(issue.get('frame_indices', [])) > 1:
-                        for idx in issue['frame_indices'][:5]:
-                            html.append(render_frame_thumbnail(idx, 'small'))
-                        if len(issue['frame_indices']) > 5:
-                            html.append(f"<span style='align-self: center; color: #7f8c8d; margin-left: 8px;'>+{len(issue['frame_indices']) - 5} more</span>")
-                    elif 'frame_index' in issue:
-                        html.append(render_frame_thumbnail(issue['frame_index'], 'small'))
-
-                    html.append("</div>")
-
-                # ALWAYS show text reference with timestamp
-                if 'frame_indices' in issue and len(issue.get('frame_indices', [])) > 1:
-                    frame_labels = []
-                    for idx in issue['frame_indices'][:5]:
-                        if idx in frame_images and frame_images[idx].get('timestamp') is not None:
-                            ts = frame_images[idx]['timestamp']
-                            frame_labels.append(f"Frame {idx} ({ts:.1f}s)")
-                        else:
-                            frame_labels.append(f"Frame {idx}")
-                    label_text = ", ".join(frame_labels)
-                    if len(issue['frame_indices']) > 5:
-                        label_text += f" +{len(issue['frame_indices']) - 5} more"
-                    html.append(f"<p style='margin: 0; color: #555; font-size: 0.9em;'>{label_text}</p>")
-                elif 'frame_index' in issue:
-                    idx = issue['frame_index']
-                    if idx in frame_images and frame_images[idx].get('timestamp') is not None:
-                        ts = frame_images[idx]['timestamp']
-                        html.append(f"<p style='margin: 0; color: #555; font-size: 0.9em;'>Frame {idx} ({ts:.1f}s)</p>")
-                    else:
-                        html.append(f"<p style='margin: 0; color: #555; font-size: 0.9em;'>Frame {idx}</p>")
-                elif 'frame' in issue:
-                    html.append(f"<p style='margin: 0; color: #555; font-size: 0.9em;'>{issue['frame']}</p>")
-
-                html.append("</div>")
-
-            html.append(f"<p><strong>Trap Detected:</strong> <strong>{issue.get('trap_name', 'UNKNOWN').upper()}</strong> (Potential)</p>")
-            html.append(f"<p class='tenet'><strong>Tenet:</strong> {issue.get('tenet', 'N/A').upper()}</p>")
-            html.append(f"<p><strong>Where:</strong> {_cap_terms(issue.get('location', 'N/A'))}</p>")
-            html.append(f"<p><strong>Observation:</strong> {_cap_terms(issue.get('observation', issue.get('problem', 'N/A')))}</p>")
-            html.append(f"<p><strong>Why Uncertain:</strong> {_cap_terms(issue.get('why_uncertain', 'Requires human review'))}</p>")
-            html.append(f"<p class='confidence'><em>Confidence: {issue.get('confidence', 'low')} - Requires human review</em></p>")
             html.append("</div>")
         html.append("</div>")
 

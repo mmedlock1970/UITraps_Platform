@@ -45,11 +45,14 @@ function assembleContext(fields: {
     priorProducts ? `Products they use regularly: ${priorProducts}` : '',
   ].filter(Boolean);
 
+  const designName = [screenName, productDomain].filter(Boolean).join(' — ');
+
   return {
     users: userParts.join('. '),
     expertise: `${expLevel}${techSavvy ? ` / ${techSavvy}` : ''}`,
     tasks: userGoal,
     format: formatParts.join('. '),
+    design_name: designName || undefined,
     contentType: platformToContentType(platform, productDomain),
     extra_context: extraContext || undefined,
     kb_version: kbVersion,

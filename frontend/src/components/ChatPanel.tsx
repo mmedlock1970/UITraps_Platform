@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, KeyboardEvent } from 'react';
+import React, { useCallback, useEffect, useRef, useState, KeyboardEvent } from 'react';
 import { useReportChat } from '../hooks/useReportChat';
 import styles from './ChatPanel.module.css';
 
@@ -28,8 +28,20 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ apiEndpoint, apiKey, repor
   });
 
   const [input, setInput] = useState('');
+  const [copied, setCopied] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleCopy = useCallback(() => {
+    if (messages.length === 0) return;
+    const text = messages
+      .map(m => `${m.role === 'user' ? 'You' : 'Assistant'}: ${m.content}`)
+      .join('\n\n');
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }, [messages]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -66,6 +78,30 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ apiEndpoint, apiKey, repor
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
         </svg>
         <span className={styles.headerTitle}>Discuss Results</span>
+        <button
+          type="button"
+          className={styles.copyButton}
+          onClick={handleCopy}
+          disabled={messages.length === 0}
+          title="Copy conversation"
+        >
+          {copied ? (
+            <>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              Copied!
+            </>
+          ) : (
+            <>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+              Copy
+            </>
+          )}
+        </button>
         {canRerun && onRerunAnalysis && (
           <button
             type="button"
