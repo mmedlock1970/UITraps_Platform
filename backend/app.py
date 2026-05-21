@@ -59,6 +59,17 @@ from src.usage_service import (
 # Report saver for automatic report persistence
 from src.report_saver import save_analysis_report, get_report_saver
 
+# Subscription and token management
+from src.subscription_service import (
+    activate_subscription,
+    renew_subscription,
+    cancel_subscription,
+    expire_subscription,
+    add_bonus_tokens,
+    check_and_consume_token,
+    get_usage_summary,
+)
+
 # NEW: JWT auth for unified platform
 from src.auth import get_current_user
 
@@ -99,6 +110,9 @@ ALLOWED_ORIGIN_REGEX = r"https://([\w-]+\.)?uitraps\.com"
 
 # Monthly analysis limit per API key
 MONTHLY_LIMIT = int(os.environ.get("MONTHLY_LIMIT", "20"))
+
+# Shared secret for WooCommerce webhook calls (set same value in WordPress and Railway env vars)
+WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
 
 # Simple in-memory cache for Figma file data (avoids hitting API twice for estimate + analyze)
 # Key: file_key, Value: {"data": file_data, "timestamp": time.time()}
@@ -1693,6 +1707,111 @@ async def analyze_pdf(
 
 
 # ===========================================================
+# Subscription & Token Webhook Endpoints (called by WordPress/WooCommerce)
+# ===========================================================
+
+def _verify_webhook_secret(request: Request) -> bool:
+    """Check the X-Webhook-Secret header matches our shared secret."""
+    if not WEBHOOK_SECRET:
+        logger.warning("WEBHOOK_SECRET not set — accepting all webhook calls (dev mode)")
+        return True
+    return request.headers.get("X-Webhook-Secret", "") == WEBHOOK_SECRET
+
+
+class SubscriptionWebhookRequest(BaseModel):
+    user_id: str
+    event: str  # activated | renewed | cancelled | expired
+    monthly_limit: Optional[int] = None
+    subscription_start: Optional[str] = None
+    subscription_end: Optional[str] = None
+    next_renewal: Optional[str] = None
+
+
+class TokensWebhookRequest(BaseModel):
+    user_id: str
+    tokens: int
+
+
+@app.post("/api/webhook/subscription")
+async def webhook_subscription(payload: SubscriptionWebhookRequest, request: Request):
+    """
+    WooCommerce subscription lifecycle webhook.
+
+    Called by WordPress when a subscription is activated, renewed, cancelled, or expired.
+    Secure with X-Webhook-Secret header — set WEBHOOK_SECRET env var on both sides.
+
+    Events:
+      activated — new subscription started, resets monthly usage
+      renewed   — subscription renewed, resets monthly usage and updates dates
+      cancelled — subscription cancelled (access continues until period end)
+      expired   — subscription fully expired, access revoked
+    """
+    if not _verify_webhook_secret(request):
+        raise HTTPException(status_code=401, detail="Invalid webhook secret.")
+
+    event = payload.event.lower()
+    with Session(engine) as session:
+        if event == "activated":
+            result = activate_subscription(
+                session, payload.user_id,
+                monthly_limit=payload.monthly_limit or MONTHLY_LIMIT,
+                subscription_start=payload.subscription_start,
+                subscription_end=payload.subscription_end,
+                next_renewal=payload.next_renewal,
+            )
+        elif event == "renewed":
+            result = renew_subscription(
+                session, payload.user_id,
+                monthly_limit=payload.monthly_limit,
+                next_renewal=payload.next_renewal,
+                subscription_end=payload.subscription_end,
+            )
+        elif event == "cancelled":
+            result = cancel_subscription(session, payload.user_id)
+        elif event == "expired":
+            result = expire_subscription(session, payload.user_id)
+        else:
+            raise HTTPException(status_code=400, detail=f"Unknown event: {payload.event}")
+
+    logger.info(f"[webhook/subscription] user={payload.user_id} event={event} status={result.subscription_status}")
+    return {"success": True, "user_id": payload.user_id, "status": result.subscription_status}
+
+
+@app.post("/api/webhook/tokens")
+async def webhook_tokens(payload: TokensWebhookRequest, request: Request):
+    """
+    WooCommerce token top-up webhook.
+
+    Called by WordPress when a user purchases additional tokens.
+    Secure with X-Webhook-Secret header.
+    """
+    if not _verify_webhook_secret(request):
+        raise HTTPException(status_code=401, detail="Invalid webhook secret.")
+
+    if payload.tokens <= 0:
+        raise HTTPException(status_code=400, detail="Tokens must be a positive number.")
+
+    with Session(engine) as session:
+        result = add_bonus_tokens(session, payload.user_id, payload.tokens)
+
+    logger.info(f"[webhook/tokens] user={payload.user_id} added={payload.tokens} total_bonus={result.bonus_tokens}")
+    return {"success": True, "user_id": payload.user_id, "bonus_tokens": result.bonus_tokens}
+
+
+@app.get("/api/user/usage")
+async def get_user_usage(user: dict = Depends(get_current_user)):
+    """
+    Get current usage and subscription status for the authenticated user.
+
+    Returns monthly allowance, usage, bonus tokens, and subscription dates.
+    """
+    user_id = str(user.get("userId", ""))
+    with Session(engine) as session:
+        summary = get_usage_summary(session, user_id)
+    return {"success": True, **summary}
+
+
+# ===========================================================
 # NEW: Unified Platform Endpoints (JWT auth)
 # ===========================================================
 
@@ -1767,6 +1886,14 @@ async def unified_ask(
     - Files + question (no context) → Hybrid
     """
     intent = detect_intent(message, files, users, tasks, format)
+
+    # For analysis requests, check subscription and consume a token
+    if intent.mode in (IntentMode.ANALYSIS, IntentMode.HYBRID):
+        user_id = str(user.get("userId", ""))
+        with Session(engine) as session:
+            allowed, reason = check_and_consume_token(session, user_id)
+        if not allowed:
+            raise HTTPException(status_code=402, detail=reason)
 
     if intent.mode == IntentMode.CHAT:
         # --- Pure chat ---

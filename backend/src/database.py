@@ -57,6 +57,25 @@ class AnalysisAudit(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
 
+# --- Subscription & Token Models ---
+
+class UserSubscription(SQLModel, table=True):
+    """Per-user subscription status and token balance, keyed by WordPress user ID."""
+    __tablename__ = "user_subscriptions"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: str = Field(unique=True, index=True)  # WordPress user ID (from JWT)
+    subscription_status: str = Field(default="inactive")  # active | cancelled | expired | inactive
+    monthly_limit: int = Field(default=0)
+    monthly_used: int = Field(default=0)
+    bonus_tokens: int = Field(default=0)
+    subscription_start: Optional[datetime] = Field(default=None)
+    subscription_end: Optional[datetime] = Field(default=None)
+    next_renewal: Optional[datetime] = Field(default=None)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 # --- Chat Models (for unified platform) ---
 
 class ConversationSession(SQLModel, table=True):
