@@ -1,14 +1,15 @@
 /* Full-viewport wrapper that handles background for all screen widths */
 .viewportWrapper {
-  min-height: 100vh;
+  height: 100vh;
   width: 100%;
+  overflow: hidden;
   background: var(--uitraps-bg);
 }
 
 .platform {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
   width: 100%;
   max-width: 1200px;
   margin: 0 auto;
@@ -266,11 +267,15 @@
 }
 
 /* ── Chat page empty state ── */
-.chatPageIntro {
+.chatPageContent {
   max-width: 900px;
   width: 100%;
-  margin: 0 auto 32px;
+  margin: 0 auto;
   padding: 0 24px;
+}
+
+.chatPageIntro {
+  margin-bottom: 32px;
   text-align: left;
 }
 
@@ -286,6 +291,7 @@
 .chatPageSubtitle {
   font-size: 16px;
   color: var(--uitraps-text-secondary);
+  max-width: 520px;
   line-height: 1.65;
   margin: 0;
 }

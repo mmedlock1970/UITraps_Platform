@@ -652,11 +652,12 @@ export const App: React.FC = () => {
         {view === 'chat' && (
           isEmpty ? (
             <div className={styles.centeredLayout}>
-              <div className={styles.chatPageIntro}>
-                <h1 className={styles.chatPageTitle}>Ask me anything...</h1>
-                <p className={styles.chatPageSubtitle}>Ask anything about UI Tenets &amp; Traps, or describe an interface issue and I'll identify the relevant Traps.</p>
-              </div>
-              <UnifiedInput
+              <div className={styles.chatPageContent}>
+                <div className={styles.chatPageIntro}>
+                  <h1 className={styles.chatPageTitle}>Ask me anything...</h1>
+                  <p className={styles.chatPageSubtitle}>Ask anything about UI Tenets &amp; Traps, or describe an interface issue and I'll identify the relevant Traps.</p>
+                </div>
+                <UnifiedInput
                 centered
                 placeholder=""
                 inputText={unified.inputText}
@@ -677,6 +678,7 @@ export const App: React.FC = () => {
                 isLoading={unified.isLoading}
                 onSubmit={unified.submit}
               />
+              </div>
             </div>
           ) : (
             <>
