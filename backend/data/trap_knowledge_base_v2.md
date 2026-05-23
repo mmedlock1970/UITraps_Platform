@@ -1185,21 +1185,33 @@ Design for retention by default: when a user provides information at any point i
 ## Definition (verbatim)
 Information presented to the user is factually wrong, distorted, incomplete, out-of-date, or contains errors.
 
-Examples: factual inaccuracies, hallucinations, algorithmically biased content, intentionally misleading information, typographical errors. The user may or may not know the information is incorrect.
+**⚠️ SCOPE — read before classifying anything as this trap:**
+This trap applies exclusively to static factual claims — content that is factually wrong independent of who the user is. The test is: **would this content be wrong for any user?** If yes, it may be Incorrect Information. If it is only wrong for this specific user (because the system chose to show the wrong thing), it is **BAD PREDICTION**, not Incorrect Information.
 
-**Key characteristic:** Unlike most Traps, this one produces no friction. The user receives information, acts on it, and does not immediately realize it is wrong. This makes it particularly consequential — errors go undetected until consequences arrive.
+Personalization failures, recommendation errors, and surfaced content that is inappropriate for a specific user are BAD PREDICTION — the error is in the system's choice of what to show, not in the factual accuracy of the content itself.
+
+Examples of Incorrect Information (static factual errors): a button labelled "Save" that actually deletes the item; a product description stating incorrect dimensions; a chatbot response citing a legal case that does not exist; a "Romantic Comedies" category that contains horror films.
+
+Examples of BAD PREDICTION (wrong for this user, not wrong in fact): a homepage recommendation row showing thriller films to a user who stated they want children's content; a search default set to a category the user has never shown interest in; an auto-complete suggestion irrelevant to this user's task. The thriller films are correctly described — the error is that the system chose to show them to this user.
+
+**Key characteristic:** Unlike most Traps, this one produces no friction. The user receives information, acts on it, and does not immediately realize it is wrong. This makes it particularly consequential — errors go undetected until consequences arrive. Note: bad recommendations DO produce friction (the user must scroll past irrelevant content); if friction is present, this is a signal you may be looking at Bad Prediction rather than Incorrect Information.
 
 ## DISCONFIRMATION — Apply First
 NOT present when:
 (a) Information is clearly attributed to a source and presented with appropriate uncertainty indicators — the Trap applies to information presented as fact.
 (b) Information was accurate at the time and the interface provides a mechanism for keeping it current.
 (c) The "incorrect" judgment reflects user preference disagreement rather than factual inaccuracy.
+(d) The element is a recommendation, surfaced content row, suggestion, prediction, or system-generated default that is wrong for this specific user — that is BAD PREDICTION, not Incorrect Information. The fact that a recommendation engine made an error — even one you would describe as a "prediction error" — does not make it Incorrect Information. Wrong for this user ≠ factually incorrect.
 
-**Key distinction from Bad Prediction:** Incorrect Information = factually wrong content. Bad Prediction = unwelcome proactive action regardless of factual accuracy. The distinguishing question: did the user ask for this? If the system surfaced it based on probabilistic inference without being asked AND it was factually wrong, both Traps may be present. If hard-coded or user-requested and wrong, only Incorrect Information applies.
+**Key distinction from Bad Prediction — single disambiguation test:**
+
+Ask: "Would this content be wrong for a user with completely different goals?"
+- If **yes** (only wrong for this specific user) → **BAD PREDICTION**. The system chose to show the wrong thing to this user. The factual accuracy of the content does not matter.
+- If **no** (factually wrong for any user, regardless of their goals) → **INCORRECT INFORMATION**. The error is in the content itself, not in who it was shown to.
 
 ## Severity
 **Part A — Consequence:** Scales with stakes of the domain. Minor for low-stakes recommendations. Significant for financial, health, navigational, or legal information acted upon in good faith. Severe when incorrect information causes irreversible harm (hallucinated legal cases; sycophancy leading to confirmation bias).
-**Part B — Likelihood:** High when: AI-generated content presented without attribution or uncertainty indicators; information is time-sensitive with no refresh mechanism; algorithmic outputs presented as fact without disclosure of their basis.
+**Part B — Likelihood:** High when: AI-generated factual assertions presented without attribution or uncertainty indicators; information is time-sensitive with no refresh mechanism; AI-authored content presented as authoritative fact without disclosure that it was generated.
 **Combination rule:** High severity when consequence is task failure or worse, regardless of likelihood.
 
 ## Confidence Tiers
@@ -1207,7 +1219,7 @@ NOT present when:
 - **Tier 3:** Factual accuracy of specific claims — requires external verification; cannot be automated for general content.
 
 ## Root Cause Confirmation (U4)
-- **Bad Prediction** (distinction): See above — distinguishing question is whether the system surfaced this without being asked and made a probabilistic inference.
+- **Bad Prediction** (distinction): Apply the single disambiguation test above. If the content would be fine for a user with different goals, it is Bad Prediction (wrong for this user). If the content would be wrong for any user, it is Incorrect Information (wrong in fact).
 - **Inviting Dead End** (downstream consequence): Incorrect information suggesting a wrong path forward is actually correct (mislabeled button, outdated instructions) functions as Inviting Dead End, but Incorrect Information is root cause. If a signifier is merely visually confusing but not factually wrong, it's only Inviting Dead End.
 
 ## Examples → Rules
@@ -1217,13 +1229,13 @@ NOT present when:
 ## Rules (consolidated)
 - [definition] Unlike most Traps, this one produces no user friction at the moment of encounter — making it especially dangerous in high-stakes domains.
 - [examples] AI-generated content without attribution or uncertainty indicators is a structural Tier 2 indicator, regardless of whether the specific content is actually wrong.
-- [why it occurs] Outdated data, AI probabilistic generation, human error, algorithmic engagement optimization overriding accuracy, intentional deception.
+- [why it occurs] Outdated data, AI probabilistic generation of factual claims, human error, intentional deception. Note: an algorithm surfacing content inappropriate for a specific user is Bad Prediction, not Incorrect Information — that is a relevance failure, not a factual accuracy failure.
 - [how to avoid] For any information presented as fact: document the source, the verification process, and the mechanism for keeping it current. AI-generated content must be labeled and accompanied by source citations where possible.
 - [governing principle] Design interfaces to surface uncertainty rather than hide it — confident presentation of uncertain information is a design failure, not a feature.
 - [AI detectability] Tier 2 for structural indicators (no attribution, AI disclosure absent, internal contradictions). Tier 3 for factual accuracy of specific claims.
 
 ## Related Traps
-- **Bad Prediction** (distinguish): Incorrect Information is about factual accuracy; Bad Prediction is about unwelcome proactive action.
+- **Bad Prediction** (distinguish): Apply the single disambiguation test. Content wrong only for this specific user = Bad Prediction. Content factually wrong for any user = Incorrect Information. These are mutually exclusive — do not apply both to the same element.
 - **Inviting Dead End** (downstream): Incorrect information pointing to wrong path makes Incorrect Information the root cause.
 
 ## Report Language (U6)
@@ -1260,8 +1272,8 @@ NOT present when:
 **Combination rule:** High severity when consequence is task failure or worse, regardless of likelihood.
 
 ## Confidence Tiers
-- **Tier 1:** Predictive features with high-consequence wrong-prediction outcomes (irreversible actions, privacy implications) — flag regardless of accuracy rate, as the threshold for acting rather than suggesting is not met.
-- **Tier 2:** Predictive features identifiable in design files, but whether specific predictions are wrong requires usage data.
+- **Tier 1 (confirmed finding from static screenshot):** When user context is provided and the interface visibly surfaces content, sections, or defaults that are clearly wrong for the stated user — the prediction failure is directly observable from the artifact. Do not require usage data; flag as confirmed finding. Also applies to high-consequence irreversible predictive features (accidental send, privacy exposure) regardless of accuracy rate.
+- **Tier 2:** Predictive features identifiable in design files where the specific predictions cannot be evaluated without usage data (no user context provided, or the mismatch is not visible in the artifact).
 
 ## Root Cause Confirmation (U4)
 - **System Amnesia** (sometimes root cause): Confirm independently that user previously engaged in behavior or provided information that is unused. Do not infer System Amnesia from poor predictions alone.
@@ -1278,6 +1290,8 @@ NOT present when:
 - **[Example 18.5] Amazon Alexa "By the way" promotions:** Amazon’s Alexa voice assistant
 began adding unsolicited "By the way..." messages after replies to promote other features. Users judged these messages to be irrelevant or ill-timed leading Amazon to reduce these prompts. → *Rule: Proactively surfaced content must not only be relevant but timely - and only presented to users when you can be certain they are open to suggestion.*
 
+- **[Example 18.6] Content recommendation wrong for stated user (classification guidance):** An interface homepage prominently features content sections that contradict the stated user's goal or demographic. The content items are correctly labelled — the error is not in the accuracy of any item's description but in the system's decision to surface this content to this user. → *Rule: This is BAD PREDICTION, not INCORRECT INFORMATION. The system guessed wrong about what to show; the content itself is accurately described. The diagnostic question: would this content row be wrong for a user with different goals? If yes — it is only wrong for this specific user → BAD PREDICTION. If the content would be wrong for any user (factually inaccurate regardless of who views it) → INCORRECT INFORMATION. These two traps are mutually exclusive; do not apply both.*
+
 ## Rules (consolidated)
 - [definition] The question is not whether prediction is perfect, but whether the benefit of acting on imperfect prediction outweighs the cost of getting it wrong in this context.
 - [definition] Acting requires a higher accuracy threshold than suggesting. Where wrong-prediction consequence is significant and reversal is difficult, suggest rather than act.
@@ -1290,7 +1304,7 @@ began adding unsolicited "By the way..." messages after replies to promote other
 - **System Amnesia** (sometimes root cause): System failing to retain prior context will make progressively worse predictions.
 - **Accidental Activation** (downstream): In voice and gesture interfaces, Bad Prediction is often the mechanism. Distinguish from physical Accidental Activation.
 - **Distraction, Unwanted Disclosure, Unnecessary Steps** (downstream): All possible downstream effects — confirm each independently.
-- **Incorrect Information** (distinguish): Incorrect Information = factually wrong content. Bad Prediction = unwelcome proactive action regardless of factual accuracy.
+- **Incorrect Information** (distinguish): Apply the single disambiguation test. If the content would be fine for a user with different goals, it is Bad Prediction. If it would be factually wrong for any user, it is Incorrect Information. These are mutually exclusive — do not apply both to the same element.
 
 ## Report Language (U6)
 **Finding:** [Predictive feature] is generated by the system but unwelcomed by the user — requiring users to work around the incorrect result rather than benefiting from the intended assistance.

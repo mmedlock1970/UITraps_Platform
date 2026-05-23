@@ -98,6 +98,17 @@ UI_ANALYSIS_SCHEMA = {
                         "type": "string",
                         "enum": ["high", "medium", "low"],
                         "description": "Confidence level in this finding"
+                    },
+                    "region": {
+                        "type": "object",
+                        "description": "Bounding box of the specific UI element or area where this issue occurs, as normalized coordinates (0.0–1.0, origin top-left corner of the image). Include when you can clearly identify a bounded area; omit when the issue spans the full interface or cannot be spatially bounded.",
+                        "properties": {
+                            "x": {"type": "number", "description": "Left edge (0.0 = left side, 1.0 = right side)"},
+                            "y": {"type": "number", "description": "Top edge (0.0 = top, 1.0 = bottom)"},
+                            "width": {"type": "number", "description": "Width as a fraction of image width"},
+                            "height": {"type": "number", "description": "Height as a fraction of image height"}
+                        },
+                        "required": ["x", "y", "width", "height"]
                     }
                 },
                 "required": ["trap_name", "tenet", "headline", "location", "problem", "recommendation", "confidence"]
@@ -121,6 +132,17 @@ UI_ANALYSIS_SCHEMA = {
                     "confidence": {
                         "type": "string",
                         "enum": ["high", "medium", "low"]
+                    },
+                    "region": {
+                        "type": "object",
+                        "description": "Bounding box of the specific UI element or area where this issue occurs, as normalized coordinates (0.0–1.0, origin top-left). Include when you can clearly identify a bounded area; omit when the issue spans the full interface.",
+                        "properties": {
+                            "x": {"type": "number"},
+                            "y": {"type": "number"},
+                            "width": {"type": "number"},
+                            "height": {"type": "number"}
+                        },
+                        "required": ["x", "y", "width", "height"]
                     }
                 },
                 "required": ["trap_name", "tenet", "headline", "location", "problem", "recommendation", "confidence"]
@@ -144,6 +166,17 @@ UI_ANALYSIS_SCHEMA = {
                     "confidence": {
                         "type": "string",
                         "enum": ["high", "medium", "low"]
+                    },
+                    "region": {
+                        "type": "object",
+                        "description": "Bounding box of the specific UI element or area where this issue occurs, as normalized coordinates (0.0–1.0, origin top-left). Include when you can clearly identify a bounded area; omit when the issue spans the full interface.",
+                        "properties": {
+                            "x": {"type": "number"},
+                            "y": {"type": "number"},
+                            "width": {"type": "number"},
+                            "height": {"type": "number"}
+                        },
+                        "required": ["x", "y", "width", "height"]
                     }
                 },
                 "required": ["trap_name", "tenet", "headline", "location", "problem", "recommendation", "confidence"]

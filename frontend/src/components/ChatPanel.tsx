@@ -10,18 +10,9 @@ interface ChatPanelProps {
   onRerunAnalysis?: (messages: Array<{ role: string; content: string }>) => void;
 }
 
-const RERUN_PATTERNS = [
-  /\bre.?run\b/i,
-  /\brun.{0,20}again\b/i,
-  /\bredo\b/i,
-  /\bre.?analyz/i,
-  /\banalyze.{0,20}again\b/i,
-  /\brun\s+(?:a\s+)?new\s+anal/i,
-  /\bdo\s+(?:it|the\s+anal).{0,20}again\b/i,
-];
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({ apiEndpoint, apiKey, reportMarkdown, canRerun, onRerunAnalysis }) => {
-  const { messages, isLoading, error, sendMessage, addLocalMessage } = useReportChat({
+  const { messages, isLoading, error, sendMessage } = useReportChat({
     apiEndpoint,
     apiKey,
     reportMarkdown,
@@ -71,16 +62,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ apiEndpoint, apiKey, repor
     const msg = input.trim();
     if (!msg || isLoading) return;
     setInput('');
-    atBottomRef.current = true; // always scroll to bottom when user sends
-
-    // Intercept re-run requests — route to the structured pipeline, not inline chat
-    if (canRerun && onRerunAnalysis && RERUN_PATTERNS.some(p => p.test(msg))) {
-      const userMsg = { role: 'user' as const, content: msg };
-      addLocalMessage(userMsg);
-      onRerunAnalysis([...messages, userMsg]);
-      return;
-    }
-
+    atBottomRef.current = true;
     await sendMessage(msg);
   };
 

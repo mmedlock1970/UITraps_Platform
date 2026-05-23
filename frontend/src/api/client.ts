@@ -447,6 +447,12 @@ export async function unifiedAsk(options: UnifiedAskOptions): Promise<UnifiedAsk
     formData.append('content_type', context.contentType || 'website');
     if (context.design_name) formData.append('design_name', context.design_name);
     if (context.extra_context) formData.append('extra_context', context.extra_context);
+    if (context.product_context) formData.append('product_context', context.product_context);
+    if (context.physical_env) formData.append('physical_env', context.physical_env);
+    if (context.lighting) formData.append('lighting', context.lighting);
+    if (context.grip_position) formData.append('grip_position', context.grip_position);
+    if (context.attentional_state) formData.append('attentional_state', context.attentional_state);
+    if (context.tenet_filter?.length) formData.append('tenet_filter', context.tenet_filter.join(','));
   }
   if (conversationHistory) formData.append('conversation_history', conversationHistory);
   if (chatContext) formData.append('chat_context', chatContext);

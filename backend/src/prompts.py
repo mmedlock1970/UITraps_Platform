@@ -521,14 +521,24 @@ Before flagging ANY trap, you MUST:
 
 🚨 CRITICAL TRAP DETECTION RULES:
 
-**Traps You CANNOT Detect from Static Screenshots (DO NOT FLAG THESE AS ISSUES):**
-6. BAD PREDICTION - Generally requires seeing actual personalisation/predictions respond incorrectly. **EXCEPTION: Flag BAD PREDICTION from a static screenshot when the interface is visibly surfacing content, recommendations, or categories that are clearly wrong for the user context you've been given** (e.g., a streaming app showing horror/adult movies prominently to users described as children or families, a news app recommending irrelevant categories to users with a stated niche interest). The prediction failure must be directly visible in the screenshot.
+**BAD PREDICTION vs. INCORRECT INFORMATION — apply this test before naming either trap:**
+When you observe content, a section, or information that seems wrong, apply this test BEFORE deciding on a trap name:
+→ Ask: "Would this content be wrong for a user with completely different goals?"
+- If YES (only wrong for THIS user) → **BAD PREDICTION**. The system chose to show the wrong thing to this user.
+- If NO (factually wrong for any user regardless of goals) → **INCORRECT INFORMATION**. The content itself is inaccurate.
+Recommendation rows, surfaced content, personalisation results, and system-generated suggestions are always BAD PREDICTION when wrong for a specific user — never INCORRECT INFORMATION.
 
-**For `traps_checked_not_found` — TESTABILITY RULES:**
+**BAD PREDICTION — testability from static screenshots:**
+BAD PREDICTION is directly detectable from a static screenshot when the interface visibly surfaces content, recommendations, or defaults that are wrong for the stated user. See the per-trap rules below for full testability guidance. Do not treat this trap as generally undetectable — when the mismatch is visible in the artifact, it is a Tier 1 confirmed finding.
 
-**Output only entries you actually evaluated.** Do NOT enumerate the entire trap list:
-- Always-evaluable traps: include each as testable:true (unless already a confirmed issue)
-- Conditional traps: include an entry only when you applied the rule and have a result to report
+**`traps_checked_not_found` — ABSENT AND UNTESTABLE TRAPS ONLY:**
+
+This field is not a coverage checklist. It contains only traps where your conclusion is "I looked and it is not present" or "I could not evaluate this from the artifact." Detected findings never appear here.
+
+**Populate this field as follows:**
+- Include a trap only if your conclusion is "absent" or "untestable" — never if your conclusion is "found"
+- Do NOT include any trap that appears in critical_issues, moderate_issues, or minor_issues — those were found; they are excluded from this section by definition
+- Do NOT enumerate the entire trap list — only traps you actively evaluated
 - OMIT SLOW OR NO RESPONSE and POOR AESTHETIC/UNATTRACTIVE APPEARANCE — added automatically
 - OMIT conditional traps whose conditions clearly cannot apply (e.g., multi-screen traps for a single screenshot)
 
@@ -599,58 +609,33 @@ __SINGLE_SCREEN_NOTE__
 
 ⚠️ **DO NOT DISMISS AS "STANDARD PATTERNS":** Common website and app conventions that are confirmed Gratuitous Redundancy and must be flagged:
 - A site logo that navigates to the homepage AND a separate "Home" nav link — both serve the same destination
-- Navigation items that appear identically in both the header nav bar AND the footer nav
-- A search bar AND a search icon that both open search from the same screen with no functional distinction
+- The same navigation destination appearing in two or more separate navigation regions on the same screen (header, sidebar, top nav, secondary nav, app drawer, or any other nav component) — same destination label or equivalent link in multiple nav regions is always redundant regardless of which components contain each instance
+- A search input field AND a standalone search icon or button both visible on the same screen — functionally equivalent affordances are GRATUITOUS REDUNDANCY (Tier 1 confirmed) regardless of visual form; the flexible-syntax exception does not apply to matched search affordances
 - Multiple "Sign In" or "Get Started" buttons targeting the same action from the same screen
 - Social media icons appearing in both the header and the footer
 The fact that a pattern is common across the web does NOT make it acceptable — Gratuitous Redundancy describes real usability cost regardless of convention.
 
-20. **BAD PREDICTION** — ⚠️ **Actively check when user context is provided. Visible when content, defaults, or recommendations visibly mismatch the stated user.**
+20. **BAD PREDICTION** — ⚠️ **Actively check when user context is provided.**
 
-`testable: true (Tier 1 — confirmed finding)` when the screenshot shows the interface surfacing content, recommendations, or defaults that are visibly wrong for the stated user — the content is correctly labelled but the system has misjudged what this user needs:
-- A homepage dominated by content irrelevant or inappropriate to the stated user population (e.g., adult/commercial content prominent when user is a child, financial products prominent when user is a student doing research)
-- Recommendation carousels or "For You" sections surfacing categories that contradict the described user's demographics, goals, or tasks
+`testable: true (Tier 1 — confirmed finding)` when the screenshot shows the interface surfacing content, recommendations, or defaults that are visibly wrong for the stated user — the system's proactive decision does not serve this user. Output as confirmed finding, moderate severity.
+- Curated or personalised sections surfacing items that contradict the described user's demographics, goals, or tasks
 - Default settings or pre-selected options that visibly mismatch the stated user's context
-Output as confirmed finding, moderate severity. **Do NOT flag as INCORRECT INFORMATION — apply the disambiguation test in the BAD PREDICTION/INCORRECT INFORMATION section before assigning either trap.**
+- A screen dominated by content or options clearly wrong for the stated user population
 
-`testable: false` when content relevance cannot be assessed without knowing off-screen personalisation state.
+`testable: false` when content relevance cannot be assessed without off-screen personalisation state.
 
-21. **INCORRECT INFORMATION** — ⚠️ **MANDATORY: Before flagging this trap, apply the disambiguation test in the BAD PREDICTION/INCORRECT INFORMATION section above. If the content is only wrong for THIS specific user — flag as BAD PREDICTION instead.**
+21. **INCORRECT INFORMATION** — ⚠️ **Apply the single disambiguation test before classifying anything here.**
 
-`testable: true (Tier 1 — confirmed finding)` ONLY when visible content is factually wrong or misleadingly labelled **independent of who is viewing it** — any user would encounter incorrect information:
+**The one test:** Ask — "Would this content be wrong for a user with completely different goals?"
+- If **yes** (only wrong for this specific user) → **BAD PREDICTION**. The error is in what the system chose to show this user. Do not classify as Incorrect Information.
+- If **no** (factually wrong for any user regardless of their goals) → **INCORRECT INFORMATION**. The error is in the content itself.
+
+`testable: true (Tier 1 — confirmed finding)` ONLY for static factual claims that are wrong independent of who the user is:
 - UI labels or descriptions that contradict what the element actually does
 - Ratings, metadata, or descriptions visibly inconsistent with the actual content shown
-- Content filed under a category label that is factually wrong regardless of user context
-Do NOT use this trap for content that is merely irrelevant or mismatched to a specific user — that is BAD PREDICTION. The test: "Would this be wrong for a user with completely different goals?" If yes → INCORRECT INFORMATION. If no → BAD PREDICTION.
+- Content filed under a category or label that factually does not describe it
 
-❌ **NEVER flag as INCORRECT INFORMATION for these scenarios — use BAD PREDICTION instead:**
-- A streaming or content app surfacing the wrong genre, category, or audience tier for the stated user (e.g., adult/thriller films prominent when user wants kids shows) — the content is correctly labeled; only the recommendation decision is wrong
-- Recommendation carousels, "For You" sections, or homepage content rows showing content irrelevant or inappropriate to the stated user's demographics, goals, or tasks
-- Any case where the content IS accurately labeled and described, but the system chose the wrong content to surface for this specific user
-The diagnostic signal: if you would write "appears to mismatch the user's goal" or "may not serve their needs" in the finding, that is BAD PREDICTION language, not INCORRECT INFORMATION language.
-
-**BAD PREDICTION — When to flag from static screenshots:**
-Flag when the interface is visibly surfacing content, recommendations, or defaults that are wrong **for this specific user** given the stated context — the content itself is not incorrect, but the system has misjudged what this user needs:
-- A streaming homepage dominated by adult or mature content when the stated user is a child looking for kids' shows — the content exists and is correctly labelled, but the system chose the wrong content for this user
-- Recommendation carousels surfacing categories irrelevant to the described user's tasks or demographics
-- Personalisation widgets (e.g. "Because you watched…", "Recommended for you") surfacing clearly wrong content given the user context
-The prediction failure must be visible in the screenshot — do not infer it from off-screen state.
-
-⚠️ **BAD PREDICTION vs. INCORRECT INFORMATION — mandatory disambiguation test:**
-Before choosing between these two traps, apply this single decision rule:
-> "Would this content be wrong regardless of which user is viewing it — or is it only wrong because of who this specific user is and what they are trying to do?"
-- **Only wrong for THIS user** (the system guessed wrong about their needs, preferences, or context) → **BAD PREDICTION**
-- **Wrong on its own terms, for any user** (factually incorrect label, wrong category, metadata that contradicts the actual content) → **INCORRECT INFORMATION**
-
-Example: A child-user homepage surfacing adult films → BAD PREDICTION (the films exist and are correctly labelled; the system made a wrong personalisation decision). A film listed under "Family" that is rated R with no parental-guidance note → INCORRECT INFORMATION (the categorisation is factually wrong independent of who is viewing).
-
-**INCORRECT INFORMATION — When to flag from static screenshots:**
-Flag when visible content is factually wrong or misleadingly labelled **independent of user context** — any user viewing this interface would encounter incorrect information:
-- UI labels or descriptions that contradict what the element actually does
-- Ratings, metadata, or descriptions visibly inconsistent with the actual content shown
-- Content explicitly filed under a category label that factually does not describe it (e.g., a clearly adult-rated film filed under a "Kids" or "Family" label)
-Do NOT flag INCORRECT INFORMATION solely because content is hard to find — use INVISIBLE ELEMENT or POOR GROUPING for navigation problems.
-Do NOT flag INCORRECT INFORMATION because the system surfaced content that seems wrong for a specific user — that is BAD PREDICTION.
+Do NOT flag INCORRECT INFORMATION for recommendation rows, surfaced content, personalisation results, or system-generated suggestions — those are always BAD PREDICTION when wrong for a specific user.
 
 🔍 **WHOLE-INTERFACE REPEATED-ELEMENT SCAN — PERFORM BEFORE TRAP-BY-TRAP ANALYSIS:**
 
@@ -888,21 +873,40 @@ EXAMPLE 5 - CORRECT IDENTIFICATION: BAD PREDICTION (Not INCORRECT INFORMATION):
   - Disambiguation test: "Would this content be wrong for a user with different goals?" → No — a thriller fan would find this perfectly fine
   - Conclusion: only wrong for THIS user → BAD PREDICTION
 - ❌ DO NOT flag as INCORRECT INFORMATION — the films are what they say they are; the system guessed wrong about what to show this user, not about the facts
-- Key diagnostic: the finding language "appears to mismatch the user's goal" and "may not serve their needs" is BAD PREDICTION language. INCORRECT INFORMATION findings describe content that is factually wrong or mislabeled for any viewer.
+- Key diagnostic — single test: "Would this content be wrong for a user with completely different goals?" → A thriller fan finds this row perfectly fine, so it is ONLY wrong for THIS user → BAD PREDICTION. If the content would be wrong for any user (factually incorrect regardless of who views it), it would be INCORRECT INFORMATION — but that is not the case here.
 
 OUTPUT REQUIREMENTS:
-- Write a `summary_headline` (one sentence tied to the user's stated goal — how well does the design appear to support it?)
+- **traps_checked_not_found is mutually exclusive with your findings.** Every trap belongs in exactly one of these states: found (critical/moderate/minor), uncertain (potential_issues), needs human review (flagged_for_human_review), or not found/untestable (traps_checked_not_found). A trap in any findings section is found — it must not appear in traps_checked_not_found. This is a structural property of the output, not a rule to weigh against others.
+- Write a `summary_headline`: a punchy verdict on how well the design supports the stated goal. Target 16–24 words. Plain language, no subordinate clauses. It should read like a headline, not a sentence from a report.
+  - BAD: "The design presents several moderate usability challenges that may make it difficult for elderly users to complete appointment scheduling tasks without friction."
+  - GOOD: "Scheduling entry points are buried, likely slowing elderly users down."
 - Write a `summary_narrative` (one paragraph): focus on the user experience implications given the stated goal and user type — what friction themes emerge, and what does that mean for this user trying to accomplish this task. Do NOT mention trap counts or enumerate findings; the scorecard handles counts.
-- For confirmed issues (Critical/Moderate/Minor), provide: trap name (ALL CAPS), tenet violated, a `headline` sentence describing how the trap manifests and its likely user impact, exact location, `problem` elaboration (2-3 sentences of reasoning), `recommendation` (2-3 advisory sentences), and confidence level
+- For confirmed issues (Critical/Moderate/Minor), provide: trap name (ALL CAPS), tenet violated, `headline`, exact location, `problem` (2-3 sentences), `recommendation` (2-3 sentences), confidence level, and a `region` bounding box when you can spatially identify the element (normalized 0.0–1.0 coordinates, origin top-left). Omit `region` only when the issue spans the full interface or cannot be spatially bounded.
 
-**⚠️ CRITICAL - HUMAN-READABLE OUTPUT:**
-The 'problem' field MUST be written for end users (clients, designers, stakeholders) who have never heard of UI Traps methodology:
-- DO NOT include "GATE 0", "GATE 1", etc. or any internal reasoning steps
-- DO NOT include analytical labels like "This is an ACTION task" or "Evidence of excess:"
-- DO write in plain language: describe WHAT the issue is, WHERE it appears, and HOW it impacts users
-- DO write as a consultant explaining findings to a client
-- Example BAD: "GATE 0 - User goal: purchase. GATE 1 - Evidence: multiple banners..."
-- Example GOOD: "Three promotional banners appear between the size selector and Add to Cart button, forcing users to scroll past marketing content to complete their purchase."
+**⚠️ ONE ELEMENT, ONE FINDING — BUT NOTE SECONDARY TRAPS:**
+Report each UI issue once, under the trap that best characterizes it. Do not file duplicate findings for the same element under different trap names. However, if the same issue meaningfully implicates a second trap, note that briefly in the `problem` field so the reader understands the fuller picture. Example: redundant Home buttons are best reported as GRATUITOUS REDUNDANCY. In the problem description, it is appropriate to note that the duplication also creates navigational ambiguity consistent with AMBIGUOUS HOME — since there is no single, integrated way to return home, the user may be uncertain which path to take.
+
+**⚠️ HEADLINE — BE CONCISE:**
+The `headline` is a short, punchy impact statement — not a finding description. It names the problem and its cost to the user in plain language. Target 8–12 words. No subordinate clauses. No "which may cause" constructions.
+- BAD (too long): "The hero section prominently promotes appointment scheduling through a mobile app call-to-action, which appears to create momentary confusion for an elderly user visiting to schedule an appointment."
+- GOOD: "App promotion in hero section may misdirect users seeking appointment scheduling."
+- BAD: "First content row surfaces adult thriller content that contradicts the child user's stated goal of finding age-appropriate shows."
+- GOOD: "First content row surfaces adult content to a child user seeking kids' shows."
+
+**⚠️ PROBLEM FIELD — DESCRIBE THE UX ISSUE, NOT THE CLASSIFICATION:**
+The `problem` field is written for clients, designers, and stakeholders who have no knowledge of the UI Traps framework. Describe what is wrong with the design and how it affects the user.
+- DO describe: what you see, where it appears, and the friction or harm it causes the user
+- DO NOT include: any reasoning about which trap this is, why this trap was chosen over another, or how this finding relates to the framework
+- DO NOT include: "GATE 0", "GATE 1", analytical labels, or internal reasoning steps
+- Example BAD: "This is a Bad Prediction and not Incorrect Information because the content is accurately described — the system's proactive decision to surface this content is the error, not the facts themselves."
+- Example GOOD: "The first browsable content row features adult thriller and action titles. For a child user whose goal is to find kids' shows, this placement means the most visible section of the page offers nothing relevant, and age-appropriate content may require significant scrolling to find."
+
+**⚠️ RECOMMENDATION FIELD — PROPORTIONATE TO PRODUCT TYPE:**
+Recommendations must be practical and appropriate for the type of product being evaluated. The stated user goal is ONE task being tested — this product likely supports other users and other goals. Do not recommend changes that would compromise the product's broader purpose.
+- Frame recommendations for the stated task without implying the rest of the interface should be removed or restructured around that single goal
+- If a fix for the stated task would harm other users or use cases, acknowledge the tradeoff
+- Example BAD (hospital website, task = schedule appointment): "Remove the hero banner and replace with a prominent 'Schedule Appointment' CTA."
+- Example GOOD: "Consider surfacing a clear appointment scheduling entry point earlier on the page — such as in the hero section alongside or above the current promotional content — so users arriving with that intent can find it without scanning the full page."
 
 **⚠️ HEDGED LANGUAGE — MANDATORY (see also MEASURED LANGUAGE block above):**
 You are analyzing a static design, not running a user study. You cannot observe actual user behavior.
@@ -926,6 +930,9 @@ If an issue doesn't fit one of these traps, it is NOT a UI Trap - do not report 
 
 ⚠️ VISUAL VERIFICATION REMINDER:
 Before submitting, verify each finding against what you actually see in the image. Do NOT flag elements as missing if they are visible in the screenshot.
+
+⚠️ PRE-SUBMISSION CHECK — MUTUAL EXCLUSIVITY:
+Before submitting, scan your output for this violation: any trap name that appears in BOTH a findings section (critical_issues, moderate_issues, minor_issues) AND in traps_checked_not_found. This is always an error. A trap is either found or not found — never both. Remove it from traps_checked_not_found if it appears in any findings section.
 
 You will submit your analysis using the ui_analysis_report tool with all required fields including potential_issues and flagged_for_human_review."""
 
@@ -1235,6 +1242,76 @@ ADDITIONAL CONTEXT FROM SUBMITTER:
 {extra_ctx}
 """ if extra_ctx else ""
 
+    product_ctx = user_context.get('product_context', '').strip()
+    product_context_section = f"""
+PRODUCT CONTEXT:
+{product_ctx}
+""" if product_ctx else ""
+
+    tenet_filter_raw = user_context.get('tenet_filter', '')
+    if isinstance(tenet_filter_raw, list):
+        tenet_list = [t.strip().upper() for t in tenet_filter_raw if t.strip()]
+    else:
+        tenet_list = [t.strip().upper() for t in str(tenet_filter_raw).split(',') if t.strip()]
+    tenet_filter_section = f"""
+⚠️ TENET SCOPE — RESTRICTED ANALYSIS:
+Evaluate ONLY the following Tenets: {', '.join(tenet_list)}.
+Do not report findings for traps that fall under any other Tenet. Traps outside these Tenets should be treated as out of scope and omitted from all output sections.
+""" if tenet_list else ""
+
+    _physical_labels = {
+        'desk':       'At a desk or workstation',
+        'stationary': 'Stationary but away from a desk (couch, café, waiting area)',
+        'moving':     'On the go — walking, commuting, or in transit',
+        'vehicle':    'In a vehicle (as a passenger)',
+        'outdoor':    'Outdoors or in variable conditions',
+    }
+    _lighting_labels = {
+        'well_lit':  'Well lit — consistent indoor lighting',
+        'variable':  'Variable or mixed lighting',
+        'bright':    'Bright sunlight or significant glare',
+        'low_light': 'Low light or dim environment',
+    }
+    _grip_labels = {
+        'keyboard':         'Both hands on a keyboard (desktop or laptop)',
+        'one_hand':         'One hand holding device, other hand interacting',
+        'two_hands_thumbs': 'Two hands holding device, thumbs for input',
+        'flat':             'Device resting flat on a surface',
+        'hands_free':       'Hands-free — voice, mounted display, or kiosk',
+    }
+    _attentional_labels = {
+        'fully_focused': 'Fully focused — users give this interface their complete attention with no competing demands.',
+        'mostly_focused': 'Mostly focused — primarily attending to this interface but in a mildly distracting environment (open office, background noise, presence of others).',
+        'divided':        'Divided attention — actively managing this interface alongside a concurrent activity (commuting, minding children, monitoring equipment or a parallel process).',
+        'peripheral':     'Attention mostly elsewhere — primary focus is a real-world activity; interaction happens in brief glances and quick inputs (driving, working a register, operating machinery).',
+    }
+    _physical_raw    = user_context.get('physical_env',     '').strip()
+    _lighting_raw    = user_context.get('lighting',         '').strip()
+    _grip_raw        = user_context.get('grip_position',    '').strip()
+    _attentional_raw = user_context.get('attentional_state','').strip()
+
+    _env_lines = []
+    if _physical_raw    in _physical_labels:    _env_lines.append(f"- Physical environment: {_physical_labels[_physical_raw]}")
+    if _lighting_raw    in _lighting_labels:    _env_lines.append(f"- Lighting conditions: {_lighting_labels[_lighting_raw]}")
+    if _grip_raw        in _grip_labels:        _env_lines.append(f"- Typical grip / body position: {_grip_labels[_grip_raw]}")
+    if _attentional_raw in _attentional_labels: _env_lines.append(f"- User's attentional state: {_attentional_labels[_attentional_raw]}")
+
+    _att_guidance = ""
+    if _attentional_raw in ('divided', 'peripheral'):
+        _att_guidance = """
+⚠️ ATTENTION IMPACT — ELEVATE LIKELIHOOD FOR THESE TRAPS:
+Given the divided or peripheral attentional state, treat the following trap likelihood assessments as elevated relative to a fully-focused user:
+- Effectively Invisible Element: Elements the user would notice when focused may be missed entirely. Anything not within their brief attentional window is at high risk.
+- Distraction: Any unsolicited attention capture (motion, badges, alerts, audio) is more disruptive and more likely to cause task failure when cognitive resources are already split.
+- Memory Challenge: Working memory capacity is directly reduced under divided attention. Any step requiring the user to hold or recall information mid-task is at materially higher risk.
+- Accidental Activation: Physical imprecision increases when attention is divided. Controls near grip points, swipe-sensitive areas, or in the path of incidental movement carry elevated accidental-activation risk.
+- Feedback Failure: System feedback the user would notice when focused may go completely unregistered. Severity of any feedback absence is correspondingly higher."""
+
+    attentional_state_section = f"""
+USE ENVIRONMENT:
+{chr(10).join(_env_lines)}{_att_guidance}
+""" if _env_lines else ""
+
     context_text = f"""Please analyze this UI design using the UI Tenets & Traps framework.
 
 CONTEXT PROVIDED BY USER:
@@ -1242,9 +1319,11 @@ CONTEXT PROVIDED BY USER:
 1. WHO ARE THE USERS?
 {user_context['users']}
 {expertise_section}
-{"3" if has_expertise else "2"}. WHAT ARE THE KEY USER TASKS?
+{"3" if has_expertise else "2"}. WHAT IS THE TASK BEING EVALUATED?
 {user_context['tasks']}
 
+⚠️ IMPORTANT — TASK SCOPE: The task above is ONE specific use case being evaluated. This product almost certainly supports other users and other goals. Your analysis should identify friction for the stated task, but findings and recommendations must remain proportionate to the product's broader purpose. Do not recommend changes that would strip the interface down to serve only this one task.
+{product_context_section}{attentional_state_section}{tenet_filter_section}
 {"4" if has_expertise else "3"}. DESIGN FORMAT:
 {user_context['format']}
 {content_type_section}

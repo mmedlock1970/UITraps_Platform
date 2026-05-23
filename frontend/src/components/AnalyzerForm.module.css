@@ -101,6 +101,25 @@
   user-select: none;
 }
 
+.fieldGroupComingSoon {
+  opacity: 0.4;
+  pointer-events: none;
+  user-select: none;
+}
+
+.comingSoonInline {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--uitraps-text-muted);
+  background: var(--uitraps-bg-secondary);
+  border: 1px solid var(--uitraps-border);
+  padding: 2px 6px;
+  border-radius: 100px;
+  margin-left: auto;
+}
+
 .comingSoonBadge {
   display: inline-flex;
   align-items: center;
@@ -497,3 +516,90 @@
   color: var(--uitraps-bg) !important;
   font-weight: 600;
 }
+
+/* Tenet selector grid */
+.tenetGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.tenetBtn {
+  padding: 8px 6px;
+  font-size: 0.72em;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-family: 'Montserrat', sans-serif;
+  background: var(--tenet-bg-light, var(--uitraps-bg-secondary));
+  color: var(--uitraps-text-secondary);
+  border: 1px solid var(--uitraps-border, #e4e1dc);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  text-align: center;
+}
+.tenetBtn:hover:not(:disabled) {
+  background: var(--uitraps-bg-hover, #e8e4de);
+  color: var(--uitraps-text);
+}
+.tenetBtnActive {
+  background: var(--tenet-color, var(--uitraps-text)) !important;
+  color: var(--tenet-text, var(--uitraps-bg)) !important;
+  border-color: var(--tenet-color, var(--uitraps-text)) !important;
+}
+.tenetBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.tenetClearBtn {
+  font-size: 0.78em;
+  color: var(--uitraps-text-secondary);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.tenetClearBtn:hover { color: var(--uitraps-text); }
+.tenetClearBtn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* Field history chips */
+.fieldHistory {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px;
+  margin: 0 0 6px;
+}
+.fieldHistoryLabel {
+  font-size: 0.7em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--uitraps-text-tertiary, #a09d9a);
+  white-space: nowrap;
+  margin-right: 2px;
+  flex-shrink: 0;
+}
+.historyChip {
+  font-size: 0.75em;
+  color: var(--uitraps-text-secondary);
+  background: var(--uitraps-bg-secondary, #f0ede8);
+  border: 1px solid var(--uitraps-border, #e4e1dc);
+  border-radius: 3px;
+  padding: 2px 7px;
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background 0.12s, color 0.12s;
+  line-height: 1.4;
+}
+.historyChip:hover {
+  background: var(--uitraps-bg-hover, #e8e4de);
+  color: var(--uitraps-text);
+}
+

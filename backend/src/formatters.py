@@ -128,8 +128,8 @@ _TRAP_CARD_FILENAMES: Dict[str, str] = {
     "UNNECESSARY STEPS":             "Final_op1_efficient_01_front.png",
     "INFORMATION OVERLOAD":          "Final_op1_efficient_02_front.png",
     "SYSTEM AMNESIA":                "Final_op1_efficient_03_front.png",
-    "BAD PREDICTION":                "Final_op1_accurate_01_front.png",
-    "INCORRECT INFORMATION":         "Final_op1_accurate_02_front.png",
+    "BAD PREDICTION":                "Final_op1_accurate_02_front.png",
+    "INCORRECT INFORMATION":         "Final_op1_accurate_01_front.png",
     "IRREVERSIBLE ACTION":           "Final_op1_protective_01_front.png",
     "UNWANTED DISCLOSURE":           "Final_op1_protective_02_front.png",
     "DATA LOSS":                     "Final_op1_protective_03_front.png",
@@ -266,6 +266,47 @@ def parse_tasks(tasks_str: str) -> list:
             return parts
 
     return [tasks_str.strip()]
+
+
+_USERS_LABELS = [
+    'Experience with product:',
+    'Tech savviness:',
+    'Frequency of use:',
+    'Experience with similar interfaces:',
+]
+
+
+def _parse_users_string(users_raw: str):
+    """Parse a joined users string into (description, [(label, value), ...]).
+
+    The string is assembled as "Free text desc. Label: value. Label: value."
+    Returns the unlabeled description first, then each structured field.
+    """
+    if not users_raw or users_raw == 'N/A':
+        return users_raw, []
+
+    first_pos = len(users_raw)
+    for label in _USERS_LABELS:
+        pos = users_raw.find(label)
+        if pos != -1 and pos < first_pos:
+            first_pos = pos
+
+    desc = users_raw[:first_pos].strip().rstrip('.')
+    parts = []
+    remainder = users_raw[first_pos:]
+    for label in _USERS_LABELS:
+        pos = remainder.find(label)
+        if pos == -1:
+            continue
+        end_pos = len(remainder)
+        for other in _USERS_LABELS:
+            other_pos = remainder.find(other, pos + len(label))
+            if other_pos != -1 and other_pos < end_pos:
+                end_pos = other_pos
+        value = remainder[pos + len(label):end_pos].strip().rstrip('. ')
+        if value:
+            parts.append((label.rstrip(':'), value))
+    return desc, parts
 
 
 def parse_claude_response(response_text: str) -> Dict[str, Any]:
@@ -757,6 +798,34 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
         .context-body p { margin: 0 0 8px; }
         .context-body p:last-child { margin-bottom: 0; }
         .context-body ul { margin: 4px 0 8px; padding-left: 20px; }
+        .users-detail { margin: 0 0 8px; }
+        .users-detail-label { margin: 0 0 8px; }
+        .users-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.93em;
+            border: 1px solid #e4e1dc;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .users-table td {
+            padding: 7px 12px;
+            border: 1px solid #e4e1dc;
+            vertical-align: top;
+            line-height: 1.5;
+        }
+        .users-table .ut-label {
+            width: 170px;
+            text-align: right;
+            font-size: 0.78em;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: #8a8680;
+            white-space: nowrap;
+            background: #faf9f7;
+        }
+        .users-table .ut-value { color: #2c2c2c; }
         .summary-section {
             padding: 0;
             border-radius: 14px;
@@ -798,6 +867,9 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
             font-weight: 600;
             letter-spacing: 0.03em;
         }
+        .chat-override-section { margin-top: 12px; }
+        .chat-override-list { margin: 6px 0 0; padding-left: 20px; font-size: 13px; color: #4a4744; }
+        .chat-override-list li { margin-bottom: 3px; }
         /* Scorecard table title */
         .scorecard-title {
             font-size: 0.72em;
@@ -877,7 +949,7 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
             margin: 0 0 10px;
             line-height: 1.45;
         }
-        /* Tenet-colored pill — used for trap names in cards and not-found lists */
+        /* Tenet-colored badge — used for trap names in cards and not-found lists */
         .tenet-pill {
             display: inline-block;
             font-size: 0.72em;
@@ -886,10 +958,32 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
             letter-spacing: 0.04em;
             text-transform: uppercase;
             color: #ffffff;
-            border-radius: 100px;
+            border-radius: 4px;
             padding: 3px 10px;
             white-space: nowrap;
             line-height: 1.5;
+        }
+        /* Region screenshot figure */
+        .issue-region-figure {
+            margin: 14px 0 10px;
+            border: 1px solid #e4e1dc;
+            border-radius: 6px;
+            overflow: hidden;
+            background: #f7f5f2;
+        }
+        .issue-region-img {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+        .issue-region-caption {
+            display: block;
+            padding: 6px 10px;
+            font-size: 0.78em;
+            color: #6b6764;
+            font-style: italic;
+            border-top: 1px solid #e4e1dc;
+            background: #f7f5f2;
         }
         .issue-meta {
             display: flex;
@@ -909,6 +1003,7 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
         .meta-severity.sev-moderate { color: #9a7000; }
         .meta-severity.sev-minor    { color: #2980b9; }
         .meta-confidence { color: #4a4744; }
+        .meta-trap-name { font-weight: 700; font-size: 0.82em; letter-spacing: 0.04em; color: #2c2a28; }
         .issue-section { margin: 10px 0 0; }
         .issue-section-label {
             font-size: 0.78em;
@@ -1257,37 +1352,70 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
     # Header
     html.append(f"<h1>UI Tenets &amp; Traps<br>Analysis Report</h1>")
 
-    # Design name/title
-    if user_context and user_context.get('design_name'):
-        html.append(f"<p style='font-size:1.05em;font-weight:600;color:#4a4744;letter-spacing:-0.2px;margin:6px 0 0;'>{user_context['design_name']}</p>")
-
     html.append(f"<p class='timestamp'>Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}</p>")
 
     # Evaluation Details
     if user_context:
-        html.append("<div class='context-section'>")
         html.append("<h2>Evaluation Details</h2>")
+        html.append("<div class='context-section'>")
         html.append("<div class='context-body'>")
-        if user_context.get('chat_context_used'):
-            html.append("<p class='chat-context-badge'>&#x21BA; Re-analyzed with chat clarifications</p>")
         if user_context.get('design_name'):
-            html.append(f"<p><strong>Name of analysis:</strong> {user_context['design_name']}</p>")
-        html.append(f"<p><strong>Users:</strong> {user_context.get('users', 'N/A')}</p>")
+            html.append(f"<p><strong>Interface evaluated:</strong> {user_context['design_name']}</p>")
+
+        # Strip leading "Target users: " prefix (it's now the label) and capitalize first letter
+        users_raw = user_context.get('users', 'N/A')
+        if users_raw.startswith('Target users: '):
+            users_raw = users_raw[len('Target users: '):]
+        if users_raw:
+            users_raw = users_raw[0].upper() + users_raw[1:]
+
+        users_desc, users_attrs = _parse_users_string(users_raw)
+        # Drop Frequency of use — not needed in the report summary
+        users_attrs = [(l, v) for l, v in users_attrs if l != 'Frequency of use']
+        html.append("<div class='users-detail'>")
+        html.append("<p class='users-detail-label'><strong>Intended users:</strong></p>")
+        html.append("<table class='users-table'>")
+        if users_desc:
+            html.append(f"<tr><td class='ut-label'>Description</td><td class='ut-value'>{users_desc}</td></tr>")
+        for label, value in users_attrs:
+            html.append(f"<tr><td class='ut-label'>{label}</td><td class='ut-value'>{value}</td></tr>")
+        if not users_desc and not users_attrs:
+            html.append(f"<tr><td class='ut-label'>Description</td><td class='ut-value'>{users_raw}</td></tr>")
+        html.append("</table>")
+        html.append("</div>")
 
         # Format tasks as bulleted list
         raw_tasks = user_context.get('tasks', 'N/A')
         task_list = parse_tasks(raw_tasks)
-        html.append("<p><strong>User's goal(s):</strong></p>")
+        html.append("<p><strong>Task(s) evaluated:</strong></p>")
         html.append("<ul>")
         for task in task_list:
             html.append(f"<li>{task}</li>")
         html.append("</ul>")
+
+        # When re-analyzed via chat, surface the user's instructions so overrides are visible
+        chat_content = user_context.get('chat_context_content', '')
+        if chat_content:
+            user_lines = []
+            for line in chat_content.split('\n'):
+                stripped = line.strip()
+                if stripped.startswith('User: '):
+                    user_lines.append(stripped[6:])
+            if user_lines:
+                html.append("<div class='chat-override-section'>")
+                html.append("<p class='chat-context-badge'>&#x21BA; Re-analyzed with chat instructions &mdash; the following overrides were applied to this analysis:</p>")
+                html.append("<ul class='chat-override-list'>")
+                for line in user_lines:
+                    html.append(f"<li>{line}</li>")
+                html.append("</ul>")
+                html.append("</div>")
+
         html.append("</div>")
         html.append("</div>")
 
     # Summary
-    html.append("<div class='summary-section'>")
     html.append("<h2>Summary of Findings</h2>")
+    html.append("<div class='summary-section'>")
     html.append("<div class='summary-inner'>")
 
     # Scorecard: high confidence = confidence:'high' only; low = 'medium'|'low'|missing + potentials
@@ -1482,10 +1610,15 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
         headline_text = _cap_terms(issue.get('headline', ''))
         if headline_text:
             html.append(f"<p class='issue-headline'>{headline_text}</p>")
-        # Meta row: "Severity: ● High | Confidence: High" — below headline
+        # Meta row: "Trap: NAME | Severity: ● High | Confidence: High" — below headline
         conf = issue.get('confidence', '')
         sev_label = {'critical': 'High', 'moderate': 'Moderate', 'minor': 'Low'}.get(severity_class, severity_class.title())
         html.append("<div class='issue-meta'>")
+        trap_name_display = issue.get('trap_name', '').upper()
+        if trap_name_display:
+            html.append(f"<span class='meta-label'>Trap:</span>")
+            html.append(f"<span class='meta-trap-name'>{trap_name_display}</span>")
+            html.append(f"<span class='meta-pipe'> | </span>")
         html.append(f"<span class='meta-label'>Severity:</span>")
         html.append(f"<span class='sev-dot sev-{severity_class}'></span>")
         html.append(f"<span class='meta-severity sev-{severity_class}'>{sev_label}</span>")
@@ -1500,6 +1633,15 @@ def format_report_as_html(report: Dict[str, Any], user_context: Dict[str, str] =
             html.append("<div class='issue-section'>")
             html.append(f"<p class='issue-section-body'>{problem_text}</p>")
             html.append("</div>")
+        # Region screenshot figure (between problem and recommendation)
+        region_b64 = issue.get('region_image_b64')
+        if region_b64:
+            caption = _cap_terms(issue.get('location', ''))
+            html.append("<figure class='issue-region-figure'>")
+            html.append(f"<img src='data:image/png;base64,{region_b64}' class='issue-region-img' alt='Screenshot detail showing the identified issue' />")
+            if caption:
+                html.append(f"<figcaption class='issue-region-caption'>{caption}</figcaption>")
+            html.append("</figure>")
         # Recommendation (keep label)
         rec_text = _cap_terms(issue.get('recommendation', ''))
         if rec_text:

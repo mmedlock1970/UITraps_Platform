@@ -231,8 +231,9 @@ export const App: React.FC = () => {
           html: result.report_html!,
           markdown: result.report_markdown,
           statistics: result.statistics,
-          originalContext: correctedContext,
+          originalContext: { ...prev.originalContext, ...correctedContext },
         } : prev);
+        setChatOpen(false);
 
         saveAnalysis({
           timestamp: new Date().toISOString(),

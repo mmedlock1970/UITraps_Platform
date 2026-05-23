@@ -117,7 +117,13 @@ export interface UserContext {
   design_name?: string;
   contentType?: ContentType;
   extra_context?: string;
+  product_context?: string;
+  physical_env?: string;
+  lighting?: string;
+  grip_position?: string;
+  attentional_state?: string;
   kb_version?: KbVersion;
+  tenet_filter?: string[];
 }
 
 export interface ReportStatistics {

@@ -267,10 +267,12 @@ class UITrapsAnalyzer:
         # Guarantee report completeness across KB versions: backfill the per-trap
         # "Could Not Evaluate" breakdown. This makes v1 and v2 reports symmetric.
         self._normalize_report_completeness(report, kb_version=kb_version)
+        self._crop_issue_regions(report, design_file)
 
         if chat_context and chat_context.strip():
             user_context = dict(user_context)
             user_context['chat_context_used'] = True
+            user_context['chat_context_content'] = chat_context.strip()
         markdown_report = format_report_as_markdown(report, user_context)
         html_report = format_report_as_html(report, user_context)
         statistics = get_report_statistics(report)
@@ -283,6 +285,39 @@ class UITrapsAnalyzer:
             "statistics": statistics,
             "status": "success"
         }
+
+    def _crop_issue_regions(self, report: Dict[str, Any], image_path: str) -> None:
+        """Crop region screenshots from the source image and attach as base64 to each issue."""
+        try:
+            from PIL import Image
+            import io
+            img = Image.open(image_path)
+            img_w, img_h = img.size
+            for severity in ['critical_issues', 'moderate_issues', 'minor_issues']:
+                for issue in report.get(severity, []):
+                    region = issue.get('region')
+                    if not region:
+                        continue
+                    try:
+                        x = max(0.0, min(1.0, float(region.get('x', 0))))
+                        y = max(0.0, min(1.0, float(region.get('y', 0))))
+                        w = max(0.01, min(1.0 - x, float(region.get('width', 0))))
+                        h = max(0.01, min(1.0 - y, float(region.get('height', 0))))
+                        # 15% padding on each side, clamped to image bounds
+                        pad_x, pad_y = w * 0.15, h * 0.15
+                        x1 = max(0, int((x - pad_x) * img_w))
+                        y1 = max(0, int((y - pad_y) * img_h))
+                        x2 = min(img_w, int((x + w + pad_x) * img_w))
+                        y2 = min(img_h, int((y + h + pad_y) * img_h))
+                        if x2 > x1 and y2 > y1:
+                            buf = io.BytesIO()
+                            img.crop((x1, y1, x2, y2)).save(buf, format='PNG', optimize=True)
+                            issue['region_image_b64'] = base64.standard_b64encode(buf.getvalue()).decode('utf-8')
+                    except Exception as crop_err:
+                        print(f"[UITraps] Region crop skipped ({issue.get('trap_name', '?')}): {crop_err}")
+            img.close()
+        except Exception as e:
+            print(f"[UITraps] Region crop unavailable: {e}")
 
     def _enrich_report(self, pass1_report: Dict[str, Any], timeout: int = 120, kb_version: str = "v2") -> Dict[str, Any]:
         """

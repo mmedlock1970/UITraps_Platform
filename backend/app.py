@@ -1876,6 +1876,12 @@ async def unified_ask(
     conversation_history: Optional[str] = Form(None),
     chat_context: Optional[str] = Form(None),
     extra_context: Optional[str] = Form(None),
+    product_context: Optional[str] = Form(None),
+    physical_env: Optional[str] = Form(None),
+    lighting: Optional[str] = Form(None),
+    grip_position: Optional[str] = Form(None),
+    attentional_state: Optional[str] = Form(None),
+    tenet_filter: Optional[str] = Form(None),
     design_name: Optional[str] = Form(None),
     kb_version: str = Form("v2"),
 ):
@@ -1962,7 +1968,7 @@ async def unified_ask(
                     tmp_path = tmp.name
                 logger.info(f"[/api/ask analysis] temp file written: {tmp_path}")
 
-                user_context = {"users": users, "tasks": tasks, "format": format, "content_type": content_type, "extra_context": extra_context or "", "design_name": design_name or ""}
+                user_context = {"users": users, "tasks": tasks, "format": format, "content_type": content_type, "extra_context": extra_context or "", "product_context": product_context or "", "physical_env": physical_env or "", "lighting": lighting or "", "grip_position": grip_position or "", "attentional_state": attentional_state or "", "tenet_filter": tenet_filter or "", "design_name": design_name or ""}
                 user_id = str(user.get("id") or user.get("userId", ""))
 
                 if kb_version == "both":
@@ -2004,6 +2010,7 @@ async def unified_ask(
                         "kb_version": "both",
                         "report_html_v1": result_v1.get("html"),
                         "report_html_v2": result_v2.get("html"),
+                        "report_markdown": result_v2.get("markdown"),
                         "statistics_v1": result_v1.get("statistics"),
                         "statistics_v2": result_v2.get("statistics"),
                     }
@@ -2054,7 +2061,7 @@ async def unified_ask(
                         tmp.write(content)
                         tmp_paths.append(tmp.name)
 
-                user_context = {"users": users, "tasks": tasks, "format": format, "content_type": content_type, "extra_context": extra_context or "", "design_name": design_name or ""}
+                user_context = {"users": users, "tasks": tasks, "format": format, "content_type": content_type, "extra_context": extra_context or "", "product_context": product_context or "", "physical_env": physical_env or "", "lighting": lighting or "", "grip_position": grip_position or "", "attentional_state": attentional_state or "", "tenet_filter": tenet_filter or "", "design_name": design_name or ""}
                 result = get_multi_analyzer().analyze_images(tmp_paths, user_context, chat_context=chat_context)
 
                 user_id = str(user.get("id") or user.get("userId", ""))

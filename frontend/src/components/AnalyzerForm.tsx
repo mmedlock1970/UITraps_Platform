@@ -22,13 +22,44 @@ function platformToContentType(platform: string, productDomain: string): Content
   return 'website';
 }
 
+const ALL_TENETS = [
+  'UNDERSTANDABLE', 'COMFORTABLE', 'RESPONSIVE',
+  'EFFICIENT',      'ACCURATE',    'PROTECTIVE',
+  'HABITUATING',    'BEAUTIFUL',
+] as const;
+
+const TENET_COLORS: Record<string, string> = {
+  UNDERSTANDABLE: '#2B4C6F',
+  COMFORTABLE:    '#D1492E',
+  RESPONSIVE:     '#E0AE22',
+  EFFICIENT:      '#AF1C66',
+  ACCURATE:       '#45A24C',
+  PROTECTIVE:     '#642FA1',
+  HABITUATING:    '#1F7DA8',
+  BEAUTIFUL:      '#E37209',
+};
+
+function tenetTextColor(_hex: string): string {
+  return '#ffffff';
+}
+
+function tenetLightBg(hex: string): string {
+  const r = Math.round(parseInt(hex.slice(1, 3), 16) * 0.10 + 255 * 0.90);
+  const g = Math.round(parseInt(hex.slice(3, 5), 16) * 0.10 + 255 * 0.90);
+  const b = Math.round(parseInt(hex.slice(5, 7), 16) * 0.10 + 255 * 0.90);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
 function assembleContext(fields: {
   platform: string; productDomain: string; screenName: string;
   expLevel: string; techSavvy: string; frequency: string; userGoal: string;
-  priorProducts: string; userDesc: string; extraContext: string; kbVersion: KbVersion;
+  priorProducts: string; userDesc: string; extraContext: string; productContext: string;
+  physicalEnv: string; lighting: string; gripPosition: string; attentionalState: string;
+  kbVersion: KbVersion; selectedTenets: string[];
 }): UserContext {
   const { platform, productDomain, screenName, expLevel, techSavvy,
-          frequency, userGoal, priorProducts, userDesc, extraContext, kbVersion } = fields;
+          frequency, userGoal, priorProducts, userDesc, extraContext, productContext,
+          physicalEnv, lighting, gripPosition, attentionalState, kbVersion, selectedTenets } = fields;
 
   const formatParts = [
     platform && productDomain ? `${platform} — ${productDomain}` : platform || productDomain,
@@ -40,8 +71,7 @@ function assembleContext(fields: {
     expLevel ? `Experience with product: ${expLevel}` : '',
     techSavvy ? `Tech savviness: ${techSavvy}` : '',
     frequency ? `Frequency of use: ${frequency}` : '',
-    userGoal ? `Outcome: ${userGoal}` : '',
-    priorProducts ? `Products they use regularly: ${priorProducts}` : '',
+    priorProducts ? `Experience with similar interfaces: ${priorProducts}` : '',
   ].filter(Boolean);
 
   const designName = screenName.trim() || undefined;
@@ -54,7 +84,13 @@ function assembleContext(fields: {
     design_name: designName || undefined,
     contentType: platformToContentType(platform, productDomain),
     extra_context: extraContext || undefined,
+    product_context: productContext || undefined,
+    physical_env: physicalEnv || undefined,
+    lighting: lighting || undefined,
+    grip_position: gripPosition || undefined,
+    attentional_state: attentionalState || undefined,
     kb_version: kbVersion,
+    tenet_filter: selectedTenets.length > 0 ? selectedTenets : undefined,
   };
 }
 
@@ -74,6 +110,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
   const [screenName, setScreenName] = useState('');
   const [platform, setPlatform] = useState('');
   const [productDomain, setProductDomain] = useState('');
+  const [productContext, setProductContext] = useState('');
   const [isDragover, setIsDragover] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -85,9 +122,24 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
   const [userDesc, setUserDesc] = useState('');
   const [priorProducts, setPriorProducts] = useState('');
 
-  // Card 4 — Analysis Scope
+  // Card 3 — Use Environment
+  const [physicalEnv, setPhysicalEnv] = useState('');
+  const [lighting, setLighting] = useState('');
+  const [gripPosition, setGripPosition] = useState('');
+  const [attentionalState, setAttentionalState] = useState('');
+
+  // Card 4 — Additional Context
   const [extraContext, setExtraContext] = useState('');
+
+  // Card 5 — Analysis Scope
   const [kbVersion, setKbVersion] = useState<KbVersion>('v2');
+  const [selectedTenets, setSelectedTenets] = useState<string[]>([]);
+
+  const toggleTenet = useCallback((tenet: string) => {
+    setSelectedTenets(prev =>
+      prev.includes(tenet) ? prev.filter(t => t !== tenet) : [...prev, tenet]
+    );
+  }, []);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -117,10 +169,12 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
     if (disabled) return;
     if (!validate()) return;
     const context = assembleContext({ platform, productDomain, screenName,
-      expLevel, techSavvy, frequency, userGoal, priorProducts, userDesc, extraContext, kbVersion });
+      expLevel, techSavvy, frequency, userGoal, priorProducts, userDesc, extraContext, productContext,
+      physicalEnv, lighting, gripPosition, attentionalState, kbVersion, selectedTenets });
     onSubmit({ files, url, context });
   }, [disabled, validate, files, url, platform, productDomain, screenName,
-      expLevel, techSavvy, frequency, userGoal, priorProducts, userDesc, extraContext, kbVersion, onSubmit]);
+      expLevel, techSavvy, frequency, userGoal, priorProducts, userDesc, extraContext, productContext,
+      physicalEnv, lighting, gripPosition, attentionalState, kbVersion, selectedTenets, onSubmit]);
 
   const handleFileChange = useCallback((newFiles: FileList | null) => {
     if (!newFiles || newFiles.length === 0) return;
@@ -163,7 +217,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
           <div className={styles.field}>
             <label className={styles.fieldLabel} htmlFor="screenName">
               <span className={styles.req} />
-              Provide a name for what is being analyzed
+              Name the interface being evaluated
             </label>
             <input
               id="screenName"
@@ -180,7 +234,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
           <div className={styles.field}>
             <label className={styles.fieldLabel}>
               <span className={styles.req} />
-              Upload screenshots
+              Upload screenshots or provide a link
             </label>
             <div
               className={`${styles.uploadZone} ${isDragover ? styles.uploadZoneDragover : ''} ${files.length > 0 ? styles.uploadZoneActive : ''}`}
@@ -232,14 +286,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
                 </>
               )}
             </div>
-            {errors.upload && <p className={styles.fieldError}>{errors.upload}</p>}
-          </div>
-
-          <div className={styles.field}>
-            <label className={styles.fieldLabel} htmlFor="urlInput">
-              Live URL or Figma link
-              <span className={styles.opt}>alternative to upload</span>
-            </label>
+            <div className={styles.uploadDivider}>or paste a live URL or Figma file link</div>
             <input
               id="urlInput"
               type="url"
@@ -249,6 +296,25 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
               onChange={e => setUrl(e.target.value)}
               disabled={disabled}
             />
+            {errors.upload && <p className={styles.fieldError}>{errors.upload}</p>}
+          </div>
+
+          {/* Product context */}
+          <div className={styles.field}>
+            <label className={styles.fieldLabel} htmlFor="productContext">
+              Describe the general purpose of this product
+              <span className={styles.opt}>optional</span>
+            </label>
+            <input
+              id="productContext"
+              type="text"
+              className={styles.input}
+              placeholder="e.g., Hospital website, retail mobile app, banking dashboard, B2B SaaS tool"
+              value={productContext}
+              onChange={e => setProductContext(e.target.value)}
+              disabled={disabled}
+            />
+            <p className={styles.fieldHint}>Helps calibrate findings and recommendations to the product's broader purpose — not just the task being evaluated.</p>
           </div>
 
           <div className={`${styles.fieldGrid} ${styles.twoCol}`}>
@@ -338,47 +404,27 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
 
           <div className={styles.callout}>
             <strong>Why this matters</strong>
-            Many Traps are only detectable when we understand what users already know,
-            what conventions they have learned from other products, and what they are
-            trying to accomplish. The more precisely you describe the user, the more
-            accurate the analysis.
+            Many Traps are only visible when we know what users already understand and what they are trying to do.
+            The more precisely you describe the user, the more accurate the analysis.
           </div>
 
           <div className={`${styles.fieldGrid} ${styles.twoCol}`}>
 
             <div className={`${styles.field} ${styles.span2}`}>
               <label className={styles.fieldLabel} htmlFor="userDesc">
-                Describe the target users
+                Describe the intended users of this interface
                 <span className={styles.opt}>optional</span>
               </label>
-              <textarea
+              <input
                 id="userDesc"
-                className={styles.textarea}
-                rows={2}
+                type="text"
+                className={styles.input}
                 placeholder="e.g., Adults 55+, low tech confidence, first smartphone users. Or: Healthcare professionals, clinical setting, time-pressured."
                 value={userDesc}
                 onChange={e => setUserDesc(e.target.value)}
                 disabled={disabled}
               />
               <p className={styles.fieldHint}>Age, occupation, cognitive load, accessibility needs, domain expertise — anything relevant to how they'll interact with this UI.</p>
-            </div>
-
-            <div className={`${styles.field} ${styles.span2}`}>
-              <label className={styles.fieldLabel} htmlFor="userGoal">
-                <span className={styles.req} />
-                Outcome the user is trying to achieve
-              </label>
-              <input
-                id="userGoal"
-                type="text"
-                className={`${styles.input} ${errors.userGoal ? styles.inputError : ''}`}
-                placeholder="e.g., Complete a purchase, Find and book a flight, Set up smart home routines"
-                value={userGoal}
-                onChange={e => setUserGoal(e.target.value)}
-                disabled={disabled}
-              />
-              {errors.userGoal && <p className={styles.fieldError}>{errors.userGoal}</p>}
-              <p className={styles.fieldHint}>The specific outcome most users are trying to achieve when they reach this screen or flow.</p>
             </div>
 
             <div className={styles.field}>
@@ -429,7 +475,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
             <div className={styles.field}>
               <label className={styles.fieldLabel} htmlFor="frequency">
                 <span className={styles.req} />
-                How often do users interact with this?
+                How often will users interact with this product?
               </label>
               <select
                 id="frequency"
@@ -449,85 +495,229 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
               {errors.frequency && <p className={styles.fieldError}>{errors.frequency}</p>}
             </div>
 
-            <div className={`${styles.field} ${styles.span2}`}>
+            <div className={styles.field}>
               <label className={styles.fieldLabel} htmlFor="priorProducts">
-                Products this user population uses regularly
+                Experience with similar interfaces
                 <span className={styles.opt}>optional</span>
               </label>
-              <textarea
+              <select
                 id="priorProducts"
-                className={styles.textarea}
-                rows={2}
-                placeholder="e.g., iPhone, Gmail, Amazon, Spotify — or for specialist tools: Salesforce, Epic, AutoCAD"
+                className={styles.select}
                 value={priorProducts}
                 onChange={e => setPriorProducts(e.target.value)}
                 disabled={disabled}
+              >
+                <option value="">— Select one —</option>
+                <option value="none">None — this type of product is new to them</option>
+                <option value="limited">Limited — used one or two similar products briefly</option>
+                <option value="some">Some — regular user of a comparable product</option>
+                <option value="extensive">Extensive — power user of similar products</option>
+                <option value="professional">Professional — expert-level familiarity with this category</option>
+              </select>
+            </div>
+
+            <div className={`${styles.field} ${styles.span2}`}>
+              <label className={styles.fieldLabel} htmlFor="userGoal">
+                <span className={styles.req} />
+                Describe the user task(s) to focus on in this analysis
+              </label>
+              <input
+                id="userGoal"
+                type="text"
+                className={`${styles.input} ${errors.userGoal ? styles.inputError : ''}`}
+                placeholder="e.g., Complete a purchase, Find and book a flight, Set up smart home routines"
+                value={userGoal}
+                onChange={e => setUserGoal(e.target.value)}
+                disabled={disabled}
               />
-              <p className={styles.fieldHint}>This establishes which icons, conventions, and interaction patterns users have already learned.</p>
+              {errors.userGoal && <p className={styles.fieldError}>{errors.userGoal}</p>}
+              <p className={styles.fieldHint}>The specific outcome most users are trying to achieve when they reach this screen or flow.</p>
             </div>
 
           </div>
         </div>
       </div>
 
-      {/* ── Card 3: Use Environment — COMING SOON ── */}
-      <div className={`${styles.card} ${styles.cardComingSoon}`}>
+      {/* ── Card 3: Use Environment ── */}
+      <div className={styles.card}>
         <div className={styles.cardHeader}>
           <div className={styles.cardNum}>3</div>
           <div className={styles.cardHeaderText}>
             <h2>Use Environment</h2>
             <p>Where and how will this interface be used?</p>
           </div>
-          <span className={styles.comingSoonBadge}>Coming soon</span>
         </div>
         <div className={styles.cardBody}>
+          <div className={styles.callout}>
+            <strong>Why this matters</strong>
+            The context of use — where users are, what else they're doing, and how much attention they can give the interface —
+            shapes which risks are real and how severe they are. The more detail you provide, the sharper the analysis.
+          </div>
           <div className={`${styles.fieldGrid} ${styles.twoCol}`}>
             <div className={styles.field}>
-              <label className={styles.fieldLabel}>Physical environment</label>
-              <select className={styles.select} disabled defaultValue=""><option value="" disabled>Select one</option></select>
+              <label className={styles.fieldLabel} htmlFor="physicalEnv">
+                Physical environment
+                <span className={styles.opt}>optional</span>
+              </label>
+              <select
+                id="physicalEnv"
+                className={styles.select}
+                value={physicalEnv}
+                onChange={e => setPhysicalEnv(e.target.value)}
+                disabled={disabled}
+              >
+                <option value="">— Select one —</option>
+                <option value="desk">At a desk or workstation</option>
+                <option value="stationary">Stationary but away from a desk (couch, café, waiting area)</option>
+                <option value="moving">On the go — walking, commuting, or in transit</option>
+                <option value="vehicle">In a vehicle (as a passenger)</option>
+                <option value="outdoor">Outdoors or in variable conditions</option>
+              </select>
             </div>
             <div className={styles.field}>
-              <label className={styles.fieldLabel}>Lighting conditions</label>
-              <select className={styles.select} disabled defaultValue=""><option value="" disabled>Select one</option></select>
+              <label className={styles.fieldLabel} htmlFor="lighting">
+                Lighting conditions
+                <span className={styles.opt}>optional</span>
+              </label>
+              <select
+                id="lighting"
+                className={styles.select}
+                value={lighting}
+                onChange={e => setLighting(e.target.value)}
+                disabled={disabled}
+              >
+                <option value="">— Select one —</option>
+                <option value="well_lit">Well lit — consistent indoor lighting</option>
+                <option value="variable">Variable or mixed lighting</option>
+                <option value="bright">Bright sunlight or significant glare</option>
+                <option value="low_light">Low light or dim environment</option>
+              </select>
             </div>
             <div className={styles.field}>
-              <label className={styles.fieldLabel}>Typical grip / body position</label>
-              <select className={styles.select} disabled defaultValue=""><option value="" disabled>Select one</option></select>
+              <label className={styles.fieldLabel} htmlFor="gripPosition">
+                Typical grip / body position
+                <span className={styles.opt}>optional</span>
+              </label>
+              <select
+                id="gripPosition"
+                className={styles.select}
+                value={gripPosition}
+                onChange={e => setGripPosition(e.target.value)}
+                disabled={disabled}
+              >
+                <option value="">— Select one —</option>
+                <option value="keyboard">Both hands on a keyboard (desktop or laptop)</option>
+                <option value="one_hand">One hand holding device, other hand interacting</option>
+                <option value="two_hands_thumbs">Two hands holding device, thumbs for input</option>
+                <option value="flat">Device resting flat on a surface</option>
+                <option value="hands_free">Hands-free — voice, mounted display, or kiosk</option>
+              </select>
+            </div>
+            <div className={styles.field}>
+              <label className={styles.fieldLabel} htmlFor="attentionalState">
+                Typically, how focused are users on this interface?
+                <span className={styles.opt}>optional</span>
+              </label>
+              <select
+                id="attentionalState"
+                className={styles.select}
+                value={attentionalState}
+                onChange={e => setAttentionalState(e.target.value)}
+                disabled={disabled}
+              >
+                <option value="">— Select one —</option>
+                <option value="fully_focused">Fully focused — this is their only active task</option>
+                <option value="mostly_focused">Mostly focused, but in a distracting setting</option>
+                <option value="divided">Divided — managing this alongside something else</option>
+                <option value="peripheral">Mostly elsewhere — this interface is a secondary task</option>
+              </select>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── Card 4: Analysis Scope ── */}
+      {/* ── Card 4: Additional Context ── */}
       <div className={styles.card}>
         <div className={styles.cardHeader}>
           <div className={styles.cardNum}>4</div>
           <div className={styles.cardHeaderText}>
+            <h2>Additional Context</h2>
+            <p>Anything else that would help calibrate the analysis.</p>
+          </div>
+        </div>
+        <div className={styles.cardBody}>
+          <div className={styles.field}>
+            <label className={styles.fieldLabel} htmlFor="extraContext">
+              Add any additional context
+              <span className={styles.opt}>optional</span>
+            </label>
+            <input
+              id="extraContext"
+              type="text"
+              className={styles.input}
+              placeholder="Known technical constraints, recent design changes, specific hypotheses to test, competitive context — anything that would help calibrate the analysis."
+              value={extraContext}
+              onChange={e => setExtraContext(e.target.value)}
+              disabled={disabled}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* ── Card 5: Analysis Scope ── */}
+      <div className={styles.card}>
+        <div className={styles.cardHeader}>
+          <div className={styles.cardNum}>5</div>
+          <div className={styles.cardHeaderText}>
             <h2>Analysis Scope</h2>
-            <p>Focus the analysis or run it across all Tenets.</p>
+            <p>Narrow to specific Tenets for a faster result, or leave all selected for a complete review.</p>
           </div>
         </div>
         <div className={styles.cardBody}>
 
-          {/* Tenet grid — coming soon */}
-          <div style={{ opacity: 0.4, pointerEvents: 'none', userSelect: 'none' }}>
-            <div className={styles.field}>
-              <label className={styles.fieldLabel}>
-                <span className={styles.req} />
-                Tenets to analyze
-                <span className={styles.comingSoonBadge}>Coming soon</span>
-              </label>
-              <p className={styles.fieldHint}>Select specific Tenets to focus the analysis, or keep all selected for a full review.</p>
+          {/* Tenet selector */}
+          <div className={styles.field}>
+            <label className={styles.fieldLabel}>Tenets to analyze</label>
+            <p className={styles.fieldHint} style={{ marginBottom: 10 }}>
+              {selectedTenets.length === 0
+                ? 'All nine Tenets will be evaluated (default).'
+                : `Focusing on ${selectedTenets.length} Tenet${selectedTenets.length > 1 ? 's' : ''}: ${selectedTenets.join(', ')}.`}
+            </p>
+            <div className={styles.tenetGrid}>
+              {ALL_TENETS.map(tenet => (
+                <button
+                  key={tenet}
+                  type="button"
+                  className={`${styles.tenetBtn} ${selectedTenets.includes(tenet) ? styles.tenetBtnActive : ''}`}
+                  style={{
+                    '--tenet-color': TENET_COLORS[tenet],
+                    '--tenet-text': tenetTextColor(TENET_COLORS[tenet]),
+                    '--tenet-bg-light': tenetLightBg(TENET_COLORS[tenet]),
+                  } as React.CSSProperties}
+                  onClick={() => toggleTenet(tenet)}
+                  disabled={disabled}
+                >
+                  {tenet}
+                </button>
+              ))}
             </div>
+            {selectedTenets.length > 0 && (
+              <button
+                type="button"
+                className={styles.tenetClearBtn}
+                onClick={() => setSelectedTenets([])}
+                disabled={disabled}
+              >
+                Clear — analyze all Tenets
+              </button>
+            )}
           </div>
 
           <hr className={styles.fieldDivider} />
 
           {/* Knowledge base version selector */}
           <div className={styles.field}>
-            <label className={styles.fieldLabel}>
-              Knowledge base version
-            </label>
+            <label className={styles.fieldLabel}>Knowledge base version</label>
             <div className={styles.kbVersionGroup}>
               {(['v2', 'v1', 'both'] as KbVersion[]).map(v => (
                 <button
@@ -546,25 +736,6 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
               {kbVersion === 'v1' && 'Previous knowledge engine.'}
               {kbVersion === 'both' && 'Runs two parallel analyses — one with each engine. Results are shown side-by-side with a toggle. Takes roughly twice as long.'}
             </p>
-          </div>
-
-          <hr className={styles.fieldDivider} />
-
-          {/* Extra context — ACTIVE */}
-          <div className={styles.field}>
-            <label className={styles.fieldLabel} htmlFor="extraContext">
-              Additional context
-              <span className={styles.opt}>optional</span>
-            </label>
-            <textarea
-              id="extraContext"
-              className={styles.textarea}
-              rows={3}
-              placeholder="Known technical constraints, recent design changes, specific hypotheses to test, competitive context — anything that would help calibrate the analysis."
-              value={extraContext}
-              onChange={e => setExtraContext(e.target.value)}
-              disabled={disabled}
-            />
           </div>
 
         </div>
