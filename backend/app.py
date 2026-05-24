@@ -42,6 +42,7 @@ from src.video_processor import is_ffmpeg_available, VideoProcessor
 
 # Figma, Web Crawler, Site Analyzer, and PDF Analyzer
 from src.figma_analyzer import FigmaAnalyzer
+from src.formatters import format_report_as_html, get_report_statistics
 from src.web_crawler import WebCrawler
 from src.site_analyzer import SiteAnalyzer
 from src.pdf_analyzer import PdfAnalyzer, is_pymupdf_available
@@ -1872,6 +1873,9 @@ async def unified_ask(
     pass1_model: Optional[str] = Form(None),
     thorough_mode: Optional[str] = Form(None),
     task_list: Optional[str] = Form(None),
+    input_type: Optional[str] = Form(None),
+    flow_mode: Optional[str] = Form(None),
+    figma_url: Optional[str] = Form(None),
 ):
     """
     Unified endpoint: auto-routes to analysis, chat, or hybrid based on input.
@@ -1946,6 +1950,105 @@ async def unified_ask(
                     _task_list_parsed = []
             except (json.JSONDecodeError, TypeError):
                 _task_list_parsed = []
+
+        _input_type = input_type or 'screenshot'
+        _flow_mode = flow_mode or 'screen'
+        _is_flow_diagram = _input_type == 'flow_diagram'
+
+        # ── Figma URL flow path ──────────────────────────────────────────────
+        if _is_flow_diagram and figma_url and figma_url.strip():
+            if not is_figma_available():
+                raise HTTPException(
+                    status_code=503,
+                    detail="Figma analysis not available. FIGMA_TOKEN not configured."
+                )
+            try:
+                with tempfile.TemporaryDirectory() as _tmp_dir:
+                    _figma = FigmaAnalyzer()
+                    _file_key, _ = _figma.parse_figma_url(figma_url.strip())
+                    _cached = get_cached_figma_data(_file_key)
+                    _figma_result = _figma.analyze_figma_file(
+                        figma_url.strip(), _tmp_dir,
+                        cached_file_data=_cached,
+                        max_frames=10
+                    )
+                    _frames = _figma_result['frames']
+                    _flows = _figma_result['flows']
+
+                    from src.figma_analyzer import build_flow_map
+                    _flow_map = build_flow_map(_frames, _flows)
+
+                    _fctx = {
+                        "users": users,
+                        "tasks": tasks,
+                        "format": format,
+                        "content_type": content_type,
+                        "extra_context": extra_context or "",
+                        "product_context": product_context or "",
+                        "tenet_filter": tenet_filter or "",
+                        "design_name": design_name or "",
+                        "task_list": _task_list_parsed,
+                    }
+                    _flow_analyzer = UITrapsAnalyzer()
+                    _report_dict = _flow_analyzer.analyze_flow_diagram(
+                        frames=_frames,
+                        flow_map=_flow_map,
+                        user_context=_fctx,
+                        mode=_flow_mode,
+                        kb_version=kb_version,
+                        verbosity=verbosity,
+                        pass1_model=pass1_model,
+                    )
+                    for _opt in ['critical_issues', 'moderate_issues', 'minor_issues',
+                                 'positive_observations', 'potential_issues',
+                                 'traps_checked_not_found', 'flagged_for_human_review',
+                                 'incomplete_flow_findings']:
+                        if not isinstance(_report_dict.get(_opt), list):
+                            _report_dict[_opt] = []
+                    _flow_analyzer._normalize_report_completeness(_report_dict, kb_version=kb_version)
+
+                    _analysis_settings = {
+                        'verbosity': verbosity,
+                        'pass1_model': pass1_model,
+                        'kb_version': kb_version,
+                        'elapsed_seconds': 0,
+                        'thorough_mode': False,
+                    }
+                    _html = format_report_as_html(_report_dict, _fctx, analysis_settings=_analysis_settings)
+                    _stats = get_report_statistics(_report_dict)
+
+                    return {
+                        "success": True,
+                        "mode": "analysis",
+                        "report_html": _html,
+                        "statistics": _stats,
+                        "kb_version": kb_version,
+                    }
+            except HTTPException:
+                raise
+            except Exception as _e:
+                logger.error(f"Flow Figma analysis error: {_e}")
+                raise HTTPException(status_code=500, detail=f"Flow analysis failed: {str(_e)}")
+
+        # ── Image flow path: prepend flow preamble to extra_context ──────────
+        if _is_flow_diagram:
+            _flow_preamble = (
+                "FLOW DIAGRAM INPUT:\n"
+                "The uploaded image contains a multi-screen flow diagram. "
+                "Read the connecting arrows to understand the navigation structure between screens."
+            )
+            if _flow_mode == 'flow':
+                _flow_preamble += (
+                    " Then evaluate the journey end-to-end. Focus on traps that only manifest "
+                    "across multiple steps: UNNECESSARY STEPS, MEMORY CHALLENGE, SYSTEM AMNESIA, "
+                    "FEEDBACK FAILURE at transitions, AMBIGUOUS HOME. Per-screen traps are "
+                    "secondary — flag them only if clearly severe."
+                )
+            else:
+                _flow_preamble += (
+                    " Then analyze each screen for traps using its position in the flow as context."
+                )
+            extra_context = (_flow_preamble + '\n' + (extra_context or '')).strip()
 
         # Determine single vs multi image
         if len(files) == 1:
