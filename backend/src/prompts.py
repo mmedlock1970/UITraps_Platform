@@ -1024,6 +1024,7 @@ You will submit your analysis using the ui_analysis_report tool with all require
 def build_user_message(
     user_context: dict,
     image_data: dict = None,
+    image_data_list: list = None,
     page_context: dict = None,
     is_video_analysis: bool = False,
     is_multi_frame: bool = False,
@@ -1403,8 +1404,10 @@ Begin your analysis now."""
     # Build message content
     content = []
 
-    # Add image first if provided (Claude processes images before text)
-    if image_data:
+    # Add images first (Claude processes images before text)
+    if image_data_list:
+        content.extend(image_data_list)
+    elif image_data:
         content.append(image_data)
 
     # Add the context and instructions
@@ -1414,6 +1417,54 @@ Begin your analysis now."""
     })
 
     return content
+
+
+def build_flow_context_section(
+    flow_context: dict = None,
+    flow_summary: str = None,
+    mode: str = 'screen',
+) -> str:
+    """
+    Build the FLOW CONTEXT or FLOW ANALYSIS prompt injection.
+
+    Args:
+        flow_context:  Per-frame dict {name, reached_from, leads_to} — for screen mode
+        flow_summary:  Complete flow summary string — for flow mode
+        mode:          'screen' or 'flow'
+    """
+    if mode == 'flow' and flow_summary:
+        return (
+            "\nFLOW ANALYSIS:\n"
+            "You are analyzing a complete user flow, not individual screens.\n"
+            f"{flow_summary}\n\n"
+            "Evaluate the journey end-to-end. Focus on traps that only manifest "
+            "across multiple steps: UNNECESSARY STEPS, MEMORY CHALLENGE, SYSTEM "
+            "AMNESIA, FEEDBACK FAILURE at transitions, AMBIGUOUS HOME. Per-screen "
+            "traps are secondary — flag them only if clearly severe.\n"
+        )
+
+    if mode == 'screen' and flow_context:
+        reached = '\n'.join(
+            f"  - Reached from: {r['screen']} via {r['via']}"
+            for r in flow_context.get('reached_from', [])
+        )
+        leads = '\n'.join(
+            f"  - Leads to: {l['screen']} via {l['via']}"
+            for l in flow_context.get('leads_to', [])
+        )
+        lines = '\n'.join(filter(None, [reached, leads]))
+        if not lines:
+            lines = "  - No connected screens detected in prototype data"
+        return (
+            "\nFLOW CONTEXT:\n"
+            "This screen sits within a multi-screen flow.\n"
+            f"{lines}\n\n"
+            "Analyze this screen for traps. Use the flow context to inform your "
+            "findings — an element that appears ambiguous in isolation may be clear "
+            "given where the user came from, or vice versa.\n"
+        )
+
+    return ''
 
 
 def build_figma_message(user_context: dict, figma_url: str) -> list:
