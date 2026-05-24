@@ -1871,6 +1871,7 @@ async def unified_ask(
     verbosity: str = Form("standard"),
     pass1_model: Optional[str] = Form(None),
     thorough_mode: Optional[str] = Form(None),
+    task_list: Optional[str] = Form(None),
 ):
     """
     Unified endpoint: auto-routes to analysis, chat, or hybrid based on input.
@@ -1937,6 +1938,15 @@ async def unified_ask(
                 detail="Analysis requires context. Please provide users, tasks, and format descriptions.",
             )
 
+        _task_list_parsed = []
+        if task_list:
+            try:
+                _task_list_parsed = json.loads(task_list)
+                if not isinstance(_task_list_parsed, list):
+                    _task_list_parsed = []
+            except (json.JSONDecodeError, TypeError):
+                _task_list_parsed = []
+
         # Determine single vs multi image
         if len(files) == 1:
             image = files[0]
@@ -1955,7 +1965,7 @@ async def unified_ask(
                     tmp_path = tmp.name
                 logger.info(f"[/api/ask analysis] temp file written: {tmp_path}")
 
-                user_context = {"users": users, "tasks": tasks, "format": format, "content_type": content_type, "extra_context": extra_context or "", "product_context": product_context or "", "physical_env": physical_env or "", "lighting": lighting or "", "grip_position": grip_position or "", "attentional_state": attentional_state or "", "tenet_filter": tenet_filter or "", "design_name": design_name or ""}
+                user_context = {"users": users, "tasks": tasks, "format": format, "content_type": content_type, "extra_context": extra_context or "", "product_context": product_context or "", "physical_env": physical_env or "", "lighting": lighting or "", "grip_position": grip_position or "", "attentional_state": attentional_state or "", "tenet_filter": tenet_filter or "", "design_name": design_name or "", "task_list": _task_list_parsed}
                 user_id = str(user.get("id") or user.get("userId", ""))
 
                 if kb_version == "both":
@@ -2054,7 +2064,7 @@ async def unified_ask(
                         tmp.write(content)
                         tmp_paths.append(tmp.name)
 
-                user_context = {"users": users, "tasks": tasks, "format": format, "content_type": content_type, "extra_context": extra_context or "", "product_context": product_context or "", "physical_env": physical_env or "", "lighting": lighting or "", "grip_position": grip_position or "", "attentional_state": attentional_state or "", "tenet_filter": tenet_filter or "", "design_name": design_name or ""}
+                user_context = {"users": users, "tasks": tasks, "format": format, "content_type": content_type, "extra_context": extra_context or "", "product_context": product_context or "", "physical_env": physical_env or "", "lighting": lighting or "", "grip_position": grip_position or "", "attentional_state": attentional_state or "", "tenet_filter": tenet_filter or "", "design_name": design_name or "", "task_list": _task_list_parsed}
                 result = get_multi_analyzer().analyze_images(tmp_paths, user_context, chat_context=chat_context)
 
                 user_id = str(user.get("id") or user.get("userId", ""))
