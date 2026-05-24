@@ -1985,6 +1985,10 @@ async def unified_ask(
                         "content_type": content_type,
                         "extra_context": extra_context or "",
                         "product_context": product_context or "",
+                        "physical_env": physical_env or "",
+                        "lighting": lighting or "",
+                        "grip_position": grip_position or "",
+                        "attentional_state": attentional_state or "",
                         "tenet_filter": tenet_filter or "",
                         "design_name": design_name or "",
                         "task_list": _task_list_parsed,
@@ -2005,7 +2009,6 @@ async def unified_ask(
                                  'incomplete_flow_findings']:
                         if not isinstance(_report_dict.get(_opt), list):
                             _report_dict[_opt] = []
-                    _flow_analyzer._normalize_report_completeness(_report_dict, kb_version=kb_version)
 
                     _analysis_settings = {
                         'verbosity': verbosity,

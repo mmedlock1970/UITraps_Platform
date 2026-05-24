@@ -493,6 +493,8 @@ class UITrapsAnalyzer:
             if not isinstance(merged.get(_opt), list):
                 merged[_opt] = []
 
+        self._normalize_report_completeness(merged, kb_version=kb_version)
+
         try:
             merged = self._enrich_report(merged, timeout=timeout, kb_version=kb_version, verbosity=verbosity)
         except Exception as e:

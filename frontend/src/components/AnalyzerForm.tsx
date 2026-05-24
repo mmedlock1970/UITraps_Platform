@@ -110,7 +110,7 @@ function assembleContext(fields: {
     pass1_model: pass1Model,
     thorough_mode: thoroughMode || undefined,
     input_type: inputType,
-    flow_mode: flowMode,
+    flow_mode: inputType === 'flow_diagram' ? flowMode : undefined,
     figma_url: (figmaLink.trim() && inputType === 'flow_diagram') ? figmaLink.trim() : undefined,
   };
 }
