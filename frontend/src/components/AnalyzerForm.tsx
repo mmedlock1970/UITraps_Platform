@@ -51,7 +51,7 @@ function tenetLightBg(hex: string): string {
 
 function assembleContext(fields: {
   platform: string; productDomain: string; screenName: string;
-  expLevel: string; techSavvy: string; frequency: string; userGoal: string;
+  expLevel: string; techSavvy: string; frequency: string; taskList: Array<{ name: string; description: string }>;
   priorProducts: string; userDesc: string; extraContext: string; productContext: string;
   physicalEnv: string; lighting: string; gripPosition: string; attentionalState: string;
   kbVersion: KbVersion; selectedTenets: string[];
@@ -59,7 +59,7 @@ function assembleContext(fields: {
   figmaLink: string; thoroughMode: boolean;
 }): UserContext {
   const { platform, productDomain, screenName, expLevel, techSavvy,
-          frequency, userGoal, priorProducts, userDesc, extraContext, productContext,
+          frequency, taskList, priorProducts, userDesc, extraContext, productContext,
           physicalEnv, lighting, gripPosition, attentionalState, kbVersion, selectedTenets,
           verbosity, pass1Model, figmaLink, thoroughMode } = fields;
 
@@ -86,7 +86,13 @@ function assembleContext(fields: {
   return {
     users: userParts.join('. '),
     expertise: `${expLevel}${techSavvy ? ` / ${techSavvy}` : ''}`,
-    tasks: userGoal,
+    tasks: taskList
+      .filter(t => t.description.trim())
+      .map(t => (t.name.trim() ? `${t.name}: ${t.description}` : t.description))
+      .join('. '),
+    task_list: taskList.filter(t => t.description.trim()).length > 1
+      ? taskList.filter(t => t.description.trim())
+      : undefined,
     format: formatParts.join('. '),
     design_name: designName || undefined,
     contentType: platformToContentType(platform, productDomain),
@@ -128,7 +134,9 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
   const [expLevel, setExpLevel] = useState('');
   const [techSavvy, setTechSavvy] = useState('');
   const [frequency, setFrequency] = useState('');
-  const [userGoal, setUserGoal] = useState('');
+  const [tasks, setTasks] = useState<Array<{ name: string; description: string }>>([
+    { name: '', description: '' },
+  ]);
   const [userDesc, setUserDesc] = useState('');
   const [priorProducts, setPriorProducts] = useState('');
 
@@ -154,6 +162,18 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
     );
   }, []);
 
+  const addTask = useCallback(() => {
+    setTasks(prev => prev.length < 3 ? [...prev, { name: '', description: '' }] : prev);
+  }, []);
+
+  const removeTask = useCallback((index: number) => {
+    setTasks(prev => prev.length > 1 ? prev.filter((_, i) => i !== index) : prev);
+  }, []);
+
+  const updateTask = useCallback((index: number, field: 'name' | 'description', value: string) => {
+    setTasks(prev => prev.map((t, i) => i === index ? { ...t, [field]: value } : t));
+  }, []);
+
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Create and revoke object URLs for image thumbnails
@@ -172,22 +192,22 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
     if (!expLevel) e.expLevel = 'Required';
     if (!techSavvy) e.techSavvy = 'Required';
     if (!frequency) e.frequency = 'Required';
-    if (!userGoal.trim()) e.userGoal = 'Required';
+    if (!tasks[0]?.description.trim()) e.userGoal = 'Required';
     setErrors(e);
     return Object.keys(e).length === 0;
-  }, [files, screenName, platform, productDomain, expLevel, techSavvy, frequency, userGoal]);
+  }, [files, screenName, platform, productDomain, expLevel, techSavvy, frequency, tasks]);
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (disabled) return;
     if (!validate()) return;
     const context = assembleContext({ platform, productDomain, screenName,
-      expLevel, techSavvy, frequency, userGoal, priorProducts, userDesc, extraContext, productContext,
+      expLevel, techSavvy, frequency, taskList: tasks, priorProducts, userDesc, extraContext, productContext,
       physicalEnv, lighting, gripPosition, attentionalState, kbVersion, selectedTenets,
       verbosity, pass1Model, figmaLink, thoroughMode });
     onSubmit({ files, context });
   }, [disabled, validate, files, figmaLink, platform, productDomain, screenName,
-      expLevel, techSavvy, frequency, userGoal, priorProducts, userDesc, extraContext, productContext,
+      expLevel, techSavvy, frequency, tasks, priorProducts, userDesc, extraContext, productContext,
       physicalEnv, lighting, gripPosition, attentionalState, kbVersion, selectedTenets,
       verbosity, pass1Model, thoroughMode, onSubmit]);
 
@@ -532,21 +552,60 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
             </div>
 
             <div className={`${styles.field} ${styles.span2}`}>
-              <label className={styles.fieldLabel} htmlFor="userGoal">
+              <label className={styles.fieldLabel}>
                 <span className={styles.req} />
-                Describe the user task(s) to focus on in this analysis
+                User task(s) to evaluate
               </label>
-              <input
-                id="userGoal"
-                type="text"
-                className={`${styles.input} ${errors.userGoal ? styles.inputError : ''}`}
-                placeholder="e.g., Complete a purchase, Find and book a flight, Set up smart home routines"
-                value={userGoal}
-                onChange={e => setUserGoal(e.target.value)}
-                disabled={disabled}
-              />
+              <p className={styles.fieldHint}>
+                The specific outcome(s) users are trying to achieve on this screen or flow.
+                You can add up to 3 tasks — each additional task increases analysis time but
+                produces a report with a General Findings section plus one section per task.
+              </p>
+              {tasks.map((task, i) => (
+                <div key={i} className={styles.taskRow}>
+                  {tasks.length > 1 && (
+                    <input
+                      type="text"
+                      className={styles.input}
+                      placeholder={`Task ${i + 1} name (optional)`}
+                      value={task.name}
+                      onChange={e => updateTask(i, 'name', e.target.value)}
+                      disabled={disabled}
+                    />
+                  )}
+                  <div className={styles.taskDescRow}>
+                    <input
+                      id={i === 0 ? 'userGoal' : undefined}
+                      type="text"
+                      className={`${styles.input} ${i === 0 && errors.userGoal ? styles.inputError : ''}`}
+                      placeholder={tasks.length === 1
+                        ? 'e.g., Complete a purchase, Find and book a flight'
+                        : `Task ${i + 1} description`}
+                      value={task.description}
+                      onChange={e => updateTask(i, 'description', e.target.value)}
+                      disabled={disabled}
+                    />
+                    {tasks.length > 1 && (
+                      <button
+                        type="button"
+                        className={styles.taskRemoveBtn}
+                        onClick={() => removeTask(i)}
+                        disabled={disabled}
+                        title="Remove task"
+                      >×</button>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {tasks.length < 3 && (
+                <button
+                  type="button"
+                  className={styles.taskAddBtn}
+                  onClick={addTask}
+                  disabled={disabled}
+                >+ Add task</button>
+              )}
               {errors.userGoal && <p className={styles.fieldError}>{errors.userGoal}</p>}
-              <p className={styles.fieldHint}>The specific outcome most users are trying to achieve when they reach this screen or flow.</p>
             </div>
 
           </div>
