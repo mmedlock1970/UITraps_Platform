@@ -459,6 +459,9 @@ export async function unifiedAsk(options: UnifiedAskOptions): Promise<UnifiedAsk
     if (context.verbosity) formData.append('verbosity', context.verbosity);
     if (context.pass1_model) formData.append('pass1_model', context.pass1_model);
     if (context.thorough_mode) formData.append('thorough_mode', 'true');
+    if (context.input_type) formData.append('input_type', context.input_type);
+    if (context.flow_mode) formData.append('flow_mode', context.flow_mode);
+    if (context.figma_url) formData.append('figma_url', context.figma_url);
   }
   if (conversationHistory) formData.append('conversation_history', conversationHistory);
   if (chatContext) formData.append('chat_context', chatContext);

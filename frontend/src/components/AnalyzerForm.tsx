@@ -57,14 +57,16 @@ function assembleContext(fields: {
   kbVersion: KbVersion; selectedTenets: string[];
   verbosity: 'brief' | 'standard'; pass1Model: 'sonnet' | 'haiku';
   figmaLink: string; thoroughMode: boolean;
+  inputType: 'screenshot' | 'video' | 'flow_diagram';
+  flowMode: 'screen' | 'flow';
 }): UserContext {
   const { platform, productDomain, screenName, expLevel, techSavvy,
           frequency, taskList, priorProducts, userDesc, extraContext, productContext,
           physicalEnv, lighting, gripPosition, attentionalState, kbVersion, selectedTenets,
-          verbosity, pass1Model, figmaLink, thoroughMode } = fields;
+          verbosity, pass1Model, figmaLink, thoroughMode, inputType, flowMode } = fields;
 
   const combinedExtra = [
-    figmaLink.trim() ? `Design file: ${figmaLink.trim()}` : '',
+    (figmaLink.trim() && inputType !== 'flow_diagram') ? `Design file: ${figmaLink.trim()}` : '',
     extraContext,
   ].filter(Boolean).join('\n');
 
@@ -107,6 +109,9 @@ function assembleContext(fields: {
     verbosity,
     pass1_model: pass1Model,
     thorough_mode: thoroughMode || undefined,
+    input_type: inputType,
+    flow_mode: flowMode,
+    figma_url: (figmaLink.trim() && inputType === 'flow_diagram') ? figmaLink.trim() : undefined,
   };
 }
 
@@ -204,7 +209,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
     const context = assembleContext({ platform, productDomain, screenName,
       expLevel, techSavvy, frequency, taskList: tasks, priorProducts, userDesc, extraContext, productContext,
       physicalEnv, lighting, gripPosition, attentionalState, kbVersion, selectedTenets,
-      verbosity, pass1Model, figmaLink, thoroughMode });
+      verbosity, pass1Model, figmaLink, thoroughMode, inputType, flowMode });
     onSubmit({ files, context });
   }, [disabled, validate, files, figmaLink, platform, productDomain, screenName,
       expLevel, techSavvy, frequency, tasks, priorProducts, userDesc, extraContext, productContext,
