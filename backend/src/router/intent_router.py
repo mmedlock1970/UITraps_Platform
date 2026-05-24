@@ -5,8 +5,10 @@ Detects whether user input should be routed to:
 - ANALYSIS: Trap analysis pipeline (files + context)
 - CHAT: RAG chat pipeline (text only)
 - HYBRID: Analysis + contextual chat (files + question)
+- URL_ANALYSIS: Website crawl + analysis pipeline (URL + context)
 """
 
+import re
 from enum import Enum
 from dataclasses import dataclass
 from typing import Optional
@@ -16,6 +18,10 @@ class IntentMode(str, Enum):
     ANALYSIS = "analysis"
     CHAT = "chat"
     HYBRID = "hybrid"
+    URL_ANALYSIS = "url_analysis"
+
+
+_URL_RE = re.compile(r'^https?://', re.IGNORECASE)
 
 
 @dataclass
@@ -62,6 +68,16 @@ def detect_intent(
         tasks and len(tasks.strip()) >= 2,
         format_desc and len(format_desc.strip()) >= 2,
     ])
+    is_url = bool(message and _URL_RE.match(message.strip()))
+
+    # URL with no files → website crawl analysis
+    if is_url and not has_files:
+        return IntentResult(
+            mode=IntentMode.URL_ANALYSIS,
+            message=message.strip(),
+            has_files=False,
+            has_context=has_context,
+        )
 
     if has_files and has_context:
         # Standard trap analysis with full context

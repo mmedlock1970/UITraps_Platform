@@ -252,7 +252,7 @@ export const App: React.FC = () => {
   }, [activeReport, apiEndpoint, effectiveToken, rerunElapsed]);
 
   const handleFormSubmit = useCallback(async (payload: FormSubmitPayload) => {
-    const { files, url, context } = payload;
+    const { files, context } = payload;
 
     setFormError(null);
     setFormAnalysisPhase('analyzing');
@@ -261,7 +261,6 @@ export const App: React.FC = () => {
 
     try {
       const inputFiles = files.length > 0 ? files : [];
-      const inputMessage = url && files.length === 0 ? url : undefined;
       const imageTimeout = Math.min(180000 + (files.length || 1) * 120000, 1800000);
 
       const kbVersionForRequest = context?.kb_version;
@@ -272,7 +271,6 @@ export const App: React.FC = () => {
       const result = await unifiedAsk({
         apiEndpoint,
         token: effectiveToken,
-        message: inputMessage,
         files: inputFiles,
         context,
         kbVersion: kbVersionForRequest,

@@ -1028,7 +1028,8 @@ def build_user_message(
     is_video_analysis: bool = False,
     is_multi_frame: bool = False,
     frame_index: int = None,
-    total_frames: int = None
+    total_frames: int = None,
+    verbosity: str = "standard",
 ) -> list:
     """
     Build the user message with context and design file.
@@ -1253,11 +1254,28 @@ PRODUCT CONTEXT:
         tenet_list = [t.strip().upper() for t in tenet_filter_raw if t.strip()]
     else:
         tenet_list = [t.strip().upper() for t in str(tenet_filter_raw).split(',') if t.strip()]
-    tenet_filter_section = f"""
+
+    trap_filter_raw = user_context.get('trap_filter', '')
+    if isinstance(trap_filter_raw, list):
+        trap_list = [t.strip().upper() for t in trap_filter_raw if t.strip()]
+    else:
+        trap_list = [t.strip().upper() for t in str(trap_filter_raw).split(',') if t.strip()]
+
+    if trap_list:
+        # Trap-level filter (sub-tenet groups) — overrides tenet filter
+        tenet_filter_section = f"""
+⚠️ TRAP SCOPE — RESTRICTED ANALYSIS:
+Evaluate ONLY the following specific traps: {', '.join(trap_list)}.
+Do not report findings for any other trap. All other traps are out of scope and must be omitted from every output section.
+"""
+    elif tenet_list:
+        tenet_filter_section = f"""
 ⚠️ TENET SCOPE — RESTRICTED ANALYSIS:
 Evaluate ONLY the following Tenets: {', '.join(tenet_list)}.
 Do not report findings for traps that fall under any other Tenet. Traps outside these Tenets should be treated as out of scope and omitted from all output sections.
-""" if tenet_list else ""
+"""
+    else:
+        tenet_filter_section = ""
 
     _physical_labels = {
         'desk':       'At a desk or workstation',
@@ -1312,6 +1330,16 @@ USE ENVIRONMENT:
 {chr(10).join(_env_lines)}{_att_guidance}
 """ if _env_lines else ""
 
+    verbosity_section = (
+        "\n⚡ BRIEF OUTPUT MODE — ACTIVE:\n"
+        "Write concise output throughout:\n"
+        "- summary_narrative: 2 sentences maximum\n"
+        "- headline: keep short (already required — comply strictly)\n"
+        "- problem: 1–2 sentences maximum\n"
+        "- recommendation: 1–2 sentences maximum\n"
+        "Prioritize the most important information. Omit elaboration and examples.\n"
+    ) if verbosity == "brief" else ""
+
     context_text = f"""Please analyze this UI design using the UI Tenets & Traps framework.
 
 CONTEXT PROVIDED BY USER:
@@ -1347,7 +1375,7 @@ Remember to:
 - Note positive observations
 - List traps you checked but didn't find
 - Submit your complete analysis using the ui_analysis_report tool
-
+{verbosity_section}
 Begin your analysis now."""
 
     # Build message content
@@ -1914,6 +1942,7 @@ def build_enrichment_user_message(
     trap_sections: dict,
     trap_images: Optional[dict] = None,
     knowledge_chunks: Optional[str] = None,
+    verbosity: str = "standard",
 ) -> list:
     """
     Build the user message for Pass 2 enrichment.
@@ -1980,12 +2009,13 @@ def build_enrichment_user_message(
                         },
                     })
 
+    brief_note = " Keep problem and recommendation fields concise — 1–2 sentences each maximum." if verbosity == "brief" else ""
     content.append({
         "type": "text",
         "text": "\nUsing the full framework content and any illustrations above, enhance the "
                 "problem descriptions and recommendations for each finding. Keep the same trap "
                 "names, tenets, locations, severities, and confidence levels. Only improve the "
-                "written descriptions.\nSubmit the enriched report using the ui_analysis_report tool.",
+                f"written descriptions.{brief_note}\nSubmit the enriched report using the ui_analysis_report tool.",
     })
 
     return content

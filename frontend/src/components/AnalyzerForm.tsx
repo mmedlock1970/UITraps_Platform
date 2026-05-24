@@ -4,7 +4,6 @@ import styles from './AnalyzerForm.module.css';
 
 export interface FormSubmitPayload {
   files: File[];
-  url: string;
   context: UserContext;
 }
 
@@ -56,10 +55,18 @@ function assembleContext(fields: {
   priorProducts: string; userDesc: string; extraContext: string; productContext: string;
   physicalEnv: string; lighting: string; gripPosition: string; attentionalState: string;
   kbVersion: KbVersion; selectedTenets: string[];
+  verbosity: 'brief' | 'standard'; pass1Model: 'sonnet' | 'haiku';
+  figmaLink: string; thoroughMode: boolean;
 }): UserContext {
   const { platform, productDomain, screenName, expLevel, techSavvy,
           frequency, userGoal, priorProducts, userDesc, extraContext, productContext,
-          physicalEnv, lighting, gripPosition, attentionalState, kbVersion, selectedTenets } = fields;
+          physicalEnv, lighting, gripPosition, attentionalState, kbVersion, selectedTenets,
+          verbosity, pass1Model, figmaLink, thoroughMode } = fields;
+
+  const combinedExtra = [
+    figmaLink.trim() ? `Design file: ${figmaLink.trim()}` : '',
+    extraContext,
+  ].filter(Boolean).join('\n');
 
   const formatParts = [
     platform && productDomain ? `${platform} — ${productDomain}` : platform || productDomain,
@@ -83,7 +90,7 @@ function assembleContext(fields: {
     format: formatParts.join('. '),
     design_name: designName || undefined,
     contentType: platformToContentType(platform, productDomain),
-    extra_context: extraContext || undefined,
+    extra_context: combinedExtra || undefined,
     product_context: productContext || undefined,
     physical_env: physicalEnv || undefined,
     lighting: lighting || undefined,
@@ -91,6 +98,9 @@ function assembleContext(fields: {
     attentional_state: attentionalState || undefined,
     kb_version: kbVersion,
     tenet_filter: selectedTenets.length > 0 ? selectedTenets : undefined,
+    verbosity,
+    pass1_model: pass1Model,
+    thorough_mode: thoroughMode || undefined,
   };
 }
 
@@ -106,7 +116,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
   // Card 1 — Interface
   const [files, setFiles] = useState<File[]>([]);
   const [thumbnailUrls, setThumbnailUrls] = useState<string[]>([]);
-  const [url, setUrl] = useState('');
+  const [figmaLink, setFigmaLink] = useState('');
   const [screenName, setScreenName] = useState('');
   const [platform, setPlatform] = useState('');
   const [productDomain, setProductDomain] = useState('');
@@ -134,6 +144,9 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
   // Card 5 — Analysis Scope
   const [kbVersion, setKbVersion] = useState<KbVersion>('v2');
   const [selectedTenets, setSelectedTenets] = useState<string[]>([]);
+  const [verbosity, setVerbosity] = useState<'brief' | 'standard'>('standard');
+  const [pass1Model, setPass1Model] = useState<'sonnet' | 'haiku'>('sonnet');
+  const [thoroughMode, setThoroughMode] = useState(false);
 
   const toggleTenet = useCallback((tenet: string) => {
     setSelectedTenets(prev =>
@@ -152,7 +165,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
 
   const validate = useCallback((): boolean => {
     const e: Record<string, string> = {};
-    if (files.length === 0 && !url.trim()) e.upload = 'Please upload a screenshot or enter a URL';
+    if (files.length === 0) e.upload = 'Please upload a screenshot, video, or PDF';
     if (!screenName.trim()) e.screenName = 'Required';
     if (!platform) e.platform = 'Required';
     if (!productDomain) e.productDomain = 'Required';
@@ -162,7 +175,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
     if (!userGoal.trim()) e.userGoal = 'Required';
     setErrors(e);
     return Object.keys(e).length === 0;
-  }, [files, url, screenName, platform, productDomain, expLevel, techSavvy, frequency, userGoal]);
+  }, [files, screenName, platform, productDomain, expLevel, techSavvy, frequency, userGoal]);
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
@@ -170,11 +183,13 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
     if (!validate()) return;
     const context = assembleContext({ platform, productDomain, screenName,
       expLevel, techSavvy, frequency, userGoal, priorProducts, userDesc, extraContext, productContext,
-      physicalEnv, lighting, gripPosition, attentionalState, kbVersion, selectedTenets });
-    onSubmit({ files, url, context });
-  }, [disabled, validate, files, url, platform, productDomain, screenName,
+      physicalEnv, lighting, gripPosition, attentionalState, kbVersion, selectedTenets,
+      verbosity, pass1Model, figmaLink, thoroughMode });
+    onSubmit({ files, context });
+  }, [disabled, validate, files, figmaLink, platform, productDomain, screenName,
       expLevel, techSavvy, frequency, userGoal, priorProducts, userDesc, extraContext, productContext,
-      physicalEnv, lighting, gripPosition, attentionalState, kbVersion, selectedTenets, onSubmit]);
+      physicalEnv, lighting, gripPosition, attentionalState, kbVersion, selectedTenets,
+      verbosity, pass1Model, thoroughMode, onSubmit]);
 
   const handleFileChange = useCallback((newFiles: FileList | null) => {
     if (!newFiles || newFiles.length === 0) return;
@@ -286,14 +301,14 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
                 </>
               )}
             </div>
-            <div className={styles.uploadDivider}>or paste a live URL or Figma file link</div>
+            <div className={styles.uploadDivider}>or include a Figma design link (optional)</div>
             <input
-              id="urlInput"
-              type="url"
+              id="figmaLinkInput"
+              type="text"
               className={styles.input}
-              placeholder="https://   or   figma.com/file/…"
-              value={url}
-              onChange={e => setUrl(e.target.value)}
+              placeholder="figma.com/file/…  or  figma.com/design/…"
+              value={figmaLink}
+              onChange={e => setFigmaLink(e.target.value)}
               disabled={disabled}
             />
             {errors.upload && <p className={styles.fieldError}>{errors.upload}</p>}
@@ -715,11 +730,59 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
 
           <hr className={styles.fieldDivider} />
 
+          {/* Report verbosity */}
+          <div className={styles.field}>
+            <label className={styles.fieldLabel}>Report detail</label>
+            <div className={styles.kbVersionGroup}>
+              {(['standard', 'brief'] as const).map(v => (
+                <button
+                  key={v}
+                  type="button"
+                  className={`${styles.kbVersionBtn} ${verbosity === v ? styles.kbVersionBtnActive : ''}`}
+                  onClick={() => setVerbosity(v)}
+                  disabled={disabled}
+                >
+                  {v === 'standard' ? 'Standard' : 'Brief'}
+                </button>
+              ))}
+            </div>
+            <p className={styles.fieldHint}>
+              {verbosity === 'standard' && 'Full narratives for summary, findings, and recommendations.'}
+              {verbosity === 'brief' && 'Shorter text throughout. Reduces output tokens and speeds up analysis.'}
+            </p>
+          </div>
+
+          <hr className={styles.fieldDivider} />
+
+          {/* Analysis model */}
+          <div className={styles.field}>
+            <label className={styles.fieldLabel}>Analysis model</label>
+            <div className={styles.kbVersionGroup}>
+              {(['sonnet', 'haiku'] as const).map(v => (
+                <button
+                  key={v}
+                  type="button"
+                  className={`${styles.kbVersionBtn} ${pass1Model === v ? styles.kbVersionBtnActive : ''}`}
+                  onClick={() => setPass1Model(v)}
+                  disabled={disabled}
+                >
+                  {v === 'sonnet' ? 'Sonnet' : 'Haiku'}
+                </button>
+              ))}
+            </div>
+            <p className={styles.fieldHint}>
+              {pass1Model === 'sonnet' && 'Recommended. Best visual analysis accuracy for production reviews.'}
+              {pass1Model === 'haiku' && '~3× faster and cheaper. Lower accuracy — best for quick checks, not final reviews.'}
+            </p>
+          </div>
+
+          <hr className={styles.fieldDivider} />
+
           {/* Knowledge base version selector */}
           <div className={styles.field}>
             <label className={styles.fieldLabel}>Knowledge base version</label>
             <div className={styles.kbVersionGroup}>
-              {(['v2', 'v1', 'both'] as KbVersion[]).map(v => (
+              {(['v2', 'v2.1', 'v1', 'both'] as KbVersion[]).map(v => (
                 <button
                   key={v}
                   type="button"
@@ -733,8 +796,33 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
             </div>
             <p className={styles.fieldHint}>
               {kbVersion === 'v2' && 'Current knowledge engine (recommended).'}
+              {kbVersion === 'v2.1' && 'Streamlined v2: tenet overviews, why-it-occurs notes, and remediation guidance removed. Faster analysis, same trap detection accuracy.'}
               {kbVersion === 'v1' && 'Previous knowledge engine.'}
               {kbVersion === 'both' && 'Runs two parallel analyses — one with each engine. Results are shown side-by-side with a toggle. Takes roughly twice as long.'}
+            </p>
+          </div>
+
+          <hr className={styles.fieldDivider} />
+
+          {/* Analysis coverage */}
+          <div className={styles.field}>
+            <label className={styles.fieldLabel}>Analysis coverage</label>
+            <div className={styles.kbVersionGroup}>
+              {([false, true] as const).map(v => (
+                <button
+                  key={String(v)}
+                  type="button"
+                  className={`${styles.kbVersionBtn} ${thoroughMode === v ? styles.kbVersionBtnActive : ''}`}
+                  onClick={() => setThoroughMode(v)}
+                  disabled={disabled}
+                >
+                  {v ? 'Thorough' : 'Standard'}
+                </button>
+              ))}
+            </div>
+            <p className={styles.fieldHint}>
+              {!thoroughMode && 'Single-pass analysis. Fast, good coverage for most designs.'}
+              {thoroughMode && 'Runs one focused pass per Tenet in parallel, then merges findings. More consistent results, similar speed. Recommended for final reviews.'}
             </p>
           </div>
 

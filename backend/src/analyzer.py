@@ -84,6 +84,9 @@ class UITrapsAnalyzer:
         page_context: Optional[Dict[str, Any]] = None,
         chat_context: Optional[str] = None,
         kb_version: str = "v2",
+        verbosity: str = "standard",
+        pass1_model: Optional[str] = None,
+        thorough_mode: bool = False,
     ) -> Dict[str, Any]:
         """
         Analyze a UI design using the UI Tenets & Traps framework.
@@ -122,136 +125,41 @@ class UITrapsAnalyzer:
         if not is_valid_file:
             raise ValueError(f"Invalid file: {file_msg}")
 
-        # Step 2: Build prompts
-        system_prompt = build_system_prompt(use_caching=self.use_caching, version=kb_version, image_count=1)
-
-        # Step 3: Handle different file types
-        if is_figma_url(design_file):
-            # For Figma URLs, we need special handling
-            # In production, you'd either:
-            # 1. Use Figma API to fetch images
-            # 2. Ask user to export PNG
-            # For now, we'll provide guidance
-            user_message = build_figma_message(user_context, design_file)
-            raise NotImplementedError(
-                "Figma URL support requires additional implementation. "
-                "Please export your Figma design as PNG/JPG and upload the image file. "
-                "Alternatively, integrate Figma API to fetch design images automatically."
+        # Steps 2–5: Pass 1 visual analysis (single-pass or tenet-parallel thorough mode)
+        if thorough_mode:
+            report = self._run_tenet_parallel(
+                design_file=design_file,
+                user_context=user_context,
+                timeout=timeout,
+                kb_version=kb_version,
+                verbosity=verbosity,
+                pass1_model=pass1_model,
+                chat_context=chat_context,
             )
         else:
-            # Load image and convert to base64 for Claude
-            image_data = self._load_image(design_file)
-            user_message = build_user_message(user_context, image_data, page_context)
-
-        # Prepend chat context if provided (from a prior discussion about this design)
-        if chat_context and chat_context.strip():
-            context_block = {
-                "type": "text",
-                "text": (
-                    "CRITICAL OVERRIDE — UPDATED CONTEXT FROM USER:\n"
-                    "The user has provided corrections or clarifications in a prior conversation. "
-                    "These corrections OVERRIDE any conflicting values in the structured context "
-                    "that follows (users, tasks, format, etc.). "
-                    "If the user corrected the user group, tasks, or any other context field, "
-                    "use their corrected values and DISREGARD the original values below.\n\n"
-                    f"{chat_context.strip()}\n\n"
-                    "--- END OF USER CORRECTIONS — use these when analyzing ---\n"
-                )
-            }
-            user_message = [context_block] + list(user_message)
-
-        # Step 4: Call Claude API with structured output
-        # Use tool forcing to ensure structured JSON output
-        schema = get_ui_analysis_schema()
-
-        try:
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=5000,
-                temperature=0,
-                system=system_prompt,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": user_message
-                    }
-                ],
-                tools=[
-                    {
-                        "name": "ui_analysis_report",
-                        "description": "Submit the complete UI Tenets & Traps analysis report",
-                        "input_schema": schema
-                    }
-                ],
-                tool_choice={"type": "tool", "name": "ui_analysis_report"},
-                timeout=timeout
-            )
-        except Exception as e:
-            raise Exception(f"Claude API call failed: {e}")
-
-        # Step 5: Parse response from tool use
-        # With tool forcing, response will be in tool_use content block
-        try:
-            tool_use_block = next(
-                (block for block in response.content if block.type == "tool_use"),
-                None
-            )
-
-            if not tool_use_block:
-                # Fallback to text parsing if tool use not found
-                response_text = response.content[0].text
-                report = parse_claude_response(response_text)
-            else:
-                # Extract structured data directly from tool input
-                report = tool_use_block.input
-
-                # Validate truly required fields (core structure)
-                for field in ['summary_headline', 'summary_narrative', 'critical_issues', 'moderate_issues', 'minor_issues']:
-                    if field not in report:
-                        raise ValueError(f"Missing required field in response: {field}")
-
-                # Ensure summary fields are strings
-                if not isinstance(report.get('summary_headline'), str):
-                    report['summary_headline'] = ''
-                if not isinstance(report.get('summary_narrative'), str):
-                    report['summary_narrative'] = ''
-
-                # Ensure issue arrays are actually arrays
-                for issue_field in ['critical_issues', 'moderate_issues', 'minor_issues']:
-                    if not isinstance(report[issue_field], list):
-                        raise ValueError(f"{issue_field} must be an array, got {type(report[issue_field])}")
-
-                # Default optional array fields if absent or wrong type
-                for opt_field in ['positive_observations', 'potential_issues', 'traps_checked_not_found',
-                                  'flagged_for_human_review', 'incomplete_flow_findings']:
-                    if not isinstance(report.get(opt_field), list):
-                        report[opt_field] = []
-
-        except Exception as e:
-            raise ValueError(
-                f"Failed to parse Claude's response: {e}\n\n"
-                f"Response content: {response.content}"
+            report = self._pass1(
+                design_file=design_file,
+                user_context=user_context,
+                timeout=timeout,
+                kb_version=kb_version,
+                verbosity=verbosity,
+                pass1_model=pass1_model,
+                chat_context=chat_context,
+                page_context=page_context,
             )
 
         # Step 6: Calculate metadata
         duration = time.time() - start_time
-
         metadata = {
             "model": self.model,
-            "input_tokens": response.usage.input_tokens,
-            "output_tokens": response.usage.output_tokens,
-            "cache_creation_tokens": getattr(response.usage, 'cache_creation_input_tokens', 0),
-            "cache_read_tokens": getattr(response.usage, 'cache_read_input_tokens', 0),
-            "total_tokens": response.usage.input_tokens + response.usage.output_tokens,
             "duration_seconds": round(duration, 2),
-            "estimated_cost": self._estimate_cost(response.usage),
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "user_id": user_id
+            "user_id": user_id,
         }
 
         # Step 7: Pass 2 — Enrich findings using full book sections
         try:
-            report = self._enrich_report(report, timeout=timeout, kb_version=kb_version)
+            report = self._enrich_report(report, timeout=timeout, kb_version=kb_version, verbosity=verbosity)
         except Exception as e:
             # Enrichment failure is non-fatal — use Pass 1 report as-is
             print(f"[UITraps] Pass 2 enrichment skipped (non-fatal): {e}")
@@ -259,7 +167,8 @@ class UITrapsAnalyzer:
         # Step 8: Generate outputs
         # Normalize optional fields after enrichment — Pass 2 may omit fields that were
         # present in Pass 1, causing formatter KeyErrors.
-        for _opt in ['positive_observations', 'potential_issues', 'traps_checked_not_found',
+        for _opt in ['critical_issues', 'moderate_issues', 'minor_issues',
+                     'positive_observations', 'potential_issues', 'traps_checked_not_found',
                      'flagged_for_human_review', 'incomplete_flow_findings']:
             if not isinstance(report.get(_opt), list):
                 report[_opt] = []
@@ -273,8 +182,16 @@ class UITrapsAnalyzer:
             user_context = dict(user_context)
             user_context['chat_context_used'] = True
             user_context['chat_context_content'] = chat_context.strip()
+        _elapsed = time.time() - start_time
+        _analysis_settings = {
+            'verbosity': verbosity,
+            'pass1_model': pass1_model,
+            'kb_version': kb_version,
+            'elapsed_seconds': _elapsed,
+            'thorough_mode': thorough_mode,
+        }
         markdown_report = format_report_as_markdown(report, user_context)
-        html_report = format_report_as_html(report, user_context)
+        html_report = format_report_as_html(report, user_context, analysis_settings=_analysis_settings)
         statistics = get_report_statistics(report)
 
         return {
@@ -319,7 +236,281 @@ class UITrapsAnalyzer:
         except Exception as e:
             print(f"[UITraps] Region crop unavailable: {e}")
 
-    def _enrich_report(self, pass1_report: Dict[str, Any], timeout: int = 120, kb_version: str = "v2") -> Dict[str, Any]:
+    # Analysis groups for thorough_mode=True.
+    # UNDERSTANDABLE and HABITUATING are split by sub-tenet; no group exceeds 5 traps.
+    _ANALYSIS_GROUPS = [
+        # UNDERSTANDABLE — 3 sub-tenet groups
+        {'label': 'UNDERSTANDABLE/Noticeable',
+         'traps': ['INVISIBLE ELEMENT', 'EFFECTIVELY INVISIBLE ELEMENT', 'DISTRACTION']},
+        {'label': 'UNDERSTANDABLE/Comprehensible',
+         'traps': ['UNCOMPREHENDED ELEMENT', 'INVITING DEAD END', 'POOR GROUPING',
+                   'FORCED SYNTAX', 'MEMORY CHALLENGE']},
+        {'label': 'UNDERSTANDABLE/Confirmatory',
+         'traps': ['FEEDBACK FAILURE']},
+        # Full tenets
+        {'label': 'COMFORTABLE',  'tenet': 'COMFORTABLE'},
+        {'label': 'RESPONSIVE',   'tenet': 'RESPONSIVE'},
+        {'label': 'EFFICIENT',    'tenet': 'EFFICIENT'},
+        {'label': 'ACCURATE',     'tenet': 'ACCURATE'},
+        {'label': 'PROTECTIVE',   'tenet': 'PROTECTIVE'},
+        # HABITUATING — 3 sub-tenet groups
+        {'label': 'HABITUATING/Non-Redundant',
+         'traps': ['GRATUITOUS REDUNDANCY']},
+        {'label': 'HABITUATING/Consistent-with-Expectations',
+         'traps': ['VARIABLE OUTCOME', 'WANDERING ELEMENT', 'INCONSISTENT APPEARANCE']},
+        {'label': 'HABITUATING/Oriented',
+         'traps': ['AMBIGUOUS HOME']},
+        # Full tenet
+        {'label': 'BEAUTIFUL',    'tenet': 'BEAUTIFUL'},
+    ]
+
+    def _run_tenet_parallel(
+        self,
+        design_file: str,
+        user_context: Dict[str, str],
+        timeout: int = 120,
+        kb_version: str = "v2",
+        verbosity: str = "standard",
+        pass1_model: Optional[str] = None,
+        chat_context: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Run one _pass1 per analysis group concurrently, return merged report."""
+        import concurrent.futures
+        from copy import deepcopy
+
+        groups = list(self._ANALYSIS_GROUPS)
+        print(f"[UITraps] Thorough mode: running {len(groups)} parallel sub-analyses")
+
+        # Pre-load image once — avoids 12 concurrent PIL decode/resize operations
+        preloaded_image = self._load_image(design_file)
+        # Narrower token budget per sub-call (1-5 traps scope, not 27)
+        sub_max_tokens = 1500 if verbosity == "brief" else 2500
+
+        def analyze_one(group: dict) -> Dict[str, Any]:
+            ctx = deepcopy(user_context)
+            if 'traps' in group:
+                ctx['trap_filter'] = group['traps']
+                ctx.pop('tenet_filter', None)
+            else:
+                ctx['tenet_filter'] = [group['tenet']]
+                ctx.pop('trap_filter', None)
+            return self._pass1(
+                design_file=design_file,
+                user_context=ctx,
+                timeout=timeout,
+                kb_version=kb_version,
+                verbosity=verbosity,
+                pass1_model=pass1_model,
+                chat_context=chat_context,
+                preloaded_image=preloaded_image,
+                max_tokens_override=sub_max_tokens,
+            )
+
+        reports = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(groups)) as executor:
+            future_to_group = {executor.submit(analyze_one, g): g for g in groups}
+            for future in concurrent.futures.as_completed(future_to_group):
+                label = future_to_group[future]['label']
+                try:
+                    reports.append(future.result())
+                    print(f"[UITraps] Group complete: {label}")
+                except Exception as e:
+                    print(f"[UITraps] Group failed ({label}): {e}")
+
+        if not reports:
+            raise Exception("All parallel sub-analyses failed")
+
+        return self._merge_reports(reports)
+
+    @staticmethod
+    def _merge_reports(reports: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Merge multiple tenet/sub-tenet Pass 1 reports into one deduplicated report."""
+        try:
+            from .formatters import _normalize_trap_name
+        except ImportError:
+            from formatters import _normalize_trap_name
+
+        merged: Dict[str, Any] = {
+            'critical_issues': [],
+            'moderate_issues': [],
+            'minor_issues': [],
+            'positive_observations': [],
+            'potential_issues': [],
+            'traps_checked_not_found': [],
+            'flagged_for_human_review': [],
+            'incomplete_flow_findings': [],
+            'bugs_detected': [],
+        }
+
+        seen_traps: set = set()
+        for report in reports:
+            for severity in ('critical_issues', 'moderate_issues', 'minor_issues'):
+                for issue in report.get(severity) or []:
+                    norm = _normalize_trap_name(issue.get('trap_name', '') or '')
+                    if norm and norm not in seen_traps:
+                        seen_traps.add(norm)
+                        merged[severity].append(issue)
+
+        seen_pos: set = set()
+        for report in reports:
+            for pos in report.get('positive_observations') or []:
+                if pos and pos not in seen_pos:
+                    seen_pos.add(pos)
+                    merged['positive_observations'].append(pos)
+
+        # Merge traps_checked_not_found across all sub-reports, deduplicating by trap_name
+        seen_tcnf: set = set()
+        for report in reports:
+            for item in report.get('traps_checked_not_found') or []:
+                if isinstance(item, dict):
+                    norm = _normalize_trap_name(item.get('trap_name', '') or '')
+                    if norm and norm not in seen_traps and norm not in seen_tcnf:
+                        seen_tcnf.add(norm)
+                        merged['traps_checked_not_found'].append(item)
+                elif isinstance(item, str) and item.strip():
+                    norm = _normalize_trap_name(item)
+                    if norm and norm not in seen_traps and norm not in seen_tcnf:
+                        seen_tcnf.add(norm)
+                        merged['traps_checked_not_found'].append({'trap_name': item, 'testable': True})
+
+        for field in ('potential_issues', 'flagged_for_human_review',
+                      'incomplete_flow_findings', 'bugs_detected'):
+            for report in reports:
+                items = report.get(field) or []
+                if items:
+                    merged[field] = items
+                    break
+
+        n_crit = len(merged['critical_issues'])
+        n_mod = len(merged['moderate_issues'])
+        n_min = len(merged['minor_issues'])
+        total = n_crit + n_mod + n_min
+
+        if total == 0:
+            merged['summary_headline'] = "No UI Traps detected"
+            merged['summary_narrative'] = (
+                "Thorough tenet-by-tenet analysis found no usability issues."
+            )
+        else:
+            parts = (
+                ([f"{n_crit} critical"] if n_crit else []) +
+                ([f"{n_mod} moderate"] if n_mod else []) +
+                ([f"{n_min} minor"] if n_min else [])
+            )
+            merged['summary_headline'] = (
+                f"{total} UI Trap{'s' if total != 1 else ''} found: {', '.join(parts)}"
+            )
+            merged['summary_narrative'] = (
+                f"Thorough tenet-by-tenet analysis identified {total} "
+                f"issue{'s' if total != 1 else ''} across the full framework "
+                f"({', '.join(parts)})."
+            )
+
+        return merged
+
+    def _pass1(
+        self,
+        design_file: str,
+        user_context: Dict[str, str],
+        timeout: int = 120,
+        kb_version: str = "v2",
+        verbosity: str = "standard",
+        pass1_model: Optional[str] = None,
+        chat_context: Optional[str] = None,
+        page_context: Optional[Dict[str, Any]] = None,
+        preloaded_image: Optional[Dict[str, Any]] = None,
+        max_tokens_override: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Run Pass 1 visual analysis and return the raw report dict."""
+        _model_map = {"sonnet": self.model, "haiku": self.enrich_model}
+        effective_model = _model_map.get(pass1_model or "", self.model)
+        pass1_max_tokens = max_tokens_override or (3000 if verbosity == "brief" else 5000)
+
+        system_prompt = build_system_prompt(
+            use_caching=self.use_caching, version=kb_version, image_count=1
+        )
+
+        if preloaded_image is not None:
+            image_data = preloaded_image
+        else:
+            if is_figma_url(design_file):
+                raise NotImplementedError(
+                    "Figma URL support requires additional implementation. "
+                    "Please export your Figma design as PNG/JPG and upload the image file."
+                )
+            image_data = self._load_image(design_file)
+
+        user_message = build_user_message(
+            user_context, image_data, page_context, verbosity=verbosity
+        )
+
+        if chat_context and chat_context.strip():
+            context_block = {
+                "type": "text",
+                "text": (
+                    "CRITICAL OVERRIDE — UPDATED CONTEXT FROM USER:\n"
+                    "The user has provided corrections or clarifications in a prior conversation. "
+                    "These corrections OVERRIDE any conflicting values in the structured context "
+                    "that follows (users, tasks, format, etc.). "
+                    "If the user corrected the user group, tasks, or any other context field, "
+                    "use their corrected values and DISREGARD the original values below.\n\n"
+                    f"{chat_context.strip()}\n\n"
+                    "--- END OF USER CORRECTIONS — use these when analyzing ---\n"
+                )
+            }
+            user_message = [context_block] + list(user_message)
+
+        schema = get_ui_analysis_schema()
+        try:
+            response = self.client.messages.create(
+                model=effective_model,
+                max_tokens=pass1_max_tokens,
+                temperature=0,
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_message}],
+                tools=[{
+                    "name": "ui_analysis_report",
+                    "description": "Submit the complete UI Tenets & Traps analysis report",
+                    "input_schema": schema
+                }],
+                tool_choice={"type": "tool", "name": "ui_analysis_report"},
+                timeout=timeout
+            )
+        except Exception as e:
+            raise Exception(f"Claude API call failed: {e}")
+
+        try:
+            tool_use_block = next(
+                (block for block in response.content if block.type == "tool_use"), None
+            )
+            if not tool_use_block:
+                report = parse_claude_response(response.content[0].text)
+            else:
+                report = tool_use_block.input
+                for field in ['summary_headline', 'summary_narrative',
+                              'critical_issues', 'moderate_issues', 'minor_issues']:
+                    if field not in report:
+                        raise ValueError(f"Missing required field in response: {field}")
+                if not isinstance(report.get('summary_headline'), str):
+                    report['summary_headline'] = ''
+                if not isinstance(report.get('summary_narrative'), str):
+                    report['summary_narrative'] = ''
+                for issue_field in ['critical_issues', 'moderate_issues', 'minor_issues']:
+                    if not isinstance(report[issue_field], list):
+                        raise ValueError(f"{issue_field} must be an array")
+                for opt_field in ['positive_observations', 'potential_issues',
+                                  'traps_checked_not_found', 'flagged_for_human_review',
+                                  'incomplete_flow_findings']:
+                    if not isinstance(report.get(opt_field), list):
+                        report[opt_field] = []
+        except Exception as e:
+            raise ValueError(
+                f"Failed to parse Claude's response: {e}\n\nResponse content: {response.content}"
+            )
+
+        return report
+
+    def _enrich_report(self, pass1_report: Dict[str, Any], timeout: int = 120, kb_version: str = "v2", verbosity: str = "standard") -> Dict[str, Any]:
         """
         Pass 2: Enrich Pass 1 findings using full book sections for found traps.
 
@@ -367,15 +558,16 @@ class UITrapsAnalyzer:
         # Build Pass 2 prompts
         system_prompt = build_enrichment_system_prompt()
         user_message = build_enrichment_user_message(
-            pass1_report, trap_sections, trap_images, knowledge_chunks=knowledge_chunks
+            pass1_report, trap_sections, trap_images, knowledge_chunks=knowledge_chunks, verbosity=verbosity
         )
         schema = get_ui_analysis_schema()
 
         print(f"[UITraps] Pass 2: enriching {len(found_trap_names)} trap(s): {', '.join(found_trap_names)}")
 
+        pass2_max_tokens = 2200 if verbosity == "brief" else 3500
         response = self.client.messages.create(
             model=self.enrich_model,
-            max_tokens=3500,
+            max_tokens=pass2_max_tokens,
             temperature=0,
             system=system_prompt,
             messages=[{"role": "user", "content": user_message}],
@@ -409,6 +601,7 @@ class UITrapsAnalyzer:
 
         # Preserve other Pass 1 fields that Pass 2 might omit
         for field in (
+            "critical_issues", "moderate_issues", "minor_issues",
             "potential_issues", "bugs_detected",
             "incomplete_flow_findings", "flagged_for_human_review",
         ):
@@ -435,12 +628,12 @@ class UITrapsAnalyzer:
         """
         try:
             from .prompts import _TRAP_NAMES_V1, _TRAP_NAMES_V2
-            from .formatters import _UNTESTABLE_REASON_DEFAULTS, _normalize_trap_name
+            from .formatters import _normalize_trap_name
         except ImportError:
             from prompts import _TRAP_NAMES_V1, _TRAP_NAMES_V2
-            from formatters import _UNTESTABLE_REASON_DEFAULTS, _normalize_trap_name
+            from formatters import _normalize_trap_name
 
-        src = _TRAP_NAMES_V2 if kb_version == "v2" else _TRAP_NAMES_V1
+        src = _TRAP_NAMES_V1 if kb_version == "v1" else _TRAP_NAMES_V2
         canonical_traps = [t.strip() for t in src.split(",") if t.strip()]
 
         # Traps that are always evaluable from a single screenshot — default testable:true.
@@ -476,12 +669,6 @@ class UITrapsAnalyzer:
                     "trap_name": item, "testable": True
                 }
 
-        def _default_reason(norm: str) -> str:
-            return _UNTESTABLE_REASON_DEFAULTS.get(
-                norm,
-                "Requires additional screenshots, interaction data, or live testing to evaluate."
-            )
-
         new_tcnf = []
         for canonical in canonical_traps:
             norm = _normalize_trap_name(canonical)
@@ -490,30 +677,17 @@ class UITrapsAnalyzer:
             existing = existing_by_norm.get(norm)
             if existing is not None:
                 item = dict(existing)
+                item.pop("reason", None)
                 if norm in testable_always_false_norm:
-                    # Never evaluable — force false regardless of model output
                     item["testable"] = False
-                    if not (item.get("reason") or "").strip():
-                        item["reason"] = _default_reason(norm)
                 elif norm in testable_true_norm:
-                    # Always evaluable — accept true, fill default if missing
                     item.setdefault("testable", True)
-                else:
-                    # Conditional trap — respect model's judgment; add reason if false
-                    if not item.get("testable", True):
-                        if not (item.get("reason") or "").strip():
-                            item["reason"] = _default_reason(norm)
                 new_tcnf.append(item)
             else:
                 if norm in testable_true_norm:
                     new_tcnf.append({"trap_name": canonical, "testable": True})
                 else:
-                    # Not output by model — default to not-evaluated with standard reason
-                    new_tcnf.append({
-                        "trap_name": canonical,
-                        "testable": False,
-                        "reason": _default_reason(norm),
-                    })
+                    new_tcnf.append({"trap_name": canonical, "testable": False})
 
         report["traps_checked_not_found"] = new_tcnf
 

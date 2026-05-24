@@ -92,7 +92,7 @@ function getHelpText(inputType?: InputType, estimatedTime?: TimeEstimate): strin
     case 'video':
       return 'Video analysis may take several minutes. Please keep this window open.';
     case 'multi_image':
-      return 'Multi-screenshot analysis may take several minutes. Please keep this window open.';
+      return 'Analysis may take several minutes. Please keep this window open.';
     default:
       return 'Analysis may take several minutes. Please keep this window open.';
   }

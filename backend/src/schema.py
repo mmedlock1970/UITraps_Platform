@@ -229,17 +229,6 @@ UI_ANALYSIS_SCHEMA = {
                             "(e.g. requires multiple screens, interaction testing, session data)."
                         )
                     },
-                    "reason": {
-                        "type": "string",
-                        "description": (
-                            "REQUIRED when testable is false. One sentence explaining specifically "
-                            "what information, testing scenario, or interaction data is needed to "
-                            "evaluate this trap — e.g. 'Requires comparing this element across "
-                            "multiple screens to confirm visual consistency.' "
-                            "Do NOT omit this field when testable is false. "
-                            "Do NOT use a generic placeholder like 'Requires additional context.'"
-                        )
-                    }
                 },
                 "required": ["trap_name", "testable"]
             }

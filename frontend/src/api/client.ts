@@ -453,6 +453,9 @@ export async function unifiedAsk(options: UnifiedAskOptions): Promise<UnifiedAsk
     if (context.grip_position) formData.append('grip_position', context.grip_position);
     if (context.attentional_state) formData.append('attentional_state', context.attentional_state);
     if (context.tenet_filter?.length) formData.append('tenet_filter', context.tenet_filter.join(','));
+    if (context.verbosity) formData.append('verbosity', context.verbosity);
+    if (context.pass1_model) formData.append('pass1_model', context.pass1_model);
+    if (context.thorough_mode) formData.append('thorough_mode', 'true');
   }
   if (conversationHistory) formData.append('conversation_history', conversationHistory);
   if (chatContext) formData.append('chat_context', chatContext);

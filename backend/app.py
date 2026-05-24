@@ -10,6 +10,8 @@ Copyright © 2009-present UI Traps LLC. All Rights Reserved.
 
 import os
 import json
+import asyncio
+import concurrent.futures
 import logging
 import tempfile
 import time
@@ -1087,16 +1089,7 @@ async def estimate_url(
 
     Returns estimated time and cost based on max pages setting.
     """
-    # DISABLED: Web crawler disabled — bot protection makes this unreliable.
-    # Code preserved below for future reinstatement.
-    # To re-enable: remove this raise and uncomment the original implementation.
-    raise HTTPException(
-        status_code=503,
-        detail="Automatic website analysis is not available. Please capture screenshots of the website instead."
-    )
-
-    # --- Original implementation preserved ---
-    if not is_playwright_available():  # noqa: unreachable
+    if not is_playwright_available():
         raise HTTPException(
             status_code=503,
             detail="URL analysis not available. Playwright not installed."
@@ -1306,16 +1299,7 @@ async def analyze_url(
     - Format: '[{"name":"session","value":"abc123","domain":".site.com"}]'
     - Helps avoid false positives from missing authenticated content
     """
-    # DISABLED: Web crawler disabled — bot protection makes this unreliable.
-    # Code preserved below for future reinstatement.
-    # To re-enable: remove this raise and uncomment the original implementation.
-    raise HTTPException(
-        status_code=503,
-        detail="Automatic website analysis is not available. Please capture screenshots of the website instead."
-    )
-
-    # --- Original implementation preserved ---
-    if not is_playwright_available():  # noqa: unreachable
+    if not is_playwright_available():
         raise HTTPException(
             status_code=503,
             detail="URL analysis not available. Playwright not installed. "
@@ -1884,6 +1868,9 @@ async def unified_ask(
     tenet_filter: Optional[str] = Form(None),
     design_name: Optional[str] = Form(None),
     kb_version: str = Form("v2"),
+    verbosity: str = Form("standard"),
+    pass1_model: Optional[str] = Form(None),
+    thorough_mode: Optional[str] = Form(None),
 ):
     """
     Unified endpoint: auto-routes to analysis, chat, or hybrid based on input.
@@ -1897,7 +1884,7 @@ async def unified_ask(
     # For analysis requests, check subscription and consume a token
     # Skip in dev mode (DEV_MODE=true in .env) to allow local testing without a subscription record
     _dev_mode = os.environ.get("DEV_MODE", "false").lower() in ("true", "1", "yes")
-    if intent.mode in (IntentMode.ANALYSIS, IntentMode.HYBRID) and not _dev_mode:
+    if intent.mode in (IntentMode.ANALYSIS, IntentMode.HYBRID, IntentMode.URL_ANALYSIS) and not _dev_mode:
         user_id = str(user.get("id") or user.get("userId", ""))
         with Session(engine) as session:
             allowed, reason = check_and_consume_token(session, user_id)
@@ -1972,25 +1959,29 @@ async def unified_ask(
                 user_id = str(user.get("id") or user.get("userId", ""))
 
                 if kb_version == "both":
-                    import asyncio
                     loop = asyncio.get_running_loop()
                     analyzer_v2 = UITrapsAnalyzer()
                     analyzer_v1 = UITrapsAnalyzer()
 
                     logger.info("[/api/ask analysis] running dual analysis in parallel")
+                    _thorough = thorough_mode == 'true'
                     result_v2, result_v1 = await asyncio.gather(
                         loop.run_in_executor(
                             None,
                             lambda: analyzer_v2.analyze_design(
                                 design_file=tmp_path, user_context=user_context,
-                                chat_context=chat_context, kb_version="v2"
+                                chat_context=chat_context, kb_version="v2",
+                                verbosity=verbosity, pass1_model=pass1_model,
+                                thorough_mode=_thorough,
                             )
                         ),
                         loop.run_in_executor(
                             None,
                             lambda: analyzer_v1.analyze_design(
                                 design_file=tmp_path, user_context=user_context,
-                                chat_context=chat_context, kb_version="v1"
+                                chat_context=chat_context, kb_version="v1",
+                                verbosity=verbosity, pass1_model=pass1_model,
+                                thorough_mode=_thorough,
                             )
                         ),
                     )
@@ -2015,10 +2006,12 @@ async def unified_ask(
                         "statistics_v2": result_v2.get("statistics"),
                     }
                 else:
-                    logger.info(f"[/api/ask analysis] calling analyze_design (kb_version={kb_version})")
+                    logger.info(f"[/api/ask analysis] calling analyze_design (kb_version={kb_version} verbosity={verbosity} pass1_model={pass1_model} thorough={thorough_mode})")
                     result = get_analyzer().analyze_design(
                         design_file=tmp_path, user_context=user_context,
-                        chat_context=chat_context, kb_version=kb_version
+                        chat_context=chat_context, kb_version=kb_version,
+                        verbosity=verbosity, pass1_model=pass1_model,
+                        thorough_mode=(thorough_mode == 'true'),
                     )
                     logger.info("[/api/ask analysis] analyze_design complete")
 
@@ -2143,6 +2136,106 @@ async def unified_ask(
                 os.unlink(tmp_path)
             except Exception:
                 pass
+
+    elif intent.mode == IntentMode.URL_ANALYSIS:
+        # --- URL / website crawl analysis ---
+        url = intent.message
+        if not url:
+            raise HTTPException(status_code=400, detail="No URL provided")
+
+        if not is_playwright_available():
+            raise HTTPException(
+                status_code=503,
+                detail="URL analysis not available. Playwright not installed. "
+                       "Install with: pip install playwright && playwright install chromium"
+            )
+
+        max_pages = 5  # reasonable default for JWT-authenticated requests
+
+        try:
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                def run_crawl():
+                    crawler = WebCrawler(
+                        max_pages=max_pages,
+                        max_depth=2,
+                        viewport_width=1920,
+                        viewport_height=1080,
+                    )
+                    crawl_result = crawler.crawl(url, tmp_dir)
+                    return crawl_result, crawler.get_navigation_graph()
+
+                loop = asyncio.get_running_loop()
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    crawl_result, navigation_graph = await loop.run_in_executor(executor, run_crawl)
+
+                pages = crawl_result.get("pages", [])
+                if not pages:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"No pages could be crawled from {url}. The site may be blocking "
+                            "automated access, require authentication, or be unavailable."
+                        )
+                    )
+
+                site_pages = []
+                for page in pages:
+                    if page.get("screenshot_path") and os.path.exists(page["screenshot_path"]):
+                        site_pages.append({
+                            "url": page["url"],
+                            "title": page["title"],
+                            "screenshot_path": page["screenshot_path"],
+                            "screenshot_base64": page.get("screenshot_base64"),
+                        })
+
+                if not site_pages:
+                    raise HTTPException(status_code=400, detail="No screenshots captured during crawl")
+
+                user_context = {
+                    "users": users or "General users",
+                    "tasks": tasks or "General tasks",
+                    "format": format or "Website",
+                    "content_type": content_type,
+                }
+
+                site_analyzer = SiteAnalyzer()
+                if navigation_graph:
+                    site_analyzer.set_navigation_graph(navigation_graph)
+
+                def run_analysis():
+                    return site_analyzer.analyze_site(site_pages, user_context)
+
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    result = await loop.run_in_executor(executor, run_analysis)
+
+                from src.report_generator import generate_site_report
+                html_report = generate_site_report(result, url)
+
+                user_id = str(user.get("id") or user.get("userId", ""))
+                save_analysis_report(
+                    analysis_result={
+                        "html": html_report,
+                        "statistics": result.get("statistics"),
+                        "site_summary": result.get("site_summary"),
+                    },
+                    analysis_type="url",
+                    user_context=user_context,
+                    metadata={"url": url, "pages_analyzed": len(site_pages)},
+                    user_id=user_id
+                )
+
+                return {
+                    "success": True,
+                    "mode": "analysis",
+                    "report_html": html_report,
+                    "statistics": result.get("statistics"),
+                }
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"[/api/ask url_analysis] error: {e}\n{traceback.format_exc()}")
+            raise _friendly_api_error(e)
 
 
 # ===========================================================

@@ -107,7 +107,7 @@ export function contentTypeToPlatform(contentType: ContentType): PlatformType {
   return mapping[contentType] || 'other';
 }
 
-export type KbVersion = 'v1' | 'v2' | 'both';
+export type KbVersion = 'v1' | 'v2' | 'v2.1' | 'both';
 
 export interface UserContext {
   users: string;
@@ -124,6 +124,9 @@ export interface UserContext {
   attentional_state?: string;
   kb_version?: KbVersion;
   tenet_filter?: string[];
+  verbosity?: 'brief' | 'standard';
+  pass1_model?: 'sonnet' | 'haiku';
+  thorough_mode?: boolean;
 }
 
 export interface ReportStatistics {
