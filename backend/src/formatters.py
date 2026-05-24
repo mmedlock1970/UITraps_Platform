@@ -2458,7 +2458,7 @@ def format_report_as_html(
         html.append("<p class='none-found'>No confirmed traps found ✓</p>")
     elif _multi_task:
         task_names = [
-            (t.get('name') or '').strip() or t.get('description', f'Task {i+1}')
+            (t.get('name') or '').strip() or f'Task {i + 1}'
             for i, t in enumerate(_task_list)
         ]
 

@@ -289,7 +289,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
               {files.length === 0 ? (
                 <>
                   <div className={styles.uploadIcon}>↑</div>
-                  <p className={styles.uploadPrimary}><span>Click to upload</span> or drag and drop</p>
+                  <p className={styles.uploadPrimary}><span>Click to upload screen shot</span> or drag and drop</p>
                   <p className={styles.uploadSecondary}>PNG · JPG · WEBP · PDF · Video</p>
                 </>
               ) : (

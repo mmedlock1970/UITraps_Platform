@@ -1372,7 +1372,7 @@ CONTEXT PROVIDED BY USER:
 {_tasks_block}
 {_task_attribution}
 
-⚠️ IMPORTANT — TASK SCOPE: The task above is ONE specific use case being evaluated. This product almost certainly supports other users and other goals. Your analysis should identify friction for the stated task, but findings and recommendations must remain proportionate to the product's broader purpose. Do not recommend changes that would strip the interface down to serve only this one task.
+{"⚠️ IMPORTANT — MULTI-TASK SCOPE: The tasks above are specific use cases being evaluated. This product almost certainly supports other users and other goals. Your analysis should identify friction for the stated tasks, but findings and recommendations must remain proportionate to the product's broader purpose. Do not recommend changes that would strip the interface down to serve only these tasks." if _multi_task else "⚠️ IMPORTANT — TASK SCOPE: The task above is ONE specific use case being evaluated. This product almost certainly supports other users and other goals. Your analysis should identify friction for the stated task, but findings and recommendations must remain proportionate to the product's broader purpose. Do not recommend changes that would strip the interface down to serve only this one task."}
 {product_context_section}{attentional_state_section}{tenet_filter_section}
 {"4" if has_expertise else "3"}. DESIGN FORMAT:
 {user_context['format']}
