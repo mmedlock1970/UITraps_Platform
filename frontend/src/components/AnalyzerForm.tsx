@@ -160,6 +160,8 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
   const [verbosity, setVerbosity] = useState<'brief' | 'standard'>('standard');
   const [pass1Model, setPass1Model] = useState<'sonnet' | 'haiku'>('sonnet');
   const [thoroughMode, setThoroughMode] = useState(false);
+  const [inputType, setInputType] = useState<'screenshot' | 'video' | 'flow_diagram'>('screenshot');
+  const [flowMode, setFlowMode] = useState<'screen' | 'flow'>('screen');
 
   const toggleTenet = useCallback((tenet: string) => {
     setSelectedTenets(prev =>
@@ -214,7 +216,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
   }, [disabled, validate, files, figmaLink, platform, productDomain, screenName,
       expLevel, techSavvy, frequency, tasks, priorProducts, userDesc, extraContext, productContext,
       physicalEnv, lighting, gripPosition, attentionalState, kbVersion, selectedTenets,
-      verbosity, pass1Model, thoroughMode, onSubmit]);
+      verbosity, pass1Model, thoroughMode, inputType, flowMode, onSubmit]);
 
   const handleFileChange = useCallback((newFiles: FileList | null) => {
     if (!newFiles || newFiles.length === 0) return;
@@ -337,6 +339,33 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
               disabled={disabled}
             />
             {errors.upload && <p className={styles.fieldError}>{errors.upload}</p>}
+          </div>
+
+          {/* Input type selector */}
+          <div className={styles.field} style={{ marginTop: 12 }}>
+            <label className={styles.fieldLabel}>What are you uploading?</label>
+            <div className={styles.kbVersionGroup}>
+              {([
+                ['screenshot', 'Screenshot(s)'],
+                ['video', 'Video / recording'],
+                ['flow_diagram', 'Flow diagram'],
+              ] as const).map(([v, label]) => (
+                <button
+                  key={v}
+                  type="button"
+                  className={`${styles.kbVersionBtn} ${inputType === v ? styles.kbVersionBtnActive : ''}`}
+                  onClick={() => setInputType(v)}
+                  disabled={disabled}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {inputType === 'flow_diagram' && (
+              <p className={styles.fieldHint}>
+                If uploading an image, include all connected screens and their navigation arrows in a single file. Or enter a Figma link above — prototype connections will be extracted automatically.
+              </p>
+            )}
           </div>
 
           {/* Product context */}
@@ -887,6 +916,39 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
             <p className={styles.fieldHint}>
               {!thoroughMode && 'Single-pass analysis. Fast, good coverage for most designs.'}
               {thoroughMode && 'Runs one focused pass per Tenet in parallel, then merges findings. More consistent results, similar speed. Recommended for final reviews.'}
+            </p>
+          </div>
+
+          <hr className={styles.fieldDivider} />
+
+          {/* Flow analysis mode */}
+          <div className={styles.field}>
+            <label className={styles.fieldLabel}>
+              Flow analysis mode
+              {inputType !== 'flow_diagram' && (
+                <span className={styles.fieldHintInline}> — select Flow diagram above to enable</span>
+              )}
+            </label>
+            <div className={`${styles.kbVersionGroup} ${inputType !== 'flow_diagram' ? styles.kbVersionGroupDisabled : ''}`}>
+              {([
+                ['screen', 'Screen analysis'],
+                ['flow', 'Flow analysis'],
+              ] as const).map(([v, label]) => (
+                <button
+                  key={v}
+                  type="button"
+                  className={`${styles.kbVersionBtn} ${flowMode === v ? styles.kbVersionBtnActive : ''}`}
+                  onClick={() => inputType === 'flow_diagram' && setFlowMode(v)}
+                  disabled={disabled || inputType !== 'flow_diagram'}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className={styles.fieldHint}>
+              {flowMode === 'screen'
+                ? 'One pass per screen. Thorough per-screen findings, informed by the flow. Takes longer with more screens.'
+                : 'One pass for the whole journey. Faster. Finds issues that span multiple screens but may miss finer per-screen detail.'}
             </p>
           </div>
 
