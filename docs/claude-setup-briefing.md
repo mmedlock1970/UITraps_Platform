@@ -63,4 +63,10 @@ The following files must stay exactly as they are in the repo unless Steve expli
 - `backend/src/prompts.py` — all LLM prompts
 - `backend/src/formatters.py` — HTML report structure and CSS
 - `backend/data/trap_knowledge_base_v2.md` — the active knowledge base
-- The model names in `backend/src/analyzer.py` lines 75–76 (`claude-sonnet-4-6` and `claude-haiku-4-5-20251001`)
+- The model names in `backend/src/analyzer.py` (`claude-sonnet-4-6` and `claude-haiku-4-5-20251001`)
+- The `_ANALYSIS_GROUPS` class variable and `_run_tenet_parallel` / `_merge_reports` methods in `backend/src/analyzer.py` — these implement the Thorough analysis mode (12 parallel tenet-focused calls) and the deduplication merge logic
+
+**Key features to know about**
+
+- **Thorough mode**: The form has a Standard | Thorough toggle in Card 5 (Analysis Scope). When Thorough is selected the backend runs 12 parallel Pass 1 API calls (one per tenet / sub-tenet group), merges and deduplicates the results, then runs a single Pass 2 enrichment pass. This eliminates inconsistency between repeated runs. The `thorough_mode` flag flows: form toggle → `client.ts` → `app.py` (`thorough_mode` form field) → `analyzer.py` `analyze_design(thorough_mode=True)`.
+- **Report metadata**: Every report shows "Analysis coverage: Standard" or "Analysis coverage: Thorough" in the metrics block, positioned after Knowledge base and before Time to complete.
