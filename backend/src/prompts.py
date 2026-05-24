@@ -1340,6 +1340,27 @@ USE ENVIRONMENT:
         "Prioritize the most important information. Omit elaboration and examples.\n"
     ) if verbosity == "brief" else ""
 
+    _task_list = user_context.get('task_list') or []
+    _multi_task = len(_task_list) > 1
+    if _multi_task:
+        _task_lines = []
+        for _idx, _t in enumerate(_task_list, 1):
+            _name = _t.get('name', '').strip()
+            _desc = _t.get('description', '').strip()
+            _task_lines.append(f"{_idx}. {(_name + ': ' + _desc) if _name else _desc}")
+        _tasks_block = '\n'.join(_task_lines)
+        _task_attribution = (
+            "\n⚠️ MULTI-TASK ATTRIBUTION: Multiple tasks are defined above. "
+            "For every finding in critical_issues, moderate_issues, and minor_issues, "
+            "set the `task` field to the exact task name it most directly applies to "
+            "(use the name exactly as written above, e.g. 'Checkout', not a paraphrase), "
+            "or to 'general' if the issue applies equally across all tasks or is not "
+            "task-specific. Every issue must have a `task` field when multiple tasks are defined."
+        )
+    else:
+        _tasks_block = user_context['tasks']
+        _task_attribution = ""
+
     context_text = f"""Please analyze this UI design using the UI Tenets & Traps framework.
 
 CONTEXT PROVIDED BY USER:
@@ -1348,7 +1369,8 @@ CONTEXT PROVIDED BY USER:
 {user_context['users']}
 {expertise_section}
 {"3" if has_expertise else "2"}. WHAT IS THE TASK BEING EVALUATED?
-{user_context['tasks']}
+{_tasks_block}
+{_task_attribution}
 
 ⚠️ IMPORTANT — TASK SCOPE: The task above is ONE specific use case being evaluated. This product almost certainly supports other users and other goals. Your analysis should identify friction for the stated task, but findings and recommendations must remain proportionate to the product's broader purpose. Do not recommend changes that would strip the interface down to serve only this one task.
 {product_context_section}{attentional_state_section}{tenet_filter_section}
