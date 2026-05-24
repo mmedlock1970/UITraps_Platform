@@ -396,6 +396,79 @@ class FigmaAnalyzer:
         }
 
 
+def build_flow_map(frames: List[Dict], flows: List[Dict]) -> Dict:
+    """
+    Build per-frame flow context and a complete flow summary from prototype data.
+
+    Args:
+        frames: list of {id, name, ...} from analyze_figma_file()
+        flows:  list of {from_node, from_name, from_frame, from_frame_name,
+                         to_node, trigger} from get_prototype_flows()
+
+    Returns:
+        {
+            'per_frame': {
+                frame_id: {
+                    'name': str,
+                    'reached_from': [{'screen': str, 'via': str}],
+                    'leads_to':     [{'screen': str, 'via': str}]
+                }
+            },
+            'summary': str
+        }
+    """
+    id_to_name: Dict[str, str] = {f['id']: f['name'] for f in frames}
+
+    per_frame: Dict[str, Dict] = {
+        f['id']: {'name': f['name'], 'reached_from': [], 'leads_to': []}
+        for f in frames
+    }
+
+    for flow in flows:
+        from_frame_id   = flow.get('from_frame', '')
+        from_frame_name = flow.get('from_frame_name', '')
+        element_name    = flow.get('from_name', 'element')
+        to_id           = flow.get('to_node', '')
+        dest_name       = id_to_name.get(to_id)
+
+        if not dest_name:
+            continue  # destination not in our analyzed frames list
+
+        via_label = f'tap on "{element_name}"'
+
+        if from_frame_id in per_frame:
+            per_frame[from_frame_id]['leads_to'].append(
+                {'screen': dest_name, 'via': via_label}
+            )
+
+        if to_id in per_frame:
+            per_frame[to_id]['reached_from'].append(
+                {'screen': from_frame_name or 'Previous screen', 'via': via_label}
+            )
+
+    # Build summary string
+    nav_lines = []
+    for frame in frames:
+        fid = frame['id']
+        ctx = per_frame[fid]
+        if ctx['leads_to']:
+            parts = []
+            for l in ctx['leads_to']:
+                label = l['via'].replace('tap on "', '').replace('"', '')
+                parts.append('"' + label + '" -> ' + l['screen'])
+            transitions = ', '.join(parts)
+            nav_lines.append(f"  {ctx['name']}: {transitions}")
+
+    frame_names = [f['name'] for f in frames]
+    flow_chain = ' -> '.join(frame_names[:6])
+    if len(frame_names) > 6:
+        flow_chain += ' -> ...'
+
+    summary = f"Complete flow: {flow_chain}\nNavigation map:\n" + '\n'.join(nav_lines)
+
+    return {'per_frame': per_frame, 'summary': summary}
+
+
 def main():
     """Example usage of FigmaAnalyzer."""
     import sys
