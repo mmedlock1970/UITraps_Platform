@@ -239,14 +239,30 @@ class FigmaAnalyzer:
             file_data: File data from get_file_data()
 
         Returns:
-            List of flow connections: [{'from': node_id, 'to': node_id, 'action': ...}]
+            List of flow connections: [{
+                'from_node':       element node ID,
+                'from_name':       element name,
+                'from_frame':      parent frame ID,
+                'from_frame_name': parent frame name,
+                'to_node':         destination frame ID,
+                'trigger':         trigger type string
+            }]
         """
         flows = []
 
-        def traverse_for_interactions(node):
+        def traverse_for_interactions(node, current_frame_id='', current_frame_name=''):
             """Find all prototype interactions in the node tree."""
             if not node:
                 return
+            node_type = node.get('type', '')
+
+            # Track current frame context as we descend
+            frame_id = current_frame_id
+            frame_name = current_frame_name
+            if node_type == 'FRAME':
+                frame_id = node.get('id', '')
+                frame_name = node.get('name', 'Unnamed')
+
             # Check for interactions on this node
             interactions = node.get('interactions') or []
             for interaction in interactions:
@@ -263,13 +279,15 @@ class FigmaAnalyzer:
                     flows.append({
                         'from_node': node.get('id', ''),
                         'from_name': node.get('name', 'Unnamed'),
+                        'from_frame': frame_id,
+                        'from_frame_name': frame_name,
                         'to_node': destination_id,
                         'trigger': trigger.get('type', 'UNKNOWN')
                     })
 
-            # Recurse into children
+            # Recurse into children, passing current frame context
             for child in node.get('children') or []:
-                traverse_for_interactions(child)
+                traverse_for_interactions(child, frame_id, frame_name)
 
         # Traverse all pages
         document = file_data.get('document') or {}
