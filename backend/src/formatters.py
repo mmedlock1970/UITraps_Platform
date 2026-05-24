@@ -1144,6 +1144,19 @@ def get_report_base_css() -> str:
             border-bottom: 1px solid #e4e1dc;
         }
         .confidence-group-header:first-of-type { margin-top: 8px; }
+        .task-section-header {
+            font-size: 1.05em;
+            font-weight: 700;
+            color: #2c2a27;
+            margin: 28px 0 4px;
+            padding-bottom: 6px;
+            border-bottom: 2px solid #e4e1dc;
+        }
+        .task-section-desc {
+            color: #8a8680;
+            font-size: 0.88em;
+            margin: 0 0 14px;
+        }
         .traps-not-found {
             padding: 22px 24px;
             border-radius: 14px;
@@ -2135,13 +2148,23 @@ def format_report_as_html(
         html.append("</div>")
 
         # Format tasks as bulleted list
-        raw_tasks = user_context.get('tasks', 'N/A')
-        task_list = parse_tasks(raw_tasks)
-        html.append("<p><strong>Task(s) evaluated:</strong></p>")
-        html.append("<ul>")
-        for task in task_list:
-            html.append(f"<li>{task}</li>")
-        html.append("</ul>")
+        _tl = user_context.get('task_list') or []
+        if len(_tl) > 1:
+            html.append("<p><strong>Task(s) evaluated:</strong></p>")
+            html.append("<ul>")
+            for _t in _tl:
+                _n = _t.get('name', '').strip()
+                _d = _t.get('description', '').strip()
+                html.append(f"<li><strong>{_n}</strong>: {_d}</li>" if _n else f"<li>{_d}</li>")
+            html.append("</ul>")
+        else:
+            raw_tasks = user_context.get('tasks', 'N/A')
+            task_list_display = parse_tasks(raw_tasks)
+            html.append("<p><strong>Task(s) evaluated:</strong></p>")
+            html.append("<ul>")
+            for task in task_list_display:
+                html.append(f"<li>{task}</li>")
+            html.append("</ul>")
 
         # When re-analyzed via chat, surface the user's instructions so overrides are visible
         chat_content = user_context.get('chat_context_content', '')
@@ -2406,7 +2429,7 @@ def format_report_as_html(
         html.append("</div>")  # close issue-card-body
         html.append("</div>")  # close issue-card
 
-    # Partition all issues: high confidence (confidence='high') vs. lower (everything else + potentials)
+    # ── Traps Found ──
     all_confirmed = (
         [('critical', i) for i in report.get('critical_issues', [])] +
         [('moderate', i) for i in report.get('moderate_issues', [])] +
@@ -2414,28 +2437,93 @@ def format_report_as_html(
     )
     sev_order = {'critical': 0, 'moderate': 1, 'minor': 2}
 
-    high_conf = sorted(
-        [(s, i) for s, i in all_confirmed if i.get('confidence', '').lower() == 'high'],
-        key=lambda x: sev_order.get(x[0], 2)
-    )
-    low_conf = sorted(
-        [(s, i) for s, i in all_confirmed if i.get('confidence', '').lower() != 'high'],
-        key=lambda x: sev_order.get(x[0], 2)
-    )
-    # Fold potential_issues into low_conf as minor severity
+    # Fold potential_issues into the lower-confidence pool
+    potential_pool = []
     for p in report.get('potential_issues', []):
         norm = dict(p)
         if 'problem' not in norm and 'observation' in norm:
             norm['problem'] = norm.pop('observation')
         norm.setdefault('confidence', 'low')
-        # Generate a headline from trap name if none provided
         if not norm.get('headline') and norm.get('trap_name'):
             norm['headline'] = norm['trap_name'].title()
-        low_conf.append(('minor', norm))
+        potential_pool.append(('minor', norm))
 
-    if high_conf or low_conf:
-        html.append("<div class='issues-section'>")
-        html.append("<h2>Traps Found</h2>")
+    _task_list = (user_context or {}).get('task_list') or []
+    _multi_task = len(_task_list) > 1
+
+    html.append("<div class='issues-section'>")
+    html.append("<h2>Traps Found</h2>")
+
+    if not all_confirmed and not potential_pool:
+        html.append("<p class='none-found'>No confirmed traps found ✓</p>")
+    elif _multi_task:
+        task_names = [
+            (t.get('name') or '').strip() or t.get('description', f'Task {i+1}')
+            for i, t in enumerate(_task_list)
+        ]
+
+        def _match_task(issue_task_field):
+            if not issue_task_field or issue_task_field.strip().lower() == 'general':
+                return None
+            itf_lower = issue_task_field.strip().lower()
+            for tn in task_names:
+                if tn.lower() == itf_lower or tn.lower() in itf_lower or itf_lower in tn.lower():
+                    return tn
+            return None  # unmatched → general
+
+        general_issues = []
+        per_task = {tn: [] for tn in task_names}
+        for sev_class, issue in all_confirmed + potential_pool:
+            matched = _match_task(issue.get('task', ''))
+            if matched:
+                per_task[matched].append((sev_class, issue))
+            else:
+                general_issues.append((sev_class, issue))
+
+        finding_num = [0]  # use list so inner function can mutate
+
+        def _render_confidence_group(items):
+            hc = sorted(
+                [(s, iss) for s, iss in items if iss.get('confidence', '').lower() == 'high'],
+                key=lambda x: sev_order.get(x[0], 2)
+            )
+            lc = sorted(
+                [(s, iss) for s, iss in items if iss.get('confidence', '').lower() != 'high'],
+                key=lambda x: sev_order.get(x[0], 2)
+            )
+            if hc:
+                html.append("<h4 class='confidence-group-header'>Higher confidence</h4>")
+                for sc, iss in hc:
+                    finding_num[0] += 1
+                    render_trap_card(iss, sc, finding_num[0])
+            if lc:
+                html.append("<h4 class='confidence-group-header'>Lower confidence</h4>")
+                for sc, iss in lc:
+                    finding_num[0] += 1
+                    render_trap_card(iss, sc, finding_num[0])
+
+        if general_issues:
+            html.append("<h3 class='task-section-header'>General Findings</h3>")
+            html.append("<p class='task-section-desc'>These findings apply across all tasks or are not task-specific.</p>")
+            _render_confidence_group(general_issues)
+
+        for tn in task_names:
+            bucket = per_task.get(tn, [])
+            if bucket:
+                html.append(f"<h3 class='task-section-header'>Task: {tn}</h3>")
+                _render_confidence_group(bucket)
+
+    else:
+        # Single-task: original flat confidence split
+        high_conf = sorted(
+            [(s, i) for s, i in all_confirmed if i.get('confidence', '').lower() == 'high'],
+            key=lambda x: sev_order.get(x[0], 2)
+        )
+        low_conf = sorted(
+            [(s, i) for s, i in all_confirmed if i.get('confidence', '').lower() != 'high'],
+            key=lambda x: sev_order.get(x[0], 2)
+        ) + potential_pool
+
         finding_num = 0
         if high_conf:
             html.append("<h3 class='confidence-group-header'>Higher confidence</h3>")
@@ -2447,12 +2535,8 @@ def format_report_as_html(
             for sev_class, issue in low_conf:
                 finding_num += 1
                 render_trap_card(issue, sev_class, finding_num)
-        html.append("</div>")
-    else:
-        html.append("<div class='issues-section'>")
-        html.append("<h2>Traps Found</h2>")
-        html.append("<p class='none-found'>No confirmed traps found ✓</p>")
-        html.append("</div>")
+
+    html.append("</div>")
 
     # Positive Observations
     html.append("<div class='positives-section'>")
