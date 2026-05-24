@@ -443,6 +443,9 @@ export async function unifiedAsk(options: UnifiedAskOptions): Promise<UnifiedAsk
   if (context) {
     formData.append('users', context.users);
     formData.append('tasks', context.tasks);
+    if (context.task_list && context.task_list.length > 1) {
+      formData.append('task_list', JSON.stringify(context.task_list));
+    }
     formData.append('format', context.format);
     formData.append('content_type', context.contentType || 'website');
     if (context.design_name) formData.append('design_name', context.design_name);

@@ -113,6 +113,7 @@ export interface UserContext {
   users: string;
   expertise?: string;
   tasks: string;
+  task_list?: Array<{ name: string; description: string }>;
   format: string;
   design_name?: string;
   contentType?: ContentType;
