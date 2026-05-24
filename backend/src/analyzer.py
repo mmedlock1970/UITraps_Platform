@@ -10,7 +10,7 @@ Unauthorized reproduction, distribution, or use is prohibited.
 import os
 import base64
 import time
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, List, Optional, Tuple
 from pathlib import Path
 from anthropic import Anthropic
 
@@ -405,6 +405,98 @@ class UITrapsAnalyzer:
                 f"issue{'s' if total != 1 else ''} across the full framework "
                 f"({', '.join(parts)})."
             )
+
+        return merged
+
+    def analyze_flow_diagram(
+        self,
+        frames: List[Dict],
+        flow_map: Dict,
+        user_context: Dict[str, str],
+        mode: str = 'screen',
+        timeout: int = 120,
+        kb_version: str = 'v2',
+        verbosity: str = 'standard',
+        pass1_model: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Analyze Figma frames with flow-aware context.
+
+        Screen mode: one _pass1 call per frame with per-frame flow context injected
+                     into extra_context. Results are merged like tenet-parallel mode.
+        Flow mode:   single _pass1 call using the first frame's image with the complete
+                     flow summary injected into extra_context. Faster; focuses on
+                     cross-screen traps.
+        """
+        try:
+            from .prompts import build_flow_context_section
+        except ImportError:
+            from prompts import build_flow_context_section
+
+        valid_frames = [f for f in frames if f.get('image_path')]
+        if not valid_frames:
+            raise ValueError("No exportable frames found")
+
+        if mode == 'flow':
+            ctx = dict(user_context)
+            flow_section = build_flow_context_section(
+                flow_summary=flow_map.get('summary', ''),
+                mode='flow',
+            )
+            frames_list = '\n'.join(f"  - {f['name']}" for f in valid_frames)
+            existing_extra = ctx.get('extra_context', '')
+            ctx['extra_context'] = (
+                flow_section
+                + f"\nFrames included in this flow:\n{frames_list}"
+                + ('\n' + existing_extra if existing_extra else '')
+            ).strip()
+
+            report = self._pass1(
+                design_file=valid_frames[0]['image_path'],
+                user_context=ctx,
+                timeout=timeout,
+                kb_version=kb_version,
+                verbosity=verbosity,
+                pass1_model=pass1_model,
+            )
+            reports = [report]
+        else:
+            # Screen mode: one call per frame with per-frame flow context
+            reports = []
+            for frame in valid_frames:
+                ctx = dict(user_context)
+                per_frame_ctx = flow_map.get('per_frame', {}).get(frame['id'])
+                if per_frame_ctx:
+                    flow_section = build_flow_context_section(
+                        flow_context=per_frame_ctx, mode='screen'
+                    )
+                    existing_extra = ctx.get('extra_context', '')
+                    ctx['extra_context'] = (
+                        flow_section
+                        + ('\n' + existing_extra if existing_extra else '')
+                    ).strip()
+                report = self._pass1(
+                    design_file=frame['image_path'],
+                    user_context=ctx,
+                    timeout=timeout,
+                    kb_version=kb_version,
+                    verbosity=verbosity,
+                    pass1_model=pass1_model,
+                )
+                reports.append(report)
+
+        merged = self._merge_reports(reports)
+
+        for _opt in ['critical_issues', 'moderate_issues', 'minor_issues',
+                     'positive_observations', 'potential_issues', 'traps_checked_not_found',
+                     'flagged_for_human_review', 'incomplete_flow_findings']:
+            if not isinstance(merged.get(_opt), list):
+                merged[_opt] = []
+
+        try:
+            merged = self._enrich_report(merged, timeout=timeout, kb_version=kb_version, verbosity=verbosity)
+        except Exception as e:
+            print(f"[UITraps] Flow analysis Pass 2 enrichment skipped (non-fatal): {e}")
 
         return merged
 
