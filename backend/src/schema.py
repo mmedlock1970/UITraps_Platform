@@ -99,6 +99,15 @@ UI_ANALYSIS_SCHEMA = {
                         "enum": ["high", "medium", "low"],
                         "description": "Confidence level in this finding"
                     },
+                    "task": {
+                        "type": "string",
+                        "description": (
+                            "Task this finding most directly relates to. "
+                            "Set to the exact task name from the WHAT IS THE TASK BEING EVALUATED section, "
+                            "or 'general' if the issue applies across all tasks or is not task-specific. "
+                            "Omit when only one task is defined."
+                        )
+                    },
                     "region": {
                         "type": "object",
                         "description": "Bounding box of the specific UI element or area where this issue occurs, as normalized coordinates (0.0–1.0, origin top-left corner of the image). Include when you can clearly identify a bounded area; omit when the issue spans the full interface or cannot be spatially bounded.",
@@ -133,6 +142,15 @@ UI_ANALYSIS_SCHEMA = {
                         "type": "string",
                         "enum": ["high", "medium", "low"]
                     },
+                    "task": {
+                        "type": "string",
+                        "description": (
+                            "Task this finding most directly relates to. "
+                            "Set to the exact task name from the WHAT IS THE TASK BEING EVALUATED section, "
+                            "or 'general' if the issue applies across all tasks or is not task-specific. "
+                            "Omit when only one task is defined."
+                        )
+                    },
                     "region": {
                         "type": "object",
                         "description": "Bounding box of the specific UI element or area where this issue occurs, as normalized coordinates (0.0–1.0, origin top-left). Include when you can clearly identify a bounded area; omit when the issue spans the full interface.",
@@ -166,6 +184,15 @@ UI_ANALYSIS_SCHEMA = {
                     "confidence": {
                         "type": "string",
                         "enum": ["high", "medium", "low"]
+                    },
+                    "task": {
+                        "type": "string",
+                        "description": (
+                            "Task this finding most directly relates to. "
+                            "Set to the exact task name from the WHAT IS THE TASK BEING EVALUATED section, "
+                            "or 'general' if the issue applies across all tasks or is not task-specific. "
+                            "Omit when only one task is defined."
+                        )
                     },
                     "region": {
                         "type": "object",
