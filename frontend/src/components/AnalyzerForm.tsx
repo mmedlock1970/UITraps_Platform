@@ -363,7 +363,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
             </div>
             {inputType === 'flow_diagram' && (
               <p className={styles.fieldHint}>
-                If uploading an image, include all connected screens and their navigation arrows in a single file. Or enter a Figma link above — prototype connections will be extracted automatically.
+                If uploading an image of a flow, include all connected screens and their navigation arrows in a single file. Or enter a Figma link above — prototype connections will be extracted automatically.
               </p>
             )}
           </div>
