@@ -373,6 +373,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
                 </span>
                 {files.length > 0 && (
                   <span className={styles.inferredTypeAlts}>
+                    <span className={styles.inferredTypeChangeLabel}>Change to:</span>
                     {(['screenshot', 'video', 'flow_diagram'] as const)
                       .filter(t => t !== inputType)
                       .map(t => (

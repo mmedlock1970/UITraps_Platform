@@ -691,8 +691,15 @@
 
 .inferredTypeAlts {
   display: flex;
+  align-items: center;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+.inferredTypeChangeLabel {
+  font-size: 12px;
+  color: var(--uitraps-text-muted);
+  white-space: nowrap;
 }
 
 .inferredTypeChip {
