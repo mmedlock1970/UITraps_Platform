@@ -687,21 +687,20 @@ Before beginning your trap-by-trap analysis, scan the entire interface and catal
 
 - UNCOMPREHENDED ELEMENT: **⚠️ REQUIRES HUMAN JUDGMENT - ALWAYS FLAG FOR REVIEW**
 
-  **DEFINITION:** An element is visible and noticed, but the user cannot understand its meaning, purpose, or how it differs from similar elements. This includes icons, labels, terminology — AND any content block (product card, feature list, option description) where what is presented is too sparse or ambiguous to allow the user to understand what they are looking at or make an informed decision.
+  **DEFINITION:** An element is visible and noticed, but the user cannot understand its meaning, purpose, or how it relates to their decision. This includes icons, labels, terminology, and any content where what is presented is insufficient for the user to understand what they are looking at or act with confidence.
 
   **WHAT IS UNCOMPREHENDED ELEMENT:**
   - Unfamiliar icons (e.g., branded icon instead of standard magnifying glass for search)
   - Unfamiliar terminology (e.g., regional jargon like "tabs" for vehicle registration)
   - Ambiguous labels (e.g., button labeled with unclear action word)
   - Icons without text labels that users might not recognize
-  - Product, plan, or feature cards that show only a name and price with no description, making it impossible for users to understand what they would receive or how options differ from one another
-  - Any UI element whose visible content is insufficient for the user to understand its purpose, contents, or distinction from similar elements
+  - Any element where the information provided is insufficient for the user to understand it well enough to make a decision or take action
 
   **CRITICAL DISAMBIGUATION — UNCOMPREHENDED ELEMENT vs. INFORMATION OVERLOAD:**
-  These two traps are opposites. Applying the wrong one is always wrong.
-  - INFORMATION OVERLOAD = too MUCH content; the task or action is buried, obscured, or hard to find because of volume
-  - UNCOMPREHENDED ELEMENT = too LITTLE or too VAGUE content; the element is visible but the user cannot understand what it is, what they get, or how it differs
-  If you are about to write a problem description that says "the opposite of overload" or "lack of information" — stop. That is UNCOMPREHENDED ELEMENT, not INFORMATION OVERLOAD.
+  These two traps describe opposite conditions. Never apply one while acknowledging the other describes the situation better.
+  - INFORMATION OVERLOAD = the volume of content makes it hard for the user to find or act on what matters
+  - UNCOMPREHENDED ELEMENT = the content that is present does not give the user enough to understand the element or act confidently
+  This test also applies generally: if your problem description contradicts the trap you have named — stating the issue is the reverse of, or opposite to, the trap's definition — you have chosen the wrong trap. Stop, reconsider, and reclassify.
 
   **WHAT IS NOT UNCOMPREHENDED ELEMENT (DO NOT USE THIS TRAP FOR):**
   - Filter/dropdown state not visible → Use FEEDBACK FAILURE instead
