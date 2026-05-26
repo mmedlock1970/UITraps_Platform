@@ -687,14 +687,21 @@ Before beginning your trap-by-trap analysis, scan the entire interface and catal
 
 - UNCOMPREHENDED ELEMENT: **⚠️ REQUIRES HUMAN JUDGMENT - ALWAYS FLAG FOR REVIEW**
 
-  **DEFINITION:** A label, icon, or other interface element is noticed, but its MEANING is unclear.
-  This trap is ONLY about terminology, iconography, or labeling confusion.
+  **DEFINITION:** An element is visible and noticed, but the user cannot understand its meaning, purpose, or how it differs from similar elements. This includes icons, labels, terminology — AND any content block (product card, feature list, option description) where what is presented is too sparse or ambiguous to allow the user to understand what they are looking at or make an informed decision.
 
   **WHAT IS UNCOMPREHENDED ELEMENT:**
   - Unfamiliar icons (e.g., branded icon instead of standard magnifying glass for search)
   - Unfamiliar terminology (e.g., regional jargon like "tabs" for vehicle registration)
   - Ambiguous labels (e.g., button labeled with unclear action word)
   - Icons without text labels that users might not recognize
+  - Product, plan, or feature cards that show only a name and price with no description, making it impossible for users to understand what they would receive or how options differ from one another
+  - Any UI element whose visible content is insufficient for the user to understand its purpose, contents, or distinction from similar elements
+
+  **CRITICAL DISAMBIGUATION — UNCOMPREHENDED ELEMENT vs. INFORMATION OVERLOAD:**
+  These two traps are opposites. Applying the wrong one is always wrong.
+  - INFORMATION OVERLOAD = too MUCH content; the task or action is buried, obscured, or hard to find because of volume
+  - UNCOMPREHENDED ELEMENT = too LITTLE or too VAGUE content; the element is visible but the user cannot understand what it is, what they get, or how it differs
+  If you are about to write a problem description that says "the opposite of overload" or "lack of information" — stop. That is UNCOMPREHENDED ELEMENT, not INFORMATION OVERLOAD.
 
   **WHAT IS NOT UNCOMPREHENDED ELEMENT (DO NOT USE THIS TRAP FOR):**
   - Filter/dropdown state not visible → Use FEEDBACK FAILURE instead
