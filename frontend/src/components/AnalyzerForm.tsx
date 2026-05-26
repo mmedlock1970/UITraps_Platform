@@ -133,9 +133,12 @@ const INPUT_TYPE_CHIP_LABELS = {
   flow_diagram: 'Flow diagram',
 } as const;
 
+const FLOW_FILENAME_RE = /flow|diagram|journey|wireflow/i;
+
 function inferFileType(files: File[], figmaLink: string): 'screenshot' | 'video' | 'flow_diagram' {
   if (figmaLink.trim() && files.length === 0) return 'flow_diagram';
   if (files.some(f => isVideoFile(f))) return 'video';
+  if (files.some(f => FLOW_FILENAME_RE.test(f.name))) return 'flow_diagram';
   return 'screenshot';
 }
 
@@ -177,7 +180,8 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
   const [pass1Model, setPass1Model] = useState<'sonnet' | 'haiku'>('sonnet');
   const [thoroughMode, setThoroughMode] = useState(false);
   const [lockedInputType, setLockedInputType] = useState<'screenshot' | 'video' | 'flow_diagram' | null>(null);
-  const inputType = lockedInputType ?? inferFileType(files, figmaLink);
+  const [autoDetectedType, setAutoDetectedType] = useState<'flow_diagram' | null>(null);
+  const inputType = lockedInputType ?? autoDetectedType ?? inferFileType(files, figmaLink);
 
   const toggleTenet = useCallback((tenet: string) => {
     setSelectedTenets(prev =>
@@ -199,10 +203,28 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Reset manual override when all files and figma link are cleared
+  // Reset manual override and auto-detection when all files and figma link are cleared
   useEffect(() => {
-    if (files.length === 0 && !figmaLink.trim()) setLockedInputType(null);
+    if (files.length === 0 && !figmaLink.trim()) {
+      setLockedInputType(null);
+      setAutoDetectedType(null);
+    }
   }, [files, figmaLink]);
+
+  // Detect flow diagrams from image aspect ratio (wide images = likely a flow)
+  useEffect(() => {
+    const singleImage = files.length === 1 && isImageFile(files[0]) ? files[0] : null;
+    if (!singleImage) { setAutoDetectedType(null); return; }
+    const url = URL.createObjectURL(singleImage);
+    const img = new Image();
+    img.onload = () => {
+      setAutoDetectedType(img.width > img.height * 1.8 ? 'flow_diagram' : null);
+      URL.revokeObjectURL(url);
+    };
+    img.onerror = () => { setAutoDetectedType(null); URL.revokeObjectURL(url); };
+    img.src = url;
+    return () => URL.revokeObjectURL(url);
+  }, [files]);
 
   // Create and revoke object URLs for image thumbnails
   useEffect(() => {
