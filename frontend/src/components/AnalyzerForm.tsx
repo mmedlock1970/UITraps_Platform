@@ -389,9 +389,14 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
                       ))}
                   </span>
                 )}
-                {inputType === 'flow_diagram' && (
+                {inputType === 'flow_diagram' && files.length === 0 && (
                   <p className={styles.fieldHint} style={{ marginTop: 6 }}>
-                    If uploading an image of a flow, include all connected screens and their navigation arrows in a single file. Or enter a Figma link above — prototype connections will be extracted automatically.
+                    Prototype connections will be extracted automatically. Choose screen or flow analysis mode in Card 5 below.
+                  </p>
+                )}
+                {inputType === 'flow_diagram' && files.length > 0 && (
+                  <p className={styles.fieldHint} style={{ marginTop: 6 }}>
+                    Include all connected screens and their navigation arrows in a single file.
                   </p>
                 )}
               </div>
