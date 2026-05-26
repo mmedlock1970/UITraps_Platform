@@ -2058,6 +2058,106 @@ async def unified_ask(
             )
             extra_context = (_flow_preamble + '\n' + (extra_context or '')).strip()
 
+        # ── PDF path: convert pages to images, then route through normal pipeline ──
+        _pdf_file = next(
+            (f for f in files
+             if f.content_type == 'application/pdf' or (f.filename or '').lower().endswith('.pdf')),
+            None
+        )
+        if _pdf_file is not None:
+            if not is_pymupdf_available():
+                raise HTTPException(
+                    status_code=503,
+                    detail="PDF analysis is not available on this server. Please export your PDF pages as PNG or JPEG images and upload those instead."
+                )
+            _pdf_contents = await _pdf_file.read()
+            if len(_pdf_contents) > 50 * 1024 * 1024:
+                raise HTTPException(status_code=400, detail="PDF too large (max 50MB)")
+            _pdf_tmp_path = None
+            try:
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as _pdf_tmp:
+                    _pdf_tmp.write(_pdf_contents)
+                    _pdf_tmp_path = _pdf_tmp.name
+                _pdf_analyzer_inst = PdfAnalyzer()
+                with tempfile.TemporaryDirectory() as _pdf_img_dir:
+                    _page_tuples = _pdf_analyzer_inst.convert_pages_to_images(
+                        _pdf_tmp_path, output_dir=_pdf_img_dir, max_pages=20
+                    )
+                    _pdf_img_paths = [p for p, _ in _page_tuples]
+                    if not _pdf_img_paths:
+                        raise HTTPException(status_code=400, detail="No pages could be extracted from the PDF.")
+
+                    user_context = {
+                        "users": users, "tasks": tasks, "format": format,
+                        "content_type": content_type,
+                        "extra_context": extra_context or "",
+                        "product_context": product_context or "",
+                        "physical_env": physical_env or "",
+                        "lighting": lighting or "",
+                        "grip_position": grip_position or "",
+                        "attentional_state": attentional_state or "",
+                        "tenet_filter": tenet_filter or "",
+                        "design_name": design_name or "",
+                        "task_list": _task_list_parsed,
+                    }
+                    user_id = str(user.get("id") or user.get("userId", ""))
+                    logger.info(f"[/api/ask pdf] {len(_pdf_img_paths)} page(s) extracted from {_pdf_file.filename}")
+
+                    if len(_pdf_img_paths) == 1:
+                        result = get_analyzer().analyze_design(
+                            design_file=_pdf_img_paths[0],
+                            user_context=user_context,
+                            chat_context=chat_context,
+                            kb_version=kb_version,
+                            verbosity=verbosity,
+                            pass1_model=pass1_model,
+                            thorough_mode=(thorough_mode == 'true'),
+                        )
+                        save_analysis_report(
+                            analysis_result=result,
+                            analysis_type="single_image",
+                            user_context=user_context,
+                            metadata={"file_name": _pdf_file.filename, "source": "pdf"},
+                            user_id=user_id,
+                        )
+                        return {
+                            "success": True,
+                            "mode": "analysis",
+                            "kb_version": kb_version,
+                            "report_html": result.get("html"),
+                            "report_markdown": result.get("markdown"),
+                            "statistics": result.get("statistics"),
+                        }
+                    else:
+                        result = get_multi_analyzer().analyze_images(
+                            _pdf_img_paths, user_context, chat_context=chat_context
+                        )
+                        save_analysis_report(
+                            analysis_result=result,
+                            analysis_type="multi_image",
+                            user_context=user_context,
+                            metadata={"file_name": _pdf_file.filename, "source": "pdf", "page_count": len(_pdf_img_paths)},
+                            user_id=user_id,
+                        )
+                        return {
+                            "success": True,
+                            "mode": "analysis",
+                            "report_html": result.get("html"),
+                            "report_markdown": result.get("markdown"),
+                            "statistics": result.get("statistics"),
+                        }
+            except HTTPException:
+                raise
+            except Exception as _pdf_err:
+                logger.error(f"[/api/ask pdf] error: {_pdf_err}\n{traceback.format_exc()}")
+                raise _friendly_api_error(_pdf_err)
+            finally:
+                if _pdf_tmp_path:
+                    try:
+                        os.unlink(_pdf_tmp_path)
+                    except Exception:
+                        pass
+
         # Determine single vs multi image
         if len(files) == 1:
             image = files[0]
