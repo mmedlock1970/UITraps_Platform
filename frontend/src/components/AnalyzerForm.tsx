@@ -353,7 +353,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
                 </>
               )}
             </div>
-            <div className={styles.uploadDivider}>or include a Figma design link (optional)</div>
+            <div className={styles.uploadDivider}>or include a Figma design link</div>
             <input
               id="figmaLinkInput"
               type="text"
