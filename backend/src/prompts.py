@@ -922,11 +922,19 @@ The only exception: technical facts visible in the UI (e.g. "the button is not v
 - List traps you specifically looked for but did not find OR could not evaluate from static design
 - Note positive design elements
 
-⚠️ TRAP NAME VALIDATION (CRITICAL):
-You may ONLY use these trap names - do NOT invent new names:
+⚠️ TRAP NAME VALIDATION — NON-NEGOTIABLE:
+You may ONLY use these exact trap names. Do NOT invent, abbreviate, combine, or extend them:
 {trap_names_line}
 
-If an issue doesn't fit one of these traps, it is NOT a UI Trap - do not report it as one.
+Every finding in critical_issues, moderate_issues, and minor_issues MUST use one of these names verbatim in the `trap_name` field. If a name is not in this list, it is not a UI Trap — full stop.
+
+WHEN SOMETHING DOESN'T FIT A TRAP — apply this decision tree in order:
+1. First, try to map it to the closest existing trap. Example: placeholder content visible to users → INCORRECT INFORMATION (content wrong for any user regardless of goals). Content that actively misleads this user → BAD PREDICTION. An element that prevents task completion → INVISIBLE ELEMENT.
+2. If it is a technical failure (missing content, broken layout, error state, placeholder text) → report it in bugs_detected, NOT as a trap.
+3. If the interface explicitly signals unfinished work (e.g., "[content to be added]", draft markers, "coming soon" labels) → report it in bugs_detected with type "missing_content". Do NOT report it as a UI Trap — the design is openly marking work in progress, not making a false or misleading claim.
+4. If it is a genuine UX concern but cannot be mapped to any canonical trap → include it in potential_issues with a clear observation. Leave trap_name blank or omit it. Never invent a trap name to describe it.
+
+FORBIDDEN — these are NOT trap names and must never appear in findings: MISSING_CONTENT, INCOMPLETE_CONTENT, NO_CONTENT, PLACEHOLDER_CONTENT, BROKEN_FLOW, EMPTY_STATE, or any other name not in the canonical list above. Inventing a trap name is always wrong, regardless of how well the invented name describes the issue.
 
 ⚠️ VISUAL VERIFICATION REMINDER:
 Before submitting, verify each finding against what you actually see in the image. Do NOT flag elements as missing if they are visible in the screenshot.
