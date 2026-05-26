@@ -434,12 +434,14 @@ class UITrapsAnalyzer:
         except ImportError:
             from prompts import build_flow_context_section
 
+        from concurrent.futures import ThreadPoolExecutor
+
         valid_frames = [f for f in frames if f.get('image_path')]
         if not valid_frames:
             raise ValueError("No exportable frames found")
 
-        # --- Screen pass: one call per frame with per-frame flow context ---
-        screen_reports = []
+        # Build per-frame contexts for screen pass
+        screen_tasks: List[tuple] = []
         for frame in valid_frames:
             ctx = dict(user_context)
             per_frame_ctx = flow_map.get('per_frame', {}).get(frame['id'])
@@ -452,18 +454,9 @@ class UITrapsAnalyzer:
                     flow_section
                     + ('\n' + existing_extra if existing_extra else '')
                 ).strip()
-            report = self._pass1(
-                design_file=frame['image_path'],
-                user_context=ctx,
-                timeout=timeout,
-                kb_version=kb_version,
-                verbosity=verbosity,
-                pass1_model=pass1_model,
-            )
-            self._crop_issue_regions(report, frame['image_path'])
-            screen_reports.append(report)
+            screen_tasks.append((frame, ctx))
 
-        # --- Flow pass: single call for journey-level traps ---
+        # Build flow pass context
         flow_ctx = dict(user_context)
         flow_section = build_flow_context_section(
             flow_summary=flow_map.get('summary', ''),
@@ -476,15 +469,40 @@ class UITrapsAnalyzer:
             + f"\nFrames included in this flow:\n{frames_list}"
             + ('\n' + existing_extra if existing_extra else '')
         ).strip()
-        flow_report = self._pass1(
-            design_file=valid_frames[0]['image_path'],
-            user_context=flow_ctx,
-            timeout=timeout,
-            kb_version=kb_version,
-            verbosity=verbosity,
-            pass1_model=pass1_model,
-        )
-        self._crop_issue_regions(flow_report, valid_frames[0]['image_path'])
+
+        def _run_screen(args: tuple) -> Dict[str, Any]:
+            frame, ctx = args
+            report = self._pass1(
+                design_file=frame['image_path'],
+                user_context=ctx,
+                timeout=timeout,
+                kb_version=kb_version,
+                verbosity=verbosity,
+                pass1_model=pass1_model,
+            )
+            self._crop_issue_regions(report, frame['image_path'])
+            return report
+
+        def _run_flow(_: None = None) -> Dict[str, Any]:
+            report = self._pass1(
+                design_file=valid_frames[0]['image_path'],
+                user_context=flow_ctx,
+                timeout=timeout,
+                kb_version=kb_version,
+                verbosity=verbosity,
+                pass1_model=pass1_model,
+            )
+            self._crop_issue_regions(report, valid_frames[0]['image_path'])
+            return report
+
+        # Run all passes in parallel — screen pass tasks + flow pass task
+        n_workers = len(screen_tasks) + 1
+        with ThreadPoolExecutor(max_workers=n_workers) as executor:
+            screen_futures = [executor.submit(_run_screen, task) for task in screen_tasks]
+            flow_future = executor.submit(_run_flow)
+            # Collect screen results in original frame order
+            screen_reports = [f.result() for f in screen_futures]
+            flow_report = flow_future.result()
 
         # Screen findings first so they win dedup over flow findings
         merged = self._merge_reports(screen_reports + [flow_report])
