@@ -1953,7 +1953,6 @@ async def unified_ask(
                 _task_list_parsed = []
 
         _input_type = input_type or 'screenshot'
-        _flow_mode = flow_mode or 'screen'
         _is_flow_diagram = _input_type == 'flow_diagram'
 
         # ── Figma URL flow path ──────────────────────────────────────────────
@@ -2054,19 +2053,9 @@ async def unified_ask(
             _flow_preamble = (
                 "FLOW DIAGRAM INPUT:\n"
                 "The uploaded image contains a multi-screen flow diagram. "
-                "Read the connecting arrows to understand the navigation structure between screens."
+                "Read the connecting arrows to understand the navigation structure between screens. "
+                "Then analyze each screen for traps using its position in the flow as context."
             )
-            if _flow_mode == 'flow':
-                _flow_preamble += (
-                    " Then evaluate the journey end-to-end. Focus on traps that only manifest "
-                    "across multiple steps: UNNECESSARY STEPS, MEMORY CHALLENGE, SYSTEM AMNESIA, "
-                    "FEEDBACK FAILURE at transitions, AMBIGUOUS HOME. Per-screen traps are "
-                    "secondary — flag them only if clearly severe."
-                )
-            else:
-                _flow_preamble += (
-                    " Then analyze each screen for traps using its position in the flow as context."
-                )
             extra_context = (_flow_preamble + '\n' + (extra_context or '')).strip()
 
         # Determine single vs multi image
