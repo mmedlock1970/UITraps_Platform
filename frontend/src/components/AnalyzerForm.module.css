@@ -669,3 +669,50 @@
   font-weight: 400;
 }
 
+/* ── Inferred Input Type Strip ── */
+
+.inferredTypeStrip {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: var(--uitraps-bg-secondary);
+  border: 1.5px solid var(--uitraps-border);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.inferredTypeLabel {
+  font-size: 13px;
+  color: var(--uitraps-text);
+  font-weight: 500;
+}
+
+.inferredTypeAlts {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.inferredTypeChip {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  border: 1.5px solid var(--uitraps-border);
+  background: var(--uitraps-bg);
+  color: var(--uitraps-text-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.inferredTypeChip:hover:not(:disabled) {
+  border-color: var(--uitraps-text);
+  color: var(--uitraps-text);
+}
+
+.inferredTypeChip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+

@@ -123,6 +123,24 @@ function isVideoFile(file: File) {
   return file.type.startsWith('video/');
 }
 
+const INPUT_TYPE_LABELS = {
+  screenshot: 'a screenshot',
+  video: 'a video',
+  flow_diagram: 'a flow diagram',
+} as const;
+
+const INPUT_TYPE_CHIP_LABELS = {
+  screenshot: 'Screenshot(s)',
+  video: 'Video / recording',
+  flow_diagram: 'Flow diagram',
+} as const;
+
+function inferFileType(files: File[], figmaLink: string): 'screenshot' | 'video' | 'flow_diagram' {
+  if (figmaLink.trim() && files.length === 0) return 'flow_diagram';
+  if (files.some(f => isVideoFile(f))) return 'video';
+  return 'screenshot';
+}
+
 export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled = false }) => {
   // Card 1 — Interface
   const [files, setFiles] = useState<File[]>([]);
@@ -160,7 +178,8 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
   const [verbosity, setVerbosity] = useState<'brief' | 'standard'>('standard');
   const [pass1Model, setPass1Model] = useState<'sonnet' | 'haiku'>('sonnet');
   const [thoroughMode, setThoroughMode] = useState(false);
-  const [inputType, setInputType] = useState<'screenshot' | 'video' | 'flow_diagram'>('screenshot');
+  const [lockedInputType, setLockedInputType] = useState<'screenshot' | 'video' | 'flow_diagram' | null>(null);
+  const inputType = lockedInputType ?? inferFileType(files, figmaLink);
   const [flowMode, setFlowMode] = useState<'screen' | 'flow'>('screen');
 
   const toggleTenet = useCallback((tenet: string) => {
@@ -183,6 +202,11 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Reset manual override when all files and figma link are cleared
+  useEffect(() => {
+    if (files.length === 0 && !figmaLink.trim()) setLockedInputType(null);
+  }, [files, figmaLink]);
+
   // Create and revoke object URLs for image thumbnails
   useEffect(() => {
     const urls = files.map(f => isImageFile(f) ? URL.createObjectURL(f) : '');
@@ -203,7 +227,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
     if (!tasks[0]?.description.trim()) e.userGoal = 'Required';
     setErrors(e);
     return Object.keys(e).length === 0;
-  }, [files, screenName, platform, productDomain, expLevel, techSavvy, frequency, tasks]);
+  }, [files, figmaLink, lockedInputType, screenName, platform, productDomain, expLevel, techSavvy, frequency, tasks]);
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
@@ -217,7 +241,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
   }, [disabled, validate, files, figmaLink, platform, productDomain, screenName,
       expLevel, techSavvy, frequency, tasks, priorProducts, userDesc, extraContext, productContext,
       physicalEnv, lighting, gripPosition, attentionalState, kbVersion, selectedTenets,
-      verbosity, pass1Model, thoroughMode, inputType, flowMode, onSubmit]);
+      verbosity, pass1Model, thoroughMode, lockedInputType, flowMode, onSubmit]);
 
   const handleFileChange = useCallback((newFiles: FileList | null) => {
     if (!newFiles || newFiles.length === 0) return;
@@ -340,32 +364,36 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
               disabled={disabled}
             />
             {errors.upload && <p className={styles.fieldError}>{errors.upload}</p>}
-          </div>
-
-          {/* Input type selector */}
-          <div className={styles.field} style={{ marginTop: 12 }}>
-            <label className={styles.fieldLabel}>What are you uploading?</label>
-            <div className={styles.kbVersionGroup}>
-              {([
-                ['screenshot', 'Screenshot(s)'],
-                ['video', 'Video / recording'],
-                ['flow_diagram', 'Flow diagram'],
-              ] as const).map(([v, label]) => (
-                <button
-                  key={v}
-                  type="button"
-                  className={`${styles.kbVersionBtn} ${inputType === v ? styles.kbVersionBtnActive : ''}`}
-                  onClick={() => setInputType(v)}
-                  disabled={disabled}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            {inputType === 'flow_diagram' && (
-              <p className={styles.fieldHint}>
-                If uploading an image of a flow, include all connected screens and their navigation arrows in a single file. Or enter a Figma link above — prototype connections will be extracted automatically.
-              </p>
+            {(files.length > 0 || figmaLink.trim()) && (
+              <div className={styles.inferredTypeStrip}>
+                <span className={styles.inferredTypeLabel}>
+                  {figmaLink.trim() && files.length === 0
+                    ? 'Figma link detected — will analyze as a flow diagram.'
+                    : `Looks like ${INPUT_TYPE_LABELS[inputType]}.`}
+                </span>
+                {files.length > 0 && (
+                  <span className={styles.inferredTypeAlts}>
+                    {(['screenshot', 'video', 'flow_diagram'] as const)
+                      .filter(t => t !== inputType)
+                      .map(t => (
+                        <button
+                          key={t}
+                          type="button"
+                          className={styles.inferredTypeChip}
+                          onClick={() => setLockedInputType(t)}
+                          disabled={disabled}
+                        >
+                          {INPUT_TYPE_CHIP_LABELS[t]}
+                        </button>
+                      ))}
+                  </span>
+                )}
+                {inputType === 'flow_diagram' && (
+                  <p className={styles.fieldHint} style={{ marginTop: 6 }}>
+                    If uploading an image of a flow, include all connected screens and their navigation arrows in a single file. Or enter a Figma link above — prototype connections will be extracted automatically.
+                  </p>
+                )}
+              </div>
             )}
           </div>
 
@@ -927,7 +955,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
             <label className={styles.fieldLabel}>
               Flow analysis mode
               {inputType !== 'flow_diagram' && (
-                <span className={styles.fieldHintInline}> — select Flow diagram above to enable</span>
+                <span className={styles.fieldHintInline}> — upload a flow diagram to enable</span>
               )}
             </label>
             <div className={`${styles.kbVersionGroup} ${inputType !== 'flow_diagram' ? styles.kbVersionGroupDisabled : ''}`}>
