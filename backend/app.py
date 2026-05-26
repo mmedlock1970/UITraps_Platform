@@ -2032,7 +2032,18 @@ async def unified_ask(
                 raise
             except Exception as _e:
                 logger.error(f"Flow Figma analysis error: {_e}")
-                raise HTTPException(status_code=500, detail=f"Flow analysis failed: {str(_e)}")
+                _err_str = str(_e)
+                if '403' in _err_str or 'Forbidden' in _err_str.lower():
+                    raise HTTPException(
+                        status_code=403,
+                        detail="This Figma file is private. In Figma, go to Share → set to 'Anyone with the link can view', then try again."
+                    )
+                if '404' in _err_str or 'Not Found' in _err_str:
+                    raise HTTPException(
+                        status_code=404,
+                        detail="Figma file not found. Check that the link is correct and the file still exists."
+                    )
+                raise HTTPException(status_code=500, detail=f"Flow analysis failed: {_err_str}")
 
         # ── Image flow path: prepend flow preamble to extra_context ──────────
         if _is_flow_diagram:
