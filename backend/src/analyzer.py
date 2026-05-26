@@ -610,12 +610,23 @@ class UITrapsAnalyzer:
                 if not isinstance(report.get('summary_narrative'), str):
                     report['summary_narrative'] = ''
                 for issue_field in ['critical_issues', 'moderate_issues', 'minor_issues']:
+                    if isinstance(report[issue_field], str):
+                        try:
+                            report[issue_field] = json.loads(report[issue_field])
+                        except (json.JSONDecodeError, TypeError):
+                            pass
                     if not isinstance(report[issue_field], list):
                         raise ValueError(f"{issue_field} must be an array")
                 for opt_field in ['positive_observations', 'potential_issues',
                                   'traps_checked_not_found', 'flagged_for_human_review',
                                   'incomplete_flow_findings']:
-                    if not isinstance(report.get(opt_field), list):
+                    val = report.get(opt_field)
+                    if isinstance(val, str):
+                        try:
+                            report[opt_field] = json.loads(val)
+                        except (json.JSONDecodeError, TypeError):
+                            report[opt_field] = []
+                    elif not isinstance(val, list):
                         report[opt_field] = []
         except Exception as e:
             raise ValueError(
