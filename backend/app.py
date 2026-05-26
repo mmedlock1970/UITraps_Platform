@@ -1999,7 +1999,6 @@ async def unified_ask(
                         frames=_frames,
                         flow_map=_flow_map,
                         user_context=_fctx,
-                        mode=_flow_mode,
                         kb_version=kb_version,
                         verbosity=verbosity,
                         pass1_model=pass1_model,

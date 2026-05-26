@@ -58,12 +58,11 @@ function assembleContext(fields: {
   verbosity: 'brief' | 'standard'; pass1Model: 'sonnet' | 'haiku';
   figmaLink: string; thoroughMode: boolean;
   inputType: 'screenshot' | 'video' | 'flow_diagram';
-  flowMode: 'screen' | 'flow';
 }): UserContext {
   const { platform, productDomain, screenName, expLevel, techSavvy,
           frequency, taskList, priorProducts, userDesc, extraContext, productContext,
           physicalEnv, lighting, gripPosition, attentionalState, kbVersion, selectedTenets,
-          verbosity, pass1Model, figmaLink, thoroughMode, inputType, flowMode } = fields;
+          verbosity, pass1Model, figmaLink, thoroughMode, inputType } = fields;
 
   const combinedExtra = [
     (figmaLink.trim() && inputType !== 'flow_diagram') ? `Design file: ${figmaLink.trim()}` : '',
@@ -110,7 +109,6 @@ function assembleContext(fields: {
     pass1_model: pass1Model,
     thorough_mode: thoroughMode || undefined,
     input_type: inputType,
-    flow_mode: inputType === 'flow_diagram' ? flowMode : undefined,
     figma_url: (figmaLink.trim() && inputType === 'flow_diagram') ? figmaLink.trim() : undefined,
   };
 }
@@ -180,7 +178,6 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
   const [thoroughMode, setThoroughMode] = useState(false);
   const [lockedInputType, setLockedInputType] = useState<'screenshot' | 'video' | 'flow_diagram' | null>(null);
   const inputType = lockedInputType ?? inferFileType(files, figmaLink);
-  const [flowMode, setFlowMode] = useState<'screen' | 'flow'>('screen');
 
   const toggleTenet = useCallback((tenet: string) => {
     setSelectedTenets(prev =>
@@ -236,12 +233,12 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
     const context = assembleContext({ platform, productDomain, screenName,
       expLevel, techSavvy, frequency, taskList: tasks, priorProducts, userDesc, extraContext, productContext,
       physicalEnv, lighting, gripPosition, attentionalState, kbVersion, selectedTenets,
-      verbosity, pass1Model, figmaLink, thoroughMode, inputType, flowMode });
+      verbosity, pass1Model, figmaLink, thoroughMode, inputType });
     onSubmit({ files, context });
   }, [disabled, validate, files, figmaLink, platform, productDomain, screenName,
       expLevel, techSavvy, frequency, tasks, priorProducts, userDesc, extraContext, productContext,
       physicalEnv, lighting, gripPosition, attentionalState, kbVersion, selectedTenets,
-      verbosity, pass1Model, thoroughMode, lockedInputType, flowMode, onSubmit]);
+      verbosity, pass1Model, thoroughMode, lockedInputType, onSubmit]);
 
   const handleFileChange = useCallback((newFiles: FileList | null) => {
     if (!newFiles || newFiles.length === 0) return;
@@ -954,38 +951,6 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
             </p>
           </div>
 
-          <hr className={styles.fieldDivider} />
-
-          {/* Flow analysis mode */}
-          <div className={styles.field}>
-            <label className={styles.fieldLabel}>
-              Flow analysis mode
-              {inputType !== 'flow_diagram' && (
-                <span className={styles.fieldHintInline}> — upload a flow diagram to enable</span>
-              )}
-            </label>
-            <div className={`${styles.kbVersionGroup} ${inputType !== 'flow_diagram' ? styles.kbVersionGroupDisabled : ''}`}>
-              {([
-                ['screen', 'Screen analysis'],
-                ['flow', 'Flow analysis'],
-              ] as const).map(([v, label]) => (
-                <button
-                  key={v}
-                  type="button"
-                  className={`${styles.kbVersionBtn} ${flowMode === v ? styles.kbVersionBtnActive : ''}`}
-                  onClick={() => inputType === 'flow_diagram' && setFlowMode(v)}
-                  disabled={disabled || inputType !== 'flow_diagram'}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <p className={styles.fieldHint}>
-              {flowMode === 'screen'
-                ? 'One pass per screen. Thorough per-screen findings, informed by the flow. Takes longer with more screens.'
-                : 'One pass for the whole journey. Faster. Finds issues that span multiple screens but may miss finer per-screen detail.'}
-            </p>
-          </div>
 
         </div>
       </div>
