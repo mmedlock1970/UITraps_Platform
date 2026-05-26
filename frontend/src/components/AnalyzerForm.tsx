@@ -388,7 +388,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
                 )}
                 {inputType === 'flow_diagram' && files.length === 0 && (
                   <p className={styles.fieldHint} style={{ marginTop: 6 }}>
-                    Prototype connections will be extracted automatically. Choose screen or flow analysis mode in Card 5 below.
+                    Prototype connections will be extracted automatically. Both per-screen and flow-level analysis will run.
                   </p>
                 )}
                 {inputType === 'flow_diagram' && files.length > 0 && (
