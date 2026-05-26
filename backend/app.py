@@ -1884,7 +1884,7 @@ async def unified_ask(
     - Files + context → Trap analysis
     - Files + question (no context) → Hybrid
     """
-    intent = detect_intent(message, files, users, tasks, format)
+    intent = detect_intent(message, files, users, tasks, format, figma_url=figma_url, input_type=input_type)
 
     # For analysis requests, check subscription and consume a token
     # Skip in dev mode (DEV_MODE=true in .env) to allow local testing without a subscription record
@@ -1933,7 +1933,8 @@ async def unified_ask(
 
     elif intent.mode == IntentMode.ANALYSIS:
         # --- Trap analysis ---
-        if not files:
+        _has_figma_flow = bool(figma_url and figma_url.strip() and (input_type or '') == 'flow_diagram')
+        if not files and not _has_figma_flow:
             raise HTTPException(status_code=400, detail="No files provided for analysis")
 
         if not intent.has_context:

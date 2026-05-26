@@ -38,6 +38,8 @@ def detect_intent(
     users: Optional[str] = None,
     tasks: Optional[str] = None,
     format_desc: Optional[str] = None,
+    figma_url: Optional[str] = None,
+    input_type: Optional[str] = None,
 ) -> IntentResult:
     """
     Route user input to the appropriate pipeline.
@@ -47,6 +49,7 @@ def detect_intent(
     2. Files + question text only (no context fields)                      → HYBRID
     3. Text only, no files                                                 → CHAT
     4. Files only, no text, no context                                     → ANALYSIS (basic)
+    5. Figma URL + input_type=flow_diagram + context                       → ANALYSIS
 
     Args:
         message: User's text input.
@@ -54,6 +57,8 @@ def detect_intent(
         users: "Who are the users?" context field.
         tasks: "What are they trying to do?" context field.
         format_desc: "What format is this?" context field.
+        figma_url: Figma file URL (treated as input when input_type=flow_diagram).
+        input_type: Input type hint from the frontend.
 
     Returns:
         IntentResult with mode, message, and detection flags.
@@ -61,7 +66,8 @@ def detect_intent(
     if files is None:
         files = []
 
-    has_files = len(files) > 0
+    has_figma_flow = bool(figma_url and figma_url.strip() and input_type == 'flow_diagram')
+    has_files = len(files) > 0 or has_figma_flow
     has_message = bool(message and message.strip())
     has_context = all([
         users and len(users.strip()) >= 2,
