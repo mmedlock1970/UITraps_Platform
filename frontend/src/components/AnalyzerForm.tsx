@@ -105,7 +105,7 @@ function assembleContext(fields: {
     grip_position: gripPosition || undefined,
     attentional_state: attentionalState || undefined,
     kb_version: kbVersion,
-    tenet_filter: selectedTenets.length > 0 ? selectedTenets : undefined,
+    tenet_filter: selectedTenets.length > 0 && selectedTenets.length < ALL_TENETS.length ? selectedTenets : undefined,
     verbosity,
     pass1_model: pass1Model,
     thorough_mode: thoroughMode || undefined,
@@ -156,7 +156,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
 
   // Card 5 — Analysis Scope
   const [kbVersion, setKbVersion] = useState<KbVersion>('v2');
-  const [selectedTenets, setSelectedTenets] = useState<string[]>([]);
+  const [selectedTenets, setSelectedTenets] = useState<string[]>([...ALL_TENETS]);
   const [verbosity, setVerbosity] = useState<'brief' | 'standard'>('standard');
   const [pass1Model, setPass1Model] = useState<'sonnet' | 'haiku'>('sonnet');
   const [thoroughMode, setThoroughMode] = useState(false);
@@ -788,7 +788,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
           <div className={styles.field}>
             <label className={styles.fieldLabel}>Tenets to analyze</label>
             <p className={styles.fieldHint} style={{ marginBottom: 10 }}>
-              {selectedTenets.length === 0
+              {selectedTenets.length === ALL_TENETS.length
                 ? 'All nine Tenets will be evaluated (default).'
                 : `Focusing on ${selectedTenets.length} Tenet${selectedTenets.length > 1 ? 's' : ''}: ${selectedTenets.join(', ')}.`}
             </p>
@@ -810,14 +810,14 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
                 </button>
               ))}
             </div>
-            {selectedTenets.length > 0 && (
+            {selectedTenets.length < ALL_TENETS.length && (
               <button
                 type="button"
                 className={styles.tenetClearBtn}
-                onClick={() => setSelectedTenets([])}
+                onClick={() => setSelectedTenets([...ALL_TENETS])}
                 disabled={disabled}
               >
-                Clear — analyze all Tenets
+                Select all Tenets
               </button>
             )}
           </div>
