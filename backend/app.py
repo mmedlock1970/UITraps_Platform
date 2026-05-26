@@ -2033,6 +2033,11 @@ async def unified_ask(
             except Exception as _e:
                 logger.error(f"Flow Figma analysis error: {_e}")
                 _err_str = str(_e)
+                if '401' in _err_str or 'Unauthorized' in _err_str:
+                    raise HTTPException(
+                        status_code=401,
+                        detail="Figma access token has expired or is invalid. Please contact support."
+                    )
                 if '403' in _err_str or 'Forbidden' in _err_str.lower():
                     raise HTTPException(
                         status_code=403,
