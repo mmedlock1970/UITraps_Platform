@@ -110,7 +110,7 @@ UI_ANALYSIS_SCHEMA = {
                     },
                     "region": {
                         "type": "object",
-                        "description": "Bounding box of the specific UI element or area where this issue occurs, as normalized coordinates (0.0–1.0, origin top-left corner of the image). Include when you can clearly identify a bounded area; omit when the issue spans the full interface or cannot be spatially bounded.",
+                        "description": "Bounding box tightly enclosing the specific element (button, label, icon, text, card) that exhibits this trap — not the section, container, or page area around it. Normalized coordinates 0.0–1.0, origin top-left. The crop is used as visual evidence: it must show the problematic element itself. Omit only when the issue spans the full interface or cannot be spatially bounded at all.",
                         "properties": {
                             "x": {"type": "number", "description": "Left edge (0.0 = left side, 1.0 = right side)"},
                             "y": {"type": "number", "description": "Top edge (0.0 = top, 1.0 = bottom)"},
@@ -153,7 +153,7 @@ UI_ANALYSIS_SCHEMA = {
                     },
                     "region": {
                         "type": "object",
-                        "description": "Bounding box of the specific UI element or area where this issue occurs, as normalized coordinates (0.0–1.0, origin top-left). Include when you can clearly identify a bounded area; omit when the issue spans the full interface.",
+                        "description": "Bounding box tightly enclosing the specific element (button, label, icon, text, card) that exhibits this trap — not the section, container, or page area around it. Normalized coordinates 0.0–1.0, origin top-left. The crop is used as visual evidence: it must show the problematic element itself. Omit only when the issue spans the full interface or cannot be spatially bounded at all.",
                         "properties": {
                             "x": {"type": "number"},
                             "y": {"type": "number"},
@@ -196,7 +196,7 @@ UI_ANALYSIS_SCHEMA = {
                     },
                     "region": {
                         "type": "object",
-                        "description": "Bounding box of the specific UI element or area where this issue occurs, as normalized coordinates (0.0–1.0, origin top-left). Include when you can clearly identify a bounded area; omit when the issue spans the full interface.",
+                        "description": "Bounding box tightly enclosing the specific element (button, label, icon, text, card) that exhibits this trap — not the section, container, or page area around it. Normalized coordinates 0.0–1.0, origin top-left. The crop is used as visual evidence: it must show the problematic element itself. Omit only when the issue spans the full interface or cannot be spatially bounded at all.",
                         "properties": {
                             "x": {"type": "number"},
                             "y": {"type": "number"},
