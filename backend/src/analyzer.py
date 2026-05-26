@@ -459,6 +459,7 @@ class UITrapsAnalyzer:
                 verbosity=verbosity,
                 pass1_model=pass1_model,
             )
+            self._crop_issue_regions(report, valid_frames[0]['image_path'])
             reports = [report]
         else:
             # Screen mode: one call per frame with per-frame flow context
@@ -483,6 +484,7 @@ class UITrapsAnalyzer:
                     verbosity=verbosity,
                     pass1_model=pass1_model,
                 )
+                self._crop_issue_regions(report, frame['image_path'])
                 reports.append(report)
 
         merged = self._merge_reports(reports)
