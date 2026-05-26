@@ -192,7 +192,8 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
 
   const validate = useCallback((): boolean => {
     const e: Record<string, string> = {};
-    if (files.length === 0) e.upload = 'Please upload a screenshot, video, or PDF';
+    const figmaFlowProvided = inputType === 'flow_diagram' && figmaLink.trim().length > 0;
+    if (files.length === 0 && !figmaFlowProvided) e.upload = 'Please upload a screenshot, video, or PDF';
     if (!screenName.trim()) e.screenName = 'Required';
     if (!platform) e.platform = 'Required';
     if (!productDomain) e.productDomain = 'Required';
