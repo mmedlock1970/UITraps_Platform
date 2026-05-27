@@ -114,6 +114,46 @@ VIDEO_ANALYSIS_GUIDANCE = '''
    - Missing elements early in flow might appear later
 '''
 
+# Flow diagram image guidance - for single images containing multiple screens
+FLOW_DIAGRAM_IMAGE_GUIDANCE = '''
+🗺️ FLOW DIAGRAM IMAGE ANALYSIS — READ BEFORE ANALYZING:
+
+You are analyzing a single image that contains multiple UI screens connected by arrows showing the navigation flow. Follow this structured approach.
+
+**STEP 1 — MAP THE FLOW BEFORE ANALYZING (mandatory first step):**
+Scan the entire image and identify every distinct screen.
+- Number them in encounter order, following the arrows from start to end (Screen 1, Screen 2, …)
+- Give each a brief descriptive name based on what it shows: "Screen 1 — Home", "Screen 2 — Item Detail"
+- Note the arrow connections: which screens lead to which
+
+Complete this map before analyzing any individual screen.
+
+**STEP 2 — ANCHOR EVERY FINDING TO A SCREEN:**
+Every finding (critical, moderate, minor, potential, human-review) MUST identify the screen in the `location` field:
+- ✅ CORRECT: "Screen 2 (Item Detail) — Add to Cart button"
+- ❌ WRONG: "Add to Cart button" — no screen identified, cannot be verified
+- ❌ WRONG: "Throughout the flow" — too vague to act on
+
+**STEP 3 — FLOW-LEVEL TRAP ANALYSIS (after per-screen analysis):**
+Evaluate the full sequence as a connected journey and check for:
+- **UNNECESSARY STEP(S)**: Is there a screen that adds no value toward the user's goal and could be removed?
+- **MEMORY CHALLENGE**: Does a later screen require the user to recall information shown on an earlier screen, with no visible retrieval cue?
+- **SYSTEM AMNESIA**: Does a later screen fail to use or re-ask for information the user already provided?
+- **FEEDBACK FAILURE at transitions**: Is there any visible indication of what happened when moving from one screen to the next? (If the transition is not shown, apply the partial artifact rule — do not assert feedback is absent.)
+- **AMBIGUOUS HOME**: Does more than one screen plausibly serve as the primary starting point with no clear designation?
+
+**BRANCHING AND CONVERGING FLOWS:**
+Some flows show multiple paths leading to the same destination. When you identify a branch:
+- Note where the paths diverge and where they converge
+- If the same screen state appears in two different branches (identical or near-identical screens), analyze it once and note it appears via multiple paths — do NOT generate duplicate findings for the same screen shown twice
+
+**GRATUITOUS REDUNDANCY — EVALUATE PER SCREEN:**
+When performing the whole-interface scan for repeated elements, evaluate each screen independently. Do NOT flag elements that repeat across different screens — navigation elements (back buttons, headers, tabs) appearing consistently across screens are expected, not redundant.
+
+**REGION CROPS — DO NOT INCLUDE FOR FLOW DIAGRAM IMAGES:**
+Flow diagram images pack many small screens into a single composite image. Coordinates for individual UI elements within individual screens are too imprecise to be reliable — crops frequently show the wrong screen or the wrong area entirely, which misleads rather than supports the finding. **Do not include a `region` on any finding when analyzing a flow diagram image.** Describe the element and its location clearly in the `location` and `problem` fields instead.
+'''
+
 # Navigation flow guidance - prevents false positives from isolated page analysis
 NAVIGATION_FLOW_GUIDANCE = '''
 🧭 NAVIGATION FLOW AWARENESS (CRITICAL - READ BEFORE ANALYZING):
@@ -517,11 +557,16 @@ Before flagging ANY trap, you MUST:
 
 5. **GROUND EVERY FINDING IN VISUAL EVIDENCE** - For each trap you flag, include a "visual_evidence" mental note describing exactly what you see that supports the finding.
 
-6. **TREAT EVERY ARTIFACT AS PARTIAL — ASSUME NOTHING ABOUT WHAT IS NOT SHOWN** - Screenshots and flows are almost always incomplete. They show a moment or a path, not the entire product. Do not assume, infer, or speculate about screens, steps, states, or interactions that are not present in the provided images.
-   - Do not describe what "probably happens" before or after the shown screens
-   - Do not assume a missing confirmation screen, error state, or onboarding step exists elsewhere in the product
-   - Do not flag the absence of something as a trap unless you have positive evidence — from what is visible — that it should be present at this point in the flow
-   - When you suspect something may exist off-screen but cannot confirm it, frame it conditionally in the finding: "If no [screen/step/confirmation] exists elsewhere in this flow, then..." This lets the reviewer apply their knowledge of the full product without the finding asserting something false.
+6. **ABSENCE FROM THE SUBMISSION IS NOT EVIDENCE OF ABSENCE FROM THE PRODUCT** - Every flow or set of screenshots submitted for analysis is a subset of the full product. Screens, steps, confirmation states, error handlers, and toasts that are not shown may well exist — they were simply not included in this submission. You cannot conclude that something is absent from the product just because it was not in the provided screens. This principle applies to every trap, not just those about feedback.
+
+   - A confirmation screen not shown → does NOT mean no confirmation exists in the product
+   - A success toast not visible → does NOT mean no toast appears after the action
+   - An error state not included → does NOT mean no error handling exists
+   - A step not present in the flow → does NOT mean the step is missing from the experience
+
+   ONLY flag an absence when you have **positive visual evidence** from the provided screens that a required element is definitively skipped — for example, a visible transition showing Screen A going directly to Screen C where the expected step would have to appear between them.
+
+   WHEN IN DOUBT — USE CONDITIONAL LANGUAGE: Frame the finding around the possibility rather than asserting it as fact: "If no [confirmation / success state / error feedback] exists elsewhere in this flow, then [consequence for the user]." This gives the reviewer something actionable without asserting something you cannot verify.
 
 ⚠️ PENALTY FOR FALSE POSITIVES: Flagging something as missing when it is clearly visible in the screenshot is a critical error. Take extra time to verify before claiming absence.
 
@@ -583,7 +628,14 @@ __SINGLE_SCREEN_NOTE__
 
 8. **ACCIDENTAL ACTIVATION** — `testable: true (Tier 3 — risk noted)` when controls are visibly positioned at natural grip points for the device type shown (e.g., controls at the edges or back of a phone, gesture-activated surfaces covering the full device). Output: potential_issues confidence "low" with explicit note that hardware testing is required. `testable: false` for all other instances.
 
-9. **FEEDBACK FAILURE** — `testable: true (Tier 1)` for: (a) error messages visible in the artifact that fail to answer both "what happened?" AND "what should I do?" — answering only one of the two questions is this Trap; (b) interactive elements (buttons, form submissions, controls) where the artifact shows no visible response state, loading indicator, or confirmation — absence of any response state is directly observable. `testable: false` for assessing whether feedback is noticeable or comprehensible to real users.
+9. **FEEDBACK FAILURE** — `testable: true (Tier 1)` for: (a) error messages visible in the artifact that fail to answer both "what happened?" AND "what should I do?" — answering only one of the two questions is this Trap; (b) interactive elements where no in-screen response state is visible (loading indicator, button state change, inline confirmation on the same screen).
+
+   **CRITICAL DISTINCTION — in-screen vs. post-action feedback:**
+   - Feedback that should appear **on the same screen** immediately (loading state, button state change, inline validation) → confirmed absent if not visible on that screen, Tier 1 finding.
+   - Feedback that could exist on a **subsequent screen** (toast notification, confirmation page, success state after a transition) → DO NOT assert absent. The partial artifact rule applies: frame the finding conditionally — "If no confirmation screen or toast exists elsewhere in this flow, users would have no indication the action completed."
+   - Never assert that a post-action confirmation is missing solely because it does not appear in the provided screens.
+
+   `testable: false` for assessing whether feedback is noticeable or comprehensible to real users.
 
 10. **CAPTIVE WAIT** — `testable: true (Tier 2)` when the artifact shows a mandatory sequence, interstitial, or process with no visible skip option, no visible duration indicator, and no visible means of backing out. Flag: "This sequence appears to prevent users from advancing or exiting — confirm whether a skip option or duration disclosure exists." Output: potential_issues confidence "medium". `testable: false` for assessing whether the duration and purpose justify the captive period.
 
@@ -893,7 +945,7 @@ OUTPUT REQUIREMENTS:
   - BAD: "The design presents several moderate usability challenges that may make it difficult for elderly users to complete appointment scheduling tasks without friction."
   - GOOD: "Scheduling entry points are buried, likely slowing elderly users down."
 - Write a `summary_narrative` (one paragraph): focus on the user experience implications given the stated goal and user type — what friction themes emerge, and what does that mean for this user trying to accomplish this task. Do NOT mention trap counts or enumerate findings; the scorecard handles counts.
-- For confirmed issues (Critical/Moderate/Minor), provide: trap name (ALL CAPS), tenet violated, `headline`, exact location, `problem` (2-3 sentences), `recommendation` (2-3 sentences), confidence level, and a `region` bounding box tightly enclosing the specific element that exhibits the trap (button, label, icon, text, card) — not the section or container around it. Normalized 0.0–1.0 coordinates, origin top-left. The crop is shown as visual evidence: it must show the problematic element itself, not a broad area of the screen. Omit only when the issue spans the full interface or truly cannot be spatially bounded.
+- For confirmed issues (Critical/Moderate/Minor), provide: trap name (ALL CAPS), tenet violated, `headline`, exact location, `problem` (2-3 sentences), `recommendation` (2-3 sentences), confidence level, and — when it adds value — a `region` bounding box tightly enclosing the specific element that exhibits the trap (button, label, icon, text, card) — not the section or container around it. Normalized 0.0–1.0 coordinates, origin top-left. **WHEN TO INCLUDE a region:** only when the crop will show the problematic element itself as visual evidence. **WHEN TO OMIT a region:** (a) when the finding is about an absence on a screen not provided in this artifact, (b) when the issue spans the full interface with no single bounded element, (c) when the crop would not add meaningful evidence beyond what is already described. **WHEN INCLUDING a region:** you MUST also include a `caption` string inside the region object that states (1) what the cropped area shows, and (2) how what is shown illustrates this finding. The caption must be specific to the content of the crop — not a restatement of the location field.
 
 **⚠️ ONE ELEMENT, ONE FINDING — BUT NOTE SECONDARY TRAPS:**
 Report each UI issue once, under the trap that best characterizes it. Do not file duplicate findings for the same element under different trap names. However, if the same issue meaningfully implicates a second trap, note that briefly in the `problem` field so the reader understands the fuller picture. Example: redundant Home buttons are best reported as GRATUITOUS REDUNDANCY. In the problem description, it is appropriate to note that the duplication also creates navigational ambiguity consistent with AMBIGUOUS HOME — since there is no single, integrated way to return home, the user may be uncertain which path to take.
@@ -1250,6 +1302,15 @@ def build_user_message(
 ---
 """
 
+    # Build flow diagram section (image-based composite flow, not Figma)
+    is_flow_diagram_image = user_context.get('input_type') == 'flow_diagram'
+    flow_diagram_section = ""
+    if is_flow_diagram_image:
+        flow_diagram_section = f"""
+{FLOW_DIAGRAM_IMAGE_GUIDANCE}
+---
+"""
+
     # Build expertise section if present
     expertise_section = ""
     if has_expertise:
@@ -1400,19 +1461,22 @@ CONTEXT PROVIDED BY USER:
 {content_type_section}
 {extra_context_section}
 {page_context_section}
-{video_section}
+{video_section}{flow_diagram_section}
 ---
 
 Perform a complete UI Tenets & Traps analysis following the methodology in your training content.
 
 Remember to:
-- **WHOLE-INTERFACE SCAN FIRST (before any trap analysis)**: Scan the entire screen for every text label, icon, and interactive control that appears more than once anywhere on screen — regardless of which nav bar, panel, or component each instance is in. For each repeated element apply the GR scan protocol from your instructions (Tier 1 confirmed / Tier 2 candidate / directed inspection to potential_issues).
+{('- **MAP THE FLOW FIRST** — Identify and number every screen in encounter order before analyzing any traps' if is_flow_diagram_image else '- **WHOLE-INTERFACE SCAN FIRST (before any trap analysis)**: Scan the entire screen for every text label, icon, and interactive control that appears more than once anywhere on screen — regardless of which nav bar, panel, or component each instance is in. For each repeated element apply the GR scan protocol from your instructions (Tier 1 confirmed / Tier 2 candidate / directed inspection to potential_issues).')}
+{('- **ANCHOR EVERY FINDING TO A SCREEN** — Every location field must include the screen number and name (e.g., "Screen 2 (Item Detail) — button label")' if is_flow_diagram_image else '')}
+{('- **DO NOT INCLUDE REGIONS** — Omit the `region` field on every finding. Describe element locations in text only.' if is_flow_diagram_image else '')}
 - Check all __TRAP_COUNT__ Traps systematically
 - Use the gated decision procedure for Information Overload
 - Provide specific locations where issues occur
 - Classify severity appropriately (Critical/Moderate/Minor)
 - **RESPECT PAGE ROLES** - Only flag missing elements appropriate for this page type
 - **RESPECT CONTENT TYPE** - Adjust analysis for {content_guidance['name']} specifics
+{('- **FLOW-LEVEL TRAP ANALYSIS** — After per-screen analysis, evaluate the complete sequence for cross-screen traps (UNNECESSARY STEP, MEMORY CHALLENGE, SYSTEM AMNESIA, FEEDBACK FAILURE at transitions)' if is_flow_diagram_image else '')}
 {('- **ASSESS FRAME QUALITY FIRST** - Note any mid-transition, loading, or problematic frames' if (is_video_analysis or is_multi_frame) else '')}
 {('- **DETECT BUGS** - Report technical failures separately from UI traps' if (is_video_analysis or is_multi_frame) else '')}
 - Note positive observations

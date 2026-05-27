@@ -1994,6 +1994,7 @@ async def unified_ask(
                         "task_list": _task_list_parsed,
                     }
                     _flow_analyzer = UITrapsAnalyzer()
+                    _t0 = time.time()
                     _report_dict = _flow_analyzer.analyze_flow_diagram(
                         frames=_frames,
                         flow_map=_flow_map,
@@ -2002,6 +2003,7 @@ async def unified_ask(
                         verbosity=verbosity,
                         pass1_model=pass1_model,
                     )
+                    _elapsed = time.time() - _t0
                     for _opt in ['critical_issues', 'moderate_issues', 'minor_issues',
                                  'positive_observations', 'potential_issues',
                                  'traps_checked_not_found', 'flagged_for_human_review',
@@ -2013,7 +2015,7 @@ async def unified_ask(
                         'verbosity': verbosity,
                         'pass1_model': pass1_model,
                         'kb_version': kb_version,
-                        'elapsed_seconds': 0,
+                        'elapsed_seconds': _elapsed,
                         'thorough_mode': False,
                     }
                     _html = format_report_as_html(_report_dict, _fctx, analysis_settings=_analysis_settings)
@@ -2047,16 +2049,6 @@ async def unified_ask(
                         detail="Figma file not found. Check that the link is correct and the file still exists."
                     )
                 raise HTTPException(status_code=500, detail=f"Flow analysis failed: {_err_str}")
-
-        # ── Image flow path: prepend flow preamble to extra_context ──────────
-        if _is_flow_diagram:
-            _flow_preamble = (
-                "FLOW DIAGRAM INPUT:\n"
-                "The uploaded image contains a multi-screen flow diagram. "
-                "Read the connecting arrows to understand the navigation structure between screens. "
-                "Then analyze each screen for traps using its position in the flow as context."
-            )
-            extra_context = (_flow_preamble + '\n' + (extra_context or '')).strip()
 
         # ── PDF path: convert pages to images, then route through normal pipeline ──
         _pdf_file = next(
@@ -2099,6 +2091,7 @@ async def unified_ask(
                         "tenet_filter": tenet_filter or "",
                         "design_name": design_name or "",
                         "task_list": _task_list_parsed,
+                        "input_type": _input_type,
                     }
                     user_id = str(user.get("id") or user.get("userId", ""))
                     logger.info(f"[/api/ask pdf] {len(_pdf_img_paths)} page(s) extracted from {_pdf_file.filename}")
@@ -2176,7 +2169,7 @@ async def unified_ask(
                     tmp_path = tmp.name
                 logger.info(f"[/api/ask analysis] temp file written: {tmp_path}")
 
-                user_context = {"users": users, "tasks": tasks, "format": format, "content_type": content_type, "extra_context": extra_context or "", "product_context": product_context or "", "physical_env": physical_env or "", "lighting": lighting or "", "grip_position": grip_position or "", "attentional_state": attentional_state or "", "tenet_filter": tenet_filter or "", "design_name": design_name or "", "task_list": _task_list_parsed}
+                user_context = {"users": users, "tasks": tasks, "format": format, "content_type": content_type, "extra_context": extra_context or "", "product_context": product_context or "", "physical_env": physical_env or "", "lighting": lighting or "", "grip_position": grip_position or "", "attentional_state": attentional_state or "", "tenet_filter": tenet_filter or "", "design_name": design_name or "", "task_list": _task_list_parsed, "input_type": _input_type}
                 user_id = str(user.get("id") or user.get("userId", ""))
 
                 if kb_version == "both":
@@ -2275,7 +2268,7 @@ async def unified_ask(
                         tmp.write(content)
                         tmp_paths.append(tmp.name)
 
-                user_context = {"users": users, "tasks": tasks, "format": format, "content_type": content_type, "extra_context": extra_context or "", "product_context": product_context or "", "physical_env": physical_env or "", "lighting": lighting or "", "grip_position": grip_position or "", "attentional_state": attentional_state or "", "tenet_filter": tenet_filter or "", "design_name": design_name or "", "task_list": _task_list_parsed}
+                user_context = {"users": users, "tasks": tasks, "format": format, "content_type": content_type, "extra_context": extra_context or "", "product_context": product_context or "", "physical_env": physical_env or "", "lighting": lighting or "", "grip_position": grip_position or "", "attentional_state": attentional_state or "", "tenet_filter": tenet_filter or "", "design_name": design_name or "", "task_list": _task_list_parsed, "input_type": _input_type}
                 result = get_multi_analyzer().analyze_images(tmp_paths, user_context, chat_context=chat_context)
 
                 user_id = str(user.get("id") or user.get("userId", ""))

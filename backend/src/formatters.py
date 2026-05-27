@@ -2409,7 +2409,7 @@ def format_report_as_html(
         # Region screenshot figure (between problem and recommendation)
         region_b64 = issue.get('region_image_b64')
         if region_b64:
-            caption = _cap_terms(issue.get('location', ''))
+            caption = _cap_terms((issue.get('region') or {}).get('caption') or issue.get('location', ''))
             html.append("<figure class='issue-region-figure'>")
             html.append(f"<img src='data:image/png;base64,{region_b64}' class='issue-region-img' alt='Screenshot detail showing the identified issue' />")
             if caption:

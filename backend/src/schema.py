@@ -110,12 +110,13 @@ UI_ANALYSIS_SCHEMA = {
                     },
                     "region": {
                         "type": "object",
-                        "description": "Bounding box tightly enclosing the specific element (button, label, icon, text, card) that exhibits this trap — not the section, container, or page area around it. Normalized coordinates 0.0–1.0, origin top-left. The crop is used as visual evidence: it must show the problematic element itself. Omit only when the issue spans the full interface or cannot be spatially bounded at all.",
+                        "description": "Bounding box tightly enclosing the specific element (button, label, icon, text, card) that exhibits this trap — not the section, container, or page area around it. Normalized coordinates 0.0–1.0, origin top-left. The crop must show the problematic element itself. Omit if the crop would not add visual evidence (e.g., finding is about an absence on a screen not provided, or no specific element can be bounded). When including, also provide a caption explaining what the crop shows and how it illustrates this finding.",
                         "properties": {
                             "x": {"type": "number", "description": "Left edge (0.0 = left side, 1.0 = right side)"},
                             "y": {"type": "number", "description": "Top edge (0.0 = top, 1.0 = bottom)"},
                             "width": {"type": "number", "description": "Width as a fraction of image width"},
-                            "height": {"type": "number", "description": "Height as a fraction of image height"}
+                            "height": {"type": "number", "description": "Height as a fraction of image height"},
+                            "caption": {"type": "string", "description": "Describes (1) what the cropped area shows and (2) how what is shown illustrates this finding. Required when region is provided."}
                         },
                         "required": ["x", "y", "width", "height"]
                     }
@@ -153,12 +154,13 @@ UI_ANALYSIS_SCHEMA = {
                     },
                     "region": {
                         "type": "object",
-                        "description": "Bounding box tightly enclosing the specific element (button, label, icon, text, card) that exhibits this trap — not the section, container, or page area around it. Normalized coordinates 0.0–1.0, origin top-left. The crop is used as visual evidence: it must show the problematic element itself. Omit only when the issue spans the full interface or cannot be spatially bounded at all.",
+                        "description": "Bounding box tightly enclosing the specific element (button, label, icon, text, card) that exhibits this trap — not the section, container, or page area around it. Normalized coordinates 0.0–1.0, origin top-left. The crop must show the problematic element itself. Omit if the crop would not add visual evidence (e.g., finding is about an absence on a screen not provided, or no specific element can be bounded). When including, also provide a caption explaining what the crop shows and how it illustrates this finding.",
                         "properties": {
                             "x": {"type": "number"},
                             "y": {"type": "number"},
                             "width": {"type": "number"},
-                            "height": {"type": "number"}
+                            "height": {"type": "number"},
+                            "caption": {"type": "string", "description": "Describes (1) what the cropped area shows and (2) how what is shown illustrates this finding. Required when region is provided."}
                         },
                         "required": ["x", "y", "width", "height"]
                     }
@@ -196,12 +198,13 @@ UI_ANALYSIS_SCHEMA = {
                     },
                     "region": {
                         "type": "object",
-                        "description": "Bounding box tightly enclosing the specific element (button, label, icon, text, card) that exhibits this trap — not the section, container, or page area around it. Normalized coordinates 0.0–1.0, origin top-left. The crop is used as visual evidence: it must show the problematic element itself. Omit only when the issue spans the full interface or cannot be spatially bounded at all.",
+                        "description": "Bounding box tightly enclosing the specific element (button, label, icon, text, card) that exhibits this trap — not the section, container, or page area around it. Normalized coordinates 0.0–1.0, origin top-left. The crop must show the problematic element itself. Omit if the crop would not add visual evidence (e.g., finding is about an absence on a screen not provided, or no specific element can be bounded). When including, also provide a caption explaining what the crop shows and how it illustrates this finding.",
                         "properties": {
                             "x": {"type": "number"},
                             "y": {"type": "number"},
                             "width": {"type": "number"},
-                            "height": {"type": "number"}
+                            "height": {"type": "number"},
+                            "caption": {"type": "string", "description": "Describes (1) what the cropped area shows and (2) how what is shown illustrates this finding. Required when region is provided."}
                         },
                         "required": ["x", "y", "width", "height"]
                     }

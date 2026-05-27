@@ -516,10 +516,29 @@ class UITrapsAnalyzer:
 
         self._normalize_report_completeness(merged, kb_version=kb_version)
 
+        # Save region crops before enrichment — Pass 2 rewrites findings from scratch
+        # and drops region_image_b64. Keyed by (trap_name, location) so we can restore
+        # them after enrichment.
+        _saved_crops: dict = {}
+        for _sev in ('critical_issues', 'moderate_issues', 'minor_issues'):
+            for _issue in merged.get(_sev, []):
+                if _issue.get('region_image_b64'):
+                    _key = (_issue.get('trap_name', ''), _issue.get('location', ''))
+                    _saved_crops[_key] = _issue['region_image_b64']
+
         try:
             merged = self._enrich_report(merged, timeout=timeout, kb_version=kb_version, verbosity=verbosity)
         except Exception as e:
             print(f"[UITraps] Flow analysis Pass 2 enrichment skipped (non-fatal): {e}")
+
+        # Restore crops that Pass 2 stripped
+        if _saved_crops:
+            for _sev in ('critical_issues', 'moderate_issues', 'minor_issues'):
+                for _issue in merged.get(_sev, []):
+                    if not _issue.get('region_image_b64'):
+                        _key = (_issue.get('trap_name', ''), _issue.get('location', ''))
+                        if _key in _saved_crops:
+                            _issue['region_image_b64'] = _saved_crops[_key]
 
         return merged
 
