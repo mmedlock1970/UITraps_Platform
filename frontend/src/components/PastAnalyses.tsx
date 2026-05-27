@@ -16,12 +16,16 @@ interface PastAnalysesProps {
 function formatDate(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+    month: 'short', day: 'numeric', year: 'numeric',
+  }) + ' · ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+}
+
+function getDisplayName(analysis: StoredAnalysis): string {
+  const screenName = analysis.formSnapshot?.screenName?.trim();
+  if (screenName) return screenName;
+  const firstName = analysis.fileNames[0];
+  if (firstName) return firstName.replace(/\.[^.]+$/, ''); // strip extension
+  return 'Untitled analysis';
 }
 
 export const PastAnalyses: React.FC<PastAnalysesProps> = ({ onViewReport, onReuseSettings, onClose }) => {
@@ -69,14 +73,8 @@ export const PastAnalyses: React.FC<PastAnalysesProps> = ({ onViewReport, onReus
       <div className={styles.list}>
         {analyses.map(analysis => (
           <div key={analysis.id} className={styles.card}>
-            <div className={styles.cardHeader}>
-              <span className={styles.cardDate}>{formatDate(analysis.timestamp)}</span>
-              {analysis.fileNames.length > 0 && (
-                <span className={styles.cardFiles}>
-                  {analysis.fileNames.join(', ')}
-                </span>
-              )}
-            </div>
+            <div className={styles.cardName}>{getDisplayName(analysis)}</div>
+            <div className={styles.cardDate}>{formatDate(analysis.timestamp)}</div>
 
             {analysis.statistics && (
               <div className={styles.statsRow}>
