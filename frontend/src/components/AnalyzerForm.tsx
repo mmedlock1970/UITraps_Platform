@@ -433,24 +433,6 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
             )}
           </div>
 
-          {/* Product context */}
-          <div className={styles.field}>
-            <label className={styles.fieldLabel} htmlFor="productContext">
-              Describe the general purpose of this product
-              <span className={styles.opt}>optional</span>
-            </label>
-            <input
-              id="productContext"
-              type="text"
-              className={styles.input}
-              placeholder="e.g., Hospital website, retail mobile app, banking dashboard, B2B SaaS tool"
-              value={productContext}
-              onChange={e => setProductContext(e.target.value)}
-              disabled={disabled}
-            />
-            <p className={styles.fieldHint}>Helps calibrate findings and recommendations to the product's broader purpose — not just the task being evaluated.</p>
-          </div>
-
           <div className={`${styles.fieldGrid} ${styles.twoCol}`}>
             <div className={styles.field}>
               <label className={styles.fieldLabel} htmlFor="platform">
@@ -520,6 +502,24 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
               {errors.productDomain && <p className={styles.fieldError}>{errors.productDomain}</p>}
             </div>
 
+          </div>
+
+          {/* Product context */}
+          <div className={styles.field}>
+            <label className={styles.fieldLabel} htmlFor="productContext">
+              Describe the general purpose of this product
+              <span className={styles.opt}>optional</span>
+            </label>
+            <input
+              id="productContext"
+              type="text"
+              className={styles.input}
+              placeholder="e.g., Hospital website, retail mobile app, banking dashboard, B2B SaaS tool"
+              value={productContext}
+              onChange={e => setProductContext(e.target.value)}
+              disabled={disabled}
+            />
+            <p className={styles.fieldHint}>Helps calibrate findings and recommendations to the product's broader purpose — not just the task being evaluated.</p>
           </div>
 
         </div>
