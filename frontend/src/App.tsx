@@ -172,18 +172,22 @@ export const App: React.FC = () => {
     }
   }, [tokenInput, auth]);
 
-  // Listen for live theme changes posted from the parent WordPress page
-  // Parent sends: iframe.contentWindow.postMessage({ type: 'uitraps-theme', theme: 'dark' }, '*')
+  // Listen for messages posted from the parent WordPress page:
+  //   { type: 'uitraps-theme', theme: 'dark'|'light' }  → live theme update
+  //   { type: 'uitraps-token', token: '<jwt>' }          → JWT auth on iframe load
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'uitraps-theme') {
         const val = event.data.theme;
         if (val === 'dark' || val === 'light') { setTheme(val); setExternalTheme(true); }
+      } else if (event.data?.type === 'uitraps-token') {
+        const token = event.data.token;
+        if (typeof token === 'string' && token.trim()) { auth.setToken(token.trim()); }
       }
     };
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, []);
+  }, [auth.setToken]);
 
   // Skip auth in dev mode — default true for local dev (localhost), false in production
   const [devMode, setDevMode] = useState(() =>
