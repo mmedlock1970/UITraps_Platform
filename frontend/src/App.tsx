@@ -18,10 +18,11 @@ import { AnalysisProgress } from './components/AnalysisProgress';
 import { ReportViewer } from './components/ReportViewer';
 import { PastAnalyses } from './components/PastAnalyses';
 import { TaskCaptureScreen, CapturedStep } from './components/TaskCaptureScreen';
-import { saveAnalysis, getAnalysisHistory, StoredAnalysis } from './services/analysisHistory';
+import { saveAnalysis, StoredAnalysis } from './services/analysisHistory';
 import { ReportStatistics, UsageInfo, UnifiedAskResponse, TimeEstimate, UserContext, isFigmaEstimate, isUrlEstimate, isFileEstimate, UnifiedEstimate } from './api/types';
 import { unifiedAsk } from './api/client';
 import { ChatPanel } from './components/ChatPanel';
+import { RecentStrip } from './components/RecentStrip';
 import './styles/variables.css';
 import styles from './App.module.css';
 
@@ -610,12 +611,9 @@ export const App: React.FC = () => {
             )}
             {/* Separator line when tab row is hidden */}
             {externalMode && <div className={styles.topBorderLine} />}
-            {/* Sub-actions: Past Analyses, New Session, theme toggle — only rendered when at least one button is visible */}
-            {((view === 'form' && getAnalysisHistory().length > 0) || view === 'chat' || !externalTheme) && (
+            {/* Sub-actions: New Session (chat), theme toggle */}
+            {(view === 'chat' || !externalTheme) && (
               <div className={styles.subTabActions}>
-                {view === 'form' && getAnalysisHistory().length > 0 && (
-                  <button className={styles.headerButton} onClick={() => setView('history')}>Past Analyses</button>
-                )}
                 {view === 'chat' && (
                   <button className={styles.headerButton} onClick={() => unified.clearHistory()}>New Session</button>
                 )}
@@ -644,6 +642,10 @@ export const App: React.FC = () => {
               </div>
             )}
             <div style={{ display: isFormAnalyzing ? 'none' : 'flex', flexDirection: 'column', overflowY: 'auto', flex: 1, paddingTop: '24px' }}>
+              <RecentStrip
+                onViewReport={handleViewHistoryReport}
+                onViewAll={() => setView('history')}
+              />
               {formError && (
                 <div style={{ maxWidth: 900, margin: '0 auto 0', padding: '0 24px', width: '100%', boxSizing: 'border-box' }}>
                   <div style={{ background: '#fdecea', border: '1px solid #f5c6c6', color: '#c0392b', borderRadius: 8, padding: '12px 16px', fontSize: 13, marginBottom: 16 }}>
