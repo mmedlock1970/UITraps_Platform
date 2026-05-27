@@ -430,11 +430,6 @@ export const App: React.FC = () => {
       return (
         <div className={`uitraps-viewport-wrapper ${styles.viewportWrapper}`} data-theme={theme}>
           <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
-            <header className={styles.header}>
-              <div className={styles.logo}>
-                UI Traps <span className={styles.logoAccent}>Helper</span>
-              </div>
-            </header>
             <div className={styles.overlayContainer}>
               <AnalysisProgress
                 elapsedTime={rerunElapsed.elapsedTime}
@@ -451,27 +446,22 @@ export const App: React.FC = () => {
     return (
       <div className={`uitraps-viewport-wrapper ${styles.viewportWrapper}`} data-theme={theme} style={{ height: '100vh', overflow: 'hidden' }}>
         <div className={`uitraps-platform ${styles.platform}`} data-theme={theme} style={{ height: '100vh', overflow: 'hidden' }}>
-          <header className={styles.header}>
-            <div className={styles.logo}>
-              UI Traps <span className={styles.logoAccent}>Helper</span>
-            </div>
-            <div className={styles.headerActions}>
-              <button
-                className={chatOpen ? styles.headerButtonActive : styles.headerButton}
-                onClick={() => setChatOpen(o => !o)}
-              >
-                Chat about Results
-              </button>
-              <button className={styles.headerButton} onClick={() => setView('form')}>
-                New Analysis
-              </button>
-              <button className={`${styles.headerButton} ${styles.themeToggle}`} onClick={toggleTheme} title={theme === 'light' ? 'Dark mode' : 'Light mode'}>
-                {theme === 'light'
-                ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-                : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>}
-              </button>
-            </div>
-          </header>
+          <div className={styles.actionBar}>
+            <button
+              className={chatOpen ? styles.headerButtonActive : styles.headerButton}
+              onClick={() => setChatOpen(o => !o)}
+            >
+              Chat about Results
+            </button>
+            <button className={styles.headerButton} onClick={() => setView('form')}>
+              New Analysis
+            </button>
+            <button className={`${styles.headerButton} ${styles.themeToggle}`} onClick={toggleTheme} title={theme === 'light' ? 'Dark mode' : 'Light mode'}>
+              {theme === 'light'
+              ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+              : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>}
+            </button>
+          </div>
           <div className={styles.reportWithChat}>
             <div className={styles.reportArea}>
               <ReportViewer
@@ -510,21 +500,16 @@ export const App: React.FC = () => {
     return (
       <div className={`uitraps-viewport-wrapper ${styles.viewportWrapper}`} data-theme={theme}>
         <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
-          <header className={styles.header}>
-            <div className={styles.logo}>
-              UI Traps <span className={styles.logoAccent}>Helper</span>
-            </div>
-            <div className={styles.headerActions}>
-              <button className={styles.headerButton} onClick={() => setView('form')}>
-                Back
-              </button>
-              <button className={`${styles.headerButton} ${styles.themeToggle}`} onClick={toggleTheme} title={theme === 'light' ? 'Dark mode' : 'Light mode'}>
-                {theme === 'light'
-                ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-                : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>}
-              </button>
-            </div>
-          </header>
+          <div className={styles.actionBar}>
+            <button className={styles.headerButton} onClick={() => setView('form')}>
+              Back
+            </button>
+            <button className={`${styles.headerButton} ${styles.themeToggle}`} onClick={toggleTheme} title={theme === 'light' ? 'Dark mode' : 'Light mode'}>
+              {theme === 'light'
+              ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+              : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>}
+            </button>
+          </div>
           <PastAnalyses
             onViewReport={handleViewHistoryReport}
             onClose={() => setView('chat')}
@@ -539,16 +524,11 @@ export const App: React.FC = () => {
     return (
       <div className={`uitraps-viewport-wrapper ${styles.viewportWrapper}`} data-theme={theme}>
         <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
-          <header className={styles.header}>
-            <div className={styles.logo}>
-              UI Traps <span className={styles.logoAccent}>Helper</span>
-            </div>
-            <div className={styles.headerActions}>
-              <button className={styles.headerButton} onClick={unified.cancelAnalysis}>
-                Cancel
-              </button>
-            </div>
-          </header>
+          <div className={styles.actionBar}>
+            <button className={styles.headerButton} onClick={unified.cancelAnalysis}>
+              Cancel
+            </button>
+          </div>
           <div className={styles.overlayContainer}>
             <EstimatePreview
               estimate={unified.estimate}
@@ -566,11 +546,6 @@ export const App: React.FC = () => {
     return (
       <div className={`uitraps-viewport-wrapper ${styles.viewportWrapper}`} data-theme={theme}>
         <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
-          <header className={styles.header}>
-            <div className={styles.logo}>
-              UI Traps <span className={styles.logoAccent}>Helper</span>
-            </div>
-          </header>
           <div className={styles.overlayContainer}>
             <AnalysisProgress
               elapsedTime={unified.elapsedTime}
@@ -592,34 +567,23 @@ export const App: React.FC = () => {
   return (
     <div className={`uitraps-viewport-wrapper ${styles.viewportWrapper}`} data-theme={theme}>
       <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
-        <header className={styles.header}>
-          <div className={styles.logo}>UI Traps <span className={styles.logoAccent}>Helper</span></div>
-          {!isFormAnalyzing && (
-            <div className={styles.headerActions}>
+        {!isFormAnalyzing && (
+          <div className={styles.tabRow}>
+            <button type="button" className={`${styles.tab} ${view === 'form' ? styles.tabActive : ''}`} onClick={() => setView('form')}>Analyze a design</button>
+            <button type="button" className={`${styles.tab} ${view === 'chat' ? styles.tabActive : ''}`} onClick={() => setView('chat')}>Ask a question</button>
+            <div className={styles.tabRowActions}>
+              {view === 'form' && getAnalysisHistory().length > 0 && (
+                <button className={styles.headerButton} onClick={() => setView('history')}>Past Analyses</button>
+              )}
+              {view === 'chat' && (
+                <button className={styles.headerButton} onClick={() => unified.clearHistory()}>New Session</button>
+              )}
               <button className={`${styles.headerButton} ${styles.themeToggle}`} onClick={toggleTheme} title={theme === 'light' ? 'Dark mode' : 'Light mode'}>
                 {theme === 'light'
                   ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
                   : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>}
               </button>
             </div>
-          )}
-        </header>
-
-        {!isFormAnalyzing && (
-          <div className={styles.tabRow}>
-            <button type="button" className={`${styles.tab} ${view === 'form' ? styles.tabActive : ''}`} onClick={() => setView('form')}>Analyze a design</button>
-            <button type="button" className={`${styles.tab} ${view === 'chat' ? styles.tabActive : ''}`} onClick={() => setView('chat')}>Ask a question</button>
-          </div>
-        )}
-
-        {!isFormAnalyzing && (
-          <div className={styles.subTabActions}>
-            {view === 'form' && getAnalysisHistory().length > 0 && (
-              <button className={styles.headerButton} onClick={() => setView('history')}>Past Analyses</button>
-            )}
-            {view === 'chat' && (
-              <button className={styles.headerButton} onClick={() => unified.clearHistory()}>New Session</button>
-            )}
           </div>
         )}
 

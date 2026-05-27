@@ -20,24 +20,19 @@
   background: var(--uitraps-bg);
 }
 
-.header {
+.logoAccent {
+  color: var(--uitraps-primary);
+}
+
+/* Slim action bar for views without tabs (report, history) — buttons only, no logo */
+.actionBar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   padding: var(--uitraps-spacing-sm) var(--uitraps-spacing-md);
   border-bottom: 1px solid var(--uitraps-border);
   background: var(--uitraps-bg);
   flex-shrink: 0;
-}
-
-.logo {
-  font-size: var(--uitraps-font-size-lg);
-  font-weight: 700;
-  color: var(--uitraps-text);
-}
-
-.logoAccent {
-  color: var(--uitraps-primary);
 }
 
 .headerActions {
@@ -227,10 +222,20 @@
 /* ── Page tab navigation (shared by form + chat views) ── */
 .tabRow {
   display: flex;
+  align-items: center;
   padding: 0 24px;
   border-bottom: 1px solid var(--uitraps-border);
   background: var(--uitraps-bg);
   flex-shrink: 0;
+}
+
+/* Right-side actions living inside the tab row */
+.tabRowActions {
+  display: flex;
+  align-items: center;
+  gap: var(--uitraps-spacing-sm);
+  margin-left: auto;
+  padding: var(--uitraps-spacing-xs) 0;
 }
 
 .tab {
@@ -257,14 +262,6 @@
   border-bottom-color: var(--uitraps-text);
 }
 
-.subTabActions {
-  height: 40px;
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  padding: 0 24px;
-  flex-shrink: 0;
-}
 
 /* ── Chat page empty state ── */
 .chatPageContent {
