@@ -6,7 +6,7 @@
  * Supports centered welcome layout, analysis progress, and full-page reports.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { useUnifiedInput } from './hooks/useUnifiedInput';
 import { useElapsedTime } from './hooks/useElapsedTime';
@@ -133,6 +133,8 @@ interface ActiveReport {
 
 export const App: React.FC = () => {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [externalTheme, setExternalTheme] = useState(false);
+  const [externalMode, setExternalMode] = useState(false);
   const [apiEndpoint] = useState(DEFAULT_API_ENDPOINT);
   const [view, setView] = useState<AppView>('form');
   const [activeReport, setActiveReport] = useState<ActiveReport | null>(null);
@@ -160,6 +162,26 @@ export const App: React.FC = () => {
       auth.setToken(tokenInput.trim());
     }
   }, [tokenInput, auth]);
+
+  // Read external config from data attributes on mount.
+  // data-uitraps-mode="analyze|chat" on #root  → locks view, hides tabs
+  // data-theme="light|dark" on <html>          → follows parent site theme, hides toggle
+  useEffect(() => {
+    const root = document.getElementById('root');
+    const modeAttr = root?.dataset.uitrapsMode;
+    if (modeAttr === 'analyze') { setView('form'); setExternalMode(true); }
+    else if (modeAttr === 'chat') { setView('chat'); setExternalMode(true); }
+
+    const htmlEl = document.documentElement;
+    const applyTheme = (val: string | undefined) => {
+      if (val === 'dark' || val === 'light') { setTheme(val); setExternalTheme(true); }
+    };
+    applyTheme(htmlEl.dataset.theme);
+
+    const observer = new MutationObserver(() => applyTheme(htmlEl.dataset.theme));
+    observer.observe(htmlEl, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, []);
 
   // Skip auth in dev mode — default true for local dev (localhost), false in production
   const [devMode, setDevMode] = useState(() =>
@@ -457,11 +479,13 @@ export const App: React.FC = () => {
             <button className={styles.headerButton} onClick={() => setView('form')}>
               New Analysis
             </button>
-            <button className={`${styles.headerButton} ${styles.themeToggle}`} onClick={toggleTheme} title={theme === 'light' ? 'Dark mode' : 'Light mode'}>
-              {theme === 'light'
-              ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-              : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>}
-            </button>
+            {!externalTheme && (
+              <button className={`${styles.headerButton} ${styles.themeToggle}`} onClick={toggleTheme} title={theme === 'light' ? 'Dark mode' : 'Light mode'}>
+                {theme === 'light'
+                ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>}
+              </button>
+            )}
           </div>
           <div className={styles.reportWithChat}>
             <div className={styles.reportArea}>
@@ -506,11 +530,13 @@ export const App: React.FC = () => {
             <button className={styles.headerButton} onClick={() => setView('form')}>
               Back
             </button>
-            <button className={`${styles.headerButton} ${styles.themeToggle}`} onClick={toggleTheme} title={theme === 'light' ? 'Dark mode' : 'Light mode'}>
-              {theme === 'light'
-              ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-              : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>}
-            </button>
+            {!externalTheme && (
+              <button className={`${styles.headerButton} ${styles.themeToggle}`} onClick={toggleTheme} title={theme === 'light' ? 'Dark mode' : 'Light mode'}>
+                {theme === 'light'
+                ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>}
+              </button>
+            )}
           </div>
           <PastAnalyses
             onViewReport={handleViewHistoryReport}
@@ -572,10 +598,16 @@ export const App: React.FC = () => {
       <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
         {!isFormAnalyzing && (
           <>
-            <div className={styles.tabRow}>
-              <button type="button" className={`${styles.tab} ${view === 'form' ? styles.tabActive : ''}`} onClick={() => setView('form')}>Analyze a design</button>
-              <button type="button" className={`${styles.tab} ${view === 'chat' ? styles.tabActive : ''}`} onClick={() => setView('chat')}>Ask a question</button>
-            </div>
+            {/* Tab row — hidden when parent site drives the mode */}
+            {!externalMode && (
+              <div className={styles.tabRow}>
+                <button type="button" className={`${styles.tab} ${view === 'form' ? styles.tabActive : ''}`} onClick={() => setView('form')}>Analyze a design</button>
+                <button type="button" className={`${styles.tab} ${view === 'chat' ? styles.tabActive : ''}`} onClick={() => setView('chat')}>Ask a question</button>
+              </div>
+            )}
+            {/* Separator line when tab row is hidden */}
+            {externalMode && <div className={styles.topBorderLine} />}
+            {/* Sub-actions: Past Analyses, New Session, theme toggle (hidden when parent controls theme) */}
             <div className={styles.subTabActions}>
               {view === 'form' && getAnalysisHistory().length > 0 && (
                 <button className={styles.headerButton} onClick={() => setView('history')}>Past Analyses</button>
@@ -583,11 +615,13 @@ export const App: React.FC = () => {
               {view === 'chat' && (
                 <button className={styles.headerButton} onClick={() => unified.clearHistory()}>New Session</button>
               )}
-              <button className={`${styles.headerButton} ${styles.themeToggle}`} onClick={toggleTheme} title={theme === 'light' ? 'Dark mode' : 'Light mode'}>
-                {theme === 'light'
-                  ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-                  : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>}
-              </button>
+              {!externalTheme && (
+                <button className={`${styles.headerButton} ${styles.themeToggle}`} onClick={toggleTheme} title={theme === 'light' ? 'Dark mode' : 'Light mode'}>
+                  {theme === 'light'
+                    ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                    : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>}
+                </button>
+              )}
             </div>
           </>
         )}
