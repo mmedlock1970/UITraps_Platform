@@ -24,14 +24,20 @@
   color: var(--uitraps-primary);
 }
 
-/* Slim action bar for views without tabs (report, history) — buttons only, no logo */
-.actionBar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding: var(--uitraps-spacing-sm) var(--uitraps-spacing-md);
+/* Thin divider line used as top separator on views without tabs (report, history) */
+.topBorderLine {
   border-bottom: 1px solid var(--uitraps-border);
-  background: var(--uitraps-bg);
+  flex-shrink: 0;
+}
+
+/* Sub-row below the tab/divider border — holds contextual action buttons */
+.subTabActions {
+  height: 40px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 0 24px;
+  gap: var(--uitraps-spacing-sm);
   flex-shrink: 0;
 }
 
@@ -229,14 +235,6 @@
   flex-shrink: 0;
 }
 
-/* Right-side actions living inside the tab row */
-.tabRowActions {
-  display: flex;
-  align-items: center;
-  gap: var(--uitraps-spacing-sm);
-  margin-left: auto;
-  padding: var(--uitraps-spacing-xs) 0;
-}
 
 .tab {
   padding: 12px 0;
