@@ -132,15 +132,20 @@ interface ActiveReport {
 }
 
 export const App: React.FC = () => {
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
-  const [externalTheme, setExternalTheme] = useState(false);
-  const [externalMode, setExternalMode] = useState(false);
+  // Read URL params once — no flash, works inside an iframe
+  // ?mode=analyze|chat  → locks view, hides tabs
+  // ?theme=light|dark   → sets initial theme, hides toggle
+  // postMessage { type: 'uitraps-theme', theme: 'light'|'dark' } → live theme updates
+  const _params = new URLSearchParams(window.location.search);
+  const [theme, setTheme] = useState<'light' | 'dark'>(() =>
+    _params.get('theme') === 'dark' ? 'dark' : 'light'
+  );
+  const [externalTheme, setExternalTheme] = useState(() => _params.has('theme'));
+  const [externalMode] = useState(() => _params.has('mode'));
   const [apiEndpoint] = useState(DEFAULT_API_ENDPOINT);
-  // Initialize view directly from DOM so there's no flash when mode is externally set
-  const [view, setView] = useState<AppView>(() => {
-    const mode = document.getElementById('root')?.dataset.uitrapsMode;
-    return mode === 'chat' ? 'chat' : 'form';
-  });
+  const [view, setView] = useState<AppView>(() =>
+    _params.get('mode') === 'chat' ? 'chat' : 'form'
+  );
   const [activeReport, setActiveReport] = useState<ActiveReport | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [isRerunning, setIsRerunning] = useState(false);
@@ -167,24 +172,17 @@ export const App: React.FC = () => {
     }
   }, [tokenInput, auth]);
 
-  // Read external config from data attributes on mount.
-  // data-uitraps-mode="analyze|chat" on #root  → locks view, hides tabs
-  // data-theme="light|dark" on <html>          → follows parent site theme, hides toggle
+  // Listen for live theme changes posted from the parent WordPress page
+  // Parent sends: iframe.contentWindow.postMessage({ type: 'uitraps-theme', theme: 'dark' }, '*')
   useEffect(() => {
-    const root = document.getElementById('root');
-    const modeAttr = root?.dataset.uitrapsMode;
-    if (modeAttr === 'analyze') { setView('form'); setExternalMode(true); }
-    else if (modeAttr === 'chat') { setView('chat'); setExternalMode(true); }
-
-    const htmlEl = document.documentElement;
-    const applyTheme = (val: string | undefined) => {
-      if (val === 'dark' || val === 'light') { setTheme(val); setExternalTheme(true); }
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'uitraps-theme') {
+        const val = event.data.theme;
+        if (val === 'dark' || val === 'light') { setTheme(val); setExternalTheme(true); }
+      }
     };
-    applyTheme(htmlEl.dataset.theme);
-
-    const observer = new MutationObserver(() => applyTheme(htmlEl.dataset.theme));
-    observer.observe(htmlEl, { attributes: true, attributeFilter: ['data-theme'] });
-    return () => observer.disconnect();
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
   }, []);
 
   // Skip auth in dev mode — default true for local dev (localhost), false in production

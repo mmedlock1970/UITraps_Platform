@@ -1,44 +1,48 @@
 # UI Traps Analyzer — WordPress Embedding Contract
 
-This document defines the interface between the UI Traps Analyzer tool and the WordPress site that embeds it. Both sides must honour this contract for the integration to work correctly.
+This document defines the interface between the UI Traps Analyzer tool and the WordPress site that embeds it via `<iframe>`. Both sides must honour this contract for the integration to work correctly.
 
 ---
 
 ## Hosting
 
-The tool is built and deployed via Railway. The WordPress site loads it from the Railway URL.
+The tool is built and deployed via Railway. The WordPress plugin embeds it in an `<iframe>`.
 
-- **Railway project:** TBD (Michael to confirm URL)
-- **Deploy trigger:** Push to `master` branch → Railway rebuilds and redeploys automatically
+- **Backend URL:** https://uitrapsplatform-production.up.railway.app
+- **Frontend URL:** TBD (Netlify/Vercel — Michael to confirm)
+- **Deploy trigger:** Push to `master` branch → Railway/Netlify/Vercel rebuilds automatically
 
 ---
 
-## Container requirements (WordPress side)
-
-WordPress must provide a container element for the tool to mount into:
+## Embedding (WordPress side)
 
 ```html
-<div id="root" data-uitraps-mode="analyze"></div>
+<!-- Analyze page -->
+<iframe src="https://<frontend-url>/?mode=analyze&theme=light" ...></iframe>
+
+<!-- Chat page -->
+<iframe src="https://<frontend-url>/?mode=chat&theme=light" ...></iframe>
 ```
 
-**Height:** The container must have an explicit height set. The tool fills `100%` of its container — it does not impose its own height.
+**Height:** The iframe must have an explicit height. The tool fills `100%` of its container.
 
 ```css
-/* Example — adjust to account for your nav bar height */
-#root {
-  height: calc(100vh - 80px);
+iframe {
+  width: 100%;
+  height: calc(100vh - 80px); /* adjust for WordPress nav height */
+  border: none;
 }
 ```
 
 ---
 
-## Configuration attributes
+## Configuration — URL parameters
 
-Both attributes are optional. The tool falls back to standalone behavior (tabs visible, internal theme toggle visible) if neither is set.
+Both parameters are optional. The tool falls back to standalone behavior (tabs visible, internal theme toggle visible) if neither is provided.
 
-### `data-uitraps-mode` (on `#root`)
+### `mode`
 
-Controls which interface loads. When set, the tab row is hidden — the parent site's navigation drives mode selection.
+Controls which interface loads. When set, the tab row is hidden.
 
 | Value | Effect |
 |-------|--------|
@@ -46,35 +50,60 @@ Controls which interface loads. When set, the tab row is hidden — the parent s
 | `chat` | Loads the Ask a question interface |
 | *(absent)* | Both tabs visible, user can switch |
 
-```html
-<!-- Analyze page -->
-<div id="root" data-uitraps-mode="analyze"></div>
+### `theme`
 
-<!-- Chat page -->
-<div id="root" data-uitraps-mode="chat"></div>
+Sets the initial color theme. When set, the internal theme toggle is hidden.
+
+| Value | Effect |
+|-------|--------|
+| `light` | Light mode |
+| `dark` | Dark mode |
+| *(absent)* | Light mode, internal toggle visible |
+
+---
+
+## Theme — live updates via postMessage
+
+When the user toggles the WordPress site's theme, the parent page notifies the iframe:
+
+```javascript
+// WordPress parent page — send when theme changes
+document.querySelector('iframe').contentWindow.postMessage(
+  { type: 'uitraps-theme', theme: 'dark' }, // or 'light'
+  '*'
+);
 ```
 
-### `data-theme` (on `<html>`)
+The tool listens for this message and updates its theme immediately. The internal toggle stays hidden once any external theme signal has been received.
 
-Controls the tool's color theme. The tool watches this attribute for changes via MutationObserver, so it responds immediately when the user toggles the site's theme. When set, the tool's internal theme toggle is hidden.
+---
 
-```html
-<html data-theme="dark">   <!-- dark mode -->
-<html data-theme="light">  <!-- light mode -->
+## Auth — JWT via postMessage
+
+The WordPress plugin issues a JWT token and passes it to the iframe on load:
+
+```javascript
+// WordPress plugin — send after iframe loads
+iframeEl.addEventListener('load', () => {
+  iframeEl.contentWindow.postMessage(
+    { type: 'uitraps-token', token: '<jwt>' },
+    '*'
+  );
+});
 ```
 
-Most WordPress themes (GeneratePress, Kadence, etc.) already set this attribute — confirm the attribute name your theme uses.
+The `userId` embedded in the JWT is the permanent WordPress user ID used as the key for subscriptions and reports.
 
 ---
 
 ## Floating chat panel (deferred)
 
-The "Ask a question" interface will eventually be available as a globally accessible floating panel injected by the WordPress plugin. This is not yet implemented. When ready, the tool will export the chat view as a standalone component for the WordPress dev to wrap in a floating panel shell.
+The "Ask a question" interface will eventually be available as a globally accessible floating panel injected by the WordPress plugin. Not yet implemented.
 
 ---
 
 ## Change process
 
-Any change to this contract (new attributes, changed behavior, new deployment URL) should be:
+Any change to this contract should be:
 1. Updated in this document
 2. Communicated to both sides before deploying

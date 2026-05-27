@@ -34,9 +34,11 @@ The tool is being embedded into the UI Traps WordPress site. See `docs/integrati
 
 Key points:
 - Tool is deployed via Railway (Michael has set this up)
-- Parent site controls theme via `data-theme="light|dark"` on `<html>`
-- Parent site controls which interface loads via `data-uitraps-mode="analyze|chat"` on `#root`
-- Tool fills its container height — WordPress dev sets the container height
+- Tool is embedded in an `<iframe>` — parent page cannot touch the iframe's internal DOM
+- Initial mode and theme are set via URL params: `?mode=analyze&theme=light`
+- Live theme changes are sent via `postMessage({ type: 'uitraps-theme', theme: 'dark' })`
+- JWT token is passed via `postMessage({ type: 'uitraps-token', token: '<jwt>' })` after iframe loads
+- Tool fills its container height (`height: 100%`) — WordPress dev sets the iframe height
 
 ## Shared memory
 Project memory that persists across Claude sessions is in `.claude/memory/`. Read `MEMORY.md` there for the index.
