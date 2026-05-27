@@ -136,7 +136,11 @@ export const App: React.FC = () => {
   const [externalTheme, setExternalTheme] = useState(false);
   const [externalMode, setExternalMode] = useState(false);
   const [apiEndpoint] = useState(DEFAULT_API_ENDPOINT);
-  const [view, setView] = useState<AppView>('form');
+  // Initialize view directly from DOM so there's no flash when mode is externally set
+  const [view, setView] = useState<AppView>(() => {
+    const mode = document.getElementById('root')?.dataset.uitrapsMode;
+    return mode === 'chat' ? 'chat' : 'form';
+  });
   const [activeReport, setActiveReport] = useState<ActiveReport | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [isRerunning, setIsRerunning] = useState(false);
@@ -607,22 +611,24 @@ export const App: React.FC = () => {
             )}
             {/* Separator line when tab row is hidden */}
             {externalMode && <div className={styles.topBorderLine} />}
-            {/* Sub-actions: Past Analyses, New Session, theme toggle (hidden when parent controls theme) */}
-            <div className={styles.subTabActions}>
-              {view === 'form' && getAnalysisHistory().length > 0 && (
-                <button className={styles.headerButton} onClick={() => setView('history')}>Past Analyses</button>
-              )}
-              {view === 'chat' && (
-                <button className={styles.headerButton} onClick={() => unified.clearHistory()}>New Session</button>
-              )}
-              {!externalTheme && (
-                <button className={`${styles.headerButton} ${styles.themeToggle}`} onClick={toggleTheme} title={theme === 'light' ? 'Dark mode' : 'Light mode'}>
-                  {theme === 'light'
-                    ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-                    : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>}
-                </button>
-              )}
-            </div>
+            {/* Sub-actions: Past Analyses, New Session, theme toggle — only rendered when at least one button is visible */}
+            {((view === 'form' && getAnalysisHistory().length > 0) || view === 'chat' || !externalTheme) && (
+              <div className={styles.subTabActions}>
+                {view === 'form' && getAnalysisHistory().length > 0 && (
+                  <button className={styles.headerButton} onClick={() => setView('history')}>Past Analyses</button>
+                )}
+                {view === 'chat' && (
+                  <button className={styles.headerButton} onClick={() => unified.clearHistory()}>New Session</button>
+                )}
+                {!externalTheme && (
+                  <button className={`${styles.headerButton} ${styles.themeToggle}`} onClick={toggleTheme} title={theme === 'light' ? 'Dark mode' : 'Light mode'}>
+                    {theme === 'light'
+                      ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                      : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>}
+                  </button>
+                )}
+              </div>
+            )}
           </>
         )}
 
