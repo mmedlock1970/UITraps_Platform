@@ -444,8 +444,8 @@ export const App: React.FC = () => {
     }
 
     return (
-      <div className={`uitraps-viewport-wrapper ${styles.viewportWrapper}`} data-theme={theme} style={{ height: '100vh', overflow: 'hidden' }}>
-        <div className={`uitraps-platform ${styles.platform}`} data-theme={theme} style={{ height: '100vh', overflow: 'hidden' }}>
+      <div className={`uitraps-viewport-wrapper ${styles.viewportWrapper}`} data-theme={theme}>
+        <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
           <div className={styles.topBorderLine} />
           <div className={styles.subTabActions}>
             <button
