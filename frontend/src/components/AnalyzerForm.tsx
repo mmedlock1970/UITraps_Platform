@@ -1,15 +1,18 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { ContentType, KbVersion, UserContext } from '../api/types';
+import { FormSnapshot } from '../services/analysisHistory';
 import styles from './AnalyzerForm.module.css';
 
 export interface FormSubmitPayload {
   files: File[];
   context: UserContext;
+  formSnapshot: FormSnapshot;
 }
 
 interface AnalyzerFormProps {
   onSubmit: (payload: FormSubmitPayload) => void;
   disabled?: boolean;
+  initialValues?: FormSnapshot;
 }
 
 function platformToContentType(platform: string, productDomain: string): ContentType {
@@ -142,44 +145,46 @@ function inferFileType(files: File[], figmaLink: string): 'screenshot' | 'video'
   return 'screenshot';
 }
 
-export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled = false }) => {
+export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled = false, initialValues }) => {
+  const iv = initialValues;
+
   // Card 1 — Interface
   const [files, setFiles] = useState<File[]>([]);
   const [thumbnailUrls, setThumbnailUrls] = useState<string[]>([]);
-  const [figmaLink, setFigmaLink] = useState('');
-  const [screenName, setScreenName] = useState('');
-  const [platform, setPlatform] = useState('');
-  const [productDomain, setProductDomain] = useState('');
-  const [productContext, setProductContext] = useState('');
+  const [figmaLink, setFigmaLink] = useState(iv?.figmaLink ?? '');
+  const [screenName, setScreenName] = useState(iv?.screenName ?? '');
+  const [platform, setPlatform] = useState(iv?.platform ?? '');
+  const [productDomain, setProductDomain] = useState(iv?.productDomain ?? '');
+  const [productContext, setProductContext] = useState(iv?.productContext ?? '');
   const [isDragover, setIsDragover] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Card 2 — User
-  const [expLevel, setExpLevel] = useState('');
-  const [techSavvy, setTechSavvy] = useState('');
-  const [frequency, setFrequency] = useState('');
-  const [tasks, setTasks] = useState<Array<{ name: string; description: string }>>([
-    { name: '', description: '' },
-  ]);
-  const [userDesc, setUserDesc] = useState('');
-  const [priorProducts, setPriorProducts] = useState('');
+  const [expLevel, setExpLevel] = useState(iv?.expLevel ?? '');
+  const [techSavvy, setTechSavvy] = useState(iv?.techSavvy ?? '');
+  const [frequency, setFrequency] = useState(iv?.frequency ?? '');
+  const [tasks, setTasks] = useState<Array<{ name: string; description: string }>>(
+    iv?.tasks ?? [{ name: '', description: '' }]
+  );
+  const [userDesc, setUserDesc] = useState(iv?.userDesc ?? '');
+  const [priorProducts, setPriorProducts] = useState(iv?.priorProducts ?? '');
 
   // Card 3 — Use Environment
-  const [physicalEnv, setPhysicalEnv] = useState('');
-  const [lighting, setLighting] = useState('');
-  const [gripPosition, setGripPosition] = useState('');
-  const [attentionalState, setAttentionalState] = useState('');
+  const [physicalEnv, setPhysicalEnv] = useState(iv?.physicalEnv ?? '');
+  const [lighting, setLighting] = useState(iv?.lighting ?? '');
+  const [gripPosition, setGripPosition] = useState(iv?.gripPosition ?? '');
+  const [attentionalState, setAttentionalState] = useState(iv?.attentionalState ?? '');
 
   // Card 4 — Additional Context
-  const [extraContext, setExtraContext] = useState('');
+  const [extraContext, setExtraContext] = useState(iv?.extraContext ?? '');
 
   // Card 5 — Analysis Scope
-  const [kbVersion, setKbVersion] = useState<KbVersion>('v2');
-  const [selectedTenets, setSelectedTenets] = useState<string[]>([...ALL_TENETS]);
-  const [verbosity, setVerbosity] = useState<'brief' | 'standard'>('standard');
-  const [pass1Model, setPass1Model] = useState<'sonnet' | 'haiku'>('sonnet');
-  const [thoroughMode, setThoroughMode] = useState(false);
-  const [lockedInputType, setLockedInputType] = useState<'screenshot' | 'video' | 'flow_diagram' | null>(null);
+  const [kbVersion, setKbVersion] = useState<KbVersion>(iv?.kbVersion ?? 'v2');
+  const [selectedTenets, setSelectedTenets] = useState<string[]>(iv?.selectedTenets ?? [...ALL_TENETS]);
+  const [verbosity, setVerbosity] = useState<'brief' | 'standard'>(iv?.verbosity ?? 'standard');
+  const [pass1Model, setPass1Model] = useState<'sonnet' | 'haiku'>(iv?.pass1Model ?? 'sonnet');
+  const [thoroughMode, setThoroughMode] = useState(iv?.thoroughMode ?? false);
+  const [lockedInputType, setLockedInputType] = useState<'screenshot' | 'video' | 'flow_diagram' | null>(iv?.lockedInputType ?? null);
   const [autoDetectedType, setAutoDetectedType] = useState<'flow_diagram' | null>(null);
   const inputType = lockedInputType ?? autoDetectedType ?? inferFileType(files, figmaLink);
 
@@ -252,13 +257,19 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
     e.preventDefault();
     if (disabled) return;
     if (!validate()) return;
+    const formSnapshot: FormSnapshot = {
+      figmaLink, screenName, platform, productDomain, productContext,
+      expLevel, techSavvy, frequency, tasks, userDesc, priorProducts,
+      physicalEnv, lighting, gripPosition, attentionalState, extraContext,
+      kbVersion, selectedTenets, verbosity, pass1Model, thoroughMode, lockedInputType,
+    };
     const context = assembleContext({ platform, productDomain, screenName,
       expLevel, techSavvy, frequency, taskList: tasks, priorProducts, userDesc, extraContext, productContext,
       physicalEnv, lighting, gripPosition, attentionalState, kbVersion, selectedTenets,
       verbosity, pass1Model, figmaLink, thoroughMode, inputType });
-    onSubmit({ files, context });
-  }, [disabled, validate, files, figmaLink, platform, productDomain, screenName,
-      expLevel, techSavvy, frequency, tasks, priorProducts, userDesc, extraContext, productContext,
+    onSubmit({ files, context, formSnapshot });
+  }, [disabled, validate, files, figmaLink, screenName, platform, productDomain, productContext,
+      expLevel, techSavvy, frequency, tasks, userDesc, priorProducts, extraContext,
       physicalEnv, lighting, gripPosition, attentionalState, kbVersion, selectedTenets,
       verbosity, pass1Model, thoroughMode, lockedInputType, onSubmit]);
 

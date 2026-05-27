@@ -9,6 +9,7 @@ import styles from './PastAnalyses.module.css';
 
 interface PastAnalysesProps {
   onViewReport: (analysis: StoredAnalysis) => void;
+  onReuseSettings?: (analysis: StoredAnalysis) => void;
   onClose: () => void;
 }
 
@@ -23,7 +24,7 @@ function formatDate(iso: string): string {
   });
 }
 
-export const PastAnalyses: React.FC<PastAnalysesProps> = ({ onViewReport, onClose }) => {
+export const PastAnalyses: React.FC<PastAnalysesProps> = ({ onViewReport, onReuseSettings, onClose }) => {
   const [analyses, setAnalyses] = useState(() => getAnalysisHistory());
 
   const handleDelete = useCallback((id: string) => {
@@ -109,6 +110,14 @@ export const PastAnalyses: React.FC<PastAnalysesProps> = ({ onViewReport, onClos
               >
                 View Report
               </button>
+              {onReuseSettings && analysis.formSnapshot && (
+                <button
+                  className={styles.downloadButton}
+                  onClick={() => onReuseSettings(analysis)}
+                >
+                  Re-use settings
+                </button>
+              )}
               <button
                 className={styles.downloadButton}
                 onClick={() => handleDownload(analysis)}

@@ -18,7 +18,7 @@ import { AnalysisProgress } from './components/AnalysisProgress';
 import { ReportViewer } from './components/ReportViewer';
 import { PastAnalyses } from './components/PastAnalyses';
 import { TaskCaptureScreen, CapturedStep } from './components/TaskCaptureScreen';
-import { saveAnalysis, StoredAnalysis } from './services/analysisHistory';
+import { saveAnalysis, StoredAnalysis, FormSnapshot } from './services/analysisHistory';
 import { ReportStatistics, UsageInfo, UnifiedAskResponse, TimeEstimate, UserContext, isFigmaEstimate, isUrlEstimate, isFileEstimate, UnifiedEstimate } from './api/types';
 import { unifiedAsk } from './api/client';
 import { ChatPanel } from './components/ChatPanel';
@@ -152,6 +152,10 @@ export const App: React.FC = () => {
   const [isRerunning, setIsRerunning] = useState(false);
   const rerunElapsed = useElapsedTime();
 
+  // Form pre-fill — incremented key forces AnalyzerForm to remount with new initialValues
+  const [prefillValues, setPrefillValues] = useState<FormSnapshot | undefined>(undefined);
+  const [formKey, setFormKey] = useState(0);
+
   // Form-specific analysis state
   const [formAnalysisPhase, setFormAnalysisPhase] = useState<'idle' | 'analyzing'>('idle');
   const [formFileCount, setFormFileCount] = useState(0);
@@ -196,7 +200,7 @@ export const App: React.FC = () => {
   );
   const effectiveToken = auth.token || (devMode ? 'dev-mode' : '');
 
-  const handleAnalysisComplete = useCallback((result: UnifiedAskResponse, fileNames: string[], files?: File[], context?: UserContext) => {
+  const handleAnalysisComplete = useCallback((result: UnifiedAskResponse, fileNames: string[], files?: File[], context?: UserContext, formSnapshot?: FormSnapshot) => {
     // Dual-report (compare mode) — report_html_v1 and report_html_v2 are both present
     const isDualReport = !!(result.report_html_v1 && result.report_html_v2);
     if (isDualReport || result.report_html) {
@@ -222,6 +226,7 @@ export const App: React.FC = () => {
         fileNames,
         statistics: isDualReport ? result.statistics_v2 : result.statistics,
         html: (result.report_html ?? result.report_html_v2) || '',
+        formSnapshot,
       });
     }
   }, []);
@@ -281,7 +286,7 @@ export const App: React.FC = () => {
   }, [activeReport, apiEndpoint, effectiveToken, rerunElapsed]);
 
   const handleFormSubmit = useCallback(async (payload: FormSubmitPayload) => {
-    const { files, context } = payload;
+    const { files, context, formSnapshot } = payload;
 
     setFormError(null);
     setFormAnalysisPhase('analyzing');
@@ -313,7 +318,8 @@ export const App: React.FC = () => {
           result,
           files.map(f => f.name),
           files,
-          context
+          context,
+          formSnapshot
         );
       } else if (result.error) {
         setFormError(result.error);
@@ -352,6 +358,13 @@ export const App: React.FC = () => {
       statistics: analysis.statistics,
     });
     setView('report');
+  }, []);
+
+  const handleReuseSettings = useCallback((analysis: StoredAnalysis) => {
+    if (!analysis.formSnapshot) return;
+    setPrefillValues(analysis.formSnapshot);
+    setFormKey(k => k + 1);
+    setView('form');
   }, []);
 
   // Task capture handlers
@@ -544,6 +557,7 @@ export const App: React.FC = () => {
           )}
           <PastAnalyses
             onViewReport={handleViewHistoryReport}
+            onReuseSettings={handleReuseSettings}
             onClose={() => setView('form')}
           />
         </div>
@@ -650,7 +664,7 @@ export const App: React.FC = () => {
                   </div>
                 </div>
               )}
-              <AnalyzerForm onSubmit={handleFormSubmit} disabled={isFormAnalyzing} />
+              <AnalyzerForm key={formKey} initialValues={prefillValues} onSubmit={handleFormSubmit} disabled={isFormAnalyzing} />
             </div>
           </>
         )}

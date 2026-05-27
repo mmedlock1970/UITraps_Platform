@@ -3,7 +3,33 @@
  * Stores the last 10 analyses with ability to view and download.
  */
 
-import { ReportStatistics } from '../api/types';
+import { ReportStatistics, KbVersion } from '../api/types';
+
+/** Serialisable snapshot of all raw form fields (no File objects). */
+export interface FormSnapshot {
+  figmaLink: string;
+  screenName: string;
+  platform: string;
+  productDomain: string;
+  productContext: string;
+  expLevel: string;
+  techSavvy: string;
+  frequency: string;
+  tasks: Array<{ name: string; description: string }>;
+  userDesc: string;
+  priorProducts: string;
+  physicalEnv: string;
+  lighting: string;
+  gripPosition: string;
+  attentionalState: string;
+  extraContext: string;
+  kbVersion: KbVersion;
+  selectedTenets: string[];
+  verbosity: 'brief' | 'standard';
+  pass1Model: 'sonnet' | 'haiku';
+  thoroughMode: boolean;
+  lockedInputType: 'screenshot' | 'video' | 'flow_diagram' | null;
+}
 
 export interface StoredAnalysis {
   id: string;
@@ -11,6 +37,7 @@ export interface StoredAnalysis {
   fileNames: string[];
   statistics?: ReportStatistics;
   html: string;
+  formSnapshot?: FormSnapshot;
 }
 
 const STORAGE_KEY = 'uitraps-analysis-history';
