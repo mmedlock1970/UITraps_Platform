@@ -4,6 +4,24 @@
   padding: var(--uitraps-spacing-lg) var(--uitraps-spacing-md);
 }
 
+.backNav {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  margin-bottom: var(--uitraps-spacing-md);
+  background: none;
+  border: none;
+  color: var(--uitraps-text-secondary);
+  font-size: var(--uitraps-font-size-sm);
+  cursor: pointer;
+  transition: color var(--uitraps-transition);
+}
+
+.backNav:hover {
+  color: var(--uitraps-text);
+}
+
 .header {
   display: flex;
   align-items: center;

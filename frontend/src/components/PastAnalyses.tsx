@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { getAnalysisHistory, deleteAnalysis, StoredAnalysis } from '../services/analysisHistory';
+import { getAnalysisHistory, deleteAnalysis, StoredAnalysis, HISTORY_LIMIT } from '../services/analysisHistory';
 import styles from './PastAnalyses.module.css';
 
 interface PastAnalysesProps {
@@ -46,14 +46,12 @@ export const PastAnalyses: React.FC<PastAnalysesProps> = ({ onViewReport, onClos
   if (analyses.length === 0) {
     return (
       <div className={styles.container}>
+        <button className={styles.backNav} onClick={onClose}>← Back</button>
         <div className={styles.empty}>
           <div className={styles.emptyTitle}>No Past Analyses</div>
           <p className={styles.emptyText}>
             Your completed analyses will appear here. Run an analysis to get started.
           </p>
-          <button className={styles.backButton} onClick={onClose}>
-            Back to Chat
-          </button>
         </div>
       </div>
     );
@@ -61,9 +59,10 @@ export const PastAnalyses: React.FC<PastAnalysesProps> = ({ onViewReport, onClos
 
   return (
     <div className={styles.container}>
+      <button className={styles.backNav} onClick={onClose}>← Back</button>
       <div className={styles.header}>
         <h2 className={styles.title}>Past Analyses</h2>
-        <span className={styles.count}>{analyses.length} of 10</span>
+        <span className={styles.count}>{analyses.length} of {HISTORY_LIMIT}</span>
       </div>
 
       <div className={styles.list}>

@@ -14,7 +14,8 @@ export interface StoredAnalysis {
 }
 
 const STORAGE_KEY = 'uitraps-analysis-history';
-const MAX_ENTRIES = 5; // Reduced from 10 due to larger report sizes with embedded screenshots
+export const HISTORY_LIMIT = 5; // Reduced from 10 due to larger report sizes with embedded screenshots
+const MAX_ENTRIES = HISTORY_LIMIT;
 
 export function saveAnalysis(analysis: Omit<StoredAnalysis, 'id'>): void {
   const id = `analysis-${Date.now()}`;
