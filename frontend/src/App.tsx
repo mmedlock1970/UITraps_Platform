@@ -642,10 +642,7 @@ export const App: React.FC = () => {
               </div>
             )}
             <div style={{ display: isFormAnalyzing ? 'none' : 'flex', flexDirection: 'column', overflowY: 'auto', flex: 1, paddingTop: '24px' }}>
-              <RecentStrip
-                onViewReport={handleViewHistoryReport}
-                onViewAll={() => setView('history')}
-              />
+              <RecentStrip onViewAll={() => setView('history')} />
               {formError && (
                 <div style={{ maxWidth: 900, margin: '0 auto 0', padding: '0 24px', width: '100%', boxSizing: 'border-box' }}>
                   <div style={{ background: '#fdecea', border: '1px solid #f5c6c6', color: '#c0392b', borderRadius: 8, padding: '12px 16px', fontSize: 13, marginBottom: 16 }}>
