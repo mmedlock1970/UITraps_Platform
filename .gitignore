@@ -18,6 +18,9 @@ dist/
 .vscode/
 .idea/
 
+# Claude Code — local settings are machine-specific and should not be shared
+.claude/settings.local.json
+
 # OS
 .DS_Store
 Thumbs.db
