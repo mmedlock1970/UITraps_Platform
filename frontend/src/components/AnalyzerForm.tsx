@@ -246,12 +246,10 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
     if (!platform) e.platform = 'Required';
     if (!productDomain) e.productDomain = 'Required';
     if (!expLevel) e.expLevel = 'Required';
-    if (!techSavvy) e.techSavvy = 'Required';
-    if (!frequency) e.frequency = 'Required';
     if (!tasks[0]?.description.trim()) e.userGoal = 'Required';
     setErrors(e);
     return Object.keys(e).length === 0;
-  }, [files, figmaLink, lockedInputType, screenName, platform, productDomain, expLevel, techSavvy, frequency, tasks]);
+  }, [files, figmaLink, lockedInputType, screenName, platform, productDomain, expLevel, tasks]);
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
@@ -448,27 +446,20 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
               >
                 <option value="" disabled>Select one</option>
                 <optgroup label="Mobile">
-                  <option>iPhone / iOS app</option>
-                  <option>Android phone app</option>
-                  <option>iPad / tablet app</option>
+                  <option>Mobile app (iOS / Android)</option>
+                  <option>Tablet app</option>
                   <option>Mobile web browser</option>
                 </optgroup>
                 <optgroup label="Desktop">
                   <option>Desktop web browser</option>
-                  <option>Desktop application — Mac</option>
-                  <option>Desktop application — Windows</option>
+                  <option>Desktop application</option>
                 </optgroup>
-                <optgroup label="Devices">
+                <optgroup label="Other devices">
                   <option>Smart TV / streaming device</option>
-                  <option>Smart speaker — voice only</option>
-                  <option>Smart display — voice + screen</option>
-                  <option>Smartwatch / wearable</option>
-                  <option>AR headset</option>
-                  <option>VR headset</option>
-                  <option>In-vehicle display</option>
                   <option>Kiosk / public terminal</option>
+                  <option>Wearable or specialty device</option>
                 </optgroup>
-                <option>Other / custom hardware</option>
+                <option>Other</option>
               </select>
               {errors.platform && <p className={styles.fieldError}>{errors.platform}</p>}
             </div>
@@ -574,8 +565,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
                 disabled={disabled}
               >
                 <option value="" disabled>Select one</option>
-                <option>First-time users</option>
-                <option>Mostly new users (0–3 sessions)</option>
+                <option>New users (first time or few sessions)</option>
                 <option>Mixed — new and returning</option>
                 <option>Mostly returning users</option>
                 <option>Long-term regular users</option>
@@ -585,48 +575,41 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
 
             <div className={styles.field}>
               <label className={styles.fieldLabel} htmlFor="techSavvy">
-                <span className={styles.req} />
                 Tech savviness
+                <span className={styles.opt}>optional</span>
               </label>
               <select
                 id="techSavvy"
-                className={`${styles.select} ${errors.techSavvy ? styles.inputError : ''}`}
+                className={styles.select}
                 value={techSavvy}
                 onChange={e => setTechSavvy(e.target.value)}
                 disabled={disabled}
               >
-                <option value="" disabled>Select one</option>
-                <option>Novice — rarely uses technology</option>
-                <option>Casual — uses apps but not tech-forward</option>
+                <option value="">— Select one —</option>
+                <option>Low — limited tech experience</option>
                 <option>Average — comfortable with everyday apps</option>
-                <option>Competent — quick to learn new interfaces</option>
-                <option>Advanced — power user, explores features</option>
-                <option>Expert professional — specialist tool user</option>
+                <option>High — power user or specialist</option>
               </select>
-              {errors.techSavvy && <p className={styles.fieldError}>{errors.techSavvy}</p>}
             </div>
 
             <div className={styles.field}>
               <label className={styles.fieldLabel} htmlFor="frequency">
-                <span className={styles.req} />
                 How often will users interact with this product?
+                <span className={styles.opt}>optional</span>
               </label>
               <select
                 id="frequency"
-                className={`${styles.select} ${errors.frequency ? styles.inputError : ''}`}
+                className={styles.select}
                 value={frequency}
                 onChange={e => setFrequency(e.target.value)}
                 disabled={disabled}
               >
-                <option value="" disabled>Select one</option>
-                <option>Once (single-use task)</option>
-                <option>Rarely — a few times per year</option>
-                <option>Occasionally — monthly</option>
-                <option>Regularly — weekly</option>
-                <option>Frequently — daily</option>
-                <option>Continuously — multiple times per day</option>
+                <option value="">— Select one —</option>
+                <option>One-time or rare</option>
+                <option>Occasional — monthly</option>
+                <option>Regular — weekly</option>
+                <option>Frequent — daily or more</option>
               </select>
-              {errors.frequency && <p className={styles.fieldError}>{errors.frequency}</p>}
             </div>
 
             <div className={styles.field}>
@@ -643,10 +626,8 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
               >
                 <option value="">— Select one —</option>
                 <option value="none">None — this type of product is new to them</option>
-                <option value="limited">Limited — used one or two similar products briefly</option>
-                <option value="some">Some — regular user of a comparable product</option>
+                <option value="some">Some — has used a comparable product</option>
                 <option value="extensive">Extensive — power user of similar products</option>
-                <option value="professional">Professional — expert-level familiarity with this category</option>
               </select>
             </div>
 
@@ -741,29 +722,9 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
               >
                 <option value="">— Select one —</option>
                 <option value="desk">At a desk or workstation</option>
-                <option value="stationary">Stationary but away from a desk (couch, café, waiting area)</option>
-                <option value="moving">On the go — walking, commuting, or in transit</option>
-                <option value="vehicle">In a vehicle (as a passenger)</option>
-                <option value="outdoor">Outdoors or in variable conditions</option>
-              </select>
-            </div>
-            <div className={styles.field}>
-              <label className={styles.fieldLabel} htmlFor="lighting">
-                Lighting conditions
-                <span className={styles.opt}>optional</span>
-              </label>
-              <select
-                id="lighting"
-                className={styles.select}
-                value={lighting}
-                onChange={e => setLighting(e.target.value)}
-                disabled={disabled}
-              >
-                <option value="">— Select one —</option>
-                <option value="well_lit">Well lit — consistent indoor lighting</option>
-                <option value="variable">Variable or mixed lighting</option>
-                <option value="bright">Bright sunlight or significant glare</option>
-                <option value="low_light">Low light or dim environment</option>
+                <option value="stationary">Stationary, away from a desk (couch, café, waiting area)</option>
+                <option value="moving">On the go — walking, commuting, outdoors, or in a vehicle</option>
+                <option value="hands_free">Mounted display, kiosk, or hands-free setting</option>
               </select>
             </div>
             <div className={styles.field}>
@@ -780,8 +741,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
               >
                 <option value="">— Select one —</option>
                 <option value="keyboard">Both hands on a keyboard (desktop or laptop)</option>
-                <option value="one_hand">One hand holding device, other hand interacting</option>
-                <option value="two_hands_thumbs">Two hands holding device, thumbs for input</option>
+                <option value="handheld">Handheld device — one or two hands, thumbs for input</option>
                 <option value="flat">Device resting flat on a surface</option>
                 <option value="hands_free">Hands-free — voice, mounted display, or kiosk</option>
               </select>
