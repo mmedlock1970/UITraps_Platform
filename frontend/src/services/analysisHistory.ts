@@ -37,6 +37,7 @@ export interface StoredAnalysis {
   fileNames: string[];
   statistics?: ReportStatistics;
   html: string;
+  markdown?: string;
   formSnapshot?: FormSnapshot;
 }
 

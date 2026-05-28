@@ -226,6 +226,7 @@ export const App: React.FC = () => {
         fileNames,
         statistics: isDualReport ? result.statistics_v2 : result.statistics,
         html: (result.report_html ?? result.report_html_v2) || '',
+        markdown: result.report_markdown,
         formSnapshot,
       });
     }
@@ -274,6 +275,7 @@ export const App: React.FC = () => {
           fileNames: activeReport.originalFiles.map(f => f.name),
           statistics: result.statistics,
           html: result.report_html,
+          markdown: result.report_markdown,
         });
       }
     } catch (err) {
@@ -355,6 +357,7 @@ export const App: React.FC = () => {
   const handleViewHistoryReport = useCallback((analysis: StoredAnalysis) => {
     setActiveReport({
       html: analysis.html,
+      markdown: analysis.markdown,
       statistics: analysis.statistics,
     });
     setView('report');
@@ -511,6 +514,7 @@ export const App: React.FC = () => {
             <div className={styles.reportArea}>
               <ReportViewer
                 html={activeReport.html}
+                markdown={activeReport.markdown}
                 statistics={activeReport.statistics}
                 showStatistics={true}
                 showUsageInfo={false}
@@ -519,10 +523,6 @@ export const App: React.FC = () => {
                 htmlV2={activeReport.htmlV2}
                 statisticsV1={activeReport.statisticsV1}
                 statisticsV2={activeReport.statisticsV2}
-                onNewAnalysis={() => {
-                  setView('form');
-                  setActiveReport(null);
-                }}
               />
             </div>
             <div style={{ display: chatOpen ? undefined : 'none' }}>

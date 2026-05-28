@@ -82,7 +82,7 @@ function assembleContext(fields: {
     expLevel ? `Experience with product: ${expLevel}` : '',
     techSavvy ? `Tech savviness: ${techSavvy}` : '',
     frequency ? `Frequency of use: ${frequency}` : '',
-    priorProducts ? `Experience with similar interfaces: ${priorProducts}` : '',
+    priorProducts ? `Experience with similar interfaces: ${priorProducts.charAt(0).toUpperCase() + priorProducts.slice(1)}` : '',
   ].filter(Boolean);
 
   const designName = screenName.trim() || undefined;
@@ -171,7 +171,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
 
   // Card 3 — Use Environment
   const [physicalEnv, setPhysicalEnv] = useState(iv?.physicalEnv ?? '');
-  const [lighting, setLighting] = useState(iv?.lighting ?? '');
+  const lighting = iv?.lighting ?? '';
   const [gripPosition, setGripPosition] = useState(iv?.gripPosition ?? '');
   const [attentionalState, setAttentionalState] = useState(iv?.attentionalState ?? '');
 
@@ -207,6 +207,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
   }, []);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState(false);
 
   // Reset manual override and auto-detection when all files and figma link are cleared
   useEffect(() => {
@@ -238,7 +239,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
     return () => { urls.forEach(u => { if (u) URL.revokeObjectURL(u); }); };
   }, [files]);
 
-  const validate = useCallback((): boolean => {
+  const validate = useCallback((): Record<string, string> => {
     const e: Record<string, string> = {};
     const figmaFlowProvided = inputType === 'flow_diagram' && figmaLink.trim().length > 0;
     if (files.length === 0 && !figmaFlowProvided) e.upload = 'Please upload a screenshot, video, or PDF';
@@ -246,15 +247,37 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
     if (!platform) e.platform = 'Required';
     if (!productDomain) e.productDomain = 'Required';
     if (!expLevel) e.expLevel = 'Required';
+    if (!userDesc.trim()) e.userDesc = 'Required';
     if (!tasks[0]?.description.trim()) e.userGoal = 'Required';
     setErrors(e);
-    return Object.keys(e).length === 0;
-  }, [files, figmaLink, lockedInputType, screenName, platform, productDomain, expLevel, tasks]);
+    return e;
+  }, [files, figmaLink, lockedInputType, screenName, platform, productDomain, expLevel, userDesc, tasks]);
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (disabled) return;
-    if (!validate()) return;
+    const errs = validate();
+    if (Object.keys(errs).length > 0) {
+      setFormError(true);
+      const fieldOrder = ['screenName', 'upload', 'platform', 'productDomain', 'userDesc', 'expLevel', 'userGoal'];
+      const idMap: Record<string, string> = {
+        screenName: 'screenName', upload: 'uploadZone',
+        platform: 'platform', productDomain: 'productDomain',
+        userDesc: 'userDesc', expLevel: 'expLevel', userGoal: 'userGoal',
+      };
+      const firstField = fieldOrder.find(f => errs[f]);
+      if (firstField) {
+        setTimeout(() => {
+          const el = document.getElementById(idMap[firstField]);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (typeof (el as HTMLInputElement).focus === 'function') (el as HTMLInputElement).focus();
+          }
+        }, 50);
+      }
+      return;
+    }
+    setFormError(false);
     const formSnapshot: FormSnapshot = {
       figmaLink, screenName, platform, productDomain, productContext,
       expLevel, techSavvy, frequency, tasks, userDesc, priorProducts,
@@ -312,7 +335,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
           <div className={styles.field}>
             <label className={styles.fieldLabel} htmlFor="screenName">
               <span className={styles.req} />
-              Name the interface being evaluated
+              Give a name to this analysis
             </label>
             <input
               id="screenName"
@@ -332,6 +355,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
               Upload screenshots or provide a link
             </label>
             <div
+              id="uploadZone"
               className={`${styles.uploadZone} ${isDragover ? styles.uploadZoneDragover : ''} ${files.length > 0 ? styles.uploadZoneActive : ''}`}
               onDragOver={e => { e.preventDefault(); setIsDragover(true); }}
               onDragLeave={() => setIsDragover(false)}
@@ -349,7 +373,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
               {files.length === 0 ? (
                 <>
                   <div className={styles.uploadIcon}>↑</div>
-                  <p className={styles.uploadPrimary}><span>Click to upload screen shot</span> or drag and drop</p>
+                  <p className={styles.uploadPrimary}><span>Click to upload screenshot</span> or drag and drop</p>
                   <p className={styles.uploadSecondary}>PNG · JPG · WEBP · PDF · Video</p>
                 </>
               ) : (
@@ -537,19 +561,20 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
 
             <div className={`${styles.field} ${styles.span2}`}>
               <label className={styles.fieldLabel} htmlFor="userDesc">
+                <span className={styles.req} />
                 Describe the intended users of this interface
-                <span className={styles.opt}>optional</span>
               </label>
               <input
                 id="userDesc"
                 type="text"
-                className={styles.input}
+                className={`${styles.input} ${errors.userDesc ? styles.inputError : ''}`}
                 placeholder="e.g., Adults 55+, low tech confidence, first smartphone users. Or: Healthcare professionals, clinical setting, time-pressured."
                 value={userDesc}
                 onChange={e => setUserDesc(e.target.value)}
                 disabled={disabled}
               />
-              <p className={styles.fieldHint}>Age, occupation, cognitive load, accessibility needs, domain expertise — anything relevant to how they'll interact with this UI.</p>
+              <p className={styles.fieldHint}>Age, occupation, accessibility needs, domain expertise — anything relevant to how they'll interact with this UI.</p>
+              {errors.userDesc && <p className={styles.fieldError}>{errors.userDesc}</p>}
             </div>
 
             <div className={styles.field}>
@@ -571,6 +596,25 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
                 <option>Long-term regular users</option>
               </select>
               {errors.expLevel && <p className={styles.fieldError}>{errors.expLevel}</p>}
+            </div>
+
+            <div className={styles.field}>
+              <label className={styles.fieldLabel} htmlFor="priorProducts">
+                Experience with similar interfaces
+                <span className={styles.opt}>optional</span>
+              </label>
+              <select
+                id="priorProducts"
+                className={styles.select}
+                value={priorProducts}
+                onChange={e => setPriorProducts(e.target.value)}
+                disabled={disabled}
+              >
+                <option value="">— Select one —</option>
+                <option value="none">None — this type of product is new to them</option>
+                <option value="some">Some — has used a comparable product</option>
+                <option value="extensive">Extensive — power user of similar products</option>
+              </select>
             </div>
 
             <div className={styles.field}>
@@ -612,29 +656,10 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
               </select>
             </div>
 
-            <div className={styles.field}>
-              <label className={styles.fieldLabel} htmlFor="priorProducts">
-                Experience with similar interfaces
-                <span className={styles.opt}>optional</span>
-              </label>
-              <select
-                id="priorProducts"
-                className={styles.select}
-                value={priorProducts}
-                onChange={e => setPriorProducts(e.target.value)}
-                disabled={disabled}
-              >
-                <option value="">— Select one —</option>
-                <option value="none">None — this type of product is new to them</option>
-                <option value="some">Some — has used a comparable product</option>
-                <option value="extensive">Extensive — power user of similar products</option>
-              </select>
-            </div>
-
             <div className={`${styles.field} ${styles.span2}`}>
               <label className={styles.fieldLabel}>
                 <span className={styles.req} />
-                User task(s) to evaluate
+                Describe the user task(s) to evaluate
               </label>
               <p className={styles.fieldHint}>
                 The specific outcome(s) users are trying to achieve on this screen or flow.
@@ -643,16 +668,6 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
               </p>
               {tasks.map((task, i) => (
                 <div key={i} className={styles.taskRow}>
-                  {tasks.length > 1 && (
-                    <input
-                      type="text"
-                      className={styles.input}
-                      placeholder={`Task ${i + 1} name (optional)`}
-                      value={task.name}
-                      onChange={e => updateTask(i, 'name', e.target.value)}
-                      disabled={disabled}
-                    />
-                  )}
                   <div className={styles.taskDescRow}>
                     <input
                       id={i === 0 ? 'userGoal' : undefined}
@@ -950,6 +965,11 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
 
       {/* ── Submit ── */}
       <div className={styles.submitCard}>
+        {formError && (
+          <p className={styles.formErrorBanner}>
+            Please complete all required fields before running the analysis.
+          </p>
+        )}
         <div className={styles.submitText}>
           <h3>Ready to analyze.</h3>
           <p>High-severity findings only, ranked by likely user impact. Analysis typically takes 2–3 minutes.</p>

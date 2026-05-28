@@ -403,11 +403,12 @@ export interface EstimatePreviewProps {
 
 export interface ReportViewerProps {
   html: string;
+  markdown?: string;
   statistics?: ReportStatistics;
   usage?: UsageInfo;
   showStatistics?: boolean;
   showUsageInfo?: boolean;
-  onNewAnalysis: () => void;
+  onNewAnalysis?: () => void;
   isDark?: boolean;
   // Dual-report (compare mode) — when both are present a toggle is shown
   htmlV1?: string;

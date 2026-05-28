@@ -101,6 +101,20 @@ const DARK_MODE_CSS = `
   .scorecard-col { border-color: #2d3748 !important; }
   .scorecard-empty { color: #4a5568 !important; }
 
+  /* ── Finding region screenshots ── */
+  .issue-region-figure { background: #0f1a2e !important; border-color: #2d3748 !important; }
+  .issue-region-caption { color: #718096 !important; }
+
+  /* ── Evaluation Details / users table ── */
+  .context-section { background: #16213e !important; border-color: #2d3748 !important; }
+  .context-body { color: #e2e8f0 !important; }
+  .context-body p, .context-body strong { color: #e2e8f0 !important; }
+  .context-body ul li { color: #e2e8f0 !important; }
+  .users-detail-label strong { color: #e2e8f0 !important; }
+  .users-table td { border-color: #2d3748 !important; }
+  .users-table .ut-label { background: #0f3460 !important; color: #718096 !important; }
+  .users-table .ut-value { background: #16213e !important; color: #e2e8f0 !important; }
+
   /* ── Chat context badge / frame ── */
   .chat-context-badge {
     background: #1e3a5f !important;
@@ -175,9 +189,9 @@ const DARK_MODE_CSS = `
 
 export const ReportViewer: React.FC<ReportViewerProps> = ({
   html,
+  markdown,
   usage,
   showUsageInfo = false,
-  onNewAnalysis,
   isDark = false,
   htmlV1,
   htmlV2,
@@ -235,17 +249,22 @@ export const ReportViewer: React.FC<ReportViewerProps> = ({
     }
   }, [isDark, applyDarkMode]);
 
-  const handleDownload = useCallback(() => {
-    const blob = new Blob([activeHtml], { type: 'text/html' });
+  const handleDownloadPdf = useCallback(() => {
+    iframeRef.current?.contentWindow?.print();
+  }, []);
+
+  const handleDownloadMarkdown = useCallback(() => {
+    if (!markdown) return;
+    const blob = new Blob([markdown], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `ui-traps-report-${new Date().toISOString().split('T')[0]}.html`;
+    a.download = `ui-traps-report-${new Date().toISOString().split('T')[0]}.md`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [activeHtml]);
+  }, [markdown]);
 
   return (
     <div className={styles.container}>
@@ -296,24 +315,26 @@ export const ReportViewer: React.FC<ReportViewerProps> = ({
       <div className={styles.actions}>
         <button
           type="button"
-          className={styles.primaryButton}
-          onClick={onNewAnalysis}
+          className={styles.secondaryButton}
+          onClick={handleDownloadPdf}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M12 4v16m8-8H4"/>
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
           </svg>
-          New Analysis
+          Download as PDF
         </button>
 
         <button
           type="button"
           className={styles.secondaryButton}
-          onClick={handleDownload}
+          onClick={handleDownloadMarkdown}
+          disabled={!markdown}
+          title={!markdown ? 'Markdown not available for this report' : undefined}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
           </svg>
-          Download Report
+          Download as Markup
         </button>
       </div>
     </div>
