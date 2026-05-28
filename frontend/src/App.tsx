@@ -227,6 +227,19 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('message', handleMessage);
   }, [auth.setToken]);
 
+  // Report content height to parent so WordPress can resize the iframe to fit
+  useEffect(() => {
+    if (window.self === window.top) return; // only when embedded in an iframe
+    const report = () => {
+      const height = document.documentElement.scrollHeight;
+      window.parent.postMessage({ type: 'uitraps-height', height }, '*');
+    };
+    report();
+    const observer = new ResizeObserver(report);
+    observer.observe(document.documentElement);
+    return () => observer.disconnect();
+  }, [view]);
+
   // Skip auth on localhost, or on direct access if the user has already entered the access code.
   const [devMode, setDevMode] = useState(() => {
     const host = window.location.hostname;
