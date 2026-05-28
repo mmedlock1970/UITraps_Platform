@@ -1,9 +1,8 @@
 import React from 'react';
-import { getAnalysisHistory, StoredAnalysis } from '../services/analysisHistory';
+import { getAnalysisHistory } from '../services/analysisHistory';
 import styles from './RecentStrip.module.css';
 
 interface RecentStripProps {
-  onViewReport: (analysis: StoredAnalysis) => void;
   onViewAll: () => void;
 }
 
