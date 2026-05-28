@@ -240,10 +240,20 @@ export const App: React.FC = () => {
     return () => observer.disconnect();
   }, [view]);
 
+  // Auto-authenticate from ?token= URL param (for WordPress iframe src embedding)
+  useEffect(() => {
+    const urlToken = new URLSearchParams(window.location.search).get('token');
+    if (urlToken) {
+      auth.setToken(urlToken);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, [auth.setToken]);
+
   // Skip auth on localhost, or on direct access if the user has already entered the access code.
   const [devMode, setDevMode] = useState(() => {
     const host = window.location.hostname;
     if (host === 'localhost' || host === '127.0.0.1') return true;
+    if (new URLSearchParams(window.location.search).get('token')) return true;
     if (window.self === window.top && localStorage.getItem('uitraps-access-granted') === 'true') return true;
     return false;
   });
