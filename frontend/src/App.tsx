@@ -719,7 +719,8 @@ export const App: React.FC = () => {
           </>
         )}
 
-        {view === 'form' && (
+        {/* Form view — always mounted so field values survive navigation to other views */}
+        <div style={{ display: view === 'form' ? 'contents' : 'none' }}>
           <>
             {isFormAnalyzing && (
               <div className={styles.overlayContainer}>
@@ -743,7 +744,7 @@ export const App: React.FC = () => {
               <AnalyzerForm key={formKey} initialValues={prefillValues} onSubmit={handleFormSubmit} disabled={isFormAnalyzing} />
             </div>
           </>
-        )}
+        </div>
 
         {view === 'chat' && (
           isEmpty ? (
