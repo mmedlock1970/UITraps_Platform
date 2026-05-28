@@ -194,9 +194,11 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('message', handleMessage);
   }, [auth.setToken]);
 
-  // Skip auth in dev mode — default true for local dev (localhost), false in production
+  // Skip auth in dev mode — true on localhost or when VITE_SKIP_AUTH=true
   const [devMode, setDevMode] = useState(() =>
-    window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1' ||
+    import.meta.env.VITE_SKIP_AUTH === 'true'
   );
   const effectiveToken = auth.token || (devMode ? 'dev-mode' : '');
 
