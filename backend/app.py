@@ -441,11 +441,13 @@ async def health_check():
         "timestamp": datetime.now().isoformat()
     }
 
+class AccessCodeRequest(BaseModel):
+    code: str = ""
+
 @app.post("/auth/access-code")
-async def verify_access_code(request: Request):
+async def verify_access_code(body: AccessCodeRequest):
     """Verify a direct-access code for non-WordPress users."""
-    body = await request.json()
-    code = body.get("code", "").strip()
+    code = body.code.strip()
     configured = os.environ.get("DIRECT_ACCESS_CODE", "").strip()
     if not configured:
         return {"success": False, "error": "Access code not configured on server"}

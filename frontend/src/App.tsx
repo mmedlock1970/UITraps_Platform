@@ -198,6 +198,8 @@ export const App: React.FC = () => {
       if (data.success) {
         localStorage.setItem('uitraps-access-granted', 'true');
         setDevMode(true);
+      } else if (!res.ok) {
+        setAccessCodeError(`Server error (${res.status}): ${data.detail || data.error || 'Unknown error'}`);
       } else {
         setAccessCodeError('Incorrect access code. Please try again.');
       }
