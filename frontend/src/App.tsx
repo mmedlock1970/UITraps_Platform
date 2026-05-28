@@ -194,11 +194,12 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('message', handleMessage);
   }, [auth.setToken]);
 
-  // Skip auth in dev mode — true on localhost or when VITE_SKIP_AUTH=true
+  // Skip auth when on localhost or when accessed directly (not embedded in an iframe).
+  // WordPress always embeds via iframe, so iframe = auth required; direct = no auth needed.
   const [devMode, setDevMode] = useState(() =>
     window.location.hostname === 'localhost' ||
     window.location.hostname === '127.0.0.1' ||
-    import.meta.env.VITE_SKIP_AUTH === 'true'
+    window.self === window.top
   );
   const effectiveToken = auth.token || (devMode ? 'dev-mode' : '');
 
