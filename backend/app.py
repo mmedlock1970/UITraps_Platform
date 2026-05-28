@@ -441,6 +441,18 @@ async def health_check():
         "timestamp": datetime.now().isoformat()
     }
 
+@app.post("/auth/access-code")
+async def verify_access_code(request: Request):
+    """Verify a direct-access code for non-WordPress users."""
+    body = await request.json()
+    code = body.get("code", "").strip()
+    configured = os.environ.get("DIRECT_ACCESS_CODE", "").strip()
+    if not configured:
+        return {"success": False, "error": "Access code not configured on server"}
+    if code and code == configured:
+        return {"success": True}
+    return {"success": False, "error": "Invalid access code"}
+
 # ===========================================================
 # Analysis Endpoints
 #

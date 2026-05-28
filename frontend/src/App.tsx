@@ -177,6 +177,37 @@ export const App: React.FC = () => {
     }
   }, [tokenInput, auth]);
 
+  // Direct access (not in iframe, not localhost) — access code flow
+  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const isDirectAccess = window.self === window.top && !isLocalhost;
+  const [accessCode, setAccessCode] = useState('');
+  const [accessCodeError, setAccessCodeError] = useState('');
+  const [accessCodeLoading, setAccessCodeLoading] = useState(false);
+
+  const handleAccessCodeSubmit = useCallback(async () => {
+    if (!accessCode.trim()) return;
+    setAccessCodeLoading(true);
+    setAccessCodeError('');
+    try {
+      const res = await fetch(`${DEFAULT_API_ENDPOINT}/auth/access-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: accessCode.trim() }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        localStorage.setItem('uitraps-access-granted', 'true');
+        setDevMode(true);
+      } else {
+        setAccessCodeError('Incorrect access code. Please try again.');
+      }
+    } catch {
+      setAccessCodeError('Could not reach the server. Please try again.');
+    } finally {
+      setAccessCodeLoading(false);
+    }
+  }, [accessCode]);
+
   // Listen for messages posted from the parent WordPress page:
   //   { type: 'uitraps-theme', theme: 'dark'|'light' }  → live theme update
   //   { type: 'uitraps-token', token: '<jwt>' }          → JWT auth on iframe load
@@ -194,13 +225,13 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('message', handleMessage);
   }, [auth.setToken]);
 
-  // Skip auth when on localhost or when accessed directly (not embedded in an iframe).
-  // WordPress always embeds via iframe, so iframe = auth required; direct = no auth needed.
-  const [devMode, setDevMode] = useState(() =>
-    window.location.hostname === 'localhost' ||
-    window.location.hostname === '127.0.0.1' ||
-    window.self === window.top
-  );
+  // Skip auth on localhost, or on direct access if the user has already entered the access code.
+  const [devMode, setDevMode] = useState(() => {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') return true;
+    if (window.self === window.top && localStorage.getItem('uitraps-access-granted') === 'true') return true;
+    return false;
+  });
   const effectiveToken = auth.token || (devMode ? 'dev-mode' : '');
 
   const handleAnalysisComplete = useCallback((result: UnifiedAskResponse, fileNames: string[], files?: File[], context?: UserContext, formSnapshot?: FormSnapshot) => {
@@ -412,39 +443,56 @@ export const App: React.FC = () => {
     setView('chat');
   }, []);
 
-  // Auth gate: show token input if not authenticated
+  // Auth gate
   if (!auth.isAuthenticated && !devMode) {
     return (
       <div className={`uitraps-viewport-wrapper ${styles.viewportWrapper}`} data-theme={theme}>
         <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
           <div className={styles.authPrompt}>
-          <div className={styles.authTitle}>
-            UI Traps <span className={styles.logoAccent}>Helper</span>
-          </div>
-          <div className={styles.authSubtitle}>
-            Enter your JWT token to connect, or use dev mode for local testing.
-          </div>
-          <input
-            className={styles.tokenInput}
-            type="text"
-            placeholder="Paste JWT token here..."
-            value={tokenInput}
-            onChange={e => setTokenInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleConnect()}
-          />
-          <button className={styles.connectButton} onClick={handleConnect}>
-            Connect
-          </button>
-          <button
-            className={styles.headerButton}
-            onClick={() => setDevMode(true)}
-          >
-            Use Dev Mode (no auth)
-          </button>
-          <div className={styles.devNote}>
-            In production, the WordPress plugin provides the JWT token automatically.
-            Dev mode lets you test the chat UI without authentication.
-          </div>
+            <div className={styles.authTitle}>
+              UI Traps <span className={styles.logoAccent}>Helper</span>
+            </div>
+            {isDirectAccess ? (
+              <>
+                <div className={styles.authSubtitle}>Enter your access code to continue.</div>
+                <input
+                  className={styles.tokenInput}
+                  type="password"
+                  placeholder="Access code"
+                  value={accessCode}
+                  onChange={e => setAccessCode(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleAccessCodeSubmit()}
+                  autoFocus
+                />
+                {accessCodeError && (
+                  <div className={styles.devNote} style={{ color: '#e05c1a' }}>{accessCodeError}</div>
+                )}
+                <button
+                  className={styles.connectButton}
+                  onClick={handleAccessCodeSubmit}
+                  disabled={accessCodeLoading || !accessCode.trim()}
+                >
+                  {accessCodeLoading ? 'Verifying...' : 'Continue'}
+                </button>
+              </>
+            ) : (
+              <>
+                <div className={styles.authSubtitle}>
+                  Enter your JWT token to connect.
+                </div>
+                <input
+                  className={styles.tokenInput}
+                  type="text"
+                  placeholder="Paste JWT token here..."
+                  value={tokenInput}
+                  onChange={e => setTokenInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleConnect()}
+                />
+                <button className={styles.connectButton} onClick={handleConnect}>
+                  Connect
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
