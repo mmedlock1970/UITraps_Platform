@@ -232,13 +232,16 @@ export const App: React.FC = () => {
   useEffect(() => {
     if (window.self === window.top) return; // only when embedded in an iframe
     const report = () => {
-      const height = document.documentElement.scrollHeight;
+      const height = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
       window.parent.postMessage({ type: 'uitraps-height', height }, '*');
     };
+    // Fire immediately, then again after delays to catch async-rendered content
     report();
+    const t1 = setTimeout(report, 300);
+    const t2 = setTimeout(report, 1000);
     const observer = new ResizeObserver(report);
-    observer.observe(document.documentElement);
-    return () => observer.disconnect();
+    observer.observe(document.body);
+    return () => { observer.disconnect(); clearTimeout(t1); clearTimeout(t2); };
   }, [view]);
 
   // Auto-authenticate from ?token= URL param (for WordPress iframe src embedding)
