@@ -578,7 +578,7 @@ export const App: React.FC = () => {
       return (
         <div className={`uitraps-viewport-wrapper ${styles.viewportWrapper}`} data-theme={theme}>
           <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
-            <div className={styles.overlayContainer}>
+            <div className={styles.overlayContainer} style={isEmbedded ? { minHeight: '500px' } : undefined}>
               <AnalysisProgress
                 elapsedTime={rerunElapsed.elapsedTime}
                 onCancel={() => { setIsRerunning(false); rerunElapsed.reset(); }}
@@ -680,7 +680,7 @@ export const App: React.FC = () => {
               Cancel
             </button>
           </div>
-          <div className={styles.overlayContainer}>
+          <div className={styles.overlayContainer} style={isEmbedded ? { minHeight: '500px' } : undefined}>
             <EstimatePreview
               estimate={unified.estimate}
               onConfirm={unified.confirmAnalysis}
@@ -697,7 +697,7 @@ export const App: React.FC = () => {
     return (
       <div className={`uitraps-viewport-wrapper ${styles.viewportWrapper}`} data-theme={theme}>
         <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
-          <div className={styles.overlayContainer}>
+          <div className={styles.overlayContainer} style={isEmbedded ? { minHeight: '500px' } : undefined}>
             <AnalysisProgress
               elapsedTime={unified.elapsedTime}
               onCancel={unified.cancelAnalysis}
@@ -751,7 +751,7 @@ export const App: React.FC = () => {
         <div style={{ display: view === 'form' ? 'contents' : 'none' }}>
           <>
             {isFormAnalyzing && (
-              <div className={styles.overlayContainer}>
+              <div className={styles.overlayContainer} style={isEmbedded ? { minHeight: '500px' } : undefined}>
                 <AnalysisProgress
                   elapsedTime={formElapsed.elapsedTime}
                   onCancel={() => { setFormAnalysisPhase('idle'); formElapsed.reset(); }}
