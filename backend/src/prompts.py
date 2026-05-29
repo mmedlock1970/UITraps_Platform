@@ -140,7 +140,7 @@ Evaluate the full sequence as a connected journey and check for:
 - **MEMORY CHALLENGE**: Does a later screen require the user to recall information shown on an earlier screen, with no visible retrieval cue?
 - **SYSTEM AMNESIA**: Does a later screen fail to use or re-ask for information the user already provided?
 - **FEEDBACK FAILURE at transitions**: Is there any visible indication of what happened when moving from one screen to the next? (If the transition is not shown, apply the partial artifact rule — do not assert feedback is absent.)
-- **AMBIGUOUS HOME**: Does more than one screen plausibly serve as the primary starting point with no clear designation?
+- **AMBIGUOUS HOME**: Does more than one element plausibly serve as the interface's *global* home destination (the product-level anchor users return to) with no single clearly designated one? Note: competing entry points for a specific task or feature are GRATUITOUS REDUNDANCY, not AMBIGUOUS HOME.
 
 **BRANCHING AND CONVERGING FLOWS:**
 Some flows show multiple paths leading to the same destination. When you identify a branch:
@@ -651,7 +651,13 @@ __SINGLE_SCREEN_NOTE__
 
 16. **INCONSISTENT APPEARANCE** — `testable: true (Tier 1)` when multiple screens are provided — cross-context visual consistency is directly auditable by comparing visual representation of recurring controls across screens. `testable: false` for single screenshot analyses.
 
-17. **AMBIGUOUS HOME** — `testable: true (Tier 2)` when the artifact shows two or more elements that could plausibly serve as the primary home or starting point with no single clearly designated home destination. Flag: "Multiple elements could plausibly serve as home — confirm whether users agree on a single starting point." Output: potential_issues confidence "medium". `testable: false` for single-screen artifacts where home ambiguity requires cross-section navigation knowledge.
+17. **AMBIGUOUS HOME** — `testable: true (Tier 2)` when the artifact shows two or more elements that could plausibly serve as the interface's **global home destination** — the single top-level anchor of the entire product that users return to (e.g., two logos, a "Home" link, and an unlabeled icon that all appear to navigate to the root of the product with no clear primary). Flag: "Multiple elements could plausibly serve as the global home — confirm whether users agree on a single starting point." Output: potential_issues confidence "medium". `testable: false` for single-screen artifacts where home ambiguity requires cross-section navigation knowledge.
+
+⚠️ **AMBIGUOUS HOME vs. GRATUITOUS REDUNDANCY — critical distinction:**
+AMBIGUOUS HOME is **exclusively** about the interface's **global home destination** — the product-level "home" that anchors the entire navigation system.
+- Multiple competing entry points for a **specific feature, task, or action** (e.g., three ways to reach appointment scheduling, two paths to checkout, multiple links to the same product page) → **GRATUITOUS REDUNDANCY**, NOT AMBIGUOUS HOME.
+- Multiple elements that could all plausibly take the user to the **root of the entire product** with no single clearly designated one → **AMBIGUOUS HOME**.
+When in doubt: ask "Is the ambiguity about where to start in the *whole app*, or about which element to use for a *specific task*?" If the latter → GRATUITOUS REDUNDANCY.
 
 18. **UNWANTED DISCLOSURE** — `testable: true (Tier 1)` when the artifact shows opt-out sharing of sensitive behavioral data as the default setting — flag as confirmed finding, high severity. `testable: true (Tier 2)` when the artifact shows data sharing features, notification defaults, or ambient display settings where social or physical context could make disclosure unwanted — output to potential_issues confidence "medium". `testable: false` for contextual evaluation of whether specific disclosures would be unwanted.
 
