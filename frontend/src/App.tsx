@@ -240,8 +240,14 @@ export const App: React.FC = () => {
 
   const sendHeightToParent = useCallback(() => {
     if (!isEmbedded) return;
-    const height = document.documentElement.scrollHeight;
-    if (height !== lastSentHeightRef.current) {
+    // getBoundingClientRect().height gives the true rendered height of the element
+    // regardless of overflow settings — unlike scrollHeight which is clamped when
+    // overflow:visible removes scroll contexts.
+    const platform = document.querySelector('.uitraps-platform');
+    const height = platform
+      ? Math.ceil(platform.getBoundingClientRect().height)
+      : document.documentElement.scrollHeight;
+    if (height > 100 && height !== lastSentHeightRef.current) {
       lastSentHeightRef.current = height;
       window.parent.postMessage({ type: 'uitraps-height', height }, '*');
     }
