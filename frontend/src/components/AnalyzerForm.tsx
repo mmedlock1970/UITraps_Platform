@@ -661,9 +661,6 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
                 <span className={styles.req} />
                 Describe the user task(s) to evaluate
               </label>
-              <p className={styles.fieldHint}>
-                You can add up to 3 tasks — each additional task increases analysis time.
-              </p>
               {tasks.map((task, i) => (
                 <div key={i} className={styles.taskRow}>
                   <div className={styles.taskDescRow}>
@@ -698,6 +695,9 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
                   disabled={disabled}
                 >+ Add task</button>
               )}
+              <p className={styles.fieldHint}>
+                You can add up to 3 tasks — each additional task increases analysis time.
+              </p>
               {errors.userGoal && <p className={styles.fieldError}>{errors.userGoal}</p>}
             </div>
 
