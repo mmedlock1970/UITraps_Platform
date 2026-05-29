@@ -92,7 +92,8 @@
 /* Embedded mode (inside WordPress iframe): let content flow to natural height
    so document.documentElement.scrollHeight correctly measures content for postMessage. */
 html[data-embed],
-html[data-embed] body {
+html[data-embed] body,
+html[data-embed] #root {
   height: auto !important;
   overflow: visible !important;
 }
