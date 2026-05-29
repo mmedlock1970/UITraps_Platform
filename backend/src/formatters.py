@@ -733,7 +733,7 @@ def get_report_base_css() -> str:
             font-size: 15px;
             line-height: 1.65;
             color: #111111;
-            background: #f5f4f2;
+            background: #ffffff;
         }
         h1, h2, h3, h4, h5, h6 {
             font-family: 'Montserrat', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -1501,7 +1501,7 @@ def format_report_as_html(
             font-size: 15px;
             line-height: 1.65;
             color: #111111;
-            background: #f5f4f2;
+            background: #ffffff;
         }
         h1, h2, h3, h4, h5, h6 {
             font-family: 'Montserrat', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
