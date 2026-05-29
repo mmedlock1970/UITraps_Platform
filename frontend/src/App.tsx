@@ -235,13 +235,19 @@ export const App: React.FC = () => {
       const height = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
       window.parent.postMessage({ type: 'uitraps-height', height }, '*');
     };
-    // Fire immediately, then again after delays to catch async-rendered content
+    // Fire immediately, then after delays, and on window load to catch fully-rendered content
     report();
-    const t1 = setTimeout(report, 300);
-    const t2 = setTimeout(report, 1000);
+    const t1 = setTimeout(report, 500);
+    const t2 = setTimeout(report, 1500);
+    const t3 = setTimeout(report, 3000);
+    window.addEventListener('load', report);
     const observer = new ResizeObserver(report);
     observer.observe(document.body);
-    return () => { observer.disconnect(); clearTimeout(t1); clearTimeout(t2); };
+    return () => {
+      observer.disconnect();
+      clearTimeout(t1); clearTimeout(t2); clearTimeout(t3);
+      window.removeEventListener('load', report);
+    };
   }, [view]);
 
   // Auto-authenticate from ?token= URL param (for WordPress iframe src embedding)
