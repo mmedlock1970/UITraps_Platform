@@ -378,9 +378,9 @@ export const App: React.FC = () => {
 
     setFormError(null);
     setFormAnalysisPhase('analyzing');
-    // Tell the parent page to scroll the iframe into view — the form may be long and
-    // the user scrolled down, so the progress screen would appear above the viewport.
-    if (isEmbedded) window.parent.postMessage({ type: 'uitraps-scroll-top' }, '*');
+    // Tell the parent page to scroll the iframe into view after the height message has
+    // been sent and applied — delay ensures the reflow from iframe shrinking is done first.
+    if (isEmbedded) setTimeout(() => window.parent.postMessage({ type: 'uitraps-scroll-top' }, '*'), 800);
     setFormFileCount(files.length || 1);
     formElapsed.start();
 
