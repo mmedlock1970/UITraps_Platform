@@ -89,6 +89,21 @@
   --uitraps-shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
 }
 
+/* Embedded mode (inside WordPress iframe): let content flow to natural height
+   so document.documentElement.scrollHeight correctly measures content for postMessage. */
+html[data-embed],
+html[data-embed] body {
+  height: auto !important;
+  overflow: visible !important;
+}
+html[data-embed] .uitraps-viewport-wrapper {
+  height: auto !important;
+  overflow: visible !important;
+}
+html[data-embed] .uitraps-platform {
+  height: auto !important;
+}
+
 /* Reset box-sizing for all children */
 .uitraps-analyzer *,
 .uitraps-analyzer *::before,

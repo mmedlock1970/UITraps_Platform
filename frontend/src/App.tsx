@@ -228,32 +228,24 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('message', handleMessage);
   }, [auth.setToken]);
 
-  // Refs to scrollable content areas — used for precise height measurement.
-  // The outer wrapper uses overflow:hidden so document.body.scrollHeight is useless;
-  // scrollHeight on the inner overflow:auto divs reports the true content height.
-  const reportAreaRef = useRef<HTMLDivElement>(null);
-  const formAreaRef = useRef<HTMLDivElement>(null);
+  // When embedded in an iframe, the global CSS (html[data-embed]) sets height:auto /
+  // overflow:visible on the wrappers, so document.documentElement.scrollHeight correctly
+  // measures the full content height rather than just the current iframe height.
+  const isEmbedded = window.self !== window.top;
   const lastSentHeightRef = useRef(0);
 
+  useEffect(() => {
+    if (isEmbedded) document.documentElement.setAttribute('data-embed', 'true');
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const sendHeightToParent = useCallback(() => {
-    if (window.self === window.top) return;
-    const reportArea = reportAreaRef.current;
-    const formArea = formAreaRef.current;
-    let height: number;
-    if (reportArea && reportArea.scrollHeight > 0) {
-      const chrome = window.innerHeight - reportArea.clientHeight;
-      height = reportArea.scrollHeight + Math.max(chrome, 0);
-    } else if (formArea && formArea.scrollHeight > 0) {
-      const chrome = window.innerHeight - formArea.clientHeight;
-      height = formArea.scrollHeight + Math.max(chrome, 0);
-    } else {
-      height = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight, 800);
-    }
+    if (!isEmbedded) return;
+    const height = document.documentElement.scrollHeight;
     if (height !== lastSentHeightRef.current) {
       lastSentHeightRef.current = height;
       window.parent.postMessage({ type: 'uitraps-height', height }, '*');
     }
-  }, []);
+  }, []); // isEmbedded is a stable constant — never changes after mount
 
   // Re-run when view changes; poll every 500ms for 20s to catch lazy-loading content
   useEffect(() => {
@@ -621,8 +613,8 @@ export const App: React.FC = () => {
               </button>
             )}
           </div>
-          <div className={styles.reportWithChat}>
-            <div ref={reportAreaRef} className={styles.reportArea}>
+          <div className={styles.reportWithChat} style={isEmbedded ? { overflow: 'visible', height: 'auto' } : undefined}>
+            <div className={styles.reportArea} style={isEmbedded ? { overflowY: 'visible' } : undefined}>
               <ReportViewer
                 html={activeReport.html}
                 markdown={activeReport.markdown}
@@ -768,7 +760,7 @@ export const App: React.FC = () => {
                 />
               </div>
             )}
-            <div ref={formAreaRef} style={{ display: isFormAnalyzing ? 'none' : 'flex', flexDirection: 'column', overflowY: 'auto', flex: 1, paddingTop: '24px' }}>
+            <div style={{ display: isFormAnalyzing ? 'none' : 'flex', flexDirection: 'column', ...(isEmbedded ? { overflow: 'visible' } : { overflowY: 'auto', flex: 1 }), paddingTop: '24px' }}>
               <RecentStrip onViewAll={() => setView('history')} />
               {formError && (
                 <div style={{ maxWidth: 900, margin: '0 auto 0', padding: '0 24px', width: '100%', boxSizing: 'border-box' }}>
