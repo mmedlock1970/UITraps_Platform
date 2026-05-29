@@ -195,6 +195,7 @@ export const ReportViewer: React.FC<ReportViewerProps> = ({
   isDark = false,
   htmlV1,
   htmlV2,
+  onContentLoaded,
 }) => {
   const isDualReport = !!(htmlV1 && htmlV2);
   const [activeVersion, setActiveVersion] = useState<'v1' | 'v2'>('v2');
@@ -228,6 +229,7 @@ export const ReportViewer: React.FC<ReportViewerProps> = ({
         if (doc && doc.body) {
           iframe.style.height = doc.body.scrollHeight + 40 + 'px';
           applyDarkMode(doc, isDark);
+          onContentLoaded?.();
         }
       } catch {
         // cross-origin safety guard
@@ -239,7 +241,7 @@ export const ReportViewer: React.FC<ReportViewerProps> = ({
       onLoad();
     }
     return () => iframe.removeEventListener('load', onLoad);
-  }, [activeHtml, isDark, applyDarkMode]);
+  }, [activeHtml, isDark, applyDarkMode, onContentLoaded]);
 
   // Toggle dark mode without reloading the iframe
   useEffect(() => {

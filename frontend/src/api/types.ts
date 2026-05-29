@@ -415,6 +415,8 @@ export interface ReportViewerProps {
   htmlV2?: string;
   statisticsV1?: ReportStatistics;
   statisticsV2?: ReportStatistics;
+  // Called after the inner report iframe finishes loading and has been resized
+  onContentLoaded?: () => void;
 }
 
 // Analyzer State

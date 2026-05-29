@@ -6,7 +6,7 @@
  * Supports centered welcome layout, analysis progress, and full-page reports.
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { useUnifiedInput } from './hooks/useUnifiedInput';
 import { useElapsedTime } from './hooks/useElapsedTime';
@@ -228,27 +228,46 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('message', handleMessage);
   }, [auth.setToken]);
 
-  // Report content height to parent so WordPress can resize the iframe to fit
-  useEffect(() => {
-    if (window.self === window.top) return; // only when embedded in an iframe
-    const report = () => {
-      const height = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
+  // Ref to the scrollable report area — used for precise height measurement
+  const reportAreaRef = useRef<HTMLDivElement>(null);
+  const lastSentHeightRef = useRef(0);
+
+  // Measure the true content height even though the outer wrapper uses overflow:hidden.
+  // reportArea.scrollHeight = full content height; clientHeight = visible slice.
+  // Chrome (tabs, action bar) = window.innerHeight - reportArea.clientHeight.
+  const sendHeightToParent = useCallback(() => {
+    if (window.self === window.top) return;
+    const reportArea = reportAreaRef.current;
+    let height: number;
+    if (reportArea) {
+      const chrome = window.innerHeight - reportArea.clientHeight;
+      height = reportArea.scrollHeight + Math.max(chrome, 0);
+    } else {
+      height = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
+    }
+    if (height > 200 && height !== lastSentHeightRef.current) {
+      lastSentHeightRef.current = height;
       window.parent.postMessage({ type: 'uitraps-height', height }, '*');
-    };
-    // Fire immediately, then after delays, and on window load to catch fully-rendered content
-    report();
-    const t1 = setTimeout(report, 500);
-    const t2 = setTimeout(report, 1500);
-    const t3 = setTimeout(report, 3000);
-    window.addEventListener('load', report);
-    const observer = new ResizeObserver(report);
-    observer.observe(document.body);
-    return () => {
-      observer.disconnect();
-      clearTimeout(t1); clearTimeout(t2); clearTimeout(t3);
-      window.removeEventListener('load', report);
-    };
-  }, [view]);
+    }
+  }, []);
+
+  // Re-run when view changes; poll every 500ms for 20s to catch lazy-loading content
+  useEffect(() => {
+    if (window.self === window.top) return;
+    lastSentHeightRef.current = 0; // reset so the new view always sends
+    sendHeightToParent();
+    let ticks = 0;
+    const interval = setInterval(() => {
+      sendHeightToParent();
+      if (++ticks >= 40) clearInterval(interval);
+    }, 500);
+    return () => clearInterval(interval);
+  }, [view, sendHeightToParent]);
+
+  // Precise trigger: inner report iframe just finished loading and was resized
+  const handleReportContentLoaded = useCallback(() => {
+    requestAnimationFrame(() => requestAnimationFrame(sendHeightToParent));
+  }, [sendHeightToParent]);
 
   // Auto-authenticate from ?token= URL param (for WordPress iframe src embedding)
   useEffect(() => {
@@ -599,7 +618,7 @@ export const App: React.FC = () => {
             )}
           </div>
           <div className={styles.reportWithChat}>
-            <div className={styles.reportArea}>
+            <div ref={reportAreaRef} className={styles.reportArea}>
               <ReportViewer
                 html={activeReport.html}
                 markdown={activeReport.markdown}
@@ -611,6 +630,7 @@ export const App: React.FC = () => {
                 htmlV2={activeReport.htmlV2}
                 statisticsV1={activeReport.statisticsV1}
                 statisticsV2={activeReport.statisticsV2}
+                onContentLoaded={handleReportContentLoaded}
               />
             </div>
             <div style={{ display: chatOpen ? undefined : 'none' }}>
