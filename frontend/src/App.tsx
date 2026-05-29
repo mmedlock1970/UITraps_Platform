@@ -220,7 +220,8 @@ export const App: React.FC = () => {
         if (val === 'dark' || val === 'light') { setTheme(val); setExternalTheme(true); }
       } else if (event.data?.type === 'uitraps-token') {
         const token = event.data.token;
-        if (typeof token === 'string' && token.trim()) { auth.setToken(token.trim()); }
+        const isDevParam = new URLSearchParams(window.location.search).get('dev') === 'true';
+        if (!isDevParam && typeof token === 'string' && token.trim()) { auth.setToken(token.trim()); }
       }
     };
     window.addEventListener('message', handleMessage);
