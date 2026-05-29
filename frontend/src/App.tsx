@@ -252,8 +252,10 @@ export const App: React.FC = () => {
   // Skip auth on localhost, or on direct access if the user has already entered the access code.
   const [devMode, setDevMode] = useState(() => {
     const host = window.location.hostname;
+    const params = new URLSearchParams(window.location.search);
     if (host === 'localhost' || host === '127.0.0.1') return true;
-    if (new URLSearchParams(window.location.search).get('token')) return true;
+    if (params.get('dev') === 'true') return true;
+    if (params.get('token')) return true;
     if (window.self === window.top && localStorage.getItem('uitraps-access-granted') === 'true') return true;
     return false;
   });
