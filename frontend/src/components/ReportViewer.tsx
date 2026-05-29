@@ -307,7 +307,7 @@ export const ReportViewer: React.FC<ReportViewerProps> = ({
         className={styles.reportFrame}
         srcDoc={activeHtml}
         title="Analysis Report"
-        sandbox="allow-same-origin"
+        sandbox="allow-same-origin allow-scripts allow-modals"
         style={{ width: '100%', border: 'none', minHeight: '400px' }}
       />
 
