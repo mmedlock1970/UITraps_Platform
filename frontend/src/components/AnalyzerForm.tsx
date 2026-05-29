@@ -662,9 +662,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
                 Describe the user task(s) to evaluate
               </label>
               <p className={styles.fieldHint}>
-                The specific outcome(s) users are trying to achieve on this screen or flow.
-                You can add up to 3 tasks — each additional task increases analysis time but
-                produces a report with a General Findings section plus one section per task.
+                You can add up to 3 tasks — each additional task increases analysis time.
               </p>
               {tasks.map((task, i) => (
                 <div key={i} className={styles.taskRow}>
