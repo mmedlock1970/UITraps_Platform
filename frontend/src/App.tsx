@@ -228,24 +228,28 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('message', handleMessage);
   }, [auth.setToken]);
 
-  // Ref to the scrollable report area — used for precise height measurement
+  // Refs to scrollable content areas — used for precise height measurement.
+  // The outer wrapper uses overflow:hidden so document.body.scrollHeight is useless;
+  // scrollHeight on the inner overflow:auto divs reports the true content height.
   const reportAreaRef = useRef<HTMLDivElement>(null);
+  const formAreaRef = useRef<HTMLDivElement>(null);
   const lastSentHeightRef = useRef(0);
 
-  // Measure the true content height even though the outer wrapper uses overflow:hidden.
-  // reportArea.scrollHeight = full content height; clientHeight = visible slice.
-  // Chrome (tabs, action bar) = window.innerHeight - reportArea.clientHeight.
   const sendHeightToParent = useCallback(() => {
     if (window.self === window.top) return;
     const reportArea = reportAreaRef.current;
+    const formArea = formAreaRef.current;
     let height: number;
-    if (reportArea) {
+    if (reportArea && reportArea.scrollHeight > 0) {
       const chrome = window.innerHeight - reportArea.clientHeight;
       height = reportArea.scrollHeight + Math.max(chrome, 0);
+    } else if (formArea && formArea.scrollHeight > 0) {
+      const chrome = window.innerHeight - formArea.clientHeight;
+      height = formArea.scrollHeight + Math.max(chrome, 0);
     } else {
-      height = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
+      height = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight, 800);
     }
-    if (height > 200 && height !== lastSentHeightRef.current) {
+    if (height !== lastSentHeightRef.current) {
       lastSentHeightRef.current = height;
       window.parent.postMessage({ type: 'uitraps-height', height }, '*');
     }
@@ -764,7 +768,7 @@ export const App: React.FC = () => {
                 />
               </div>
             )}
-            <div style={{ display: isFormAnalyzing ? 'none' : 'flex', flexDirection: 'column', overflowY: 'auto', flex: 1, paddingTop: '24px' }}>
+            <div ref={formAreaRef} style={{ display: isFormAnalyzing ? 'none' : 'flex', flexDirection: 'column', overflowY: 'auto', flex: 1, paddingTop: '24px' }}>
               <RecentStrip onViewAll={() => setView('history')} />
               {formError && (
                 <div style={{ maxWidth: 900, margin: '0 auto 0', padding: '0 24px', width: '100%', boxSizing: 'border-box' }}>
