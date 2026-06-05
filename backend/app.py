@@ -48,7 +48,7 @@ from src.site_analyzer import SiteAnalyzer
 from src.pdf_analyzer import PdfAnalyzer, is_pymupdf_available
 
 # Database persistence for usage tracking
-from sqlmodel import Session
+from sqlmodel import Session, select
 from src.database import init_db, engine
 from src.usage_service import (
     get_usage,
@@ -61,6 +61,7 @@ from src.usage_service import (
 
 # Report saver for automatic report persistence
 from src.report_saver import save_analysis_report, get_report_saver
+from src.database import AnalysisReport
 
 # Subscription and token management
 from src.subscription_service import (
@@ -156,6 +157,29 @@ def _friendly_api_error(e: Exception) -> HTTPException:
 
 # --- Initialize Database ---
 init_db()  # Create tables if they don't exist
+
+
+def _save_report_db(user_id: str, result: dict, analysis_type: str,
+                    design_name: str = "", file_name: str = ""):
+    """Save an analysis report to the database (JWT-authenticated endpoints only)."""
+    if not user_id:
+        return
+    try:
+        stats = result.get("statistics")
+        report = AnalysisReport(
+            user_id=user_id,
+            analysis_type=analysis_type,
+            design_name=design_name or None,
+            file_name=file_name or None,
+            html=result.get("html", ""),
+            markdown=result.get("markdown"),
+            statistics=json.dumps(stats) if stats else None,
+        )
+        with Session(engine) as session:
+            session.add(report)
+            session.commit()
+    except Exception as e:
+        logger.warning(f"[report_db] failed to save report: {e}")
 
 # --- Simple API Key Validation ---
 # In production, validate against WooCommerce, Stripe, or database
@@ -954,79 +978,57 @@ async def list_saved_reports(
     limit: int = 20,
     user: dict = Depends(get_current_user)
 ):
-    """
-    List saved analysis reports for the authenticated user.
-
-    Requires JWT auth. Returns only reports belonging to the requesting user.
-
-    Args:
-        limit: Maximum number of reports to return (default 20)
-
-    Returns:
-        List of report summaries
-    """
-    try:
-        user_id = str(user.get("id") or user.get("userId", ""))
-        saver = get_report_saver()
-        reports = saver.list_reports(limit=limit, user_id=user_id)
-        return {
-            "success": True,
-            "reports": reports,
-            "count": len(reports)
+    """List saved analysis reports for the authenticated user (DB-backed)."""
+    user_id = str(user.get("id") or user.get("userId", ""))
+    with Session(engine) as session:
+        rows = session.exec(
+            select(AnalysisReport)
+            .where(AnalysisReport.user_id == user_id)
+            .order_by(AnalysisReport.timestamp.desc())
+            .limit(limit)
+        ).all()
+    reports = [
+        {
+            "id": r.id,
+            "timestamp": r.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+            "analysis_type": r.analysis_type,
+            "design_name": r.design_name,
+            "file_name": r.file_name,
+            "statistics": json.loads(r.statistics) if r.statistics else None,
         }
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to list reports: {str(e)}"
-        )
+        for r in rows
+    ]
+    return {"success": True, "reports": reports, "count": len(reports)}
 
 
-@app.get("/reports/{filename}")
+@app.get("/reports/{report_id}")
 async def get_saved_report(
-    filename: str,
+    report_id: int,
     user: dict = Depends(get_current_user)
 ):
-    """
-    Retrieve a specific saved report by filename.
+    """Retrieve a specific saved report by ID (DB-backed)."""
+    user_id = str(user.get("id") or user.get("userId", ""))
+    with Session(engine) as session:
+        report = session.get(AnalysisReport, report_id)
 
-    Requires JWT auth. Returns 403 if the report belongs to a different user.
+    if report is None:
+        raise HTTPException(status_code=404, detail="Report not found")
+    if report.user_id != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
 
-    Args:
-        filename: Report filename (e.g., report_2024-01-15_14-30-00_url.json)
-
-    Returns:
-        Full report data
-    """
-    try:
-        saver = get_report_saver()
-        report = saver.get_report(filename)
-
-        if report is None:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Report not found: {filename}"
-            )
-
-        # Verify the report belongs to this user
-        user_id = str(user.get("id") or user.get("userId", ""))
-        report_user_id = str(report.get("user_id", ""))
-        if report_user_id and report_user_id != user_id:
-            raise HTTPException(
-                status_code=403,
-                detail="Access denied: this report belongs to a different user."
-            )
-
-        return {
-            "success": True,
-            "report": report
+    return {
+        "success": True,
+        "report": {
+            "id": report.id,
+            "timestamp": report.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+            "analysis_type": report.analysis_type,
+            "design_name": report.design_name,
+            "file_name": report.file_name,
+            "html": report.html,
+            "markdown": report.markdown,
+            "statistics": json.loads(report.statistics) if report.statistics else None,
         }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to retrieve report: {str(e)}"
-        )
+    }
 
 
 # ===========================================================
@@ -2222,6 +2224,8 @@ async def unified_ask(
                         metadata={"file_name": image.filename, "kb_version": "both"},
                         user_id=user_id
                     )
+                    _save_report_db(user_id, result_v2, "single_image",
+                                    design_name=design_name or "", file_name=image.filename)
 
                     return {
                         "success": True,
@@ -2250,6 +2254,8 @@ async def unified_ask(
                         metadata={"file_name": image.filename},
                         user_id=user_id
                     )
+                    _save_report_db(user_id, result, "single_image",
+                                    design_name=design_name or "", file_name=image.filename)
 
                     return {
                         "success": True,
@@ -2293,6 +2299,9 @@ async def unified_ask(
                     metadata={"file_names": [f.filename for f in files]},
                     user_id=user_id
                 )
+                _save_report_db(user_id, result, "multi_image",
+                                design_name=design_name or "",
+                                file_name=", ".join(f.filename for f in files))
 
                 return {
                     "success": True,

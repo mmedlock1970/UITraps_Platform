@@ -144,9 +144,12 @@ export const App: React.FC = () => {
   const [externalTheme, setExternalTheme] = useState(() => _params.has('theme'));
   const [externalMode] = useState(() => _params.has('mode'));
   const [apiEndpoint] = useState(DEFAULT_API_ENDPOINT);
-  const [view, setView] = useState<AppView>(() =>
-    _params.get('mode') === 'chat' ? 'chat' : 'form'
-  );
+  const [view, setView] = useState<AppView>(() => {
+    const mode = _params.get('mode');
+    if (mode === 'chat') return 'chat';
+    if (mode === 'history') return 'history';
+    return 'form';
+  });
   const [activeReport, setActiveReport] = useState<ActiveReport | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [isRerunning, setIsRerunning] = useState(false);
@@ -672,6 +675,8 @@ export const App: React.FC = () => {
             onViewReport={handleViewHistoryReport}
             onReuseSettings={handleReuseSettings}
             onClose={() => setView('form')}
+            token={effectiveToken || undefined}
+            apiEndpoint={apiEndpoint}
           />
         </div>
       </div>

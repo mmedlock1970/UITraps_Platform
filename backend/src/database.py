@@ -76,6 +76,23 @@ class UserSubscription(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+# --- Analysis Report Storage ---
+
+class AnalysisReport(SQLModel, table=True):
+    """Persisted analysis reports, keyed by WordPress user ID."""
+    __tablename__ = "analysis_reports"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: str = Field(index=True)
+    timestamp: datetime = Field(default_factory=datetime.utcnow, index=True)
+    analysis_type: str = Field(default="single_image")
+    design_name: Optional[str] = None
+    file_name: Optional[str] = None
+    html: str = Field(sa_column_kwargs={"nullable": False})
+    markdown: Optional[str] = None
+    statistics: Optional[str] = None  # JSON string
+
+
 # --- Chat Models (for unified platform) ---
 
 class ConversationSession(SQLModel, table=True):
@@ -110,11 +127,12 @@ DATABASE_URL = os.environ.get(
     f"sqlite:///{Path(__file__).parent.parent / 'usage.db'}"
 )
 
-# SQLite-specific settings for concurrency
+# SQLite needs check_same_thread=False; PostgreSQL does not accept that arg
+_is_sqlite = DATABASE_URL.startswith("sqlite")
 engine = create_engine(
     DATABASE_URL,
     echo=os.environ.get("DEBUG_SQL", "").lower() == "true",
-    connect_args={"check_same_thread": False}  # Required for SQLite + FastAPI
+    **( {"connect_args": {"check_same_thread": False}} if _is_sqlite else {} )
 )
 
 
