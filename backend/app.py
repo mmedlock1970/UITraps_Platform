@@ -987,17 +987,17 @@ async def list_saved_reports(
             .order_by(AnalysisReport.timestamp.desc())
             .limit(limit)
         ).all()
-    reports = [
-        {
-            "id": r.id,
-            "timestamp": r.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-            "analysis_type": r.analysis_type,
-            "design_name": r.design_name,
-            "file_name": r.file_name,
-            "statistics": json.loads(r.statistics) if r.statistics else None,
-        }
-        for r in rows
-    ]
+        reports = [
+            {
+                "id": r.id,
+                "timestamp": r.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+                "analysis_type": r.analysis_type,
+                "design_name": r.design_name,
+                "file_name": r.file_name,
+                "statistics": json.loads(r.statistics) if r.statistics else None,
+            }
+            for r in rows
+        ]
     return {"success": True, "reports": reports, "count": len(reports)}
 
 
@@ -1010,25 +1010,24 @@ async def get_saved_report(
     user_id = str(user.get("id") or user.get("userId", ""))
     with Session(engine) as session:
         report = session.get(AnalysisReport, report_id)
-
-    if report is None:
-        raise HTTPException(status_code=404, detail="Report not found")
-    if report.user_id != user_id:
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    return {
-        "success": True,
-        "report": {
-            "id": report.id,
-            "timestamp": report.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-            "analysis_type": report.analysis_type,
-            "design_name": report.design_name,
-            "file_name": report.file_name,
-            "html": report.html,
-            "markdown": report.markdown,
-            "statistics": json.loads(report.statistics) if report.statistics else None,
+        if report is None:
+            raise HTTPException(status_code=404, detail="Report not found")
+        if report.user_id != user_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+        result = {
+            "success": True,
+            "report": {
+                "id": report.id,
+                "timestamp": report.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+                "analysis_type": report.analysis_type,
+                "design_name": report.design_name,
+                "file_name": report.file_name,
+                "html": report.html,
+                "markdown": report.markdown,
+                "statistics": json.loads(report.statistics) if report.statistics else None,
+            }
         }
-    }
+    return result
 
 
 # ===========================================================
