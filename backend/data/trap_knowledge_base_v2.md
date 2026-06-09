@@ -261,6 +261,10 @@ NOT present when:
 ## Remediation (U7)
 Make the action visible — almost always the easier and more reliable path. If retained invisible, deliver effective instruction meeting all six conditions when the user is ready and motivated.
 
+## AI Detection Rules
+**Tier 2 — Output to `potential_issues`, confidence "medium":** When a core task identified in the user context has no visible means of completion anywhere in the artifact AND no alternative visible path exists. Flag: "No visible cue signals how to achieve [goal]. If users lack prior learning for an alternative interaction, this is a candidate Invisible Element."
+**`testable: false`:** All other instances — evaluating whether users have relevant prior learning requires user population knowledge not available from the artifact alone.
+
 ---
 
 # CHUNK: EFFECTIVELY INVISIBLE ELEMENT
@@ -320,6 +324,10 @@ NOT present when:
 
 ## Remediation (U7)
 Place the element within or adjacent to the user's primary attentional focus during the task — not where convenient. Exploit pre-attentive features (color, size, motion) for pop-out. Caution: motion used to increase visibility becomes Distraction when applied to elements not relevant to the user's current goal.
+
+## AI Detection Rules
+**Human Review — Output to `flagged_for_human_review`:** When an element critical to task completion is present but measurably peripheral, low-contrast, or misaligned with the dominant interaction pattern of the interface. Question for reviewer: "Would your users notice [element] in its current location and styling during this task?"
+**`testable: false`:** For general cases where attentional focus during the specific task cannot be assessed from the artifact.
 
 ---
 
@@ -386,6 +394,16 @@ NOT present when:
 ## Remediation (U7)
 The governing question is not "will this be noticed?" but "what will the user be doing when this appears, and what will noticing it cost them?" Remove or defer any element that appears without user initiation during focused task execution unless confidence is high that the disruption will be welcomed. For notification systems, evaluate whether the interruption serves the user or the product's engagement metrics — these are not always the same. Caution: eliminating a distracting element that was compensating for an Effectively Invisible Element may require adding a non-distracting visible solution.
 
+## AI Detection Rules
+**Tier 1 — Confirmed finding:** Auto-playing audio or video elements. Flag directly as a confirmed finding.
+**Human Review — Output to `flagged_for_human_review`:** Motion, notification badges, unread counts, or unsolicited elements during documented task flows. Question: "Does [element] pull user attention away from [primary task]?"
+**`testable: false`:** General attention-capture requiring knowledge of user goals outside the product.
+**Severity calibration (apply every time):**
+- **Minor**: Static or slow-updating element (counter, badge, timer) in entertainment, browsing, or casual context — brief involuntary glance, negligible task cost.
+- **Moderate**: Motion, animation, or audio in focused transactional context (checkout, form completion, search).
+- **High/Critical**: Any distracting element during safety-critical, time-sensitive, or irreversible tasks; or any element that physically obscures critical interface content.
+⚠️ Do NOT default to Moderate for all Distraction findings — calibrate to what the distraction actually costs the user given what they are doing.
+
 ---
 
 # CHUNK: UNCOMPREHENDED ELEMENT
@@ -442,6 +460,18 @@ NOT present when:
 
 ## Remediation (U7)
 Use universally recognized signifiers for core functions. When in doubt, provide a text label — a labeled unclear icon is always better than an unlabeled one. For genuinely novel concepts with no existing convention, plan instruction delivered when the user is ready to receive it. Replacing a well-learned brand symbol with a conventional signifier is almost always the right call for functional elements, even at the cost of brand expression.
+
+## AI Detection Rules
+**Tier 1 — Confirmed finding, moderate severity:** A brand-specific or non-standard symbol used as a functional icon for a core function with no text label and no conventional signifier equivalent. Flag directly.
+**Human Review — All other cases:** Output to `flagged_for_human_review`. Question: "Would your target users understand what [term/icon] means?"
+**What IS this trap:** Unfamiliar icons, unfamiliar terminology, ambiguous labels, icons without text labels users might not recognize, any element where the information present is insufficient for the user to understand it or act confidently.
+**What is NOT this trap (critical disambiguation):**
+- Filter/dropdown state not visible → **FEEDBACK FAILURE** instead (the issue is visibility of state, not meaning of label)
+- Selected values not displayed → **FEEDBACK FAILURE** or **INVISIBLE ELEMENT**
+- Standard UI patterns (chevrons, hamburger menus, magnifying glass for search) → universally understood
+- Clear labels like "Price", "Rating", "Sort", "Filter" → not this trap
+- Any issue about VISIBILITY of current state rather than MEANING of labels → not this trap
+**vs. INFORMATION OVERLOAD (critical disambiguation):** Mutually exclusive. Information Overload = volume makes it hard to find or act. Uncomprehended Element = content present is insufficient to understand the element or act confidently. If your problem description is the reverse of the trap's definition, you have chosen the wrong trap.
 
 ---
 
@@ -504,6 +534,11 @@ NOT present when:
 
 ## Remediation (U7)
 Systematically walk every plausible path through the interface, not just the intended one. At each decision point, ask whether any element could reasonably be mistaken for the correct next step. Where a wrong path exists, either increase visual differentiation between correct and incorrect elements, or remove the incorrect path entirely. An error message that says "don't do what you just did" is evidence of this Trap — the fix is to remove the wrong path, not improve the error message. There are no cases where such a message is acceptable and the element that triggered it should not be redesigned.
+
+## AI Detection Rules
+**Tier 1 — Confirmed finding, moderate severity:** An error message in the artifact amounting to "you should not have done what you just did" or "this action is not allowed" — this confirms users followed a plausible wrong path. Also: when you have verified the destination (multi-page analysis) and it objectively mismatches the CTA text; or when CTA text makes a specific promise that is objectively not kept (e.g., "Free Download" leads to payment).
+**Human Review — All other visual similarity cases:** Output to `flagged_for_human_review`. Question: "Do your users expect [element] to lead to [destination type]?"
+
 ---
 
 # CHUNK: POOR GROUPING
@@ -565,6 +600,21 @@ NOT present when:
 ## Remediation (U7)
 Apply Gestalt principles deliberately — elements that belong together should be spatially or conceptually closer to each other than to any competing element. Use white space as an active grouping tool. Where proximity alone is insufficient, add explicit visual separators (lines, containers, color). Test with users unfamiliar with the system by asking them to complete tasks that depend on correct grouping recognition.
 
+## AI Detection Rules
+**Tier 1 — Confirmed finding:** Measurable spatial violations: a control is measurably equidistant between two competing options with no secondary disambiguation cues; OR related items are measurably closer to unrelated items than to each other.
+**Tier 2 — Output to `potential_issues`, confidence "medium":** Most other cases — ambiguity is detectable but whether it constitutes a Trap requires user knowledge.
+**Required evaluation framework — Gestalt Principles:** POOR GROUPING is ONLY present when a specific Gestalt perceptual principle is violated. Evaluate against these principles:
+1. **PROXIMITY** (most common): Related elements must be spatially closer to each other than to unrelated elements.
+2. **SIMILARITY**: Same-function elements share visual properties. Violation: same-function elements look different, OR different-function elements look identical.
+3. **COMMON REGION**: Elements in the same visual boundary are perceived as related. Violation: unrelated elements share a container, or related elements split across containers.
+4. **CONTINUITY**: Eye follows smooth aligned paths. Violation: misalignment breaks expected reading order.
+5. **FIGURE-GROUND**: Foreground elements must be distinguishable from background. Use POOR GROUPING only when the issue is grouping confusion, not contrast alone.
+6. **CLOSURE**: Incomplete shapes resolve into recognizable forms. Rarely applicable to most UI analysis.
+7. **COMMON FATE**: Elements that move together are perceived as related. Requires video — cannot assess from static screenshots.
+8. **SYMMETRY/ORDER**: Near-symmetry creating unintentional imbalance. Example: two columns of equal importance with very unequal item counts.
+**What is NOT POOR GROUPING:** Mixed content serving the same navigational purpose; standard layouts following conventions; aesthetic preferences that don't violate the above. Multiple navigation options → may be GRATUITOUS REDUNDANCY instead.
+**Output requirement when flagging:** Cite (1) which Gestalt principle is violated, (2) measurable/observable evidence, (3) expected vs. actual grouping. If you cannot cite a specific principle violation, it is NOT POOR GROUPING.
+
 ---
 
 # CHUNK: FORCED SYNTAX
@@ -619,6 +669,11 @@ NOT present when:
 
 ## Remediation (U7)
 Identify all reasonable starting points users might use for this task and ensure the interface accepts them. Plan explicitly which tasks should support object→action AND action→object constructions — providing both allows users to approach tasks in the way that feels natural.
+
+## AI Detection Rules
+**Tier 2 — Output to `potential_issues`, confidence "medium":** Fixed sequences identifiable in design files and task flows — flag when the sequence appears unnatural for the user population described. Caveat: "Syntax requirements may extend beyond visible screenshots."
+**`testable: false`:** Whether a specific sequence is genuinely unnatural for real users requires user population knowledge.
+**vs. GRATUITOUS REDUNDANCY:** Mutually exclusive per task flow. Forced Syntax provides only one grammatical construction; Gratuitous Redundancy duplicates paths via the same construction. Confirm which is present before flagging.
 
 ---
 
@@ -678,6 +733,12 @@ NOT present when:
 
 ## Remediation (U7)
 Design for recognition over recall — let users see and choose rather than remember and enter. Present information spatially and chunk it whenever possible to facilitate recall. When users must produce information from memory, provide retrieval cues. The governing question: am I asking the user to remember this, or am I giving them a way to recognize it?
+
+## AI Detection Rules
+**Tier 1 — Confirmed finding:** When multiple screens show both the source information AND the recall demand — confirmable without user testing.
+**Tier 2 — Output to `potential_issues`, confidence "medium":** When the artifact explicitly reveals users must recall prior-session information with no retrieval cue (e.g., instructions to recall a security question, blank credential fields with no hint). Flag: "This screen requires users to recall [information] from a prior session with no retrieval cue visible." Caveat: "Earlier screens may have provided this information."
+**`testable: false`:** When memory demand can only be inferred from knowing what earlier screens contained.
+**vs. SYSTEM AMNESIA:** Memory Challenge = system requires the user to remember something easy to forget. System Amnesia = system previously collected the information but fails to use it. When both apply, cite System Amnesia as root cause.
 
 ---
 
@@ -746,6 +807,16 @@ The root cause determines the fix. Do not flag Feedback Failure without identify
 
 ## Remediation (U7)
 Every action should produce a response that is immediate, clear, and sufficient. Error messages must answer two questions: what went wrong, and what should the user do now? Continuous real-time feedback is superior to post-submission feedback. The fix depends entirely on the root cause — identify which Trap is causing the failure before designing a solution.
+
+## AI Detection Rules
+**Tier 1 — Confirmed finding:**
+(a) Error messages visible in the artifact that fail to answer BOTH "what happened?" AND "what should I do?" — answering only one question is this Trap.
+(b) Interactive elements where no in-screen response state is visible (no loading indicator, button state change, or inline confirmation on the same screen).
+**Critical distinction — in-screen vs. post-action feedback:**
+- Feedback that should appear on the same screen immediately → confirmed absent if not visible on that screen, Tier 1 finding.
+- Feedback on a subsequent screen (toast, confirmation page after transition) → DO NOT assert absent. Apply the partial artifact rule; use conditional language: "If no confirmation screen or toast exists elsewhere in this flow, users would have no indication the action completed."
+**`testable: false`:** Assessing whether feedback is noticeable or comprehensible to real users.
+
 ---
 
 # TRAP CHUNKS — COMFORTABLE TENET
@@ -811,6 +882,10 @@ NOT present when:
 ## Remediation (U7)
 Follow established guidelines: minimum 12mm touch targets, WCAG contrast ratios, platform-specific reach zone guidance. Prototype and test on real hardware in realistic conditions. Improving contrast not only removes this Trap but demonstrably increases engagement. Caution: enlarging targets to resolve Physical Challenge may increase Accidental Activation risk — evaluate both together.
 
+## AI Detection Rules
+**Tier 1 — Confirmed finding:** Measurable violations: touch targets visibly below 12mm, text contrast below WCAG minimums, text size below legibility thresholds. Checkable against guidelines in design files.
+**Tier 3 — Risk noted, output to `potential_issues`, confidence "low":** Non-measurable properties (weight, thermal comfort, VR motion sickness, one-handed reach) — note explicitly that hardware testing is required.
+
 ---
 
 # CHUNK: ACCIDENTAL ACTIVATION
@@ -872,6 +947,10 @@ NOT present when:
 
 ## Remediation (U7)
 Add friction to the activation path: recess or shield controls, require sequential actions before critical functions execute, add physical resistance, or increase gesture distinctiveness. Reserve confirmation dialogs as a last resort — they add Unnecessary Steps for the majority of intentional users. Use confirmation only for actions that are both consequential AND irreversible, after physical design options are exhausted. Caution: friction that reduces Accidental Activation may increase Physical Challenge — calibrate to context and stakes.
+
+## AI Detection Rules
+**Tier 3 — Risk noted, output to `potential_issues`, confidence "low":** When controls are visibly positioned at natural grip points for the device type shown (e.g., controls at the edges or back of a phone, gesture-activated surfaces covering the full device). Note explicitly that hardware testing is required to confirm.
+**`testable: false`:** For all other instances.
 
 ---
 
@@ -939,6 +1018,9 @@ Also applies to captive waits where duration is undisclosed.
 ## Remediation (U7)
 For interactions below the 100ms threshold: provide immediate confirmation that the action was received before the full response is ready. For processes over 1 second: provide continuous progress feedback. Never leave users facing a static screen with no indication the system is working. Apply occupied-time principles — skeleton screens, progressive loading, and background activity reduce perceived wait without changing actual duration. For captive waits: make them skippable or communicate exact duration upfront.
 
+## AI Detection Rules
+**`testable: false`:** Actual response times require live performance measurement; perceived slowness requires user observation. Always omit this trap from `traps_checked_not_found` — it is added automatically to the output.
+
 ---
 
 # CHUNK: CAPTIVE WAIT
@@ -991,6 +1073,11 @@ NOT present when:
 
 ## Remediation (U7)
 Question every point where users cannot advance, back out, or skip. For unavoidable captive periods: communicate duration upfront, make content skippable as quickly as possible, ensure content serves the user's goal. For system processes (updates, installations): give advance notice, allow parallel tasks where possible, notify when complete.
+
+## AI Detection Rules
+**Tier 2 — Output to `potential_issues`, confidence "medium":** When the artifact shows a mandatory sequence, interstitial, or process with no visible skip option, no visible duration indicator, and no visible means of backing out. Flag: "This sequence appears to prevent users from advancing or exiting — confirm whether a skip option or duration disclosure exists."
+**`testable: false`:** Assessing whether the duration and purpose justify the captive period.
+
 ---
 
 # TRAP CHUNKS — EFFICIENT TENET
@@ -1053,6 +1140,11 @@ NOT present when:
 ## Remediation (U7)
 For navigation hierarchy: surface high-frequency functions to persistent navigation rather than nesting them. For confirmation dialogs: make the action reversible instead of confirming before taking it. Walk every task flow end to end and ask of each step: does this need to exist? Particular attention to flows built incrementally by different teams where cumulative step count has never been audited.
 
+## AI Detection Rules
+**Tier 2 — Requires complete task flows:** Steps can happen between the screenshots provided — a step visible in the artifact may be justified by context not shown. Flag when a step appears to add no value, but include the caveat: "Based on provided screenshots. Additional steps in the flow may provide context that justifies this step."
+Output to `potential_issues`, confidence "medium".
+**`testable: false`:** Whether the step is genuinely unnecessary requires seeing the full flow.
+
 ---
 
 # CHUNK: INFORMATION OVERLOAD
@@ -1109,6 +1201,23 @@ NOT present when:
 
 ## Remediation (U7)
 Start from the user's most likely goal and include only what directly serves it. Apply progressive disclosure: surface secondary information only when needed. Write all text to the minimum length that preserves clarity — aggressive cutting almost always yields better communication. For navigation and option structures, minimize choices to increase decision speed. Audit regularly — interfaces accumulate content over time, and what was reasonable at launch may be overwhelming as the product grows.
+
+## AI Detection Rules
+**`testable: true` — Always evaluable from a static screenshot.** ⚠️ DO NOT UNDER-FLAG.
+**Flag as CRITICAL when:**
+- Page is predominantly text (>70% of visible content is dense text paragraphs)
+- The primary user task/action is buried within or below large blocks of text
+- User must read substantial content to find how to accomplish their task
+- Call-to-action or key functionality is not visible without scrolling past text walls
+**Flag as MODERATE when:**
+- Page has substantial text but key actions are somewhat visible
+- Important information requires parsing through multiple paragraphs
+- Visual hierarchy exists but doesn't adequately prioritize task completion
+**Output to `potential_issues` ONLY when:**
+- Content density MIGHT be legally required (terms, disclaimers, compliance)
+- The audience is known to need detailed information (e.g., technical documentation)
+**DO NOT use `potential_issues`** if the task is clearly obscured by excessive text — that is a confirmed finding.
+**vs. UNCOMPREHENDED ELEMENT:** Opposite conditions. Information Overload = volume makes it hard to find or act. Uncomprehended Element = content present is insufficient to understand or act confidently. Never apply one while acknowledging the other describes the situation better.
 
 ---
 
@@ -1169,6 +1278,10 @@ NOT present when:
 
 ## Remediation (U7)
 Design for retention by default: when a user provides information at any point in a flow, it should be available at all subsequent points in the same session. Ensure user data is shared across product contexts rather than siloed. For recommendation systems, build logic that excludes content the user already owns or has engaged with. The governing question: could the system reasonably be expected to retain this? If yes, it should.
+
+## AI Detection Rules
+**Tier 1 — Confirmed finding, moderate severity:** When the artifact shows the system displaying information it demonstrably possesses while simultaneously requesting it or acting contrary to it — visible on a single screen. Examples: recommending a product the user's profile shows they already own; asking for information already shown elsewhere on the same screen; prompting for a preference the interface shows has already been set.
+**`testable: false`:** Re-prompting across screens requiring knowledge of prior-session data.
 
 ---
 
@@ -1246,6 +1359,13 @@ Ask: "Would this content be wrong for a user with completely different goals?"
 ## Remediation (U7)
 For any information presented as fact: document the source, the verification process, and the mechanism for keeping it current. AI-generated content should be explicitly labeled and accompanied by source citations where possible. High-stakes domains (health, finance, safety, legal) require the highest verification standard and the clearest disclosure of limitations. Design interfaces to surface uncertainty rather than hide it.
 
+## AI Detection Rules
+**The single disambiguation test (apply BEFORE classifying):** Ask — "Would this content be wrong for a user with completely different goals?"
+- If YES (only wrong for THIS specific user) → **BAD PREDICTION**. Do not classify as Incorrect Information.
+- If NO (factually wrong for any user regardless of goals) → **INCORRECT INFORMATION**.
+**Tier 1 — Confirmed finding:** ONLY for static factual claims that are wrong independent of who the user is: UI labels or descriptions that contradict what the element actually does; ratings, metadata, or descriptions visibly inconsistent with the actual content shown; content filed under a category or label that factually does not describe it.
+**Do NOT flag as INCORRECT INFORMATION:** Recommendation rows, surfaced content, personalisation results, or system-generated suggestions — those are always **BAD PREDICTION** when wrong for a specific user.
+
 ---
 
 # CHUNK: BAD PREDICTION
@@ -1313,6 +1433,14 @@ began adding unsolicited "By the way..." messages after replies to promote other
 
 ## Remediation (U7)
 The governing question: is the benefit of acting on this imperfect prediction greater than the cost of getting it wrong? Where wrong-prediction consequence is significant and reversal is difficult, suggest rather than act — and make dismissal easy. Where prediction accuracy cannot be verified, default to inaction. Acting requires a higher accuracy threshold than suggesting. In other words: predict when certain.
+
+## AI Detection Rules
+**Actively check when user context is provided.**
+**Tier 1 — Confirmed finding, moderate severity:** When the screenshot shows the interface surfacing content, recommendations, or defaults that are visibly wrong for the stated user — the system's proactive decision does not serve this user. Examples: curated/personalised sections surfacing items contradicting the described user's demographics, goals, or tasks; default settings visibly mismatching the stated user's context; a screen dominated by content clearly wrong for the stated user population.
+**`testable: false`:** When content relevance cannot be assessed without off-screen personalisation state.
+**BAD PREDICTION is directly detectable from a static screenshot** when the interface visibly surfaces wrong content for the stated user. Do not treat as generally undetectable.
+**Disambiguation with INCORRECT INFORMATION:** See INCORRECT INFORMATION chunk. Recommendation rows and personalisation results are always BAD PREDICTION when wrong — never INCORRECT INFORMATION.
+
 ---
 
 # TRAP CHUNKS — PROTECTIVE TENET
@@ -1377,6 +1505,11 @@ NOT present when:
 ## Remediation (U7)
 Design forwards and backwards: for every consequential action, ask what the user does if they change their mind. Making an action reversible is almost always better than asking for confirmation — it removes both the risk and the step. Where true irreversibility exists, provide a time-limited recovery window if technically feasible. Where neither is possible, use a non-habituating confirmation (type a specific phrase) rather than a standard dialog. Confirmation dialogs are frequently dismissed without being read — they are not a reliable substitute for reversibility.
 
+## AI Detection Rules
+**Tier 2 — Output to `potential_issues`, confidence "medium":** When a consequential action (delete, send, purchase, submit, publish) is visible with no visible undo mechanism, cancel option, time-limited recovery window, or non-habituating confirmation. Flag: "This action appears to have no recovery path — confirm whether reversal is technically feasible."
+**Important:** Standard OK/Cancel dialogs alone do NOT resolve this Trap — flag even when present if the action is consequential.
+**`testable: false`:** Assessing whether an action could technically be made reversible.
+
 ---
 
 # CHUNK: UNWANTED DISCLOSURE
@@ -1437,6 +1570,11 @@ NOT present when:
 
 ## Remediation (U7)
 Default settings should reflect what users would choose if fully informed — not what maximizes data collection. For any data sharing feature, ask: where could this data surface, and would the user expect and accept that? Require explicit opt-in for sensitive behavioral data. For ambient and shared devices, provide granular control over what content is displayed and when.
+
+## AI Detection Rules
+**Tier 1 — Confirmed finding, high severity:** When the artifact shows opt-out sharing of sensitive behavioral data as the default setting.
+**Tier 2 — Output to `potential_issues`, confidence "medium":** When the artifact shows data sharing features, notification defaults, or ambient display settings where social or physical context could make disclosure unwanted.
+**`testable: false`:** Contextual evaluation of whether specific disclosures would be unwanted for this specific user.
 
 ---
 
@@ -1500,6 +1638,10 @@ NOT present when:
 ## Remediation (U7)
 Implement continuous auto-save wherever technically feasible — the requirement for explicit saving is an engineering legacy, not a user requirement. Design for failure from the outset: session timeouts, network interruptions, and crashes are certainties, not edge cases. For collaborative tools, implement conflict resolution that protects all users' contributions. The governing question: what happens to the user's work if the session ends unexpectedly right now?
 
+## AI Detection Rules
+**Tier 2 — Output to `potential_issues`, confidence "medium":** When the artifact shows user-generated content (form fields, text input, creative work, multi-step data entry) with no visible auto-save indicator AND no explicit save mechanism AND context where failure modes are foreseeable (session timeout, navigation away, crash). Flag: "User-generated content in this flow may be lost if [failure mode] occurs — confirm whether auto-save is implemented."
+**`testable: false`:** Confirming actual data loss — requires live testing.
+
 ---
 
 # TRAP CHUNKS — HABITUATING TENET
@@ -1562,6 +1704,21 @@ NOT present only when ONE of these clearly applies:
 ## Remediation (U7)
 Consolidate to one path per destination for a given grammatical construction. Audit the code for duplicate destination links — the most reliable detection method. When the motivation for adding a duplicate was poor discoverability of the original, fix the visibility of the original element rather than adding a copy. Caution: do not confuse Gratuitous Redundancy with useful flexible syntax — supporting both object→action and action→object constructions is valuable and should be preserved.
 
+## AI Detection Rules
+**⚠️ DO NOT UNDER-FLAG. Directly detectable from a static screenshot — check on every analysis.**
+**Mandatory whole-interface scan (before trap-by-trap analysis):** Scan the entire interface and catalog every text string, label, icon, and interactive control that appears more than once anywhere on the same screen — regardless of which navigation bar, panel, or component each instance appears in. Do NOT filter based on visual proximity or component hierarchy.
+**Tier 1 — Confirmed finding, moderate severity:** Same text label, icon, control, or navigation destination appearing in 2+ locations simultaneously on the same screen with no independent informational distinction. Raise severity to high if redundancy displaces other content or creates measurable Unnecessary Steps or Information Overload.
+**Tier 2 — Output to `potential_issues`, confidence "medium":** Two visually different elements that could plausibly invoke the same function from the same direction and are independently operable.
+**Directed inspection (output to `potential_issues`, confidence "low"):** Identical elements observed but functions unverifiable. State: "Cannot confirm from this artifact whether [element A] and [element B] trigger the same function — analyst must test each. If same function → Gratuitous Redundancy. If different functions → Variable Outcome."
+**DO NOT DISMISS as "standard patterns" — these are Tier 1 confirmed:**
+- Site logo navigating to homepage AND a separate "Home" nav link
+- Same navigation destination in two or more separate nav regions on the same screen
+- A search input field AND a standalone search icon/button both visible on the same screen
+- Multiple "Sign In" or "Get Started" buttons for the same action
+**The flexible-syntax exception is NARROW:** Only disconfirmed when one path is strictly object→action AND the other is strictly action→object. Visual difference, size difference, or placement in different components does NOT create an exception.
+**vs. AMBIGUOUS HOME:** AMBIGUOUS HOME is about the product's global home destination; multiple competing entry points to a specific feature or task → GRATUITOUS REDUNDANCY.
+**vs. FORCED SYNTAX:** Mutually exclusive per task flow — confirm which is present before flagging.
+
 ---
 
 # CHUNK: VARIABLE OUTCOME
@@ -1622,6 +1779,12 @@ NOT present when:
 ## Remediation (U7)
 Where possible, eliminate the mode entirely — consistent behavior is always better than a clearly indicated mode. When modes are unavoidable, place the mode indicator where the user is attending when they take the mode-dependent action — not where geometrically convenient. Evaluate mode clarity not by whether the indicator is provided, but by whether a user focused on their task will be attending to it. Alternatively, require continuous action to sustain the mode (quasi-mode), bringing it into user awareness. For safety-critical interfaces: the acceptable risk of mode error is zero — redesign to eliminate the mode dependency, not merely improve the indicator.
 
+## AI Detection Rules
+**Standard form:** Requires testing the same interaction across different modes/states/contexts — generally testable only with live testing or multi-screen flows showing evidence of variable behavior.
+**Spatial case — `testable: true` when whole-interface scan finds identical-looking elements:** Flag for directed inspection. Instruct analyst to test each element. If functions differ → Variable Outcome. If functions are the same → Gratuitous Redundancy.
+**Tier 2 — Multiple screens:** When evidence of variable behavior exists across provided screens, output to `potential_issues`, confidence "medium". Caveat: "Requires multiple task flows to confirm inconsistency."
+**`testable: false`:** For temporal inconsistency without multi-state evidence.
+
 ---
 
 # CHUNK: WANDERING ELEMENT
@@ -1678,6 +1841,11 @@ NOT present when:
 
 ## Remediation (U7)
 Identify controls appearing most frequently across the interface and map their placement systematically across every context. Inconsistencies are Wandering Elements. Pay particular attention to high-frequency controls — search, edit, navigation, confirmation — where spatial memory provides the greatest efficiency gain. Platform-level controls must appear in consistent positions across all apps in an ecosystem.
+
+## AI Detection Rules
+**Tier 1 — Confirmed finding, multiple screens only:** Cross-context placement consistency is directly auditable by comparing control positions across provided screens.
+**`testable: false`:** For single screenshot analyses — omit from `traps_checked_not_found` for single-screenshot submissions; this is added automatically.
+
 ---
 
 # CHUNK: INCONSISTENT APPEARANCE
@@ -1734,6 +1902,10 @@ NOT present when:
 
 ## Remediation (U7)
 Identify functions appearing most frequently across the product and systematically compare their visual representation across contexts. A design system specifying appearance for every recurring component is the most reliable prevention. For legacy components: either update to the current design language or clearly separate them into a context where the design language transition is explicitly communicated. Core actions — New, Delete, Edit, Share — must be represented consistently across the entire product.
+
+## AI Detection Rules
+**Tier 1 — Confirmed finding, multiple screens only:** Cross-context visual consistency is directly auditable by comparing visual representation of recurring controls across provided screens.
+**`testable: false`:** For single screenshot analyses — omit from `traps_checked_not_found` for single-screenshot submissions; this is added automatically.
 
 ---
 
@@ -1793,6 +1965,14 @@ NOT present when:
 
 ## Remediation (U7)
 Consolidate to one home — not better labeling of multiple homes. Ask users without prompting where they would go to start a new task or recover from being lost. Inconsistent answers confirm the Trap. The fix is always consolidation: one destination, one action, consistent across all contexts and input modes. Home iconography (house symbol) must be reserved exclusively for the primary home destination — using it elsewhere creates an Inviting Dead End that directly compounds this Trap.
+
+## AI Detection Rules
+**Tier 2 — Output to `potential_issues`, confidence "medium":** When the artifact shows two or more elements that could plausibly serve as the interface's global home destination (the single top-level anchor of the entire product). Flag: "Multiple elements could plausibly serve as the global home — confirm whether users agree on a single starting point."
+**`testable: false`:** For single-screen artifacts where home ambiguity requires cross-section navigation knowledge.
+**Critical disambiguation with GRATUITOUS REDUNDANCY:**
+- AMBIGUOUS HOME is EXCLUSIVELY about the interface's **global home destination** — the product-level "home" that anchors the entire navigation system.
+- Multiple competing entry points for a **specific feature, task, or action** → **GRATUITOUS REDUNDANCY**, NOT AMBIGUOUS HOME.
+- Test: "Is the ambiguity about where to start in the *whole app*, or about which element to use for a *specific task*?" If the latter → GRATUITOUS REDUNDANCY.
 
 ---
 
@@ -1866,4 +2046,8 @@ NOT present when:
 
 ## Remediation (U7)
 Ensure functional excellence on the other eight Tenets first — aesthetic quality cannot rescue a functionally broken product, and fixing functional Traps often improves aesthetics naturally. Give design expertise genuine authority from the earliest stages. Do not act on pre-launch aesthetic user feedback — it reliably reflects resistance to difference, not lasting aesthetic failure. Trust designers, not pre-launch user aesthetic responses.
+
+## AI Detection Rules
+**`testable: false`:** Not reliably detectable through structural analysis — requires cultural and aesthetic judgment. Always omit this trap from `traps_checked_not_found` — it is added automatically to the output.
+**Human Review only:** When you observe potential visual inconsistencies or quality concerns, output to `flagged_for_human_review`. Question: "Does the visual design of [element] meet your brand/quality standards?"
 
