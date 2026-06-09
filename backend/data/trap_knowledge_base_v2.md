@@ -5,6 +5,9 @@
 ---
 ## ARCHITECTURE NOTES FOR AI TOOL
 
+**This file is the single authoritative source for all evaluative content:**
+All per-trap detection criteria, confidence/testability tiers, severity calibration, disambiguation rules, and output-routing decisions live in the `## AI Detection Rules` section of each trap chunk below. The system prompt (`prompts.py`) contains only procedural rules (output structure, field semantics, few-shot format examples). When feedback from Steve or Michael indicates the tool missed a trap, confused two traps, or rated severity incorrectly → edit the relevant `## AI Detection Rules` section here, not the system prompt.
+
 **Priority order for all assessments:**
 1. Minimize false alarms (highest priority)
 2. Maximize correct rejections

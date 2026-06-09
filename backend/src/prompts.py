@@ -379,6 +379,29 @@ Before flagging ANY trap, you MUST:
 
 🚨 CRITICAL TRAP DETECTION RULES:
 
+# ──────────────────────────────────────────────────────────────────────────────
+# EDITING GUIDANCE FOR DEVELOPERS
+#
+# This section contains PROCEDURAL rules only:
+#   - output field semantics (traps_checked_not_found, potential_issues, etc.)
+#   - whole-interface scan steps
+#   - severity label definitions
+#   - page-role awareness
+#   - few-shot output format examples
+#   - hedged language requirements
+#
+# EVALUATIVE content lives exclusively in trap_knowledge_base_v2.md:
+#   - per-trap detection criteria
+#   - confidence/testability tiers (Tier 1/2/3)
+#   - severity calibration per trap
+#   - disambiguation rules (BAD PREDICTION vs INCORRECT INFORMATION, etc.)
+#   - when to output to potential_issues vs flagged_for_human_review vs findings
+#
+# If Steve or Michael report that the tool missed a trap, confused two traps,
+# or rated severity incorrectly → edit the ## AI Detection Rules section of the
+# relevant trap chunk in trap_knowledge_base_v2.md, NOT this file.
+# ──────────────────────────────────────────────────────────────────────────────
+
 **Per-trap detection criteria, confidence thresholds, testability conditions, and disambiguation rules** (including BAD PREDICTION vs. INCORRECT INFORMATION, AMBIGUOUS HOME vs. GRATUITOUS REDUNDANCY, UNCOMPREHENDED ELEMENT vs. FEEDBACK FAILURE) are documented in the Training Content. See each trap's **AI Detection Rules** section.
 
 **`traps_checked_not_found` — ABSENT AND UNTESTABLE TRAPS ONLY:**
