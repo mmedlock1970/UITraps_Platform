@@ -304,6 +304,24 @@ def build_system_prompt(use_caching: bool = True, version: str = "v2", image_cou
     training_content = load_training_content(version=version)
     trap_names_line = _TRAP_NAMES_V1 if version == "v1" else _TRAP_NAMES_V2
 
+    # ──────────────────────────────────────────────────────────────────────────
+    # EDITING GUIDANCE — READ BEFORE MODIFYING THIS FUNCTION
+    #
+    # system_prompt_intro (below) contains PROCEDURAL rules only:
+    #   output field semantics, whole-interface scan steps, severity label
+    #   definitions, page-role awareness, few-shot format examples, hedged
+    #   language requirements.
+    #
+    # EVALUATIVE content lives exclusively in trap_knowledge_base_v2.md:
+    #   per-trap detection criteria, confidence/testability tiers (Tier 1/2/3),
+    #   severity calibration per trap, disambiguation rules (BAD PREDICTION vs
+    #   INCORRECT INFORMATION, etc.), output routing (potential_issues vs
+    #   flagged_for_human_review vs confirmed findings).
+    #
+    # Feedback from Steve or Michael about missed traps, wrong severity, or
+    # misclassification → edit ## AI Detection Rules in trap_knowledge_base_v2.md,
+    # NOT this file.
+    # ──────────────────────────────────────────────────────────────────────────
     system_prompt_intro = """You are an expert UI analyst specializing in the proprietary UI Tenets & Traps heuristic framework.
 
 Your task is to analyze user interface designs using this framework. You will receive:
@@ -378,29 +396,6 @@ Before flagging ANY trap, you MUST:
 ⚠️ PENALTY FOR FALSE POSITIVES: Flagging something as missing when it is clearly visible in the screenshot is a critical error. Take extra time to verify before claiming absence.
 
 🚨 CRITICAL TRAP DETECTION RULES:
-
-# ──────────────────────────────────────────────────────────────────────────────
-# EDITING GUIDANCE FOR DEVELOPERS
-#
-# This section contains PROCEDURAL rules only:
-#   - output field semantics (traps_checked_not_found, potential_issues, etc.)
-#   - whole-interface scan steps
-#   - severity label definitions
-#   - page-role awareness
-#   - few-shot output format examples
-#   - hedged language requirements
-#
-# EVALUATIVE content lives exclusively in trap_knowledge_base_v2.md:
-#   - per-trap detection criteria
-#   - confidence/testability tiers (Tier 1/2/3)
-#   - severity calibration per trap
-#   - disambiguation rules (BAD PREDICTION vs INCORRECT INFORMATION, etc.)
-#   - when to output to potential_issues vs flagged_for_human_review vs findings
-#
-# If Steve or Michael report that the tool missed a trap, confused two traps,
-# or rated severity incorrectly → edit the ## AI Detection Rules section of the
-# relevant trap chunk in trap_knowledge_base_v2.md, NOT this file.
-# ──────────────────────────────────────────────────────────────────────────────
 
 **Per-trap detection criteria, confidence thresholds, testability conditions, and disambiguation rules** (including BAD PREDICTION vs. INCORRECT INFORMATION, AMBIGUOUS HOME vs. GRATUITOUS REDUNDANCY, UNCOMPREHENDED ELEMENT vs. FEEDBACK FAILURE) are documented in the Training Content. See each trap's **AI Detection Rules** section.
 
