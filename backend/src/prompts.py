@@ -686,6 +686,7 @@ def build_user_message(
     frame_index: int = None,
     total_frames: int = None,
     verbosity: str = "standard",
+    version: str = "v2",
 ) -> list:
     """
     Build the user message with context and design file.
@@ -698,10 +699,12 @@ def build_user_message(
         is_multi_frame: Whether this is multi-frame analysis
         frame_index: Current frame index (1-indexed) for video/multi-frame
         total_frames: Total number of frames being analyzed
+        version: Knowledge base version — "v1" (26 traps) or "v2" (27 traps)
 
     Returns:
         List of message content blocks
     """
+    trap_count = "26" if version == "v1" else "27"
     # Check for expertise (optional, for backwards compatibility)
     has_expertise = bool(user_context.get('expertise'))
     # Numbering shifts by 1 if expertise is present
@@ -1080,7 +1083,7 @@ Begin your analysis now."""
     # Add the context and instructions
     content.append({
         "type": "text",
-        "text": context_text
+        "text": context_text.replace("__TRAP_COUNT__", trap_count)
     })
 
     return content

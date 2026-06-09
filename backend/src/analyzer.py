@@ -575,7 +575,7 @@ class UITrapsAnalyzer:
             image_data = self._load_image(design_file)
 
         user_message = build_user_message(
-            user_context, image_data, page_context, verbosity=verbosity
+            user_context, image_data, page_context, verbosity=verbosity, version=kb_version
         )
 
         if chat_context and chat_context.strip():
