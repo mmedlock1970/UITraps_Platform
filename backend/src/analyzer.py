@@ -8,12 +8,16 @@ This software is provided exclusively to authorized subscribers.
 Unauthorized reproduction, distribution, or use is prohibited.
 """
 import os
+import ast
 import base64
 import json
+import logging
 import time
 from typing import Dict, Any, List, Optional, Tuple
 from pathlib import Path
 from anthropic import Anthropic
+
+logger = logging.getLogger(__name__)
 
 try:
     from .validators import validate_file_format, validate_context, is_figma_url
@@ -630,22 +634,38 @@ class UITrapsAnalyzer:
                 if not isinstance(report.get('summary_narrative'), str):
                     report['summary_narrative'] = ''
                 for issue_field in ['critical_issues', 'moderate_issues', 'minor_issues']:
-                    if isinstance(report[issue_field], str):
+                    val = report.get(issue_field)
+                    if isinstance(val, str):
+                        # Claude sometimes JSON-encodes array fields as strings.
+                        # Try json.loads first, then ast.literal_eval as fallback.
+                        parsed = None
                         try:
-                            report[issue_field] = json.loads(report[issue_field])
-                        except (json.JSONDecodeError, TypeError):
-                            pass
-                    if not isinstance(report[issue_field], list):
-                        raise ValueError(f"{issue_field} must be an array")
+                            parsed = json.loads(val)
+                        except (json.JSONDecodeError, ValueError):
+                            try:
+                                parsed = ast.literal_eval(val)
+                            except (ValueError, SyntaxError):
+                                logger.warning(
+                                    f"Could not parse {issue_field} as JSON or literal; "
+                                    f"treating as empty. First 300 chars: {val[:300]!r}"
+                                )
+                        report[issue_field] = parsed if isinstance(parsed, list) else []
+                    elif not isinstance(val, list):
+                        report[issue_field] = []
                 for opt_field in ['positive_observations', 'potential_issues',
                                   'traps_checked_not_found', 'flagged_for_human_review',
                                   'incomplete_flow_findings']:
                     val = report.get(opt_field)
                     if isinstance(val, str):
+                        parsed = None
                         try:
-                            report[opt_field] = json.loads(val)
-                        except (json.JSONDecodeError, TypeError):
-                            report[opt_field] = []
+                            parsed = json.loads(val)
+                        except (json.JSONDecodeError, ValueError):
+                            try:
+                                parsed = ast.literal_eval(val)
+                            except (ValueError, SyntaxError):
+                                pass
+                        report[opt_field] = parsed if isinstance(parsed, list) else []
                     elif not isinstance(val, list):
                         report[opt_field] = []
         except Exception as e:
