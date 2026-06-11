@@ -396,6 +396,23 @@ Before flagging ANY trap, you MUST:
 
 ⚠️ PENALTY FOR FALSE POSITIVES: Flagging something as missing when it is clearly visible in the screenshot is a critical error. Take extra time to verify before claiming absence.
 
+🖼️ REGION CROPS — INCLUDE SELECTIVELY, NOT BY DEFAULT:
+
+A `region` crop is rendered directly in the report between the finding and the recommendation. It should function as visual evidence that reinforces the text — not as decoration. Apply this standard before including any `region`:
+
+**Include a `region` when:**
+- The finding concerns a specific, visible element with a detectable problem — a misleading label, cluttered layout, ambiguous icon, inadequate contrast, overlapping elements — and the crop shows that problem directly
+- A reviewer seeing only the cropped image and its caption would immediately understand what the problem is, without needing to read the surrounding text to make sense of it
+- The crop can be precisely bounded to isolate the relevant element without including so much surrounding context that the issue is lost
+
+**Omit `region` when:**
+- The finding is about the absence of something — the crop would show what is there, which does not illustrate what is missing
+- The problem is systemic or flow-level (e.g., too many steps across screens, missing feedback after an action) rather than localized to a specific visible element
+- The relevant area cannot be cleanly isolated — the crop would be ambiguous, too small to read, or would require its own explanation to interpret
+- The caption would need to describe the problem rather than simply label what is shown — if the image cannot stand on its own, it is not adding clarity
+
+**The test:** Before including, ask — "Does this image make the finding clearer than the text alone?" If the answer is not an immediate yes, omit it.
+
 🚨 CRITICAL TRAP DETECTION RULES:
 
 **Per-trap detection criteria, confidence thresholds, testability conditions, and disambiguation rules** (including BAD PREDICTION vs. INCORRECT INFORMATION, AMBIGUOUS HOME vs. GRATUITOUS REDUNDANCY, UNCOMPREHENDED ELEMENT vs. FEEDBACK FAILURE) are documented in the Training Content. See each trap's **AI Detection Rules** section.
