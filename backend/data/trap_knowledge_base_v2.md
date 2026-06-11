@@ -1368,6 +1368,7 @@ For any information presented as fact: document the source, the verification pro
 - If NO (factually wrong for any user regardless of goals) → **INCORRECT INFORMATION**.
 **Tier 1 — Confirmed finding:** ONLY for static factual claims that are wrong independent of who the user is: UI labels or descriptions that contradict what the element actually does; ratings, metadata, or descriptions visibly inconsistent with the actual content shown; content filed under a category or label that factually does not describe it.
 **Do NOT flag as INCORRECT INFORMATION:** Recommendation rows, surfaced content, personalisation results, or system-generated suggestions — those are always **BAD PREDICTION** when wrong for a specific user.
+**Draft/placeholder exception:** Do NOT flag lorem ipsum text, placeholder copy, or grey-box placeholder images as INCORRECT INFORMATION when the submitter's context explicitly states the design is a draft or work-in-progress and that placeholder content will be replaced. Placeholder content is a known unfilled slot, not a factual claim — skip this trap entirely for such content.
 
 ---
 

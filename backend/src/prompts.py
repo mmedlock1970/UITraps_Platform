@@ -227,6 +227,7 @@ Bugs are TECHNICAL FAILURES, not usability issues. Report these separately in `b
    - Empty lists that should have items
    - Placeholder text still showing ("[Title]", "Lorem ipsum")
    - Missing images where images should be
+   - EXCEPTION: If the submitter's context explicitly states the design is a draft or work-in-progress and that placeholder content will be replaced, do NOT flag lorem ipsum text or placeholder images as missing_content bugs.
 
 4. **partial_load**: Page is partially loaded
    - Some elements visible, others missing
@@ -611,9 +612,9 @@ You may ONLY use these exact trap names. Do NOT invent, abbreviate, combine, or 
 Every finding in critical_issues, moderate_issues, and minor_issues MUST use one of these names verbatim in the `trap_name` field. If a name is not in this list, it is not a UI Trap — full stop.
 
 WHEN SOMETHING DOESN'T FIT A TRAP — apply this decision tree in order:
-1. First, try to map it to the closest existing trap. Example: placeholder content visible to users → INCORRECT INFORMATION (content wrong for any user regardless of goals). Content that actively misleads this user → BAD PREDICTION. An element that prevents task completion → INVISIBLE ELEMENT.
+1. First, try to map it to the closest existing trap. Example: placeholder content visible to users → INCORRECT INFORMATION (content wrong for any user regardless of goals), UNLESS the submitter has explicitly stated the design is a draft and placeholder content will be replaced — in that case skip it entirely (not a trap, not a bug). Content that actively misleads this user → BAD PREDICTION. An element that prevents task completion → INVISIBLE ELEMENT.
 2. If it is a technical failure (missing content, broken layout, error state, placeholder text) → report it in bugs_detected, NOT as a trap.
-3. If the interface explicitly signals unfinished work (e.g., "[content to be added]", draft markers, "coming soon" labels) → report it in bugs_detected with type "missing_content". Do NOT report it as a UI Trap — the design is openly marking work in progress, not making a false or misleading claim.
+3. If the interface explicitly signals unfinished work (e.g., "[content to be added]", draft markers, "coming soon" labels) → report it in bugs_detected with type "missing_content". Do NOT report it as a UI Trap — the design is openly marking work in progress, not making a false or misleading claim. EXCEPTION: If the submitter has also stated in their context that the design is a draft and that placeholder content will be replaced, do NOT flag lorem ipsum text or placeholder images as bugs_detected either — skip them entirely.
 4. If it is a genuine UX concern but cannot be mapped to any canonical trap → include it in potential_issues with a clear observation. Leave trap_name blank or omit it. Never invent a trap name to describe it.
 
 FORBIDDEN — these are NOT trap names and must never appear in findings: MISSING_CONTENT, INCOMPLETE_CONTENT, NO_CONTENT, PLACEHOLDER_CONTENT, BROKEN_FLOW, EMPTY_STATE, or any other name not in the canonical list above. Inventing a trap name is always wrong, regardless of how well the invented name describes the issue.
@@ -1012,18 +1013,23 @@ USE ENVIRONMENT:
     _multi_task = len(_task_list) > 1
     if _multi_task:
         _task_lines = []
+        _task_ids = []
         for _idx, _t in enumerate(_task_list, 1):
             _name = _t.get('name', '').strip()
             _desc = _t.get('description', '').strip()
-            _task_lines.append(f"{_idx}. {(_name + ': ' + _desc) if _name else _desc}")
+            # Use name if provided, otherwise description — must match formatter's task_names logic
+            _task_id = _name if _name else (_desc or f'Task {_idx}')
+            _task_ids.append(_task_id)
+            # Named task: show [name] + description. Unnamed: description IS the identifier.
+            _task_lines.append(f"[{_task_id}] {_desc}" if _name else _task_id)
         _tasks_block = '\n'.join(_task_lines)
         _task_attribution = (
             "\n⚠️ MULTI-TASK ATTRIBUTION: Multiple tasks are defined above. "
             "For every finding in critical_issues, moderate_issues, and minor_issues, "
-            "set the `task` field to the exact task name it most directly applies to "
-            "(use the name exactly as written above, e.g. 'Checkout', not a paraphrase), "
-            "or to 'general' if the issue applies equally across all tasks or is not "
-            "task-specific. Every issue must have a `task` field when multiple tasks are defined."
+            "set the `task` field to one of these exact identifiers: "
+            + ', '.join(f'"{tid}"' for tid in _task_ids)
+            + '. Or set it to "general" if the issue applies equally across all tasks or is not '
+            "task-specific. Copy the identifier exactly — do not paraphrase or use the full description."
         )
     else:
         _tasks_block = user_context['tasks']

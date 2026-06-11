@@ -2458,7 +2458,7 @@ def format_report_as_html(
         html.append("<p class='none-found'>No confirmed traps found ✓</p>")
     elif _multi_task:
         task_names = [
-            (t.get('name') or '').strip() or f'Task {i + 1}'
+            (t.get('name') or '').strip() or (t.get('description') or '').strip() or f'Task {i + 1}'
             for i, t in enumerate(_task_list)
         ]
 
@@ -2504,7 +2504,8 @@ def format_report_as_html(
 
         if general_issues:
             html.append("<h3 class='task-section-header'>General Findings</h3>")
-            html.append("<p class='task-section-desc'>These findings apply across all tasks or are not task-specific.</p>")
+            _tasks_label = ' and '.join(f'<em>{tn}</em>' for tn in task_names)
+            html.append(f"<p class='task-section-desc'>These findings apply equally across all tasks ({_tasks_label}) or are not specific to any one task.</p>")
             _render_confidence_group(general_issues)
 
         for tn in task_names:

@@ -227,6 +227,21 @@
   background: var(--uitraps-bg);
 }
 
+/* Neutralize browser autofill blue so all inputs look consistent */
+.input:-webkit-autofill,
+.input:-webkit-autofill:hover,
+.input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px var(--uitraps-bg-secondary) inset;
+  -webkit-text-fill-color: var(--uitraps-text);
+  border-color: var(--uitraps-border-focus);
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Task inputs with content get a blue border — confirms the entry "took" */
+.taskRow .input:not(:placeholder-shown) {
+  border-color: var(--uitraps-border-focus);
+}
+
 .inputError {
   border-color: #e05c1a !important;
 }
