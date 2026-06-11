@@ -987,25 +987,29 @@ async def list_saved_reports(
 ):
     """List saved analysis reports for the authenticated user (DB-backed)."""
     user_id = str(user.get("id") or user.get("userId", ""))
-    with Session(engine) as session:
-        rows = session.exec(
-            select(AnalysisReport)
-            .where(AnalysisReport.user_id == user_id)
-            .order_by(AnalysisReport.timestamp.desc())
-            .limit(limit)
-        ).all()
-        reports = [
-            {
-                "id": r.id,
-                "timestamp": r.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-                "analysis_type": r.analysis_type,
-                "design_name": r.design_name,
-                "file_name": r.file_name,
-                "statistics": json.loads(r.statistics) if r.statistics else None,
-            }
-            for r in rows
-        ]
-    return {"success": True, "reports": reports, "count": len(reports)}
+    try:
+        with Session(engine) as session:
+            rows = session.exec(
+                select(AnalysisReport)
+                .where(AnalysisReport.user_id == user_id)
+                .order_by(AnalysisReport.timestamp.desc())
+                .limit(limit)
+            ).all()
+            reports = [
+                {
+                    "id": r.id,
+                    "timestamp": r.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+                    "analysis_type": r.analysis_type,
+                    "design_name": r.design_name,
+                    "file_name": r.file_name,
+                    "statistics": json.loads(r.statistics) if r.statistics else None,
+                }
+                for r in rows
+            ]
+        return {"success": True, "reports": reports, "count": len(reports)}
+    except Exception as _db_err:
+        logger.warning("Database unavailable for /reports: %s", _db_err)
+        return {"success": True, "reports": [], "count": 0, "db_unavailable": True}
 
 
 @app.get("/reports/{report_id}")
@@ -1015,26 +1019,32 @@ async def get_saved_report(
 ):
     """Retrieve a specific saved report by ID (DB-backed)."""
     user_id = str(user.get("id") or user.get("userId", ""))
-    with Session(engine) as session:
-        report = session.get(AnalysisReport, report_id)
-        if report is None:
-            raise HTTPException(status_code=404, detail="Report not found")
-        if report.user_id != user_id:
-            raise HTTPException(status_code=403, detail="Access denied")
-        result = {
-            "success": True,
-            "report": {
-                "id": report.id,
-                "timestamp": report.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-                "analysis_type": report.analysis_type,
-                "design_name": report.design_name,
-                "file_name": report.file_name,
-                "html": report.html,
-                "markdown": report.markdown,
-                "statistics": json.loads(report.statistics) if report.statistics else None,
+    try:
+        with Session(engine) as session:
+            report = session.get(AnalysisReport, report_id)
+            if report is None:
+                raise HTTPException(status_code=404, detail="Report not found")
+            if report.user_id != user_id:
+                raise HTTPException(status_code=403, detail="Access denied")
+            result = {
+                "success": True,
+                "report": {
+                    "id": report.id,
+                    "timestamp": report.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+                    "analysis_type": report.analysis_type,
+                    "design_name": report.design_name,
+                    "file_name": report.file_name,
+                    "html": report.html,
+                    "markdown": report.markdown,
+                    "statistics": json.loads(report.statistics) if report.statistics else None,
+                }
             }
-        }
-    return result
+        return result
+    except HTTPException:
+        raise
+    except Exception as _db_err:
+        logger.warning("Database unavailable for /reports/%s: %s", report_id, _db_err)
+        raise HTTPException(status_code=503, detail="Report storage is temporarily unavailable.")
 
 
 # ===========================================================
