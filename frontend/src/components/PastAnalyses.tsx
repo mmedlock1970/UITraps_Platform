@@ -63,6 +63,7 @@ export const PastAnalyses: React.FC<PastAnalysesProps> = ({
   const [serverReports, setServerReports] = useState<ServerReport[]>([]);
   const [serverLoading, setServerLoading] = useState(false);
   const [serverError, setServerError] = useState('');
+  const [dbUnavailable, setDbUnavailable] = useState(false);
   const [loadingReportId, setLoadingReportId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -73,8 +74,12 @@ export const PastAnalyses: React.FC<PastAnalysesProps> = ({
     })
       .then(r => r.json())
       .then(data => {
-        if (data.success) setServerReports(data.reports);
-        else setServerError('Could not load reports from server.');
+        if (data.success) {
+          setServerReports(data.reports);
+          if (data.db_unavailable) setDbUnavailable(true);
+        } else {
+          setServerError('Could not load reports from server.');
+        }
       })
       .catch(() => setServerError('Could not reach server.'))
       .finally(() => setServerLoading(false));
@@ -136,8 +141,13 @@ export const PastAnalyses: React.FC<PastAnalysesProps> = ({
 
         {serverLoading && <p style={{ padding: '16px', color: 'var(--uitraps-text-secondary)' }}>Loading…</p>}
         {serverError && <p style={{ padding: '16px', color: 'var(--uitraps-error)' }}>{serverError}</p>}
+        {dbUnavailable && (
+          <p style={{ padding: '12px 16px', margin: '0 0 8px', background: 'var(--uitraps-bg-secondary)', borderRadius: '8px', fontSize: '0.88em', color: 'var(--uitraps-text-secondary)' }}>
+            Report storage is temporarily unavailable — analyses run during this time won't be saved. Showing any locally cached analyses below.
+          </p>
+        )}
 
-        {!serverLoading && !serverError && serverReports.length === 0 && (
+        {!serverLoading && !serverError && serverReports.length === 0 && !dbUnavailable && (
           <div className={styles.empty}>
             <div className={styles.emptyTitle}>No Past Analyses</div>
             <p className={styles.emptyText}>Your completed analyses will appear here.</p>
@@ -177,6 +187,41 @@ export const PastAnalyses: React.FC<PastAnalysesProps> = ({
             </div>
           ))}
         </div>
+
+        {dbUnavailable && localAnalyses.length > 0 && (
+          <div className={styles.list}>
+            {localAnalyses.map(analysis => (
+              <div key={analysis.id} className={styles.card}>
+                <div className={styles.cardName}>{getDisplayName(analysis)}</div>
+                <div className={styles.cardDate}>{formatDate(analysis.timestamp)}</div>
+                {analysis.statistics && (
+                  <div className={styles.statsRow}>
+                    {analysis.statistics.critical_count > 0 && (
+                      <span className={`${styles.statBadge} ${styles.critical}`}>{analysis.statistics.critical_count} Critical</span>
+                    )}
+                    {analysis.statistics.moderate_count > 0 && (
+                      <span className={`${styles.statBadge} ${styles.moderate}`}>{analysis.statistics.moderate_count} Moderate</span>
+                    )}
+                    {analysis.statistics.minor_count > 0 && (
+                      <span className={`${styles.statBadge} ${styles.minor}`}>{analysis.statistics.minor_count} Minor</span>
+                    )}
+                    {analysis.statistics.positive_count > 0 && (
+                      <span className={`${styles.statBadge} ${styles.positive}`}>{analysis.statistics.positive_count} Positive</span>
+                    )}
+                  </div>
+                )}
+                <div className={styles.cardActions}>
+                  <button className={styles.viewButton} onClick={() => onViewReport(analysis)}>View Report</button>
+                  {onReuseSettings && analysis.formSnapshot && (
+                    <button className={styles.downloadButton} onClick={() => onReuseSettings(analysis)}>Re-use settings</button>
+                  )}
+                  <button className={styles.downloadButton} onClick={() => handleDownloadLocal(analysis)}>Download</button>
+                  <button className={styles.deleteButton} onClick={() => handleDeleteLocal(analysis.id)}>Delete</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   }
