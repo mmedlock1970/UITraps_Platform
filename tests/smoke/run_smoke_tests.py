@@ -26,6 +26,7 @@ import json
 import os
 import re
 import sys
+import threading
 import time
 from typing import Callable, Optional
 
@@ -189,18 +190,38 @@ class _Result:
 def _run(name: str, fn: Callable) -> _Result:
     print(f"  {B}{name}{X}")
     t0 = time.time()
+    stop = threading.Event()
+
+    def _ticker():
+        while not stop.wait(1.0):
+            elapsed = time.time() - t0
+            sys.stdout.write(f"\r    ⏱  {elapsed:.0f}s")
+            sys.stdout.flush()
+
+    ticker = threading.Thread(target=_ticker, daemon=True)
+    ticker.start()
+
     try:
         fn()
+        stop.set()
+        ticker.join()
         dur = time.time() - t0
-        print(f"    {G}✓  passed{X} ({dur:.1f}s)\n")
+        sys.stdout.write(f"\r    {G}✓  passed{X} ({dur:.1f}s)\n\n")
+        sys.stdout.flush()
         return _Result(name, True, duration=dur)
     except AssertionError as e:
+        stop.set()
+        ticker.join()
         dur = time.time() - t0
-        print(f"    {R}✗  FAILED:{X} {e} ({dur:.1f}s)\n")
+        sys.stdout.write(f"\r    {R}✗  FAILED:{X} {e} ({dur:.1f}s)\n\n")
+        sys.stdout.flush()
         return _Result(name, False, str(e), dur)
     except Exception as e:
+        stop.set()
+        ticker.join()
         dur = time.time() - t0
-        print(f"    {R}✗  ERROR:{X} {type(e).__name__}: {e} ({dur:.1f}s)\n")
+        sys.stdout.write(f"\r    {R}✗  ERROR:{X} {type(e).__name__}: {e} ({dur:.1f}s)\n\n")
+        sys.stdout.flush()
         return _Result(name, False, f"{type(e).__name__}: {e}", dur)
 
 
