@@ -206,6 +206,16 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
     setTasks(prev => prev.map((t, i) => i === index ? { ...t, [field]: value } : t));
   }, []);
 
+  const moveTask = useCallback((index: number, direction: -1 | 1) => {
+    setTasks(prev => {
+      const next = [...prev];
+      const target = index + direction;
+      if (target < 0 || target >= next.length) return prev;
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  }, []);
+
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState(false);
 
@@ -664,6 +674,24 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
               {tasks.map((task, i) => (
                 <div key={i} className={styles.taskRow}>
                   <div className={styles.taskDescRow}>
+                    {tasks.length > 1 && (
+                      <div className={styles.taskReorderBtns}>
+                        <button
+                          type="button"
+                          className={styles.taskReorderBtn}
+                          onClick={() => moveTask(i, -1)}
+                          disabled={disabled || i === 0}
+                          title="Move up"
+                        >▲</button>
+                        <button
+                          type="button"
+                          className={styles.taskReorderBtn}
+                          onClick={() => moveTask(i, 1)}
+                          disabled={disabled || i === tasks.length - 1}
+                          title="Move down"
+                        >▼</button>
+                      </div>
+                    )}
                     <input
                       id={i === 0 ? 'userGoal' : undefined}
                       type="text"
