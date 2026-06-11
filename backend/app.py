@@ -156,7 +156,14 @@ def _friendly_api_error(e: Exception) -> HTTPException:
 
 
 # --- Initialize Database ---
-init_db()  # Create tables if they don't exist
+try:
+    init_db()  # Create tables if they don't exist
+except Exception as _db_init_err:
+    import logging as _logging
+    _logging.getLogger(__name__).warning(
+        f"Database unavailable at startup — analysis will still work, "
+        f"but report persistence and usage tracking are disabled. Error: {_db_init_err}"
+    )
 
 
 def _save_report_db(user_id: str, result: dict, analysis_type: str,
