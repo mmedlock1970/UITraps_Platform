@@ -1968,6 +1968,21 @@ def format_report_as_html(
             border-bottom: 1px solid #e4e1dc;
         }
         .confidence-group-header:first-of-type { margin-top: 8px; }
+        .task-section-header {
+            font-size: 1.05em;
+            font-weight: 700;
+            color: #2c2a27;
+            margin: 80px 0 4px;
+            padding-top: 24px;
+            padding-bottom: 6px;
+            border-top: 1px solid #e4e1dc;
+            border-bottom: 2px solid #e4e1dc;
+        }
+        .task-section-desc {
+            color: #8a8680;
+            font-size: 0.88em;
+            margin: 0 0 14px;
+        }
         .traps-not-found {
             padding: 22px 24px;
             border-radius: 14px;
