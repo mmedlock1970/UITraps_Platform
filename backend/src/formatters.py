@@ -944,8 +944,11 @@ def get_report_base_css() -> str:
         }
         .issue-region-img {
             display: block;
-            width: 100%;
+            max-width: 100%;
+            max-height: 260px;
+            width: auto;
             height: auto;
+            margin: 0 auto;
         }
         .issue-region-caption {
             display: block;
@@ -1039,10 +1042,10 @@ def get_report_base_css() -> str:
             z-index: 1;
         }
         .card-img-float:hover {
-            transform: scale(1.8);
+            transform: scale(1.3);
             transform-origin: top left;
             z-index: 100;
-            box-shadow: 0 8px 28px rgba(0,0,0,0.28);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.22);
         }
         .issue-card-body {
             flex: 1;
@@ -1184,8 +1187,10 @@ def get_report_base_css() -> str:
             font-size: 1.05em;
             font-weight: 700;
             color: #2c2a27;
-            margin: 48px 0 4px;
+            margin: 80px 0 4px;
+            padding-top: 24px;
             padding-bottom: 6px;
+            border-top: 1px solid #e4e1dc;
             border-bottom: 2px solid #e4e1dc;
         }
         .task-section-desc {
@@ -1755,8 +1760,11 @@ def format_report_as_html(
         }
         .issue-region-img {
             display: block;
-            width: 100%;
+            max-width: 100%;
+            max-height: 260px;
+            width: auto;
             height: auto;
+            margin: 0 auto;
         }
         .issue-region-caption {
             display: block;
@@ -1854,10 +1862,10 @@ def format_report_as_html(
             z-index: 1;
         }
         .card-img-float:hover {
-            transform: scale(1.8);
+            transform: scale(1.3);
             transform-origin: top left;
             z-index: 100;
-            box-shadow: 0 8px 28px rgba(0,0,0,0.28);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.22);
         }
         /* Content column — takes remaining width, never wraps under image */
         .issue-card-body {

@@ -138,9 +138,14 @@ export const App: React.FC = () => {
   // ?theme=light|dark   → sets initial theme, hides toggle
   // postMessage { type: 'uitraps-theme', theme: 'light'|'dark' } → live theme updates
   const _params = new URLSearchParams(window.location.search);
-  const [theme, setTheme] = useState<'light' | 'dark'>(() =>
-    _params.get('theme') === 'dark' ? 'dark' : 'light'
-  );
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const p = _params.get('theme');
+    if (p === 'dark') return 'dark';
+    if (p === 'light') return 'light';
+    // Fall back to OS preference so the iframe inherits the user's system theme
+    // (which typically matches the WordPress site theme)
+    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  });
   const [externalTheme, setExternalTheme] = useState(() => _params.has('theme'));
   const [externalMode] = useState(() => _params.has('mode'));
   const [apiEndpoint] = useState(DEFAULT_API_ENDPOINT);
@@ -230,6 +235,15 @@ export const App: React.FC = () => {
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, [auth.setToken]);
+
+  // Signal to the parent WordPress page that the iframe is mounted and listening.
+  // WordPress should respond with { type: 'uitraps-theme', theme: 'dark'|'light' }
+  // to set the theme reliably (avoids the race where the message arrives before this listener).
+  useEffect(() => {
+    if (window.self !== window.top) {
+      window.parent.postMessage({ type: 'uitraps-ready' }, '*');
+    }
+  }, []);
 
   // When embedded in an iframe, the global CSS (html[data-embed]) sets height:auto /
   // overflow:visible on the wrappers, so document.documentElement.scrollHeight correctly
