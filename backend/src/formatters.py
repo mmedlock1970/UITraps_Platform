@@ -1148,7 +1148,7 @@ def get_report_base_css() -> str:
             font-size: 1.05em;
             font-weight: 700;
             color: #2c2a27;
-            margin: 28px 0 4px;
+            margin: 48px 0 4px;
             padding-bottom: 6px;
             border-bottom: 2px solid #e4e1dc;
         }
