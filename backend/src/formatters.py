@@ -937,6 +937,7 @@ def get_report_base_css() -> str:
         }
         .issue-region-figure {
             margin: 14px 0 10px;
+            max-width: 380px;
             border: 1px solid #e4e1dc;
             border-radius: 6px;
             overflow: hidden;
@@ -944,11 +945,9 @@ def get_report_base_css() -> str:
         }
         .issue-region-img {
             display: block;
-            max-width: 380px;
+            width: 100%;
             max-height: 220px;
-            width: auto;
             height: auto;
-            margin: 0 auto;
         }
         .issue-region-caption {
             display: block;
@@ -1753,6 +1752,7 @@ def format_report_as_html(
         /* Region screenshot figure */
         .issue-region-figure {
             margin: 14px 0 10px;
+            max-width: 380px;
             border: 1px solid #e4e1dc;
             border-radius: 6px;
             overflow: hidden;
@@ -1760,11 +1760,9 @@ def format_report_as_html(
         }
         .issue-region-img {
             display: block;
-            max-width: 380px;
+            width: 100%;
             max-height: 220px;
-            width: auto;
             height: auto;
-            margin: 0 auto;
         }
         .issue-region-caption {
             display: block;
