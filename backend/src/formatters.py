@@ -1133,6 +1133,42 @@ def get_report_base_css() -> str:
         .potential-issues-section .issue-card.potential {
             border-left-color: #e05c1a;
         }
+        .bug-card {
+            background: #ffffff;
+            border: 1px solid #e4e1dc;
+            border-left: 4px solid #e91e63;
+            border-radius: 10px;
+            padding: 16px 20px;
+            margin: 12px 0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        }
+        .bug-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+        .bug-type-badge {
+            font-size: 0.78em;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            background: #fce4ec;
+            color: #c2185b;
+            padding: 3px 10px;
+            border-radius: 4px;
+        }
+        .bug-confidence {
+            font-size: 0.78em;
+            color: #8a8680;
+            font-style: italic;
+        }
+        .bug-field {
+            font-size: 0.9em;
+            color: #333;
+            margin: 7px 0;
+            line-height: 1.5;
+        }
         .confidence-group-header {
             font-size: 0.78em;
             font-weight: 700;
@@ -2559,7 +2595,7 @@ def format_report_as_html(
         html.append("<h2>🐛 Technical Bugs Detected</h2>")
         html.append("<p><em>These are technical issues or broken states, not UI Traps. They represent system failures that should be fixed regardless of usability.</em></p>")
         for bug in report['bugs_detected']:
-            html.append("<div class='issue-card' style='border-left-color: #e91e63;'>")
+            html.append("<div class='bug-card'>")
 
             # Show frame reference if available
             has_frame_info = 'frame_index' in bug or 'frame_indices' in bug or 'frame' in bug
@@ -2582,12 +2618,17 @@ def format_report_as_html(
                 html.append("</div>")
 
             bug_type_display = bug.get('bug_type', 'unknown').replace('_', ' ').title()
-            html.append(f"<p><strong>Bug Type:</strong> <strong>{bug_type_display}</strong></p>")
-            html.append(f"<p><strong>Where:</strong> {bug.get('location', 'N/A')}</p>")
-            html.append(f"<p><strong>Description:</strong> {bug.get('description', 'N/A')}</p>")
+            confidence = bug.get('confidence', 'medium').capitalize()
+            html.append(f"""
+                <div class='bug-card-header'>
+                    <span class='bug-type-badge'>{bug_type_display}</span>
+                    <span class='bug-confidence'>Confidence: {confidence}</span>
+                </div>
+                <div class='bug-field'><strong>Where:</strong> {bug.get('location', 'N/A')}</div>
+                <div class='bug-field'><strong>Description:</strong> {bug.get('description', 'N/A')}</div>
+            """)
             if bug.get('possible_cause'):
-                html.append(f"<p><strong>Possible Cause:</strong> {bug['possible_cause']}</p>")
-            html.append(f"<p class='confidence'><em>Confidence: {bug.get('confidence', 'medium')}</em></p>")
+                html.append(f"<div class='bug-field'><strong>Possible Cause:</strong> {bug['possible_cause']}</div>")
             html.append("</div>")
         html.append("</div>")
 
