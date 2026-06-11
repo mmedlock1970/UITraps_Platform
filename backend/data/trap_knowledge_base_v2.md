@@ -268,6 +268,8 @@ Make the action visible — almost always the easier and more reliable path. If 
 **Tier 2 — Output to `potential_issues`, confidence "medium":** When a core task identified in the user context has no visible means of completion anywhere in the artifact AND no alternative visible path exists. Flag: "No visible cue signals how to achieve [goal]. If users lack prior learning for an alternative interaction, this is a candidate Invisible Element."
 **`testable: false`:** All other instances — evaluating whether users have relevant prior learning requires user population knowledge not available from the artifact alone.
 
+**Distinguish from Unnecessary Steps — apply before classifying:** When the primary task path is absent from the screen because a prerequisite gate (authentication, registration, paywall, mandatory consent) is blocking access to it, this is NOT Invisible Element. The issue is not that a mechanism is hidden — it is that the system has imposed a required step before the path becomes available. If that prerequisite is not clearly justified, classify as Unnecessary Steps instead. Invisible Element requires that the path exists in the system but lacks visible communication; a blocked or gated path is a step-count problem, not a visibility problem.
+
 ---
 
 # CHUNK: EFFECTIVELY INVISIBLE ELEMENT
@@ -1147,6 +1149,8 @@ For navigation hierarchy: surface high-frequency functions to persistent navigat
 **Tier 2 — Requires complete task flows:** Steps can happen between the screenshots provided — a step visible in the artifact may be justified by context not shown. Flag when a step appears to add no value, but include the caveat: "Based on provided screenshots. Additional steps in the flow may provide context that justifies this step."
 Output to `potential_issues`, confidence "medium".
 **`testable: false`:** Whether the step is genuinely unnecessary requires seeing the full flow.
+
+**Forced prerequisite gates (Tier 2):** When the artifact shows that users must complete a prerequisite step — authentication, account registration, paywall, or mandatory consent — before they can access core functionality or primary content, flag as a potential Unnecessary Step if: (1) the core function does not technically require that prerequisite to work, OR (2) an unauthenticated or guest path would reasonably serve the user's stated goal. Flag: "Users must complete [prerequisite] before they can [core task]. Confirm whether this gate is technically required or a business/organizational decision that could be made optional or deferred." Do NOT classify this as Invisible Element — the task path is not hidden; it is blocked by a required step. This disambiguation is critical.
 
 ---
 
