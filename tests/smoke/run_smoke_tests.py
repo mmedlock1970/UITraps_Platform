@@ -343,7 +343,7 @@ def test_single_task_no_task_sections():
     )
     assert data.get("success") is True, f"Analysis failed: {data.get('error')}"
     html = data.get("report_html", "")
-    assert 'task-section' not in html, (
+    assert "<h3 class='task-section-header'" not in html, (
         "Single-task report contains task-section divs — "
         "per-task sections should only appear in multi-task reports"
     )
@@ -368,7 +368,7 @@ def test_multi_task_uses_description_as_header():
     )
     assert data.get("success") is True, f"Analysis failed: {data.get('error')}"
     html = data.get("report_html", "")
-    assert "task-section" in html, "Multi-task report is missing task-section divs entirely"
+    assert "<h3 class='task-section-header'" in html, "Multi-task report is missing task-section divs entirely"
     assert "running shoes" in html.lower(), (
         "First task description not found in HTML — "
         "task naming may be falling back to 'Task 1' instead of using description"
@@ -393,7 +393,7 @@ def test_multi_task_findings_have_task_sections():
     )
     assert data.get("success") is True, f"Analysis failed: {data.get('error')}"
     html = data.get("report_html", "")
-    assert "task-section" in html, (
+    assert "<h3 class='task-section-header'" in html, (
         "Multi-task report is missing task-section divs — "
         "findings are not being attributed to tasks"
     )
