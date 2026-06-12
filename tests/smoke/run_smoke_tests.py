@@ -57,6 +57,32 @@ if os.path.exists(_env_file):
 ANALYZER_URL = os.environ.get("ANALYZER_URL", "").rstrip("/")
 ANALYZER_TOKEN = os.environ.get("ANALYZER_TOKEN", "")
 
+
+def _check_token_expiry(token: str) -> None:
+    """Decode JWT exp claim (no signature check) and abort if expired."""
+    if not token:
+        return
+    try:
+        import base64, json as _json
+        parts = token.split(".")
+        if len(parts) != 3:
+            return
+        payload_b64 = parts[1] + "=="  # re-pad
+        payload = _json.loads(base64.urlsafe_b64decode(payload_b64))
+        exp = payload.get("exp")
+        if exp and time.time() > exp:
+            expired_at = time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(exp))
+            print(f"\n{R}Error: Token expired at {expired_at}.{X}")
+            print("Get a fresh token:")
+            print("  1. Open the WordPress staging site")
+            print("  2. DevTools → Network → filter 'railway' → clear log (🚫)")
+            print("  3. Click Past Analyses → copy Bearer value from /reports request")
+            print("  4. Paste new token into tests/smoke/.env.test\n")
+            sys.exit(1)
+    except Exception:
+        pass  # malformed token — let the server reject it
+
+
 # ─── Terminal colors ──────────────────────────────────────────────────────────
 
 G = "\033[92m"  # green
@@ -431,6 +457,8 @@ def main():
     print(f"Backend : {ANALYZER_URL or f'{R}not set{X}'}")
     print(f"Token   : {'set' if ANALYZER_TOKEN else f'{Y}not set — auth tests will fail{X}'}")
     print()
+
+    _check_token_expiry(ANALYZER_TOKEN)
 
     if not ANALYZER_URL:
         print(f"{R}Error: ANALYZER_URL is not set.{X}")
