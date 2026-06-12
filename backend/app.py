@@ -1919,14 +1919,16 @@ async def unified_ask(
     intent = detect_intent(message, files, users, tasks, format, figma_url=figma_url, input_type=input_type)
 
     # For analysis requests, check subscription and consume a token
-    # Skip in dev mode (DEV_MODE=true in .env) to allow local testing without a subscription record
+    # Skip in dev mode (DEV_MODE=true in .env) or for smoke-test user IDs (SMOKE_TEST_USER_IDS env var)
     _dev_mode = os.environ.get("DEV_MODE", "false").lower() in ("true", "1", "yes")
+    _smoke_users = {u.strip() for u in os.environ.get("SMOKE_TEST_USER_IDS", "").split(",") if u.strip()}
     if intent.mode in (IntentMode.ANALYSIS, IntentMode.HYBRID, IntentMode.URL_ANALYSIS) and not _dev_mode:
         user_id = str(user.get("id") or user.get("userId", ""))
-        with Session(engine) as session:
-            allowed, reason = check_and_consume_token(session, user_id)
-        if not allowed:
-            raise HTTPException(status_code=402, detail=reason)
+        if user_id not in _smoke_users:
+            with Session(engine) as session:
+                allowed, reason = check_and_consume_token(session, user_id)
+            if not allowed:
+                raise HTTPException(status_code=402, detail=reason)
 
     if intent.mode == IntentMode.CHAT:
         # --- Pure chat ---
