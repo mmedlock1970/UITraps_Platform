@@ -199,7 +199,12 @@ def post_analysis(
         headers=_auth_headers(),
         timeout=180,
     )
-    resp.raise_for_status()
+    if not resp.ok:
+        try:
+            detail = resp.json().get("detail", resp.text)
+        except Exception:
+            detail = resp.text
+        raise AssertionError(f"HTTP {resp.status_code} from /api/ask: {detail}")
     return resp.json()
 
 

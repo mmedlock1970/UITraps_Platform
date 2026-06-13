@@ -75,9 +75,9 @@
   --uitraps-error: #e74c3c;
   --uitraps-critical: #ff6b6b;
 
-  --uitraps-bg: #1a1a2e;
-  --uitraps-bg-secondary: #16213e;
-  --uitraps-bg-hover: #0f3460;
+  --uitraps-bg: #000000;
+  --uitraps-bg-secondary: #111111;
+  --uitraps-bg-hover: #1e1e1e;
   --uitraps-text: #eee;
   --uitraps-text-secondary: #adb5bd;
   --uitraps-text-muted: #6c757d;

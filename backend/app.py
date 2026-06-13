@@ -1767,28 +1767,34 @@ async def webhook_subscription(payload: SubscriptionWebhookRequest, request: Req
         raise HTTPException(status_code=401, detail="Invalid webhook secret.")
 
     event = payload.event.lower()
-    with Session(engine) as session:
-        if event == "activated":
-            result = activate_subscription(
-                session, payload.user_id,
-                monthly_limit=payload.monthly_limit or MONTHLY_LIMIT,
-                subscription_start=payload.subscription_start,
-                subscription_end=payload.subscription_end,
-                next_renewal=payload.next_renewal,
-            )
-        elif event == "renewed":
-            result = renew_subscription(
-                session, payload.user_id,
-                monthly_limit=payload.monthly_limit,
-                next_renewal=payload.next_renewal,
-                subscription_end=payload.subscription_end,
-            )
-        elif event == "cancelled":
-            result = cancel_subscription(session, payload.user_id)
-        elif event == "expired":
-            result = expire_subscription(session, payload.user_id)
-        else:
-            raise HTTPException(status_code=400, detail=f"Unknown event: {payload.event}")
+    try:
+        with Session(engine) as session:
+            if event == "activated":
+                result = activate_subscription(
+                    session, payload.user_id,
+                    monthly_limit=payload.monthly_limit or MONTHLY_LIMIT,
+                    subscription_start=payload.subscription_start,
+                    subscription_end=payload.subscription_end,
+                    next_renewal=payload.next_renewal,
+                )
+            elif event == "renewed":
+                result = renew_subscription(
+                    session, payload.user_id,
+                    monthly_limit=payload.monthly_limit,
+                    next_renewal=payload.next_renewal,
+                    subscription_end=payload.subscription_end,
+                )
+            elif event == "cancelled":
+                result = cancel_subscription(session, payload.user_id)
+            elif event == "expired":
+                result = expire_subscription(session, payload.user_id)
+            else:
+                raise HTTPException(status_code=400, detail=f"Unknown event: {payload.event}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[webhook/subscription] DB error for user={payload.user_id} event={event}: {e}")
+        raise HTTPException(status_code=503, detail="Database unavailable — subscription webhook could not be processed. Retry when DB is restored.")
 
     logger.info(f"[webhook/subscription] user={payload.user_id} event={event} status={result.subscription_status}")
     return {"success": True, "user_id": payload.user_id, "status": result.subscription_status}
