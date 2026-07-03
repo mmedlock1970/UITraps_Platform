@@ -126,6 +126,6 @@ def test_format_issues_report_basic():
     assert "<html" in html
     assert "GRATUITOUS REDUNDANCY" in html
     assert "AMBIGUOUS HOME" in html
-    assert "ROOT CAUSE" in html
+    assert "root cause" in html
     assert "Two separate navigation bars" in html
     assert "Traps Not Found" in html

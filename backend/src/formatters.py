@@ -2821,15 +2821,11 @@ _ISSUES_REPORT_CSS = """
   .issue-traps-section { border-top: 1px solid #f0f0f0; padding: 14px 20px; }
   .traps-label { font-size: 0.72em; font-weight: 700; letter-spacing: .08em;
                  color: #888; text-transform: uppercase; margin-bottom: 10px; }
-  .trap-bar { padding: 10px 14px; margin-bottom: 8px; border-radius: 4px;
-              background: #fafafa; border-left-width: 4px; border-left-style: solid; }
-  .trap-bar:last-child { margin-bottom: 0; }
-  .trap-bar-header { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
-  .root-cause-label { font-size: 0.68em; font-weight: 700; letter-spacing: .06em;
-                      text-transform: uppercase; color: #fff;
-                      background: #333; border-radius: 3px; padding: 2px 6px; }
-  .trap-bar-name { font-size: 0.85em; font-weight: 700; letter-spacing: .04em; }
-  .trap-bar-definition { font-size: 0.83em; color: #555; line-height: 1.5; }
+  .trap-item { margin-bottom: 10px; }
+  .trap-item:last-child { margin-bottom: 0; }
+  .trap-item-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .root-cause-label { font-size: 0.72em; color: #888; font-style: italic; }
+  .trap-item-definition { font-size: 0.83em; color: #555; line-height: 1.5; padding-left: 2px; }
 
   /* ── Description / Recommendation ───────────────────────────────────── */
   .issue-body-section { border-top: 1px solid #f0f0f0; padding: 14px 20px; }
@@ -2846,7 +2842,8 @@ _ISSUES_REPORT_CSS = """
 
   /* ── Positives ───────────────────────────────────────────────────────── */
   .positives-section { background: #fff; border-radius: 10px; padding: 20px;
-                       margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+                       margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.07);
+                       border-left: 4px solid #27ae60; }
   .positives-section h2 { font-size: 1em; font-weight: 700; margin-bottom: 10px; }
   .positives-section li { color: #444; margin-bottom: 4px; }
 
@@ -2861,24 +2858,41 @@ _ISSUES_REPORT_CSS = """
   /* ── Footer ──────────────────────────────────────────────────────────── */
   .footer { border-top: 1px solid #e0e0e0; padding-top: 16px; margin-top: 28px;
             font-size: 0.82em; color: #888; }
+
+  /* ── Findings count ──────────────────────────────────────────────────── */
+  .findings-count { font-weight: 600; color: #333; margin-top: 10px; font-size: 0.95em; }
+
+  /* ── Evaluation Details ──────────────────────────────────────────────── */
+  .eval-details { background: #fff; border-radius: 10px; padding: 20px;
+                  margin-bottom: 24px; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+  .eval-details h2 { font-size: 1em; font-weight: 700; margin-bottom: 10px; }
+  .context-body p { color: #444; margin-bottom: 6px; font-size: 0.9em; }
+  .context-body ul { margin: 4px 0 8px; padding-left: 20px; }
+  .users-detail { margin: 0 0 8px; }
+  .users-detail-label { margin: 0 0 8px; }
+  .users-table { width: 100%; border-collapse: collapse; font-size: 0.93em;
+                 border: 1px solid #e4e1dc; border-radius: 6px; overflow: hidden; }
+  .users-table td { padding: 7px 12px; border: 1px solid #e4e1dc; vertical-align: top; line-height: 1.5; }
+  .users-table .ut-label { width: 170px; text-align: right; font-size: 0.78em; font-weight: 700;
+                            letter-spacing: 0.06em; text-transform: uppercase; color: #8a8680;
+                            white-space: nowrap; background: #faf9f7; }
+  .users-table .ut-value { color: #2c2c2c; }
 """
 
 
 def _render_trap_bar_html(trap: dict[str, Any], is_root: bool) -> str:
-    """Render a tenet-colored trap bar for an issue card."""
+    """Render a trap entry for an issue card — pill + optional root-cause label + definition."""
     trap_name = trap.get("trap_name", "")
     tenet = trap.get("tenet", "")
     definition = trap.get("definition", "")
     color = TENET_COLORS.get(tenet.upper(), "#4a4744")
 
-    root_label = "<span class='root-cause-label'>ROOT CAUSE</span>" if is_root else ""
+    root_label = "<span class='root-cause-label'>root cause</span>" if is_root else ""
+    pill = f"<span class='tenet-pill' style='background:{color}'>{trap_name.upper()}</span>"
     return (
-        f"<div class='trap-bar' style='border-left: 4px solid {color}'>"
-        f"<div class='trap-bar-header'>"
-        f"{root_label}"
-        f"<span class='trap-bar-name' style='color:{color}'>{trap_name.upper()}</span>"
-        f"</div>"
-        f"<div class='trap-bar-definition'>{definition}</div>"
+        f"<div class='trap-item'>"
+        f"<div class='trap-item-header'>{pill}{root_label}</div>"
+        f"<div class='trap-item-definition'>{definition}</div>"
         f"</div>"
     )
 
@@ -3003,16 +3017,80 @@ def format_issues_report_as_html(
     html.append(f"<p class='report-date'>{'<br>'.join(_ts_lines)}</p>")
     html.append("</div>")
 
+    # Evaluation Details
+    if user_context:
+        html.append("<div class='eval-details'>")
+        html.append("<h2>Evaluation Details</h2>")
+        html.append("<div class='context-section'>")
+        html.append("<div class='context-body'>")
+        if user_context.get('design_name'):
+            html.append(f"<p><strong>Interface evaluated:</strong> {user_context['design_name']}</p>")
+
+        users_raw = user_context.get('users', 'N/A')
+        if users_raw and users_raw.startswith('Target users: '):
+            users_raw = users_raw[len('Target users: '):]
+        if users_raw:
+            users_raw = users_raw[0].upper() + users_raw[1:]
+
+        users_desc, users_attrs = _parse_users_string(users_raw)
+        users_attrs = [(l, v) for l, v in users_attrs if l != 'Frequency of use']
+        html.append("<div class='users-detail'>")
+        html.append("<p class='users-detail-label'><strong>Intended users:</strong></p>")
+        html.append("<table class='users-table'>")
+        if users_desc:
+            html.append(f"<tr><td class='ut-label'>Description</td><td class='ut-value'>{users_desc}</td></tr>")
+        for label, value in users_attrs:
+            html.append(f"<tr><td class='ut-label'>{label}</td><td class='ut-value'>{value}</td></tr>")
+        if not users_desc and not users_attrs:
+            html.append(f"<tr><td class='ut-label'>Description</td><td class='ut-value'>{users_raw}</td></tr>")
+        html.append("</table>")
+        html.append("</div>")
+
+        _tl = user_context.get('task_list') or []
+        if len(_tl) > 1:
+            html.append("<p><strong>Task(s) evaluated:</strong></p>")
+            html.append("<ul>")
+            for _t in _tl:
+                _n = _t.get('name', '').strip()
+                _d = _t.get('description', '').strip()
+                html.append(f"<li><strong>{_n}</strong>: {_d}</li>" if _n else f"<li>{_d}</li>")
+            html.append("</ul>")
+        else:
+            raw_tasks = user_context.get('tasks', 'N/A')
+            task_list_display = parse_tasks(raw_tasks)
+            html.append("<p><strong>Task(s) evaluated:</strong></p>")
+            html.append("<ul>")
+            for task in task_list_display:
+                html.append(f"<li>{task}</li>")
+            html.append("</ul>")
+
+        if user_context.get('format'):
+            html.append(f"<p><strong>Format:</strong> {user_context['format']}</p>")
+
+        html.append("</div>")
+        html.append("</div>")
+        html.append("</div>")
+
     # Summary
     headline = _cap_terms(issues_report.get("summary_headline", ""))
     narrative = _cap_terms(issues_report.get("summary_narrative", ""))
+    issues = issues_report.get("issues", [])
+    critical_count = sum(1 for i in issues if i.get('severity') == 'critical')
+    moderate_count = sum(1 for i in issues if i.get('severity') == 'moderate')
+    minor_count = sum(1 for i in issues if i.get('severity') == 'minor')
+    parts = []
+    if critical_count: parts.append(f"{critical_count} critical")
+    if moderate_count: parts.append(f"{moderate_count} moderate")
+    if minor_count: parts.append(f"{minor_count} minor")
     html.append("<div class='summary-section'>")
     html.append(f"<h2 class='summary-headline'>{headline}</h2>")
     html.append(f"<p class='summary-narrative'>{narrative}</p>")
+    if parts:
+        total = critical_count + moderate_count + minor_count
+        html.append(f"<p class='findings-count'>{', '.join(parts)} {'issue' if total == 1 else 'issues'} identified.</p>")
     html.append("</div>")
 
     # Issues
-    issues = issues_report.get("issues", [])
     if issues:
         html.append("<div class='issues-section'>")
         html.append(f"<p class='section-intro'>{len(issues)} issue{'s' if len(issues) != 1 else ''} identified.</p>")
