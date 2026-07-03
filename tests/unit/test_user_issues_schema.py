@@ -34,3 +34,59 @@ def test_root_cause_trap_structure():
     assert "tenet" in rct["properties"]
     assert "definition" in rct["properties"]
     assert rct["properties"]["trap_name"]["enum"] == VALID_TRAP_NAMES
+
+
+import importlib, types
+
+def _get_prompts_module():
+    """Import prompts as part of backend.src package to handle relative imports."""
+    project_root = os.path.normpath(os.path.join(os.path.dirname(__file__), '../..'))
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+    import backend.src.prompts as _prompts
+    return _prompts
+
+def test_synthesis_system_prompt_exists():
+    mod = _get_prompts_module()
+    prompt = mod.build_synthesis_system_prompt()
+    assert isinstance(prompt, str)
+    assert len(prompt) > 100
+    assert "Trap" in prompt
+
+def test_synthesis_user_message_contains_findings():
+    mod = _get_prompts_module()
+    mock_report = {
+        "critical_issues": [],
+        "moderate_issues": [
+            {
+                "trap_name": "GRATUITOUS REDUNDANCY",
+                "tenet": "HABITUATING",
+                "headline": "Two nav bars duplicate site navigation.",
+                "location": "Top of page",
+                "problem": "Two horizontal navigation bars appear simultaneously.",
+                "recommendation": "Consolidate into one.",
+                "confidence": "medium"
+            }
+        ],
+        "minor_issues": [],
+        "positive_observations": ["Clean typography"],
+        "traps_checked_not_found": [{"trap_name": "DISTRACTION", "testable": True}]
+    }
+    msg = mod.build_synthesis_user_message(mock_report)
+    assert isinstance(msg, str)
+    assert "GRATUITOUS REDUNDANCY" in msg
+    assert "HABITUATING" in msg
+    assert "DISTRACTION" in msg
+
+def test_synthesis_user_message_empty_report():
+    mod = _get_prompts_module()
+    mock_report = {
+        "critical_issues": [],
+        "moderate_issues": [],
+        "minor_issues": [],
+        "positive_observations": [],
+        "traps_checked_not_found": []
+    }
+    msg = mod.build_synthesis_user_message(mock_report)
+    assert isinstance(msg, str)
+    assert len(msg) > 0

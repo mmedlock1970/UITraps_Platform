@@ -7,7 +7,7 @@ PROPRIETARY & CONFIDENTIAL - UI Tenets & Traps Framework
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, Optional
 
 # Import platform-specific context
 from .platform_context import get_platform_prompt_section, SUPPORTED_PLATFORMS
@@ -1783,5 +1783,85 @@ def build_enrichment_user_message(
                 "names, tenets, locations, severities, and confidence levels. Only improve the "
                 f"written descriptions.{brief_note}\nSubmit the enriched report using the ui_analysis_report tool.",
     })
+
+
+def build_synthesis_system_prompt() -> str:
+    """
+    System prompt for Pass 3: synthesise per-Trap findings into user-centric issues.
+
+    The synthesis is grounded in the confirmed Trap findings from Pass 1+2.
+    Claude must not introduce new problems not supported by the Trap findings.
+
+    Returns:
+        System prompt string for the synthesis API call.
+    """
+    return """You are a UI usability analyst synthesising confirmed findings from a structured Trap analysis.
+
+You will receive a set of confirmed UI Trap findings — each one was identified by applying the UI Tenets & Traps knowledge base to the submitted design. Your job is to group related findings into user-facing issues and write each issue in plain language.
+
+CRITICAL RULES:
+1. Only report problems that are grounded in the confirmed Trap findings provided. Do not introduce new problems not supported by the Trap data.
+2. Group two or more Trap findings into a single issue ONLY when they describe the same design element or share the same underlying cause on the same part of the interface. Do not group findings merely because they share the same severity — they must share a root.
+3. Single-Trap findings that do not share a root with another finding become single-Trap issues (contributing_traps is an empty array).
+4. For each issue, identify the root_cause_trap — the Trap whose definition most directly names the source of the problem. Contributing Traps are downstream consequences or co-occurring effects of the same root.
+5. Write headlines and descriptions in user terms — describe what the user experiences, not Trap names or framework jargon.
+6. Preserve traps_checked_not_found and positive_observations from the input unchanged.
+7. Use measured language throughout: 'appears to', 'may cause', 'could prevent', 'seems likely'."""
+
+
+def build_synthesis_user_message(pass2_report: Dict[str, Any]) -> str:
+    """
+    User message for Pass 3: provides the confirmed Trap findings for synthesis.
+
+    Args:
+        pass2_report: The enriched report from Pass 1+2 (per-Trap findings).
+
+    Returns:
+        Formatted user message string for the synthesis API call.
+    """
+    sections = []
+    sections.append("## Confirmed Trap Findings from Trap Analysis\n\n")
+    sections.append("Group these findings into user-facing issues. Each finding was confirmed by applying the UI Tenets & Traps knowledge base.\n\n")
+
+    for severity_key, label in [
+        ("critical_issues", "CRITICAL"),
+        ("moderate_issues", "MODERATE"),
+        ("minor_issues", "MINOR"),
+    ]:
+        findings = pass2_report.get(severity_key, [])
+        if not findings:
+            continue
+        sections.append(f"### {label} Findings\n\n")
+        for f in findings:
+            sections.append(
+                f"- **{f.get('trap_name', '')}** ({f.get('tenet', '')})\n"
+                f"  Location: {f.get('location', '')}\n"
+                f"  Headline: {f.get('headline', '')}\n"
+                f"  Problem: {f.get('problem', '')}\n"
+                f"  Recommendation: {f.get('recommendation', '')}\n"
+                f"  Confidence: {f.get('confidence', '')}\n\n"
+            )
+
+    pos = pass2_report.get("positive_observations", [])
+    if pos:
+        sections.append("### Positive Observations (pass through unchanged)\n\n")
+        for p in pos:
+            sections.append(f"- {p}\n")
+        sections.append("\n")
+
+    not_found = pass2_report.get("traps_checked_not_found", [])
+    if not_found:
+        sections.append("### Traps Checked Not Found (pass through unchanged)\n\n")
+        for item in not_found:
+            if isinstance(item, dict):
+                sections.append(f"- {item.get('trap_name', '')} (testable: {item.get('testable', True)})\n")
+            else:
+                sections.append(f"- {item}\n")
+        sections.append("\n")
+
+    sections.append("---\n\n")
+    sections.append("Synthesise these findings into user-facing issues using the ui_issues_report tool.")
+
+    return "".join(sections)
 
     return content
