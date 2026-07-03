@@ -24,10 +24,15 @@ try:
     from .prompts import (
         build_system_prompt, build_user_message, build_figma_message,
         INTERACTION_ANALYSIS_SYSTEM_PROMPT, build_interaction_message,
-        build_enrichment_system_prompt, build_enrichment_user_message
+        build_enrichment_system_prompt, build_enrichment_user_message,
+        build_synthesis_system_prompt, build_synthesis_user_message,
     )
-    from .formatters import parse_claude_response, format_report_as_markdown, format_report_as_html, get_report_statistics
-    from .schema import get_ui_analysis_schema, get_interaction_analysis_schema
+    try:
+        from .formatters import parse_claude_response, format_report_as_markdown, format_report_as_html, get_report_statistics, format_issues_report_as_html
+    except ImportError:
+        from .formatters import parse_claude_response, format_report_as_markdown, format_report_as_html, get_report_statistics
+        format_issues_report_as_html = None
+    from .schema import get_ui_analysis_schema, get_interaction_analysis_schema, get_user_issues_schema
     from .knowledge_extractor import collect_found_trap_names, extract_trap_sections, extract_trap_images
     from .knowledge_base import get_chunks_for_traps
 except ImportError:
@@ -36,10 +41,15 @@ except ImportError:
     from prompts import (
         build_system_prompt, build_user_message, build_figma_message,
         INTERACTION_ANALYSIS_SYSTEM_PROMPT, build_interaction_message,
-        build_enrichment_system_prompt, build_enrichment_user_message
+        build_enrichment_system_prompt, build_enrichment_user_message,
+        build_synthesis_system_prompt, build_synthesis_user_message,
     )
-    from formatters import parse_claude_response, format_report_as_markdown, format_report_as_html, get_report_statistics
-    from schema import get_ui_analysis_schema, get_interaction_analysis_schema
+    try:
+        from formatters import parse_claude_response, format_report_as_markdown, format_report_as_html, get_report_statistics, format_issues_report_as_html
+    except ImportError:
+        from formatters import parse_claude_response, format_report_as_markdown, format_report_as_html, get_report_statistics
+        format_issues_report_as_html = None
+    from schema import get_ui_analysis_schema, get_interaction_analysis_schema, get_user_issues_schema
     from knowledge_extractor import collect_found_trap_names, extract_trap_sections, extract_trap_images
     from knowledge_base import get_chunks_for_traps
 
@@ -92,6 +102,7 @@ class UITrapsAnalyzer:
         verbosity: str = "standard",
         pass1_model: Optional[str] = None,
         thorough_mode: bool = False,
+        report_style: str = "trap",
     ) -> Dict[str, Any]:
         """
         Analyze a UI design using the UI Tenets & Traps framework.
@@ -153,6 +164,8 @@ class UITrapsAnalyzer:
                 page_context=page_context,
             )
 
+        report["_design_file"] = design_file
+
         # Step 6: Calculate metadata
         duration = time.time() - start_time
         metadata = {
@@ -168,6 +181,14 @@ class UITrapsAnalyzer:
         except Exception as e:
             # Enrichment failure is non-fatal — use Pass 1 report as-is
             print(f"[UITraps] Pass 2 enrichment skipped (non-fatal): {e}")
+
+        # Pass 3 — synthesise into user-issues format (only when requested)
+        issues_report = None
+        if report_style == "issues":
+            try:
+                issues_report = self._synthesize_issues(report, timeout=timeout)
+            except Exception as e:
+                print(f"[UITraps] Pass 3 synthesis skipped (non-fatal): {e}")
 
         # Step 8: Generate outputs
         # Normalize optional fields after enrichment — Pass 2 may omit fields that were
@@ -196,7 +217,10 @@ class UITrapsAnalyzer:
             'thorough_mode': thorough_mode,
         }
         markdown_report = format_report_as_markdown(report, user_context)
-        html_report = format_report_as_html(report, user_context, analysis_settings=_analysis_settings)
+        if issues_report is not None and format_issues_report_as_html is not None:
+            html_report = format_issues_report_as_html(issues_report, user_context, analysis_settings=_analysis_settings)
+        else:
+            html_report = format_report_as_html(report, user_context, analysis_settings=_analysis_settings)
         statistics = get_report_statistics(report)
 
         return {
@@ -777,6 +801,64 @@ class UITrapsAnalyzer:
 
         print(f"[UITraps] Pass 2: enrichment complete ({response.usage.input_tokens} input tokens)")
         return enriched
+
+    def _synthesize_issues(
+        self,
+        enriched_report: Dict[str, Any],
+        timeout: int = 120,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Pass 3: Synthesise enriched per-Trap findings into user-centric issues.
+
+        Groups Traps that share a common design element or root cause into a
+        single user-facing issue. Grounds all synthesis in the confirmed Trap
+        findings — does not introduce new problems.
+
+        Unlike Pass 2, this pass does not use prompt caching (short context, single-use).
+
+        Args:
+            enriched_report: Pass 1+2 report (per-Trap findings).
+            timeout: API call timeout in seconds.
+
+        Returns:
+            User-issues report matching USER_ISSUES_SCHEMA, or None if no
+            confirmed findings exist or the API call fails.
+        """
+        total = sum(
+            len(enriched_report.get(k, []))
+            for k in ("critical_issues", "moderate_issues", "minor_issues")
+        )
+        if total == 0:
+            return None
+
+        system_prompt = build_synthesis_system_prompt()
+        user_message = build_synthesis_user_message(enriched_report)
+        schema = get_user_issues_schema()
+
+        print(f"[UITraps] Pass 3: synthesising {total} Trap finding(s) into user issues")
+
+        response = self.client.messages.create(
+            model=self.enrich_model,
+            max_tokens=4096,
+            temperature=0,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_message}],
+            tools=[
+                {
+                    "name": "ui_issues_report",
+                    "description": "Submit the synthesised user-issues report",
+                    "input_schema": schema,
+                }
+            ],
+            tool_choice={"type": "tool", "name": "ui_issues_report"},
+            timeout=timeout,
+        )
+
+        for block in response.content:
+            if block.type == "tool_use" and block.name == "ui_issues_report":
+                return block.input
+
+        return None
 
     def _normalize_report_completeness(self, report: Dict[str, Any], kb_version: str = "v2") -> None:
         """
