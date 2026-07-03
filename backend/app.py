@@ -1907,6 +1907,7 @@ async def unified_ask(
     tenet_filter: Optional[str] = Form(None),
     design_name: Optional[str] = Form(None),
     kb_version: str = Form("v2"),
+    report_style: str = Form("trap"),
     verbosity: str = Form("standard"),
     pass1_model: Optional[str] = Form(None),
     thorough_mode: Optional[str] = Form(None),
@@ -2142,6 +2143,7 @@ async def unified_ask(
                             user_context=user_context,
                             chat_context=chat_context,
                             kb_version=kb_version,
+                            report_style=report_style,
                             verbosity=verbosity,
                             pass1_model=pass1_model,
                             thorough_mode=(thorough_mode == 'true'),
@@ -2225,6 +2227,7 @@ async def unified_ask(
                             lambda: analyzer_v2.analyze_design(
                                 design_file=tmp_path, user_context=user_context,
                                 chat_context=chat_context, kb_version="v2",
+                                report_style=report_style,
                                 verbosity=verbosity, pass1_model=pass1_model,
                                 thorough_mode=_thorough,
                             )
@@ -2234,6 +2237,7 @@ async def unified_ask(
                             lambda: analyzer_v1.analyze_design(
                                 design_file=tmp_path, user_context=user_context,
                                 chat_context=chat_context, kb_version="v1",
+                                report_style=report_style,
                                 verbosity=verbosity, pass1_model=pass1_model,
                                 thorough_mode=_thorough,
                             )
@@ -2266,6 +2270,7 @@ async def unified_ask(
                     result = get_analyzer().analyze_design(
                         design_file=tmp_path, user_context=user_context,
                         chat_context=chat_context, kb_version=kb_version,
+                        report_style=report_style,
                         verbosity=verbosity, pass1_model=pass1_model,
                         thorough_mode=(thorough_mode == 'true'),
                     )
@@ -2369,7 +2374,7 @@ async def unified_ask(
                 "format": format or "Website or application",
                 "content_type": content_type,
             }
-            result = get_analyzer().analyze_design(design_file=tmp_path, user_context=user_context)
+            result = get_analyzer().analyze_design(design_file=tmp_path, user_context=user_context, report_style=report_style)
 
             # If chat is available, also answer the question with RAG + analysis context
             chat_response = None
