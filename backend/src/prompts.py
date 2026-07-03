@@ -7,7 +7,7 @@ PROPRIETARY & CONFIDENTIAL - UI Tenets & Traps Framework
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 # Import platform-specific context
 from .platform_context import get_platform_prompt_section, SUPPORTED_PLATFORMS
@@ -1794,6 +1794,7 @@ def build_synthesis_system_prompt() -> str:
 
     Returns:
         System prompt string for the synthesis API call.
+        Unlike Pass 2, Pass 3 does not use prompt caching (short context, single-use).
     """
     return """You are a UI usability analyst synthesising confirmed findings from a structured Trap analysis.
 
@@ -1809,7 +1810,7 @@ CRITICAL RULES:
 7. Use measured language throughout: 'appears to', 'may cause', 'could prevent', 'seems likely'."""
 
 
-def build_synthesis_user_message(pass2_report: Dict[str, Any]) -> str:
+def build_synthesis_user_message(pass2_report: dict[str, Any]) -> str:
     """
     User message for Pass 3: provides the confirmed Trap findings for synthesis.
 
@@ -1833,6 +1834,8 @@ def build_synthesis_user_message(pass2_report: Dict[str, Any]) -> str:
             continue
         sections.append(f"### {label} Findings\n\n")
         for f in findings:
+            if not isinstance(f, dict):
+                continue
             sections.append(
                 f"- **{f.get('trap_name', '')}** ({f.get('tenet', '')})\n"
                 f"  Location: {f.get('location', '')}\n"
