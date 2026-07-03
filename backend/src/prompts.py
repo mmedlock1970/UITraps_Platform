@@ -1802,12 +1802,14 @@ You will receive a set of confirmed UI Trap findings — each one was identified
 
 CRITICAL RULES:
 1. Only report problems that are grounded in the confirmed Trap findings provided. Do not introduce new problems not supported by the Trap data.
-2. Group two or more Trap findings into a single issue ONLY when they describe the same design element or share the same underlying cause on the same part of the interface. Do not group findings merely because they share the same severity — they must share a root.
+2. Group two or more Trap findings into a single issue ONLY when they share the exact same underlying root cause — meaning fixing one would fix the other. Do not group findings merely because they occur in the same section of the interface or affect the same user group. They must be causally linked.
 3. Single-Trap findings that do not share a root with another finding become single-Trap issues (contributing_traps is an empty array).
 4. For each issue, identify the root_cause_trap — the Trap whose definition most directly names the source of the problem. Contributing Traps are downstream consequences or co-occurring effects of the same root.
 5. Write headlines and descriptions in user terms — describe what the user experiences, not Trap names or framework jargon.
 6. Preserve traps_checked_not_found and positive_observations from the input unchanged.
-7. Use measured language throughout: 'appears to', 'may cause', 'could prevent', 'seems likely'."""
+7. Use measured language throughout: 'appears to', 'may cause', 'could prevent', 'seems likely'.
+8. For each trap's 'definition' field, write ONLY the canonical framework definition of the Trap — the same short sentence that defines what this Trap is in any context. Do not describe how it appears in this specific design.
+9. Each issue must describe exactly ONE discrete user problem. Do not combine two separate user experiences into a single issue just because they occur in the same area of the interface. If a design has both a navigation problem AND a content relevance problem, those are two separate issues even if they co-occur. The test: would fixing one problem automatically fix the other? If not, they are separate issues."""
 
 
 def build_synthesis_user_message(pass2_report: dict[str, Any]) -> str:

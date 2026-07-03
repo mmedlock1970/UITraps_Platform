@@ -471,7 +471,7 @@ USER_ISSUES_SCHEMA = {
                             },
                             "definition": {
                                 "type": "string",
-                                "description": "One-sentence definition of this Trap as it applies to the observed problem."
+                                "description": "The canonical one-sentence definition of this Trap from the UI Tenets & Traps framework — what the Trap IS in general. Do NOT describe how it manifests in this specific design."
                             }
                         },
                         "required": ["trap_name", "tenet", "definition"]
@@ -492,7 +492,7 @@ USER_ISSUES_SCHEMA = {
                                 },
                                 "definition": {
                                     "type": "string",
-                                    "description": "One-sentence definition of this Trap as it applies to the observed problem."
+                                    "description": "The canonical one-sentence definition of this Trap from the UI Tenets & Traps framework — what the Trap IS in general. Do NOT describe how it manifests in this specific design."
                                 }
                             },
                             "required": ["trap_name", "tenet", "definition"]
