@@ -185,7 +185,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
   const [verbosity, setVerbosity] = useState<'brief' | 'standard'>(iv?.verbosity ?? 'standard');
   const [pass1Model, setPass1Model] = useState<'sonnet' | 'haiku'>(iv?.pass1Model ?? 'sonnet');
   const [thoroughMode, setThoroughMode] = useState(iv?.thoroughMode ?? false);
-  const [reportStyle, setReportStyle] = useState<'trap' | 'issues'>('trap');
+  const [reportStyle, setReportStyle] = useState<'trap' | 'issues'>(iv?.reportStyle ?? 'trap');
   const [lockedInputType, setLockedInputType] = useState<'screenshot' | 'video' | 'flow_diagram' | null>(iv?.lockedInputType ?? null);
   const [autoDetectedType, setAutoDetectedType] = useState<'flow_diagram' | null>(null);
   const inputType = lockedInputType ?? autoDetectedType ?? inferFileType(files, figmaLink);
@@ -294,7 +294,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
       figmaLink, screenName, platform, productDomain, productContext,
       expLevel, techSavvy, frequency, tasks, userDesc, priorProducts,
       physicalEnv, lighting, gripPosition, attentionalState, extraContext,
-      kbVersion, selectedTenets, verbosity, pass1Model, thoroughMode, lockedInputType,
+      kbVersion, selectedTenets, verbosity, pass1Model, thoroughMode, reportStyle, lockedInputType,
     };
     const context = assembleContext({ platform, productDomain, screenName,
       expLevel, techSavvy, frequency, taskList: tasks, priorProducts, userDesc, extraContext, productContext,
