@@ -570,7 +570,8 @@ async def analyze(
             analyzer_instance = get_analyzer()
             result = analyzer_instance.analyze_design(
                 design_file=tmp_path,
-                user_context=user_context
+                user_context=user_context,
+                report_style="trap",
             )
             logger.info("[/analyze] analyze_design complete")
 
