@@ -118,6 +118,8 @@ class UITrapsAnalyzer:
                 - page_url: URL of this page
                 - site_pages: List of other page titles on the site
                 - relevant_tasks: Tasks appropriate for this page type
+            thorough_mode: Run one _pass1 per tenet group in parallel for deeper coverage.
+            report_style: "trap" (default) for per-Trap HTML report; "issues" for user-centric issues synthesis.
 
         Returns:
             Dictionary containing:
@@ -858,6 +860,7 @@ class UITrapsAnalyzer:
             if block.type == "tool_use" and block.name == "ui_issues_report":
                 return block.input
 
+        print("[UITraps] Pass 3: no tool-use block in response, synthesis skipped")
         return None
 
     def _normalize_report_completeness(self, report: Dict[str, Any], kb_version: str = "v2") -> None:
