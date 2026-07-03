@@ -2779,6 +2779,282 @@ def format_report_as_html(
     return "\n".join(html)
 
 
+_ISSUES_REPORT_CSS = """
+  /* ── Base reset and typography ───────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+         font-size: 15px; line-height: 1.6; color: #1a1a1a; background: #f5f5f5; }
+  .report-container { max-width: 860px; margin: 0 auto; padding: 32px 24px; }
+
+  /* ── Header ─────────────────────────────────────────────────────────── */
+  .report-header { margin-bottom: 32px; }
+  .report-header h1 { font-size: 1.6em; font-weight: 700; color: #111; }
+  .report-subtitle { font-size: 0.9em; color: #666; margin-top: 2px; }
+  .report-date { font-size: 0.85em; color: #888; margin-top: 4px; }
+
+  /* ── Summary ─────────────────────────────────────────────────────────── */
+  .summary-section { background: #fff; border-radius: 10px; padding: 24px; margin-bottom: 28px;
+                     box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+  .summary-headline { font-size: 1.15em; font-weight: 700; color: #111; margin-bottom: 10px; }
+  .summary-narrative { color: #444; line-height: 1.7; }
+
+  /* ── Issues section ──────────────────────────────────────────────────── */
+  .issues-section { margin-bottom: 28px; }
+  .section-intro { color: #666; font-size: 0.9em; margin-bottom: 16px; }
+
+  /* ── Issue card ──────────────────────────────────────────────────────── */
+  .issue-card { background: #fff; border-radius: 10px; padding: 0;
+                margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.08);
+                overflow: hidden; }
+  .issue-number { font-size: 0.72em; font-weight: 700; letter-spacing: .08em;
+                  color: #888; padding: 16px 20px 4px; text-transform: uppercase; }
+  .issue-headline { font-size: 1.08em; font-weight: 700; color: #111;
+                    padding: 0 20px 10px; line-height: 1.4; }
+  .issue-meta { display: flex; align-items: center; gap: 8px;
+                padding: 0 20px 14px; }
+  .severity-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .severity-label { font-size: 0.88em; font-weight: 600; color: #333; }
+  .meta-divider { color: #ccc; font-size: 0.85em; }
+  .confidence-label { font-size: 0.85em; color: #666; }
+
+  /* ── Traps block ─────────────────────────────────────────────────────── */
+  .issue-traps-section { border-top: 1px solid #f0f0f0; padding: 14px 20px; }
+  .traps-label { font-size: 0.72em; font-weight: 700; letter-spacing: .08em;
+                 color: #888; text-transform: uppercase; margin-bottom: 10px; }
+  .trap-bar { padding: 10px 14px; margin-bottom: 8px; border-radius: 4px;
+              background: #fafafa; border-left-width: 4px; border-left-style: solid; }
+  .trap-bar:last-child { margin-bottom: 0; }
+  .trap-bar-header { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .root-cause-label { font-size: 0.68em; font-weight: 700; letter-spacing: .06em;
+                      text-transform: uppercase; color: #fff;
+                      background: #333; border-radius: 3px; padding: 2px 6px; }
+  .trap-bar-name { font-size: 0.85em; font-weight: 700; letter-spacing: .04em; }
+  .trap-bar-definition { font-size: 0.83em; color: #555; line-height: 1.5; }
+
+  /* ── Description / Recommendation ───────────────────────────────────── */
+  .issue-body-section { border-top: 1px solid #f0f0f0; padding: 14px 20px; }
+  .body-label { font-size: 0.72em; font-weight: 700; letter-spacing: .08em;
+                color: #888; text-transform: uppercase; margin-bottom: 8px; }
+  .issue-body-section p { color: #333; line-height: 1.7; }
+
+  /* ── Region crop ─────────────────────────────────────────────────────── */
+  .region-crop { margin: 12px 0 4px; }
+  .region-crop img { max-width: 380px; border-radius: 6px;
+                     border: 1px solid #e0e0e0; display: block; }
+  .region-crop figcaption { font-size: 0.8em; color: #777;
+                             font-style: italic; margin-top: 6px; }
+
+  /* ── Positives ───────────────────────────────────────────────────────── */
+  .positives-section { background: #fff; border-radius: 10px; padding: 20px;
+                       margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+  .positives-section h2 { font-size: 1em; font-weight: 700; margin-bottom: 10px; }
+  .positives-section li { color: #444; margin-bottom: 4px; }
+
+  /* ── Traps not found ─────────────────────────────────────────────────── */
+  .traps-not-found { background: #fff; border-radius: 10px; padding: 20px;
+                     margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+  .traps-not-found h2 { font-size: 1em; font-weight: 700; margin-bottom: 6px; }
+  .trap-name-list { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .tenet-pill { display: inline-block; color: #fff; font-size: 0.78em; font-weight: 700;
+                letter-spacing: .04em; padding: 4px 10px; border-radius: 4px; }
+
+  /* ── Footer ──────────────────────────────────────────────────────────── */
+  .footer { border-top: 1px solid #e0e0e0; padding-top: 16px; margin-top: 28px;
+            font-size: 0.82em; color: #888; }
+"""
+
+
+def _render_trap_bar_html(trap: dict[str, Any], is_root: bool) -> str:
+    """Render a tenet-colored trap bar for an issue card."""
+    trap_name = trap.get("trap_name", "")
+    tenet = trap.get("tenet", "")
+    definition = trap.get("definition", "")
+    color = TENET_COLORS.get(tenet.upper(), "#4a4744")
+
+    root_label = "<span class='root-cause-label'>ROOT CAUSE</span>" if is_root else ""
+    return (
+        f"<div class='trap-bar' style='border-left: 4px solid {color}'>"
+        f"<div class='trap-bar-header'>"
+        f"{root_label}"
+        f"<span class='trap-bar-name' style='color:{color}'>{trap_name.upper()}</span>"
+        f"</div>"
+        f"<div class='trap-bar-definition'>{definition}</div>"
+        f"</div>"
+    )
+
+
+def _render_issue_card_html(idx: int, issue: dict[str, Any]) -> str:
+    """Render one issue card for the user-issues report."""
+    out = []
+    severity = issue.get("severity", "moderate")
+    confidence = issue.get("confidence", "medium")
+    headline = _cap_terms(issue.get("headline", ""))
+    description = _cap_terms(issue.get("description", ""))
+    recommendation = _cap_terms(issue.get("recommendation", ""))
+
+    sev_color = {"critical": "#c0392b", "moderate": "#e67e22", "minor": "#27ae60"}.get(severity, "#888")
+
+    out.append(f"<div class='issue-card'>")
+    out.append(f"<div class='issue-number'>FINDING {idx}</div>")
+    out.append(f"<div class='issue-headline'>{headline}</div>")
+    out.append(
+        f"<div class='issue-meta'>"
+        f"<span class='severity-dot' style='background:{sev_color}'></span>"
+        f"<span class='severity-label'>{severity.capitalize()}</span>"
+        f"<span class='meta-divider'>|</span>"
+        f"<span class='confidence-label'>Confidence: {confidence.capitalize()}</span>"
+        f"</div>"
+    )
+
+    # Traps section
+    root = issue.get("root_cause_trap", {})
+    contributing = issue.get("contributing_traps", [])
+    if root:
+        out.append("<div class='issue-traps-section'>")
+        out.append("<div class='traps-label'>TRAPS</div>")
+        out.append(_render_trap_bar_html(root, is_root=True))
+        for trap in contributing:
+            out.append(_render_trap_bar_html(trap, is_root=False))
+        out.append("</div>")
+
+    # Description
+    out.append("<div class='issue-body-section'>")
+    out.append("<div class='body-label'>DESCRIPTION</div>")
+    out.append(f"<p>{description}</p>")
+
+    # Region crop
+    region = issue.get("region", {})
+    crop_b64 = region.get("_crop_b64") if region else None
+    caption = region.get("caption", "") if region else ""
+    if crop_b64:
+        out.append(f"<figure class='region-crop'>")
+        out.append(f"<img src='{crop_b64}' alt='Design detail'/>")
+        if caption:
+            out.append(f"<figcaption>{caption}</figcaption>")
+        out.append("</figure>")
+
+    out.append("</div>")
+
+    # Recommendation
+    out.append("<div class='issue-body-section'>")
+    out.append("<div class='body-label'>RECOMMENDATION</div>")
+    out.append(f"<p>{recommendation}</p>")
+    out.append("</div>")
+
+    out.append("</div>")  # .issue-card
+    return "\n".join(out)
+
+
+def format_issues_report_as_html(
+    issues_report: dict[str, Any],
+    user_context: dict[str, Any],
+    analysis_settings: Optional[dict[str, Any]] = None,
+) -> str:
+    """
+    Render the user-issues synthesis (Pass 3) as an HTML report.
+
+    Issue card layout per finding:
+      FINDING N
+      [headline]
+      Severity dot + label | Confidence label
+      TRAPS
+        [ROOT CAUSE bar] TRAP NAME — definition
+        [contributing bar] TRAP NAME — definition  (stacked, one per trap)
+      DESCRIPTION
+        [text]
+        [optional region crop]
+      RECOMMENDATION
+        [text]
+    """
+    from datetime import datetime
+    html = []
+
+    html.append("<!DOCTYPE html>")
+    html.append("<html lang='en'>")
+    html.append("<head><meta charset='UTF-8'>")
+    html.append("<meta name='viewport' content='width=device-width, initial-scale=1.0'>")
+    html.append("<title>UI Traps Analysis — Issue View</title>")
+    html.append("<style>")
+    html.append(_ISSUES_REPORT_CSS)
+    html.append("</style>")
+    html.append("</head><body>")
+    html.append("<div class='report-container'>")
+
+    # Header
+    html.append("<div class='report-header'>")
+    html.append("<h1>UI Tenets &amp; Traps Analysis</h1>")
+    html.append("<p class='report-subtitle'>Issue View</p>")
+    html.append(f"<p class='report-date'>{datetime.now().strftime('%B %d, %Y')}</p>")
+    html.append("</div>")
+
+    # Summary
+    headline = _cap_terms(issues_report.get("summary_headline", ""))
+    narrative = _cap_terms(issues_report.get("summary_narrative", ""))
+    html.append("<div class='summary-section'>")
+    html.append(f"<h2 class='summary-headline'>{headline}</h2>")
+    html.append(f"<p class='summary-narrative'>{narrative}</p>")
+    html.append("</div>")
+
+    # Issues
+    issues = issues_report.get("issues", [])
+    if issues:
+        html.append("<div class='issues-section'>")
+        html.append(f"<p class='section-intro'>{len(issues)} issue{'s' if len(issues) != 1 else ''} identified.</p>")
+        for idx, issue in enumerate(issues, 1):
+            html.append(_render_issue_card_html(idx, issue))
+        html.append("</div>")
+
+    # Positive observations
+    pos = issues_report.get("positive_observations", [])
+    if pos:
+        html.append("<div class='positives-section'>")
+        html.append("<h2>What Works Well</h2>")
+        html.append("<ul>")
+        for p in pos:
+            html.append(f"<li>{_cap_terms(p)}</li>")
+        html.append("</ul>")
+        html.append("</div>")
+
+    # Traps not found
+    raw_items = issues_report.get('traps_checked_not_found', [])
+    tested_ok = []
+    untestable = []
+    for item in raw_items:
+        if isinstance(item, str):
+            tested_ok.append(item)
+        elif item.get('testable', True):
+            tested_ok.append(item['trap_name'])
+        else:
+            untestable.append(item)
+
+    if tested_ok:
+        html.append("<div class='traps-not-found'>")
+        html.append("<h2>Traps Not Found</h2>")
+        html.append("<p class='section-intro'>The following traps were specifically evaluated and do not appear to be present.</p>")
+        html.append("<ul class='trap-name-list'>")
+        for trap in tested_ok:
+            tenet = _tenet_for(trap)
+            html.append(f"<li>{_tenet_pill_html(trap, tenet)}</li>")
+        html.append("</ul></div>")
+
+    if untestable:
+        html.append("<div class='traps-not-found'>")
+        html.append("<h2>Needs More Context</h2>")
+        html.append("<p class='section-intro'>The following traps could not be fully evaluated from the submitted materials.</p>")
+        html.append("<ul class='trap-name-list'>")
+        for item in untestable:
+            tenet = _tenet_for(item['trap_name'])
+            html.append(f"<li>{_tenet_pill_html(item['trap_name'], tenet)}</li>")
+        html.append("</ul></div>")
+
+    # Footer
+    html.append("<div class='footer confidentiality-notice'>")
+    html.append("<p><em>Generated using UI Tenets &amp; Traps proprietary framework</em></p>")
+    html.append("</div>")
+    html.append("</div></body></html>")
+    return "\n".join(html)
+
+
 def get_report_statistics(report: Dict[str, Any]) -> Dict[str, Any]:
     """
     Extract statistics from report for tracking/analytics.
