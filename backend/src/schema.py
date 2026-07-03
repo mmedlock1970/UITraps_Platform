@@ -424,6 +424,137 @@ def get_ui_analysis_schema():
     return UI_ANALYSIS_SCHEMA
 
 
+# Schema for Pass 3 user-issues synthesis output
+USER_ISSUES_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "summary_headline": {
+            "type": "string",
+            "description": "One sentence capturing the most significant user-facing issue. Use measured language: 'appears to', 'may affect'. Do NOT write a count."
+        },
+        "summary_narrative": {
+            "type": "string",
+            "description": "A single paragraph (3-5 sentences) summarising the overall picture for a reader who has not yet seen the findings. Use hedged language throughout."
+        },
+        "issues": {
+            "type": "array",
+            "description": "User-facing problems, each grouping one or more related Traps that share a common design element or underlying problem.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "headline": {
+                        "type": "string",
+                        "description": "One sentence describing the problem in user-relatable terms, tied to the specific design and context. Avoid Trap jargon. Use measured language."
+                    },
+                    "severity": {
+                        "type": "string",
+                        "enum": ["critical", "moderate", "minor"],
+                        "description": "Severity of the issue — take the highest severity among the grouped Traps."
+                    },
+                    "confidence": {
+                        "type": "string",
+                        "enum": ["high", "medium", "low"],
+                        "description": "Confidence in this issue — take the lowest confidence among the grouped Traps."
+                    },
+                    "root_cause_trap": {
+                        "type": "object",
+                        "description": "The Trap that best represents the root cause of this issue. Required even for single-Trap issues.",
+                        "properties": {
+                            "trap_name": {
+                                "type": "string",
+                                "enum": VALID_TRAP_NAMES,
+                                "description": "Trap name — MUST be one of the 27 valid trap names"
+                            },
+                            "tenet": {
+                                "type": "string",
+                                "enum": VALID_TENET_NAMES
+                            },
+                            "definition": {
+                                "type": "string",
+                                "description": "One-sentence definition of this Trap as it applies to the observed problem."
+                            }
+                        },
+                        "required": ["trap_name", "tenet", "definition"]
+                    },
+                    "contributing_traps": {
+                        "type": "array",
+                        "description": "Additional Traps whose definitions are also satisfied by this same design problem. Empty array if none.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "trap_name": {
+                                    "type": "string",
+                                    "enum": VALID_TRAP_NAMES
+                                },
+                                "tenet": {
+                                    "type": "string",
+                                    "enum": VALID_TENET_NAMES
+                                },
+                                "definition": {
+                                    "type": "string",
+                                    "description": "One-sentence definition of this Trap as it applies to the observed problem."
+                                }
+                            },
+                            "required": ["trap_name", "tenet", "definition"]
+                        }
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "2-4 sentences describing the issue from the user's perspective. Use measured language."
+                    },
+                    "recommendation": {
+                        "type": "string",
+                        "description": "2-3 sentences suggesting how the issue might be addressed. Use advisory language."
+                    },
+                    "region": {
+                        "type": "object",
+                        "description": "Bounding box of the design element. Normalized 0.0-1.0, origin top-left. Omit if no single element can be bounded.",
+                        "properties": {
+                            "x": {"type": "number"},
+                            "y": {"type": "number"},
+                            "width": {"type": "number"},
+                            "height": {"type": "number"},
+                            "caption": {"type": "string"}
+                        },
+                        "required": ["x", "y", "width", "height"]
+                    }
+                },
+                "required": ["headline", "severity", "confidence", "root_cause_trap", "contributing_traps", "description", "recommendation"]
+            }
+        },
+        "positive_observations": {
+            "type": "array",
+            "items": {"type": "string"}
+        },
+        "traps_checked_not_found": {
+            "type": "array",
+            "description": "Pass-through from the underlying Trap analysis — traps evaluated and not found.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "trap_name": {"type": "string"},
+                    "testable": {"type": "boolean"}
+                },
+                "required": ["trap_name", "testable"]
+            }
+        }
+    },
+    "required": [
+        "summary_headline",
+        "summary_narrative",
+        "issues",
+        "positive_observations",
+        "traps_checked_not_found"
+    ],
+    "additionalProperties": False
+}
+
+
+def get_user_issues_schema():
+    """Get the JSON schema for Pass 3 user-issues synthesis output."""
+    return USER_ISSUES_SCHEMA
+
+
 # Interaction Analysis Schema
 # Used for analyzing individual interaction sequences (hover, click, form, scroll, responsive)
 INTERACTION_ANALYSIS_SCHEMA = {
