@@ -2928,7 +2928,7 @@ def _render_issue_card_html(idx: int, issue: dict[str, Any]) -> str:
     caption = region.get("caption", "") if region else ""
     if crop_b64:
         out.append(f"<figure class='region-crop'>")
-        out.append(f"<img src='{crop_b64}' alt='Design detail'/>")
+        out.append(f"<img src='data:image/png;base64,{crop_b64}' alt='Design detail'/>")
         if caption:
             out.append(f"<figcaption>{caption}</figcaption>")
         out.append("</figure>")
@@ -2966,7 +2966,6 @@ def format_issues_report_as_html(
       RECOMMENDATION
         [text]
     """
-    from datetime import datetime
     html = []
 
     html.append("<!DOCTYPE html>")
@@ -2984,7 +2983,24 @@ def format_issues_report_as_html(
     html.append("<div class='report-header'>")
     html.append("<h1>UI Tenets &amp; Traps Analysis</h1>")
     html.append("<p class='report-subtitle'>Issue View</p>")
-    html.append(f"<p class='report-date'>{datetime.now().strftime('%B %d, %Y')}</p>")
+    _ts_lines = [f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}"]
+    if analysis_settings:
+        _v = analysis_settings.get('verbosity')
+        _ts_lines.append(f"Report detail: {'Brief' if _v == 'brief' else 'Standard'}")
+        _m = analysis_settings.get('pass1_model')
+        _ts_lines.append(f"Analysis model: {'Haiku 4.5' if _m == 'haiku' else 'Sonnet 4.6'}")
+        _kb = analysis_settings.get('kb_version')
+        if _kb:
+            _kb_display = {'both': 'v1 + v2', 'v2.1': 'v2.1', 'v1': 'v1'}.get(_kb, 'v2')
+            _ts_lines.append(f"Knowledge base: {_kb_display}")
+        _coverage = 'Thorough' if analysis_settings.get('thorough_mode') else 'Standard'
+        _ts_lines.append(f"Analysis coverage: {_coverage}")
+        _elapsed = analysis_settings.get('elapsed_seconds')
+        if _elapsed is not None:
+            _m2, _s = divmod(int(_elapsed), 60)
+            _time_str = f"{_m2}m {_s}s" if _m2 else f"{_s}s"
+            _ts_lines.append(f"Time to complete: {_time_str}")
+    html.append(f"<p class='report-date'>{'<br>'.join(_ts_lines)}</p>")
     html.append("</div>")
 
     # Summary
