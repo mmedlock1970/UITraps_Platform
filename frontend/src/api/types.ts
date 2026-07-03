@@ -128,6 +128,7 @@ export interface UserContext {
   verbosity?: 'brief' | 'standard';
   pass1_model?: 'sonnet' | 'haiku';
   thorough_mode?: boolean;
+  report_style?: 'trap' | 'issues';
   input_type?: 'screenshot' | 'video' | 'flow_diagram';
   flow_mode?: 'screen' | 'flow';
   figma_url?: string;

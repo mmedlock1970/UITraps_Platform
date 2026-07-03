@@ -59,13 +59,13 @@ function assembleContext(fields: {
   physicalEnv: string; lighting: string; gripPosition: string; attentionalState: string;
   kbVersion: KbVersion; selectedTenets: string[];
   verbosity: 'brief' | 'standard'; pass1Model: 'sonnet' | 'haiku';
-  figmaLink: string; thoroughMode: boolean;
+  figmaLink: string; thoroughMode: boolean; reportStyle: 'trap' | 'issues';
   inputType: 'screenshot' | 'video' | 'flow_diagram';
 }): UserContext {
   const { platform, productDomain, screenName, expLevel, techSavvy,
           frequency, taskList, priorProducts, userDesc, extraContext, productContext,
           physicalEnv, lighting, gripPosition, attentionalState, kbVersion, selectedTenets,
-          verbosity, pass1Model, figmaLink, thoroughMode, inputType } = fields;
+          verbosity, pass1Model, figmaLink, thoroughMode, reportStyle, inputType } = fields;
 
   const combinedExtra = [
     (figmaLink.trim() && inputType !== 'flow_diagram') ? `Design file: ${figmaLink.trim()}` : '',
@@ -111,6 +111,7 @@ function assembleContext(fields: {
     verbosity,
     pass1_model: pass1Model,
     thorough_mode: thoroughMode || undefined,
+    report_style: reportStyle,
     input_type: inputType,
     figma_url: (figmaLink.trim() && inputType === 'flow_diagram') ? figmaLink.trim() : undefined,
   };
@@ -184,6 +185,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
   const [verbosity, setVerbosity] = useState<'brief' | 'standard'>(iv?.verbosity ?? 'standard');
   const [pass1Model, setPass1Model] = useState<'sonnet' | 'haiku'>(iv?.pass1Model ?? 'sonnet');
   const [thoroughMode, setThoroughMode] = useState(iv?.thoroughMode ?? false);
+  const [reportStyle, setReportStyle] = useState<'trap' | 'issues'>('trap');
   const [lockedInputType, setLockedInputType] = useState<'screenshot' | 'video' | 'flow_diagram' | null>(iv?.lockedInputType ?? null);
   const [autoDetectedType, setAutoDetectedType] = useState<'flow_diagram' | null>(null);
   const inputType = lockedInputType ?? autoDetectedType ?? inferFileType(files, figmaLink);
@@ -297,12 +299,12 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
     const context = assembleContext({ platform, productDomain, screenName,
       expLevel, techSavvy, frequency, taskList: tasks, priorProducts, userDesc, extraContext, productContext,
       physicalEnv, lighting, gripPosition, attentionalState, kbVersion, selectedTenets,
-      verbosity, pass1Model, figmaLink, thoroughMode, inputType });
+      verbosity, pass1Model, figmaLink, thoroughMode, reportStyle, inputType });
     onSubmit({ files, context, formSnapshot });
   }, [disabled, validate, files, figmaLink, screenName, platform, productDomain, productContext,
       expLevel, techSavvy, frequency, tasks, userDesc, priorProducts, extraContext,
       physicalEnv, lighting, gripPosition, attentionalState, kbVersion, selectedTenets,
-      verbosity, pass1Model, thoroughMode, lockedInputType, onSubmit]);
+      verbosity, pass1Model, thoroughMode, reportStyle, lockedInputType, onSubmit]);
 
   const handleFileChange = useCallback((newFiles: FileList | null) => {
     if (!newFiles || newFiles.length === 0) return;
@@ -982,6 +984,35 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
             <p className={styles.fieldHint}>
               {!thoroughMode && 'Single-pass analysis. Fast, good coverage for most designs.'}
               {thoroughMode && 'Runs one focused pass per Tenet in parallel, then merges findings. More consistent results, similar speed. Recommended for final reviews.'}
+            </p>
+          </div>
+
+          <hr className={styles.fieldDivider} />
+
+          {/* Report Style */}
+          <div className={styles.field}>
+            <label className={styles.fieldLabel}>Report style</label>
+            <div className={styles.kbVersionGroup}>
+              <button
+                type="button"
+                className={`${styles.kbVersionBtn} ${reportStyle === 'trap' ? styles.kbVersionBtnActive : ''}`}
+                onClick={() => setReportStyle('trap')}
+                disabled={disabled}
+              >
+                By Trap
+              </button>
+              <button
+                type="button"
+                className={`${styles.kbVersionBtn} ${reportStyle === 'issues' ? styles.kbVersionBtnActive : ''}`}
+                onClick={() => setReportStyle('issues')}
+                disabled={disabled}
+              >
+                By Issue
+              </button>
+            </div>
+            <p className={styles.fieldHint}>
+              {reportStyle === 'trap' && 'Findings grouped by trap type. Best for understanding which patterns appear in your design.'}
+              {reportStyle === 'issues' && 'Findings grouped as individual issues, ranked by severity. Best for a prioritized action list.'}
             </p>
           </div>
 
