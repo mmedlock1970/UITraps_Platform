@@ -863,6 +863,17 @@ class UITrapsAnalyzer:
                 # Pass-through Pass 1 fields that the formatter needs but
                 # the synthesis schema does not produce.
                 result['traps_checked_not_found'] = enriched_report.get('traps_checked_not_found', [])
+                # Build trap_name → crop lookup so the formatter can attach
+                # the Pass 1 screenshot crop to the matching issue card.
+                region_by_trap: dict[str, dict] = {}
+                for _sev in ("critical_issues", "moderate_issues", "minor_issues"):
+                    for _f in enriched_report.get(_sev, []) or []:
+                        _name = (_f.get("trap_name") or "").upper().strip()
+                        _b64 = _f.get("region_image_b64")
+                        if _name and _b64:
+                            _caption = (_f.get("region") or {}).get("caption") or _f.get("location", "")
+                            region_by_trap[_name] = {"b64": _b64, "caption": _caption}
+                result['_region_by_trap'] = region_by_trap
                 return result
 
         print("[UITraps] Pass 3: no tool-use block in response, synthesis skipped")

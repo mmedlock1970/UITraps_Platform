@@ -2919,7 +2919,7 @@ def _render_trap_bar_html(trap: dict[str, Any], is_root: bool) -> str:
     )
 
 
-def _render_issue_card_html(idx: int, issue: dict[str, Any]) -> str:
+def _render_issue_card_html(idx: int, issue: dict[str, Any], region_by_trap: dict[str, Any] | None = None) -> str:
     """Render one issue card for the user-issues report."""
     out = []
     severity = issue.get("severity", "moderate")
@@ -2960,10 +2960,12 @@ def _render_issue_card_html(idx: int, issue: dict[str, Any]) -> str:
     out.append("<div class='body-label'>DESCRIPTION</div>")
     out.append(f"<p>{description}</p>")
 
-    # Region crop
-    region = issue.get("region", {})
-    crop_b64 = region.get("_crop_b64") if region else None
-    caption = region.get("caption", "") if region else ""
+    # Region crop: look up the root cause trap's Pass 1 screenshot crop.
+    # Only shown when Pass 1 identified a specific region with high confidence.
+    root_name = (root.get("trap_name") or "").upper().strip() if root else ""
+    region_entry = (region_by_trap or {}).get(root_name, {}) if root_name else {}
+    crop_b64 = region_entry.get("b64")
+    caption = region_entry.get("caption", "")
     if crop_b64:
         out.append(f"<figure class='region-crop'>")
         out.append(f"<img src='data:image/png;base64,{crop_b64}' alt='Design detail'/>")
@@ -3140,11 +3142,12 @@ def format_issues_report_as_html(
     html.append("</div>")  # summary-section
 
     # Issues
+    region_by_trap = issues_report.get('_region_by_trap', {})
     if issues:
         html.append(f"<h2>{'Issue' if len(issues) == 1 else 'Issues'} Identified</h2>")
         html.append("<div class='issues-section'>")
         for idx, issue in enumerate(issues, 1):
-            html.append(_render_issue_card_html(idx, issue))
+            html.append(_render_issue_card_html(idx, issue, region_by_trap))
         html.append("</div>")
 
     # Positive observations

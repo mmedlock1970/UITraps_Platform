@@ -18,7 +18,7 @@ import { AnalysisProgress } from './components/AnalysisProgress';
 import { ReportViewer } from './components/ReportViewer';
 import { PastAnalyses } from './components/PastAnalyses';
 import { TaskCaptureScreen, CapturedStep } from './components/TaskCaptureScreen';
-import { saveAnalysis, StoredAnalysis, FormSnapshot } from './services/analysisHistory';
+import { saveAnalysis, getAnalysisHistory, StoredAnalysis, FormSnapshot } from './services/analysisHistory';
 import { ReportStatistics, UsageInfo, UnifiedAskResponse, TimeEstimate, UserContext, isFigmaEstimate, isUrlEstimate, isFileEstimate, UnifiedEstimate } from './api/types';
 import { unifiedAsk } from './api/client';
 import { ChatPanel } from './components/ChatPanel';
@@ -631,6 +631,11 @@ export const App: React.FC = () => {
             <button className={styles.headerButton} onClick={() => setView('form')}>
               New Analysis
             </button>
+            {getAnalysisHistory().length > 0 && (
+              <button className={styles.headerButton} onClick={() => setView('history')}>
+                Past Analyses
+              </button>
+            )}
             {!externalTheme && (
               <button className={`${styles.headerButton} ${styles.themeToggle}`} onClick={toggleTheme} title={theme === 'light' ? 'Dark mode' : 'Light mode'}>
                 {theme === 'light'
