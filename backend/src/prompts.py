@@ -1812,16 +1812,23 @@ CRITICAL RULES:
 9. Each issue must describe exactly ONE discrete user problem. Do not combine two separate user experiences into a single issue just because they occur in the same area of the interface. If a design has both a navigation problem AND a content relevance problem, those are two separate issues even if they co-occur. The test: would fixing one problem automatically fix the other? If not, they are separate issues."""
 
 
-def build_synthesis_user_message(pass2_report: dict[str, Any]) -> str:
+def build_synthesis_user_message(pass2_report: dict[str, Any], kb_version: str = "v2") -> str:
     """
     User message for Pass 3: provides the confirmed Trap findings for synthesis.
 
     Args:
         pass2_report: The enriched report from Pass 1+2 (per-Trap findings).
+        kb_version: Knowledge base version — "v1" or "v2" (default "v2").
 
     Returns:
         Formatted user message string for the synthesis API call.
     """
+    try:
+        from .knowledge_extractor import get_trap_definitions
+    except ImportError:
+        from knowledge_extractor import get_trap_definitions
+    trap_defs = get_trap_definitions(version=kb_version)
+
     sections = []
     sections.append("## Confirmed Trap Findings from Trap Analysis\n\n")
     sections.append("Group these findings into user-facing issues. Each finding was confirmed by applying the UI Tenets & Traps knowledge base.\n\n")
@@ -1838,8 +1845,11 @@ def build_synthesis_user_message(pass2_report: dict[str, Any]) -> str:
         for f in findings:
             if not isinstance(f, dict):
                 continue
+            trap_name = f.get('trap_name', '')
+            verbatim_def = trap_defs.get(trap_name.upper(), '')
             sections.append(
-                f"- **{f.get('trap_name', '')}** ({f.get('tenet', '')})\n"
+                f"- **{trap_name}** ({f.get('tenet', '')})\n"
+                f"  Verbatim definition: {verbatim_def}\n"
                 f"  Location: {f.get('location', '')}\n"
                 f"  Headline: {f.get('headline', '')}\n"
                 f"  Problem: {f.get('problem', '')}\n"
@@ -1865,7 +1875,7 @@ def build_synthesis_user_message(pass2_report: dict[str, Any]) -> str:
         sections.append("\n")
 
     sections.append("---\n\n")
-    sections.append("Synthesise these findings into user-facing issues using the ui_issues_report tool.")
+    sections.append("Synthesise these findings into user-facing issues using the ui_issues_report tool. For each trap's 'definition' field, copy the 'Verbatim definition' provided above EXACTLY — do not paraphrase or adapt it.")
 
     return "".join(sections)
 

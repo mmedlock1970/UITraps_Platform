@@ -512,6 +512,55 @@ def _extract_single_section(trap_name: str, book_text: str) -> str:
     return section_text
 
 
+def get_trap_definitions(version: str = "v2") -> dict[str, str]:
+    """
+    Parse the KB file and return a dict mapping trap name (uppercase) to
+    its verbatim one-sentence definition.
+
+    Looks for:
+      # CHUNK: TRAP NAME
+      ...
+      ## Definition (verbatim)
+      <first non-empty line is the definition>
+    """
+    import re as _re
+    if version == "v1":
+        kb_path = ANALYSIS_REFERENCE_PATH_V1
+    else:
+        kb_path = ANALYSIS_REFERENCE_PATH
+
+    if not kb_path.exists():
+        return {}
+
+    text = kb_path.read_text(encoding="utf-8")
+    definitions: dict[str, str] = {}
+
+    # Split into chunks on '# CHUNK:' lines
+    chunks = _re.split(r'\n(?=# CHUNK:)', text)
+    for chunk in chunks:
+        lines = chunk.strip().split('\n')
+        if not lines or not lines[0].startswith('# CHUNK:'):
+            continue
+        trap_name = lines[0][len('# CHUNK:'):].strip().upper()
+        # Skip tenet-level chunks (they start with 'TENET —') or framework overview
+        if trap_name.startswith('TENET') or trap_name == 'FRAMEWORK OVERVIEW':
+            continue
+        # Find '## Definition (verbatim)' and take the next non-empty line
+        in_def = False
+        for line in lines[1:]:
+            if line.strip().startswith('## Definition'):
+                in_def = True
+                continue
+            if in_def and line.strip():
+                definitions[trap_name] = line.strip()
+                break
+            if in_def and line.startswith('## '):
+                # Hit another section without finding definition text
+                break
+
+    return definitions
+
+
 def collect_found_trap_names(report: dict) -> List[str]:
     """
     Extract all unique trap names from a Pass 1 report.

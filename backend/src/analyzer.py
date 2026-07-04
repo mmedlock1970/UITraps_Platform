@@ -834,7 +834,8 @@ class UITrapsAnalyzer:
             return None
 
         system_prompt = build_synthesis_system_prompt()
-        user_message = build_synthesis_user_message(enriched_report)
+        kb_version = enriched_report.get("_meta", {}).get("kb_version", "v2")
+        user_message = build_synthesis_user_message(enriched_report, kb_version=kb_version)
         schema = get_user_issues_schema()
 
         print(f"[UITraps] Pass 3: synthesising {total} Trap finding(s) into user issues")
