@@ -2786,6 +2786,9 @@ _ISSUES_REPORT_CSS = """
          font-size: 15px; line-height: 1.6; color: #1a1a1a; background: #f5f5f5; }
   .report-container { max-width: 860px; margin: 0 auto; padding: 32px 24px; }
 
+  /* ── Section titles (outside cards) ─────────────────────────────────── */
+  h2 { font-size: 1.3em; font-weight: 700; color: #111; margin: 28px 0 12px; }
+
   /* ── Header ─────────────────────────────────────────────────────────── */
   .report-header { margin-bottom: 32px; }
   .report-header h1 { font-size: 1.6em; font-weight: 700; color: #111; }
@@ -2794,8 +2797,10 @@ _ISSUES_REPORT_CSS = """
 
   /* ── Summary ─────────────────────────────────────────────────────────── */
   .summary-section { background: #fff; border-radius: 10px; padding: 24px; margin-bottom: 28px;
-                     box-shadow: 0 1px 4px rgba(0,0,0,.07); }
-  .summary-headline { font-size: 1.15em; font-weight: 700; color: #111; margin-bottom: 10px; }
+                     box-shadow: 0 1px 4px rgba(0,0,0,.07); margin-top: 0; }
+  .summary-inner { }
+  .summary-headline { font-size: 1.1em; font-weight: 700; color: #111;
+                      margin-top: 16px; margin-bottom: 8px; line-height: 1.4; }
   .summary-narrative { color: #444; line-height: 1.7; }
 
   /* ── Issues section ──────────────────────────────────────────────────── */
@@ -2844,14 +2849,13 @@ _ISSUES_REPORT_CSS = """
   .positives-section { background: #fff; border-radius: 10px; padding: 20px 20px 20px 28px;
                        margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.07);
                        border-left: 4px solid #27ae60; }
-  .positives-section h2 { font-size: 1em; font-weight: 700; margin-bottom: 10px; }
   .positives-section ul { padding-left: 16px; }
   .positives-section li { color: #444; margin-bottom: 6px; line-height: 1.6; }
 
   /* ── Traps not found ─────────────────────────────────────────────────── */
   .traps-not-found { background: #fff; border-radius: 10px; padding: 20px;
                      margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
-  .traps-not-found h2 { font-size: 1em; font-weight: 700; margin-bottom: 6px; }
+  .traps-not-found { margin-top: 0; }
   .trap-name-list { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
   .tenet-pill { display: inline-block; color: #fff; font-size: 0.78em; font-weight: 700;
                 letter-spacing: .04em; padding: 4px 10px; border-radius: 4px; }
@@ -2880,7 +2884,7 @@ _ISSUES_REPORT_CSS = """
   /* ── Evaluation Details ──────────────────────────────────────────────── */
   .eval-details { background: #fff; border-radius: 10px; padding: 20px;
                   margin-bottom: 24px; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
-  .eval-details h2 { font-size: 1em; font-weight: 700; margin-bottom: 10px; }
+  .eval-details { margin-top: 0; }
   .context-body p { color: #444; margin-bottom: 6px; font-size: 0.9em; }
   .context-body ul { margin: 4px 0 8px; padding-left: 20px; }
   .users-detail { margin: 0 0 8px; }
@@ -3036,8 +3040,8 @@ def format_issues_report_as_html(
 
     # Evaluation Details
     if user_context:
-        html.append("<div class='eval-details'>")
         html.append("<h2>Evaluation Details</h2>")
+        html.append("<div class='eval-details'>")
         html.append("<div class='context-section'>")
         html.append("<div class='context-body'>")
         if user_context.get('design_name'):
@@ -3088,16 +3092,24 @@ def format_issues_report_as_html(
         html.append("</div>")
         html.append("</div>")
 
-    # Summary
+    # Summary of Findings
     headline = _cap_terms(issues_report.get("summary_headline", ""))
     narrative = _cap_terms(issues_report.get("summary_narrative", ""))
     issues = issues_report.get("issues", [])
-    critical_count = sum(1 for i in issues if i.get('severity') == 'critical')
-    moderate_count = sum(1 for i in issues if i.get('severity') == 'moderate')
-    minor_count = sum(1 for i in issues if i.get('severity') == 'minor')
+
+    def _is_high_conf(i): return i.get('confidence', '').lower() == 'high'
+    hc_critical = sum(1 for i in issues if i.get('severity') == 'critical' and _is_high_conf(i))
+    hc_moderate = sum(1 for i in issues if i.get('severity') == 'moderate' and _is_high_conf(i))
+    hc_minor    = sum(1 for i in issues if i.get('severity') == 'minor'    and _is_high_conf(i))
+    lc_critical = sum(1 for i in issues if i.get('severity') == 'critical' and not _is_high_conf(i))
+    lc_moderate = sum(1 for i in issues if i.get('severity') == 'moderate' and not _is_high_conf(i))
+    lc_minor    = sum(1 for i in issues if i.get('severity') == 'minor'    and not _is_high_conf(i))
+
+    def _sc(val): return str(val) if val else '<span class="scorecard-empty">—</span>'
+
+    html.append("<h2>Summary of Findings</h2>")
     html.append("<div class='summary-section'>")
-    html.append(f"<h2 class='summary-headline'>{headline}</h2>")
-    html.append(f"<p class='summary-narrative'>{narrative}</p>")
+    html.append("<div class='summary-inner'>")
     html.append("<p class='scorecard-title'>Number of Issues Identified</p>")
     html.append("<table class='scorecard-table'>")
     html.append("<thead><tr>")
@@ -3105,20 +3117,29 @@ def format_issues_report_as_html(
     html.append("<th class='scorecard-col scorecard-th-high'>Critical</th>")
     html.append("<th class='scorecard-col scorecard-th-moderate'>Moderate</th>")
     html.append("<th class='scorecard-col scorecard-th-low'>Minor</th>")
-    html.append("</tr></thead>")
-    html.append("<tbody><tr>")
-    html.append("<td class='scorecard-label'>Issues found</td>")
-    html.append(f"<td class='scorecard-col scorecard-val-high'>{critical_count if critical_count else '<span class=\"scorecard-empty\">—</span>'}</td>")
-    html.append(f"<td class='scorecard-col scorecard-val-moderate'>{moderate_count if moderate_count else '<span class=\"scorecard-empty\">—</span>'}</td>")
-    html.append(f"<td class='scorecard-col scorecard-val-low'>{minor_count if minor_count else '<span class=\"scorecard-empty\">—</span>'}</td>")
-    html.append("</tr></tbody>")
-    html.append("</table>")
-    html.append("</div>")
+    html.append("</tr></thead><tbody>")
+    html.append("<tr>")
+    html.append("<td class='scorecard-label'>Higher confidence</td>")
+    html.append(f"<td class='scorecard-col scorecard-val-high'>{_sc(hc_critical)}</td>")
+    html.append(f"<td class='scorecard-col scorecard-val-moderate'>{_sc(hc_moderate)}</td>")
+    html.append(f"<td class='scorecard-col scorecard-val-low'>{_sc(hc_minor)}</td>")
+    html.append("</tr><tr>")
+    html.append("<td class='scorecard-label'>Lower confidence</td>")
+    html.append(f"<td class='scorecard-col scorecard-val-high'>{_sc(lc_critical)}</td>")
+    html.append(f"<td class='scorecard-col scorecard-val-moderate'>{_sc(lc_moderate)}</td>")
+    html.append(f"<td class='scorecard-col scorecard-val-low'>{_sc(lc_minor)}</td>")
+    html.append("</tr></tbody></table>")
+    if headline:
+        html.append(f"<p class='summary-headline'>{headline}</p>")
+    if narrative:
+        html.append(f"<p class='summary-narrative'>{narrative}</p>")
+    html.append("</div>")  # summary-inner
+    html.append("</div>")  # summary-section
 
     # Issues
     if issues:
+        html.append(f"<h2>{'Issue' if len(issues) == 1 else 'Issues'} Identified</h2>")
         html.append("<div class='issues-section'>")
-        html.append(f"<p class='section-intro'>{len(issues)} issue{'s' if len(issues) != 1 else ''} identified.</p>")
         for idx, issue in enumerate(issues, 1):
             html.append(_render_issue_card_html(idx, issue))
         html.append("</div>")
@@ -3126,8 +3147,8 @@ def format_issues_report_as_html(
     # Positive observations
     pos = issues_report.get("positive_observations", [])
     if pos:
-        html.append("<div class='positives-section'>")
         html.append("<h2>What Works Well</h2>")
+        html.append("<div class='positives-section'>")
         html.append("<ul>")
         for p in pos:
             html.append(f"<li>{_cap_terms(p)}</li>")
@@ -3147,8 +3168,8 @@ def format_issues_report_as_html(
             untestable.append(item)
 
     if tested_ok:
-        html.append("<div class='traps-not-found'>")
         html.append("<h2>Traps Not Found</h2>")
+        html.append("<div class='traps-not-found'>")
         html.append("<p class='section-intro'>The following traps were specifically evaluated and do not appear to be present.</p>")
         html.append("<ul class='trap-name-list'>")
         for trap in tested_ok:
@@ -3157,8 +3178,8 @@ def format_issues_report_as_html(
         html.append("</ul></div>")
 
     if untestable:
-        html.append("<div class='traps-not-found'>")
         html.append("<h2>Needs More Context</h2>")
+        html.append("<div class='traps-not-found'>")
         html.append("<p class='section-intro'>The following traps could not be fully evaluated from the submitted materials.</p>")
         html.append("<ul class='trap-name-list'>")
         for item in untestable:
