@@ -2841,11 +2841,12 @@ _ISSUES_REPORT_CSS = """
                              font-style: italic; margin-top: 6px; }
 
   /* ── Positives ───────────────────────────────────────────────────────── */
-  .positives-section { background: #fff; border-radius: 10px; padding: 20px;
+  .positives-section { background: #fff; border-radius: 10px; padding: 20px 20px 20px 28px;
                        margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.07);
                        border-left: 4px solid #27ae60; }
   .positives-section h2 { font-size: 1em; font-weight: 700; margin-bottom: 10px; }
-  .positives-section li { color: #444; margin-bottom: 4px; }
+  .positives-section ul { padding-left: 16px; }
+  .positives-section li { color: #444; margin-bottom: 6px; line-height: 1.6; }
 
   /* ── Traps not found ─────────────────────────────────────────────────── */
   .traps-not-found { background: #fff; border-radius: 10px; padding: 20px;
@@ -2859,8 +2860,22 @@ _ISSUES_REPORT_CSS = """
   .footer { border-top: 1px solid #e0e0e0; padding-top: 16px; margin-top: 28px;
             font-size: 0.82em; color: #888; }
 
-  /* ── Findings count ──────────────────────────────────────────────────── */
-  .findings-count { font-weight: 600; color: #333; margin-top: 10px; font-size: 0.95em; }
+  /* ── Scorecard table ─────────────────────────────────────────────────── */
+  .scorecard-title { font-size: 0.82em; font-weight: 600; color: #555;
+                     text-transform: uppercase; letter-spacing: .06em;
+                     margin-bottom: 10px; margin-top: 16px; }
+  .scorecard-table { border-collapse: collapse; margin-bottom: 16px; }
+  .scorecard-table th, .scorecard-table td { padding: 6px 20px; text-align: center; font-size: 0.9em; }
+  .scorecard-table thead th { font-size: 0.8em; font-weight: 600; color: #666;
+                              border-bottom: 1px solid #e0e0e0; }
+  .scorecard-label { text-align: left !important; color: #555; font-size: 0.85em; }
+  .scorecard-th-high   { color: #c0392b; }
+  .scorecard-th-moderate { color: #e67e22; }
+  .scorecard-th-low    { color: #27ae60; }
+  .scorecard-val-high   { color: #c0392b; font-weight: 700; font-size: 1.1em; }
+  .scorecard-val-moderate { color: #e67e22; font-weight: 700; font-size: 1.1em; }
+  .scorecard-val-low    { color: #27ae60; font-weight: 700; font-size: 1.1em; }
+  .scorecard-empty { color: #ccc; font-weight: 400; }
 
   /* ── Evaluation Details ──────────────────────────────────────────────── */
   .eval-details { background: #fff; border-radius: 10px; padding: 20px;
@@ -2914,7 +2929,7 @@ def _render_issue_card_html(idx: int, issue: dict[str, Any]) -> str:
     out.append(
         f"<div class='issue-meta'>"
         f"<span class='severity-dot' style='background:{sev_color}'></span>"
-        f"<span class='severity-label'>{severity.capitalize()}</span>"
+        f"<span class='severity-label'>Severity: {severity.capitalize()}</span>"
         f"<span class='meta-divider'>|</span>"
         f"<span class='confidence-label'>Confidence: {confidence.capitalize()}</span>"
         f"</div>"
@@ -2926,7 +2941,8 @@ def _render_issue_card_html(idx: int, issue: dict[str, Any]) -> str:
     if root:
         out.append("<div class='issue-traps-section'>")
         out.append("<div class='traps-label'>TRAPS</div>")
-        out.append(_render_trap_bar_html(root, is_root=True))
+        has_contributing = bool(contributing)
+        out.append(_render_trap_bar_html(root, is_root=has_contributing))
         for trap in contributing:
             out.append(_render_trap_bar_html(trap, is_root=False))
         out.append("</div>")
@@ -3078,16 +3094,24 @@ def format_issues_report_as_html(
     critical_count = sum(1 for i in issues if i.get('severity') == 'critical')
     moderate_count = sum(1 for i in issues if i.get('severity') == 'moderate')
     minor_count = sum(1 for i in issues if i.get('severity') == 'minor')
-    parts = []
-    if critical_count: parts.append(f"{critical_count} critical")
-    if moderate_count: parts.append(f"{moderate_count} moderate")
-    if minor_count: parts.append(f"{minor_count} minor")
     html.append("<div class='summary-section'>")
     html.append(f"<h2 class='summary-headline'>{headline}</h2>")
     html.append(f"<p class='summary-narrative'>{narrative}</p>")
-    if parts:
-        total = critical_count + moderate_count + minor_count
-        html.append(f"<p class='findings-count'>{', '.join(parts)} {'issue' if total == 1 else 'issues'} identified.</p>")
+    html.append("<p class='scorecard-title'>Number of Issues Identified</p>")
+    html.append("<table class='scorecard-table'>")
+    html.append("<thead><tr>")
+    html.append("<th></th>")
+    html.append("<th class='scorecard-col scorecard-th-high'>Critical</th>")
+    html.append("<th class='scorecard-col scorecard-th-moderate'>Moderate</th>")
+    html.append("<th class='scorecard-col scorecard-th-low'>Minor</th>")
+    html.append("</tr></thead>")
+    html.append("<tbody><tr>")
+    html.append("<td class='scorecard-label'>Issues found</td>")
+    html.append(f"<td class='scorecard-col scorecard-val-high'>{critical_count if critical_count else '<span class=\"scorecard-empty\">—</span>'}</td>")
+    html.append(f"<td class='scorecard-col scorecard-val-moderate'>{moderate_count if moderate_count else '<span class=\"scorecard-empty\">—</span>'}</td>")
+    html.append(f"<td class='scorecard-col scorecard-val-low'>{minor_count if minor_count else '<span class=\"scorecard-empty\">—</span>'}</td>")
+    html.append("</tr></tbody>")
+    html.append("</table>")
     html.append("</div>")
 
     # Issues
