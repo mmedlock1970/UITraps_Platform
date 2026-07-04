@@ -2924,7 +2924,7 @@ def _render_issue_card_html(idx: int, issue: dict[str, Any]) -> str:
     sev_color = {"critical": "#c0392b", "moderate": "#e67e22", "minor": "#27ae60"}.get(severity, "#888")
 
     out.append(f"<div class='issue-card'>")
-    out.append(f"<div class='issue-number'>FINDING {idx}</div>")
+    out.append(f"<div class='issue-number'>ISSUE {idx}</div>")
     out.append(f"<div class='issue-headline'>{headline}</div>")
     out.append(
         f"<div class='issue-meta'>"
@@ -2940,7 +2940,8 @@ def _render_issue_card_html(idx: int, issue: dict[str, Any]) -> str:
     contributing = issue.get("contributing_traps", [])
     if root:
         out.append("<div class='issue-traps-section'>")
-        out.append("<div class='traps-label'>TRAPS</div>")
+        trap_label = "TRAP" if not contributing else "TRAPS"
+        out.append(f"<div class='traps-label'>{trap_label}</div>")
         has_contributing = bool(contributing)
         out.append(_render_trap_bar_html(root, is_root=has_contributing))
         for trap in contributing:
