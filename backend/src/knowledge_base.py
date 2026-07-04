@@ -1,8 +1,8 @@
 """
 Structured knowledge base for UI Tenets & Traps Pass 2 enrichment.
 
-Loads trap_knowledge_base_v2.md (v2) or trap_knowledge_base_v1.md (v1) once
-and provides fast lookup by trap name for use in the enrichment prompt.
+Loads the appropriate KB file once and provides fast lookup by trap name
+for use in the enrichment prompt.
 """
 import re
 from pathlib import Path
@@ -11,9 +11,10 @@ from typing import Optional
 _DATA_DIR = Path(__file__).parent.parent / "data"
 
 _KB_PATHS = {
-    "v2": _DATA_DIR / "trap_knowledge_base_v2.md",
-    "v2.1": _DATA_DIR / "trap_knowledge_base_v2_1.md",
-    "v1": _DATA_DIR / "trap_knowledge_base_v1.md",
+    "v1":   _DATA_DIR / "trap_kb_v1.0.md",
+    "v1.1": _DATA_DIR / "trap_kb_v1.1.md",
+    "v2":   _DATA_DIR / "trap_kb_v2.0.md",
+    "v2.1": _DATA_DIR / "trap_kb_v2.1.md",
 }
 
 # Maps normalized uppercase analyzer names → names used in KB chunk headers.
@@ -36,7 +37,7 @@ _CANONICAL_OVERRIDES: dict[str, dict[str, str]] = {
     },
 }
 
-_caches: dict[str, Optional[dict[str, str]]] = {"v1": None, "v2": None, "v2.1": None}
+_caches: dict[str, Optional[dict[str, str]]] = {"v1": None, "v1.1": None, "v2": None, "v2.1": None}
 
 
 def _load_chunks(version: str) -> dict[str, str]:

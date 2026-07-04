@@ -859,7 +859,11 @@ class UITrapsAnalyzer:
 
         for block in response.content:
             if block.type == "tool_use" and block.name == "ui_issues_report":
-                return block.input
+                result = block.input
+                # Pass-through Pass 1 fields that the formatter needs but
+                # the synthesis schema does not produce.
+                result['traps_checked_not_found'] = enriched_report.get('traps_checked_not_found', [])
+                return result
 
         print("[UITraps] Pass 3: no tool-use block in response, synthesis skipped")
         return None

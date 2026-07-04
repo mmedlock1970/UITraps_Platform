@@ -2787,104 +2787,107 @@ _ISSUES_REPORT_CSS = """
   .report-container { max-width: 860px; margin: 0 auto; padding: 32px 24px; }
 
   /* ── Section titles (outside cards) ─────────────────────────────────── */
-  h2 { font-size: 1.3em; font-weight: 700; color: #111; margin: 28px 0 12px; }
+  h2 { font-size: 1.2em; font-weight: 700; color: #111; margin: 32px 0 10px; }
+  .report-header + h2 { margin-top: 0; }
 
   /* ── Header ─────────────────────────────────────────────────────────── */
-  .report-header { margin-bottom: 32px; }
-  .report-header h1 { font-size: 1.6em; font-weight: 700; color: #111; }
-  .report-subtitle { font-size: 0.9em; color: #666; margin-top: 2px; }
-  .report-date { font-size: 0.85em; color: #888; margin-top: 4px; }
+  .report-header { margin-bottom: 28px; padding-bottom: 20px;
+                   border-bottom: 1px solid #e8e8e8; }
+  .report-header h1 { font-size: 1.5em; font-weight: 700; color: #111; }
+  .report-subtitle { font-size: 0.88em; color: #666; margin-top: 3px;
+                     text-transform: uppercase; letter-spacing: .05em; }
+  .report-date { font-size: 0.82em; color: #999; margin-top: 8px; line-height: 1.6; }
 
   /* ── Summary ─────────────────────────────────────────────────────────── */
-  .summary-section { background: #fff; border-radius: 10px; padding: 24px; margin-bottom: 28px;
-                     box-shadow: 0 1px 4px rgba(0,0,0,.07); margin-top: 0; }
+  .summary-section { background: #fff; border-radius: 12px; padding: 24px 28px 28px;
+                     margin-bottom: 0; box-shadow: 0 2px 8px rgba(0,0,0,.09); }
   .summary-inner { }
-  .summary-headline { font-size: 1.1em; font-weight: 700; color: #111;
-                      margin-top: 16px; margin-bottom: 8px; line-height: 1.4; }
-  .summary-narrative { color: #444; line-height: 1.7; }
+  .summary-headline { font-size: 1.08em; font-weight: 700; color: #111;
+                      margin-top: 20px; margin-bottom: 6px; line-height: 1.45; }
+  .summary-narrative { color: #555; line-height: 1.75; font-size: 0.97em; }
+
+  /* ── Scorecard table ─────────────────────────────────────────────────── */
+  .scorecard-title { font-size: 0.75em; font-weight: 700; color: #888;
+                     text-transform: uppercase; letter-spacing: .08em;
+                     margin-bottom: 12px; margin-top: 0; }
+  .scorecard-table { border-collapse: collapse; margin-bottom: 4px; }
+  .scorecard-table th, .scorecard-table td { padding: 7px 24px; text-align: center; font-size: 0.9em; }
+  .scorecard-table thead th { font-size: 0.78em; font-weight: 700; letter-spacing: .04em;
+                              border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; }
+  .scorecard-label { text-align: left !important; color: #666; font-size: 0.84em;
+                     padding-left: 0 !important; }
+  .scorecard-th-high     { color: #c0392b; }
+  .scorecard-th-moderate { color: #e67e22; }
+  .scorecard-th-low      { color: #27ae60; }
+  .scorecard-val-high    { color: #c0392b; font-weight: 700; font-size: 1.15em; }
+  .scorecard-val-moderate{ color: #e67e22; font-weight: 700; font-size: 1.15em; }
+  .scorecard-val-low     { color: #27ae60; font-weight: 700; font-size: 1.15em; }
+  .scorecard-empty { color: #ddd; font-weight: 400; font-size: 1em; }
 
   /* ── Issues section ──────────────────────────────────────────────────── */
-  .issues-section { margin-bottom: 28px; }
-  .section-intro { color: #666; font-size: 0.9em; margin-bottom: 16px; }
+  .issues-section { margin-bottom: 0; }
 
   /* ── Issue card ──────────────────────────────────────────────────────── */
-  .issue-card { background: #fff; border-radius: 10px; padding: 0;
-                margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  .issue-card { background: #fff; border-radius: 12px; padding: 0;
+                margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,.09);
                 overflow: hidden; }
-  .issue-number { font-size: 0.72em; font-weight: 700; letter-spacing: .08em;
-                  color: #888; padding: 16px 20px 4px; text-transform: uppercase; }
-  .issue-headline { font-size: 1.08em; font-weight: 700; color: #111;
-                    padding: 0 20px 10px; line-height: 1.4; }
-  .issue-meta { display: flex; align-items: center; gap: 8px;
-                padding: 0 20px 14px; }
+  .issue-number { font-size: 0.68em; font-weight: 700; letter-spacing: .1em;
+                  color: #aaa; padding: 18px 22px 4px; text-transform: uppercase; }
+  .issue-headline { font-size: 1.05em; font-weight: 700; color: #111;
+                    padding: 2px 22px 12px; line-height: 1.45; }
+  .issue-meta { display: flex; align-items: center; gap: 8px; padding: 0 22px 14px; flex-wrap: wrap; }
   .severity-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
   .severity-label { font-size: 0.88em; font-weight: 600; color: #333; }
   .meta-divider { color: #ccc; font-size: 0.85em; }
   .confidence-label { font-size: 0.85em; color: #666; }
 
   /* ── Traps block ─────────────────────────────────────────────────────── */
-  .issue-traps-section { border-top: 1px solid #f0f0f0; padding: 14px 20px; }
-  .traps-label { font-size: 0.72em; font-weight: 700; letter-spacing: .08em;
-                 color: #888; text-transform: uppercase; margin-bottom: 10px; }
-  .trap-item { margin-bottom: 10px; }
+  .issue-traps-section { border-top: 1px solid #f2f2f2; padding: 16px 22px; background: #fafafa; }
+  .traps-label { font-size: 0.68em; font-weight: 700; letter-spacing: .1em;
+                 color: #aaa; text-transform: uppercase; margin-bottom: 12px; }
+  .trap-item { margin-bottom: 12px; }
   .trap-item:last-child { margin-bottom: 0; }
-  .trap-item-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-  .root-cause-label { font-size: 0.72em; color: #888; font-style: italic; }
-  .trap-item-definition { font-size: 0.83em; color: #555; line-height: 1.5; padding-left: 2px; }
+  .trap-item-header { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; flex-wrap: wrap; }
+  .root-cause-label { font-size: 0.7em; color: #999; font-style: italic; }
+  .trap-item-definition { font-size: 0.82em; color: #666; line-height: 1.55;
+                          padding-left: 0; font-style: italic; }
 
   /* ── Description / Recommendation ───────────────────────────────────── */
-  .issue-body-section { border-top: 1px solid #f0f0f0; padding: 14px 20px; }
-  .body-label { font-size: 0.72em; font-weight: 700; letter-spacing: .08em;
-                color: #888; text-transform: uppercase; margin-bottom: 8px; }
-  .issue-body-section p { color: #333; line-height: 1.7; }
+  .issue-body-section { border-top: 1px solid #f2f2f2; padding: 16px 22px; }
+  .body-label { font-size: 0.68em; font-weight: 700; letter-spacing: .1em;
+                color: #aaa; text-transform: uppercase; margin-bottom: 10px; }
+  .issue-body-section p { color: #333; line-height: 1.75; font-size: 0.97em; }
 
   /* ── Region crop ─────────────────────────────────────────────────────── */
-  .region-crop { margin: 12px 0 4px; }
-  .region-crop img { max-width: 380px; border-radius: 6px;
-                     border: 1px solid #e0e0e0; display: block; }
-  .region-crop figcaption { font-size: 0.8em; color: #777;
-                             font-style: italic; margin-top: 6px; }
+  .region-crop { margin: 14px 0 6px; }
+  .region-crop img { max-width: 400px; border-radius: 8px;
+                     border: 1px solid #e8e8e8; display: block;
+                     box-shadow: 0 2px 6px rgba(0,0,0,.08); }
+  .region-crop figcaption { font-size: 0.79em; color: #888;
+                             font-style: italic; margin-top: 8px; }
 
   /* ── Positives ───────────────────────────────────────────────────────── */
-  .positives-section { background: #fff; border-radius: 10px; padding: 20px 20px 20px 28px;
-                       margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.07);
-                       border-left: 4px solid #27ae60; }
-  .positives-section ul { padding-left: 16px; }
-  .positives-section li { color: #444; margin-bottom: 6px; line-height: 1.6; }
+  .positives-section { background: #fff; border-radius: 12px; padding: 20px 24px 22px 28px;
+                       margin-bottom: 0; box-shadow: 0 2px 8px rgba(0,0,0,.09);
+                       border-left: 5px solid #27ae60; }
+  .positives-section ul { padding-left: 18px; }
+  .positives-section li { color: #444; margin-bottom: 7px; line-height: 1.65; font-size: 0.97em; }
 
   /* ── Traps not found ─────────────────────────────────────────────────── */
-  .traps-not-found { background: #fff; border-radius: 10px; padding: 20px;
-                     margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
-  .traps-not-found { margin-top: 0; }
-  .trap-name-list { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-  .tenet-pill { display: inline-block; color: #fff; font-size: 0.78em; font-weight: 700;
-                letter-spacing: .04em; padding: 4px 10px; border-radius: 4px; }
+  .traps-not-found { background: #fff; border-radius: 12px; padding: 20px 24px;
+                     margin-bottom: 0; box-shadow: 0 2px 8px rgba(0,0,0,.09); }
+  .section-intro { color: #777; font-size: 0.88em; margin-bottom: 4px; }
+  .trap-name-list { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .tenet-pill { display: inline-block; color: #fff; font-size: 0.76em; font-weight: 700;
+                letter-spacing: .04em; padding: 4px 11px; border-radius: 4px; }
 
   /* ── Footer ──────────────────────────────────────────────────────────── */
-  .footer { border-top: 1px solid #e0e0e0; padding-top: 16px; margin-top: 28px;
-            font-size: 0.82em; color: #888; }
-
-  /* ── Scorecard table ─────────────────────────────────────────────────── */
-  .scorecard-title { font-size: 0.82em; font-weight: 600; color: #555;
-                     text-transform: uppercase; letter-spacing: .06em;
-                     margin-bottom: 10px; margin-top: 16px; }
-  .scorecard-table { border-collapse: collapse; margin-bottom: 16px; }
-  .scorecard-table th, .scorecard-table td { padding: 6px 20px; text-align: center; font-size: 0.9em; }
-  .scorecard-table thead th { font-size: 0.8em; font-weight: 600; color: #666;
-                              border-bottom: 1px solid #e0e0e0; }
-  .scorecard-label { text-align: left !important; color: #555; font-size: 0.85em; }
-  .scorecard-th-high   { color: #c0392b; }
-  .scorecard-th-moderate { color: #e67e22; }
-  .scorecard-th-low    { color: #27ae60; }
-  .scorecard-val-high   { color: #c0392b; font-weight: 700; font-size: 1.1em; }
-  .scorecard-val-moderate { color: #e67e22; font-weight: 700; font-size: 1.1em; }
-  .scorecard-val-low    { color: #27ae60; font-weight: 700; font-size: 1.1em; }
-  .scorecard-empty { color: #ccc; font-weight: 400; }
+  .footer { border-top: 1px solid #ebebeb; padding-top: 18px; margin-top: 16px;
+            font-size: 0.8em; color: #aaa; text-align: center; }
 
   /* ── Evaluation Details ──────────────────────────────────────────────── */
-  .eval-details { background: #fff; border-radius: 10px; padding: 20px;
-                  margin-bottom: 24px; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
-  .eval-details { margin-top: 0; }
+  .eval-details { background: #fff; border-radius: 12px; padding: 20px 24px;
+                  margin-bottom: 0; box-shadow: 0 2px 8px rgba(0,0,0,.09); }
   .context-body p { color: #444; margin-bottom: 6px; font-size: 0.9em; }
   .context-body ul { margin: 4px 0 8px; padding-left: 20px; }
   .users-detail { margin: 0 0 8px; }

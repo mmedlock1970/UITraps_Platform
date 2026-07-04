@@ -1,0 +1,114 @@
+{
+ "kb_version": "v1.1",
+ "structure": "two-pass",
+ "source": "trap_kb_v1.1.md",
+ "note": "regenerate all derived files on any master edit",
+ "pass1": "pass1_detection_pack.md",
+ "pass2_core": "pass2_core_pack.md",
+ "traps": [
+  {
+   "trap": "Invisible Element",
+   "chunk_file": "chunks/invisible_element.md"
+  },
+  {
+   "trap": "Effectively Invisible Element",
+   "chunk_file": "chunks/effectively_invisible_element.md"
+  },
+  {
+   "trap": "Distraction",
+   "chunk_file": "chunks/distraction.md"
+  },
+  {
+   "trap": "Uncomprehended Element",
+   "chunk_file": "chunks/uncomprehended_element.md"
+  },
+  {
+   "trap": "Inviting Dead End",
+   "chunk_file": "chunks/inviting_dead_end.md"
+  },
+  {
+   "trap": "Poor Grouping",
+   "chunk_file": "chunks/poor_grouping.md"
+  },
+  {
+   "trap": "Forced Syntax",
+   "chunk_file": "chunks/forced_syntax.md"
+  },
+  {
+   "trap": "Memory Challenge",
+   "chunk_file": "chunks/memory_challenge.md"
+  },
+  {
+   "trap": "Feedback Failure",
+   "chunk_file": "chunks/feedback_failure.md"
+  },
+  {
+   "trap": "Physical Challenge",
+   "chunk_file": "chunks/physical_challenge.md"
+  },
+  {
+   "trap": "Accidental Activation",
+   "chunk_file": "chunks/accidental_activation.md"
+  },
+  {
+   "trap": "Slow or No Response",
+   "chunk_file": "chunks/slow_or_no_response.md"
+  },
+  {
+   "trap": "Captive Wait",
+   "chunk_file": "chunks/captive_wait.md"
+  },
+  {
+   "trap": "Unnecessary Step",
+   "chunk_file": "chunks/unnecessary_step.md"
+  },
+  {
+   "trap": "System Amnesia",
+   "chunk_file": "chunks/system_amnesia.md"
+  },
+  {
+   "trap": "Information Overload",
+   "chunk_file": "chunks/information_overload.md"
+  },
+  {
+   "trap": "Bad Prediction",
+   "chunk_file": "chunks/bad_prediction.md"
+  },
+  {
+   "trap": "Irreversible Action",
+   "chunk_file": "chunks/irreversible_action.md"
+  },
+  {
+   "trap": "Unwanted Disclosure",
+   "chunk_file": "chunks/unwanted_disclosure.md"
+  },
+  {
+   "trap": "Data Loss",
+   "chunk_file": "chunks/data_loss.md"
+  },
+  {
+   "trap": "Gratuitous Redundancy",
+   "chunk_file": "chunks/gratuitous_redundancy.md"
+  },
+  {
+   "trap": "Variable Outcome",
+   "chunk_file": "chunks/variable_outcome.md"
+  },
+  {
+   "trap": "Wandering Element",
+   "chunk_file": "chunks/wandering_element.md"
+  },
+  {
+   "trap": "Inconsistent Appearance",
+   "chunk_file": "chunks/inconsistent_appearance.md"
+  },
+  {
+   "trap": "Ambiguous Home",
+   "chunk_file": "chunks/ambiguous_home.md"
+  },
+  {
+   "trap": "Unattractive Appearance",
+   "chunk_file": "chunks/unattractive_appearance.md"
+  }
+ ]
+}

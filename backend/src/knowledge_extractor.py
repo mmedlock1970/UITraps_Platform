@@ -5,7 +5,7 @@ Copyright © 2009-present UI Traps LLC. All Rights Reserved.
 PROPRIETARY & CONFIDENTIAL - UI Tenets & Traps Framework
 
 Manages loading and extraction from two knowledge sources:
-- trap_knowledge_base_v2.md / trap_knowledge_base_v1.md  →  Pass 1 (detection, condensed, AI-optimized)
+- trap_kb_v2.0.md / trap_kb_v1.0.md  →  Pass 1 (detection, condensed, AI-optimized)
 - UI_Tenets_Traps.txt             →  Pass 2 (enrichment, full book content)
 
 Book images are extracted from the source PDF and stored in data/book_images/
@@ -20,8 +20,8 @@ from typing import Dict, List, Optional, Tuple
 
 # Paths relative to this file
 _DATA_DIR = Path(__file__).parent.parent / "data"
-ANALYSIS_REFERENCE_PATH = _DATA_DIR / "trap_knowledge_base_v2.md"
-ANALYSIS_REFERENCE_PATH_V1 = _DATA_DIR / "trap_knowledge_base_v1.md"
+ANALYSIS_REFERENCE_PATH = _DATA_DIR / "trap_kb_v2.0.md"
+ANALYSIS_REFERENCE_PATH_V1 = _DATA_DIR / "trap_kb_v1.0.md"
 FULL_BOOK_PATH = _DATA_DIR / "UI_Tenets_Traps.txt"
 BOOK_IMAGES_DIR = _DATA_DIR / "book_images"
 BOOK_IMAGES_DIR_V1 = BOOK_IMAGES_DIR / "v1"
@@ -85,7 +85,7 @@ def load_analysis_reference(version: str = "v2") -> str:
             if not ANALYSIS_REFERENCE_PATH_V1.exists():
                 raise FileNotFoundError(
                     f"v1 analysis reference not found at {ANALYSIS_REFERENCE_PATH_V1}. "
-                    f"Ensure trap_knowledge_base_v1.md is in the data/ directory."
+                    f"Ensure trap_kb_v1.0.md is in the data/ directory."
                 )
             _analysis_reference_cache_v1 = ANALYSIS_REFERENCE_PATH_V1.read_text(encoding="utf-8")
         return _analysis_reference_cache_v1
@@ -94,7 +94,7 @@ def load_analysis_reference(version: str = "v2") -> str:
             if not ANALYSIS_REFERENCE_PATH.exists():
                 raise FileNotFoundError(
                     f"Analysis reference not found at {ANALYSIS_REFERENCE_PATH}. "
-                    f"Ensure trap_knowledge_base_v2.md is in the data/ directory."
+                    f"Ensure trap_kb_v2.0.md is in the data/ directory."
                 )
             _analysis_reference_cache = ANALYSIS_REFERENCE_PATH.read_text(encoding="utf-8")
         return _analysis_reference_cache

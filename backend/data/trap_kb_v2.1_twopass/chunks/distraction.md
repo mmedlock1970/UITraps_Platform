@@ -1,0 +1,24 @@
+<!-- GENERATED from trap_kb_v2.1.md — do not edit; regenerate on any master edit -->
+### TRAP: DISTRACTION *(draft-grade)*
+*Sub-tenet: Noticeable*
+
+**Definition.** Something in the interface draws the user's attention away from their current goal. The mirror image of Effectively Invisible Element: every attribute that makes something noticeable (color, motion, sound, sudden appearance, spatial position) can direct attention appropriately or hijack it. Forms: pop-up notifications, auto-playing audio/video, animated ads, attention-demanding chrome; also mere presence of certain information (a visible phone, a persistent badge), and mode-of-interaction distraction (voice interaction consumes the same cognitive resources as internal verbal thought — issuing a voice command mid-thought breaks the thought; a practiced physical action does not).
+
+**Boundary.** IS: unsolicited exogenous attention capture away from the user's goal. IS NOT present when the user initiated it, when it is directly relevant to the current goal (a status update during an active process), when no focused goal exists to disrupt (passive browsing), or when the user would judge the interruption justified (an emergency call). IS NOT Information Overload: excess information slowing processing is that Trap; specific elements capturing attention is this one — the line is blurry and the fix is shared (remove what isn't relevant to the goal), so when both flags fire on the same material, report one issue and evidence each Trap independently. Bad-faith exploitation (engagement-driven autoplay, attention-hijacking ads) should additionally be flagged as a potential dark pattern.
+
+**Detection procedure (pass one — flag, do not filter).** *Unit: per-screen; cross-screen for elements that appear during flows.*
+1. Enumerate every element that moves, animates, auto-plays, sounds, appears without user initiation, or changes state on its own; plus persistent attention-pulling elements (badges, blinking indicators) **[JUDGMENT: and, in flow artifacts, interstitials/notifications injected mid-task]**.
+2. For each, record: user-initiated? relevant to the C2 goal at that moment? modality (motion and peripheral motion are un-ignorable — the orienting response is involuntary)?
+3. Flag every uninitiated, goal-irrelevant attention-capturing element; flag cumulative competition (many simultaneous attention-demanding elements — the Boeing 737 pattern) as its own candidate.
+
+**Disconfirmation (pass two).** NOT present when: (a) directly relevant to the current goal; (b) passive/exploratory context with no focused goal; (c) user-initiated; (d) the user would agree the interruption was justified by its importance.
+
+**Severity.** Do not default to Medium — calibrate to what the capture costs given what the user is doing: a static badge or counter in a casual browsing context is Low; motion or audio during a focused transactional task (checkout, form, search) is Medium; High when critical information is missed or obscured (notification over driving directions); Critical in safety contexts (competing cockpit warnings). Escalators: C3 (a distraction during divided-attention or safety-relevant contexts escalates); C4 (recurring interruptions in a core loop compound).
+
+**Assessability & Confidence.** Auto-play audio/video during documented task flows: Confirmed ceiling from artifact. Otherwise Probable — whether capture harms depends on task context (C2 gates: what is the user trying to do when this fires?). Static screenshots under-detect this Trap (motion/sound invisible); declare the limitation. Context axis: C2 gates goal-relevance judgments; C3 sharpens severity.
+
+**Attribution.** If motion was added as a remedy for an Effectively Invisible Element, confirm the original attention problem independently; remediation must replace, not merely delete (see that Trap). Information Overload: confirm excess volume independently — do not infer overload from one distracting element. Bad Prediction: an irrelevant proactive notification is Bad Prediction root cause with Distraction as consequence (fix-based: improving the prediction/removing the proaction resolves the distraction).
+
+**Report fragments.** Finding: "[Element] draws attention away from [goal] without user initiation, goal relevance, or a justification the user would endorse." Why it matters: "Involuntary attention cannot be suppressed — users will notice this regardless of their efforts to focus."
+
+**Remediation.** The governing question is not "will this be noticed?" but "what will the user be doing when this appears, and what will noticing it cost them?" Remove or defer uninitiated elements during focused execution; evaluate whether each interruption serves the user or the product's engagement metrics. Caution: removing a distraction that compensated for an Effectively Invisible Element requires adding a non-distracting visible solution.

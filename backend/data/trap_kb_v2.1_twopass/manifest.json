@@ -1,0 +1,145 @@
+{
+ "kb_version": "v2.1",
+ "structure": "two-pass",
+ "source": "trap_kb_v2.1.md",
+ "note": "regenerate all derived files on any master edit",
+ "pass1": "pass1_detection_pack.md",
+ "pass2_core": "pass2_core_pack.md",
+ "traps": [
+  {
+   "trap": "Invisible Element",
+   "grade": "draft",
+   "chunk_file": "chunks/invisible_element.md"
+  },
+  {
+   "trap": "Effectively Invisible Element",
+   "grade": "pilot",
+   "chunk_file": "chunks/effectively_invisible_element.md"
+  },
+  {
+   "trap": "Distraction",
+   "grade": "draft",
+   "chunk_file": "chunks/distraction.md"
+  },
+  {
+   "trap": "Uncomprehended Element",
+   "grade": "pilot",
+   "chunk_file": "chunks/uncomprehended_element.md"
+  },
+  {
+   "trap": "Inviting Dead End",
+   "grade": "pilot",
+   "chunk_file": "chunks/inviting_dead_end.md"
+  },
+  {
+   "trap": "Poor Grouping",
+   "grade": "draft",
+   "chunk_file": "chunks/poor_grouping.md"
+  },
+  {
+   "trap": "Forced Syntax",
+   "grade": "pilot",
+   "chunk_file": "chunks/forced_syntax.md"
+  },
+  {
+   "trap": "Memory Challenge",
+   "grade": "draft",
+   "chunk_file": "chunks/memory_challenge.md"
+  },
+  {
+   "trap": "Feedback Failure",
+   "grade": "draft",
+   "chunk_file": "chunks/feedback_failure.md"
+  },
+  {
+   "trap": "Physical Challenge",
+   "grade": "pilot",
+   "chunk_file": "chunks/physical_challenge.md"
+  },
+  {
+   "trap": "Accidental Activation",
+   "grade": "draft",
+   "chunk_file": "chunks/accidental_activation.md"
+  },
+  {
+   "trap": "Slow or No Response",
+   "grade": "draft",
+   "chunk_file": "chunks/slow_or_no_response.md"
+  },
+  {
+   "trap": "Captive Wait",
+   "grade": "draft",
+   "chunk_file": "chunks/captive_wait.md"
+  },
+  {
+   "trap": "Unnecessary Step(s)",
+   "grade": "draft",
+   "chunk_file": "chunks/unnecessary_step_s.md"
+  },
+  {
+   "trap": "Information Overload",
+   "grade": "draft",
+   "chunk_file": "chunks/information_overload.md"
+  },
+  {
+   "trap": "System Amnesia",
+   "grade": "draft",
+   "chunk_file": "chunks/system_amnesia.md"
+  },
+  {
+   "trap": "Incorrect Information",
+   "grade": "pilot",
+   "chunk_file": "chunks/incorrect_information.md"
+  },
+  {
+   "trap": "Bad Prediction",
+   "grade": "draft",
+   "chunk_file": "chunks/bad_prediction.md"
+  },
+  {
+   "trap": "Irreversible Action",
+   "grade": "draft",
+   "chunk_file": "chunks/irreversible_action.md"
+  },
+  {
+   "trap": "Unwanted Disclosure",
+   "grade": "draft",
+   "chunk_file": "chunks/unwanted_disclosure.md"
+  },
+  {
+   "trap": "Data Loss",
+   "grade": "draft",
+   "chunk_file": "chunks/data_loss.md"
+  },
+  {
+   "trap": "Gratuitous Redundancy",
+   "grade": "pilot",
+   "chunk_file": "chunks/gratuitous_redundancy.md"
+  },
+  {
+   "trap": "Variable Outcome",
+   "grade": "draft",
+   "chunk_file": "chunks/variable_outcome.md"
+  },
+  {
+   "trap": "Wandering Element",
+   "grade": "draft",
+   "chunk_file": "chunks/wandering_element.md"
+  },
+  {
+   "trap": "Inconsistent Appearance",
+   "grade": "draft",
+   "chunk_file": "chunks/inconsistent_appearance.md"
+  },
+  {
+   "trap": "Ambiguous Home",
+   "grade": "draft",
+   "chunk_file": "chunks/ambiguous_home.md"
+  },
+  {
+   "trap": "Poor Aesthetic",
+   "grade": "draft",
+   "chunk_file": "chunks/poor_aesthetic.md"
+  }
+ ]
+}
