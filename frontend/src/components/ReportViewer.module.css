@@ -4,63 +4,6 @@
   gap: var(--uitraps-spacing-lg);
 }
 
-/* ── Version Toggle (compare mode) ── */
-
-.versionToggle {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 20px;
-  background: #f7f6f4;
-  border: 1.5px solid #e8e6e2;
-  border-radius: 10px;
-}
-
-.versionToggleLabel {
-  font-size: 13px;
-  font-weight: 600;
-  color: #4a4744;
-  white-space: nowrap;
-}
-
-.versionToggleGroup {
-  display: flex;
-  gap: 0;
-  border: 1.5px solid #e8e6e2;
-  border-radius: 6px;
-  overflow: hidden;
-  background: #ffffff;
-}
-
-.versionToggleBtn {
-  background: #ffffff;
-  color: #4a4744;
-  border: none;
-  border-right: 1.5px solid #e8e6e2;
-  font-family: 'Inter', system-ui, sans-serif;
-  font-size: 13px;
-  font-weight: 500;
-  padding: 7px 20px;
-  cursor: pointer;
-  transition: background 0.12s, color 0.12s;
-  white-space: nowrap;
-}
-
-.versionToggleBtn:last-child {
-  border-right: none;
-}
-
-.versionToggleBtn:hover {
-  background: #f0eeeb;
-  color: #111111;
-}
-
-.versionToggleBtnActive {
-  background: #111111 !important;
-  color: #ffffff !important;
-  font-weight: 600;
-}
-
 /* Statistics Grid */
 .statsGrid {
   display: grid;

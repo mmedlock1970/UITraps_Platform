@@ -64,13 +64,8 @@ def valid_user_context():
 def valid_analysis_response():
     """Valid analysis response matching schema."""
     return {
-        "summary": [
-            "The design has strong visual hierarchy with clear headings",
-            "Primary call-to-action button is prominent and well-labeled",
-            "Form validation feedback is immediate and helpful",
-            "Navigation structure is intuitive and well-organized",
-            "Some secondary actions are less visible than ideal"
-        ],
+        "summary_headline": "Strong visual hierarchy, though some secondary actions are less visible than ideal.",
+        "summary_narrative": "The design supports the primary task well; a few secondary actions may be harder to find.",
         "critical_issues": [
             {
                 "trap_name": "INVISIBLE ELEMENT",
@@ -117,9 +112,10 @@ def valid_analysis_response():
 
 @pytest.fixture
 def malformed_summary_response():
-    """Response where summary is string instead of array."""
+    """Response where summary_headline is the wrong type (a list, not a string)."""
     return {
-        "summary": "This is a single string instead of an array",  # WRONG TYPE
+        "summary_headline": ["not", "a", "string"],  # WRONG TYPE — parser coerces to ''
+        "summary_narrative": "A valid narrative paragraph.",
         "critical_issues": [],
         "moderate_issues": [],
         "minor_issues": [],
@@ -133,7 +129,8 @@ def malformed_summary_response():
 def hallucinated_trap_response():
     """Response with invalid trap name (hallucination)."""
     return {
-        "summary": ["Finding 1", "Finding 2", "Finding 3", "Finding 4", "Finding 5"],
+        "summary_headline": "The design broadly supports the task, with a few notable friction points.",
+        "summary_narrative": "Users can likely accomplish the goal, though some elements may slow them down.",
         "critical_issues": [
             {
                 "trap_name": "CONFUSING BUTTON",  # NOT IN VALID_TRAP_NAMES!
@@ -156,7 +153,8 @@ def hallucinated_trap_response():
 def hallucinated_tenet_response():
     """Response with invalid tenet name."""
     return {
-        "summary": ["Finding 1", "Finding 2", "Finding 3", "Finding 4", "Finding 5"],
+        "summary_headline": "The design broadly supports the task, with a few notable friction points.",
+        "summary_narrative": "Users can likely accomplish the goal, though some elements may slow them down.",
         "critical_issues": [
             {
                 "trap_name": "INVISIBLE ELEMENT",
@@ -179,7 +177,8 @@ def hallucinated_tenet_response():
 def invalid_confidence_response():
     """Response with invalid confidence value."""
     return {
-        "summary": ["Finding 1", "Finding 2", "Finding 3", "Finding 4", "Finding 5"],
+        "summary_headline": "The design broadly supports the task, with a few notable friction points.",
+        "summary_narrative": "Users can likely accomplish the goal, though some elements may slow them down.",
         "critical_issues": [
             {
                 "trap_name": "INVISIBLE ELEMENT",
@@ -202,7 +201,8 @@ def invalid_confidence_response():
 def missing_required_fields_response():
     """Response missing required issue fields."""
     return {
-        "summary": ["Finding 1", "Finding 2", "Finding 3", "Finding 4", "Finding 5"],
+        "summary_headline": "The design broadly supports the task, with a few notable friction points.",
+        "summary_narrative": "Users can likely accomplish the goal, though some elements may slow them down.",
         "critical_issues": [
             {
                 "trap_name": "INVISIBLE ELEMENT",
@@ -291,7 +291,7 @@ def test_valid_response_passes_validation(mock_anthropic_client, valid_analysis_
 
     # Check required top-level fields
     required_fields = [
-        'summary', 'critical_issues', 'moderate_issues',
+        'summary_headline', 'summary_narrative', 'critical_issues', 'moderate_issues',
         'minor_issues', 'positive_observations', 'potential_issues',
         'traps_checked_not_found'
     ]
@@ -299,8 +299,8 @@ def test_valid_response_passes_validation(mock_anthropic_client, valid_analysis_
         assert field in report, f"Missing required field: {field}"
 
 
-def test_summary_must_be_array(mock_anthropic_client, malformed_summary_response, valid_user_context):
-    """Summary field must be an array of strings, not a single string."""
+def test_summary_headline_wrong_type_is_coerced(mock_anthropic_client, malformed_summary_response, valid_user_context):
+    """A non-string summary_headline should be coerced to a string, not crash."""
     # Setup mock
     mock_client = Mock()
     mock_response = create_mock_tool_response(malformed_summary_response)
@@ -310,21 +310,23 @@ def test_summary_must_be_array(mock_anthropic_client, malformed_summary_response
     # Create analyzer
     analyzer = UITrapsAnalyzer(api_key="test-key")
 
-    # Should convert string to array automatically
+    # Should normalize the malformed headline rather than fail
     result = analyzer.analyze_design(
         design_file="test.png",
         user_context=valid_user_context
     )
 
-    # After auto-fix, summary should be an array
-    assert isinstance(result["report"]["summary"], list)
+    # After normalization, both summary fields are strings
+    assert result["status"] == "success"
+    assert isinstance(result["report"]["summary_headline"], str)
+    assert isinstance(result["report"]["summary_narrative"], str)
 
 
-def test_summary_length_validation(mock_anthropic_client, valid_user_context):
-    """Summary should have 5-9 items according to schema."""
-    # Test with too few items (< 5)
+def test_minimal_summary_fields_are_accepted(mock_anthropic_client, valid_user_context):
+    """A minimal headline/narrative pair should parse into string summary fields."""
     response = {
-        "summary": ["Item 1", "Item 2"],  # Only 2 items
+        "summary_headline": "A minimal summary headline.",
+        "summary_narrative": "A minimal narrative.",
         "critical_issues": [],
         "moderate_issues": [],
         "minor_issues": [],
@@ -344,11 +346,10 @@ def test_summary_length_validation(mock_anthropic_client, valid_user_context):
         user_context=valid_user_context
     )
 
-    # Should still succeed (schema validation happens at API level)
-    # But we can log a warning
-    summary = result["report"]["summary"]
-    assert isinstance(summary, list)
-    # Note: Full schema validation would reject this, but we're testing parser
+    # Should succeed; summary fields normalize to strings
+    assert result["status"] == "success"
+    assert isinstance(result["report"]["summary_headline"], str)
+    assert isinstance(result["report"]["summary_narrative"], str)
 
 
 # ============================================================================
@@ -520,7 +521,8 @@ def test_potential_issue_has_different_required_fields():
 def test_empty_issues_arrays_are_valid(mock_anthropic_client, valid_user_context):
     """Empty issue arrays should be valid (design might have no issues)."""
     perfect_design_response = {
-        "summary": ["Great design", "No major issues", "Well done", "Clear hierarchy", "Good UX"],
+        "summary_headline": "A clean design with no major issues found.",
+        "summary_narrative": "The interface appears to support the task well with no critical friction.",
         "critical_issues": [],  # No critical issues
         "moderate_issues": [],  # No moderate issues
         "minor_issues": [],     # No minor issues
@@ -547,7 +549,8 @@ def test_empty_issues_arrays_are_valid(mock_anthropic_client, valid_user_context
 def test_missing_optional_fields_with_defaults(mock_anthropic_client, valid_user_context):
     """Optional fields should get default values if missing."""
     response_missing_optionals = {
-        "summary": ["Finding 1", "Finding 2", "Finding 3", "Finding 4", "Finding 5"],
+        "summary_headline": "The design broadly supports the task, with a few notable friction points.",
+        "summary_narrative": "Users can likely accomplish the goal, though some elements may slow them down.",
         "critical_issues": [],
         "moderate_issues": [],
         "minor_issues": [],
@@ -588,7 +591,8 @@ def test_handles_many_issues_without_crashing(mock_anthropic_client, valid_user_
     ]
 
     stress_test_response = {
-        "summary": ["Finding 1", "Finding 2", "Finding 3", "Finding 4", "Finding 5"],
+        "summary_headline": "The design broadly supports the task, with a few notable friction points.",
+        "summary_narrative": "Users can likely accomplish the goal, though some elements may slow them down.",
         "critical_issues": many_issues[:20],
         "moderate_issues": many_issues[20:40],
         "minor_issues": many_issues[40:],
@@ -656,11 +660,11 @@ def test_metadata_is_present(mock_anthropic_client, valid_analysis_response, val
 
     metadata = result["metadata"]
 
-    # Check required metadata fields
+    # Check required metadata fields (current shape: token counts live under `usage`)
     assert "model" in metadata
-    assert "input_tokens" in metadata
-    assert "output_tokens" in metadata
-    assert "total_tokens" in metadata
+    assert "usage" in metadata
+    assert "input" in metadata["usage"]
+    assert "output" in metadata["usage"]
     assert "estimated_cost" in metadata
     assert "duration_seconds" in metadata
     assert "timestamp" in metadata

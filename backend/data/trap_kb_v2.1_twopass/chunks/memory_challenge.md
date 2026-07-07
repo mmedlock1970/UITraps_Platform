@@ -1,5 +1,5 @@
 <!-- GENERATED from trap_kb_v2.1.md — do not edit; regenerate on any master edit -->
-### TRAP: MEMORY CHALLENGE *(draft-grade)*
+### TRAP: MEMORY CHALLENGE *(ratified 2026-07-04)*
 *Sub-tenet: Comprehensible*
 
 **Definition.** The user is required to remember information that is easy to forget: holding information across screens, recalling passwords/commands from long-term memory without a retrieval cue, executing multi-step processes by memory alone. Even carrying a small item from one screen to the next may be too much — short-term memory is tiny and volatile.
@@ -14,11 +14,11 @@
 
 **Disconfirmation (pass two).** NOT present when: (a) the information is genuinely easy to remember in context (own name; a daily-used PIN); (b) the task is recognition, not recall — information presented for selection; (c) the information stays available for reference during the task.
 
-**Severity.** High when recall failure blocks the task with no recovery path; Medium when recovery is effortful. Escalators: C3 — interruption, time pressure, and divided attention are precisely when held information evaporates; C4 — infrequent tasks (rare logins) maximize forgetting; spatially-presented information is markedly more memorable than verbal (mall-map principle).
+**Severity.** High when recall failure blocks the task with no recovery path; Medium when recovery is effortful. Anchor: the security answer demanded without its question shown (card example): High — recall failure blocks the task with no recovery short of a reset flow. Escalators: C3 — interruption, time pressure, and divided attention are precisely when held information evaporates; C4 — infrequent tasks (rare logins) maximize forgetting; spatially-presented information is markedly more memorable than verbal (mall-map principle).
 
-**Assessability & Confidence.** Confirmed when provided screens show both the source information AND the recall demand — the cross-boundary carry is visible without user testing. Recall-without-cue flows: Confirmed-grade structural detection from flows/design files; whether the specific information is genuinely easy to forget stays Probable without C1/C4 — promotion path: interaction-frequency data or observation. Context axis: C4 (frequency) softens; C3 (interruption/pressure) sharpens severity.
+**Assessability & Confidence.** High confidence when provided screens show both the source information AND the recall demand — the cross-boundary carry is visible without user testing. Recall-without-cue flows: High confidence-grade structural detection from flows/design files; whether the specific information is genuinely easy to forget stays Medium confidence without C1/C4 — promotion path: interaction-frequency data or observation. Scoped coverage (single statics): cross-boundary carries require multiple screens to observe — "assessed within scope: recall-without-cue demands visible on this screen; not assessable from this artifact: cross-screen and cross-session carries — flow artifacts would settle." Context axis: C4 (frequency) softens; C3 (interruption/pressure) sharpens severity.
 
-**Attribution.** System Amnesia (above, fix-based). Invisible Element overlap (above). Forced Syntax adjacency: an unguessable required order that must be memorized — distinguish unaccommodating (there) from unlearnable-without-memorization (here) **[JUDGMENT]**.
+**Attribution.** System Amnesia (above, fix-based). Invisible Element overlap (above). Forced Syntax adjacency (author-ruled): a required order that must be memorized is Forced Syntax (root cause) with this Trap as C4-gated consequence — the recall burden exists because the order is arbitrary relative to the user's mental model; accepting their natural construction dissolves it. This Trap stands alone only when the recalled content is intrinsically arbitrary (codes, passwords, security answers) — no syntax flexibility removes those. System Amnesia link: when the system's failure to retain imposes the recall burden, that Trap is root cause and this one the consequence.
 
 **Report fragments.** Finding: "[Task/step] requires users to recall [information] without a retrieval cue, in a context where it is likely to be forgotten." Why it matters: "When users cannot recall this, they cannot complete the task — and may not know how to recover."
 

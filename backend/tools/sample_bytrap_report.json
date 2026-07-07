@@ -1,0 +1,74 @@
+{
+  "summary_headline": "A cluttered home screen and an unlabeled primary action slow first-time users; a few traps recur across the layout.",
+  "summary_narrative": "Several traps surface on the home screen. Distraction shows up in more than one place — the hero autoplay and the sports countdown — while the primary Create control is unlabeled. Together these make the first 30 seconds harder than they need to be for the first-time visitors this product is trying to win.",
+  "critical_issues": [
+    {
+      "trap_name": "UNCOMPREHENDED ELEMENT",
+      "tenet": "Understandable",
+      "severity_label": "High",
+      "confidence": "High",
+      "headline": "The primary action is an unlabeled icon.",
+      "location": "Top-right toolbar — gear-like glyph",
+      "problem": "The main call-to-action is a bare gear-like glyph with no text label. Users are likely to read it as a settings control rather than the primary Create action it triggers.",
+      "recommendation": "Pair the icon with a visible text label (\"Create\"), or replace it with a labeled button."
+    }
+  ],
+  "moderate_issues": [
+    {
+      "trap_name": "DISTRACTION",
+      "tenet": "Understandable",
+      "severity_label": "Medium",
+      "confidence": "High",
+      "headline": "The hero banner autoplays and pulls focus.",
+      "location": "Hero banner (top of screen)",
+      "problem": "The hero autoplays motion on load, drawing the eye away from the entry points a first-time visitor is scanning for.",
+      "recommendation": "Pause hero motion until hover, or give the primary entry point stronger visual weight than the banner."
+    },
+    {
+      "trap_name": "DISTRACTION",
+      "tenet": "Understandable",
+      "severity_label": "Medium",
+      "confidence": "Medium",
+      "headline": "A sports countdown timer animates persistently.",
+      "location": "Sports widget (mid-right)",
+      "problem": "A live countdown timer animates continuously, competing for attention with the content the user is trying to browse.",
+      "recommendation": "Make the timer static, or move it below the primary content region."
+    },
+    {
+      "trap_name": "FEEDBACK FAILURE",
+      "tenet": "Understandable",
+      "severity_label": "Medium",
+      "confidence": "Medium",
+      "headline": "Tapping Save gives no confirmation.",
+      "location": "Save control (detail panel)",
+      "problem": "After the Save control is pressed there is no visible state change — no spinner, toast, or disabled state — so a user isn't sure the tap registered. Inferred from the static screen.",
+      "recommendation": "Acknowledge the tap immediately: disable the button, show a brief spinner, then confirm with a short toast."
+    }
+  ],
+  "minor_issues": [
+    {
+      "trap_name": "INCONSISTENT APPEARANCE",
+      "tenet": "Habituating",
+      "severity_label": "Low",
+      "confidence": "Low",
+      "headline": "Content badges vary in style across cards.",
+      "location": "Content cards (TOP 10 / TRENDING / NEW)",
+      "problem": "Badges use different colors and shapes across cards, so users can't rely on a badge's appearance to predict its meaning.",
+      "recommendation": "Standardize badge color and shape by badge type."
+    }
+  ],
+  "traps_checked_not_found": [
+    {"trap_name": "INVISIBLE ELEMENT", "coverage_status": "not_present"},
+    {"trap_name": "FORCED SYNTAX", "coverage_status": "not_present"},
+    {"trap_name": "MEMORY CHALLENGE", "coverage_status": "not_present"},
+    {"trap_name": "GRATUITOUS REDUNDANCY", "coverage_status": "not_present"},
+    {"trap_name": "AMBIGUOUS HOME", "coverage_status": "not_present"},
+    {"trap_name": "SYSTEM AMNESIA", "coverage_status": "not_assessable_artifact"},
+    {"trap_name": "UNNECESSARY STEP(S)", "coverage_status": "not_assessable_artifact"},
+    {"trap_name": "INVITING DEAD END", "coverage_status": "not_assessable_context"}
+  ],
+  "positive_observations": [
+    "The color palette holds strong contrast throughout, so text stays legible against every background used here.",
+    "The bottom navigation labels each destination with both an icon and a word, which helps first-time users build a mental map quickly."
+  ]
+}

@@ -1,5 +1,5 @@
 <!-- GENERATED from trap_kb_v2.1.md — do not edit; regenerate on any master edit -->
-### TRAP: EFFECTIVELY INVISIBLE ELEMENT *(pilot-grade)*
+### TRAP: EFFECTIVELY INVISIBLE ELEMENT *(ratified 2026-07-04)*
 *Sub-tenet: Noticeable*
 
 **Definition.** An element that is present and perceivable, but that users fail to notice — because it sits outside their attentional focus for the task, **or because it is presented in an unexpected way, regardless of its location**. Applies to visual, auditory, and tactile elements.
@@ -7,7 +7,7 @@
 **Boundary.**
 - IS: a perceivable element likely to go unregistered given where the user's attention falls during the task, or given what they are looking for. **Central placement and high salience do not disconfirm this Trap; expectation mismatch renders elements unnoticed independent of position (goal-driven filtering — the brain passes signals matching the user's search template and suppresses the rest).**
 - IS NOT **Invisible Element**: there, no perceivable element exists at all. Tie-breaker: an element exists but is likely missed → here; no element exists → there.
-- IS NOT **Distraction**: that Trap is attention wrongly captured; this one is attention never captured (mirror images).
+- IS NOT **Distraction**: that Trap is attention wrongly captured; this one is attention never captured (mirror images). Shared-salience-budget cases (one over-weighted element captures attention AND drowns a goal element): one issue, anchored on the goal element's finding HERE, the over-weighted element named as root cause in the fix — see Distraction's Attribution.
 - IS NOT **Wandering Element**: if the element would be noticed at a stable location and the noticing failure stems from its moving between screens or states, Wandering Element is the root cause (fix-based rule) — flag it there and reference the delayed noticing in the explanation.
 - IS NOT **Inconsistent Appearance**: if the noticing/recognition failure stems from the same element being restyled across contexts, attribute there.
 - IS NOT mere small size or subtle styling in the abstract: the test is misalignment with task-driven attention or expectation, not aesthetics.
@@ -19,11 +19,13 @@
 4. Name the specific condition(s) per flag (G6).
 5. Cross-screen (multi-screen artifacts only): flag state or mode indicators that must be noticed on a different screen from where the state was set; flag content that changes between screens in ways the user would not expect (unexpected changes are unlooked-for, hence filtered). Location changes route to Wandering Element; appearance changes route to Inconsistent Appearance (see Boundary).
 
+6. Flag goal-critical elements styled or positioned like promotional content (banner slots, right rails, ad-like framing) — learned suppression of ad-shaped regions applies regardless of C1 product familiarity.
+
 **Disconfirmation (pass two).** NOT present when: (a) the element is in a location users are habituated to attending from prior product experience (C1) — even if not geometrically central; (b) the element differs from surroundings on a pre-attentive feature causing automatic pop-out AND matches the expected category for its function; (c) the element is consistent with the dominant interaction pattern, so users naturally encounter it in normal task flow.
 
 **Severity.** High when the element is critical-path and fully unnoticed (functionally identical to absence). Delayed noticing is still this Trap; its severity equals the consequence of the delay in the specific task context (a missed mute indicator mid-meeting: High; a slowly-found settings link: Low). Escalators: C3 (divided attention, noise, motion sharply raise miss likelihood); C4 (recurring tasks compound the cost).
 
-**Assessability & Confidence.** Static screenshot: Confirmed ceiling only when the element is measurably far from the primary task area AND critical to task completion; otherwise Probable — promotion path: confirm attentional focus with user observation (usability testing is the gold standard; design review alone cannot reliably confirm or rule this out — curse of knowledge). Context axis: C2 (task goal) softens under its default; C1 gates disconfirmation (a) only — absent C1, candidates cannot be cleared on habituation grounds and stay flagged; C3 modifies likelihood globally (its default makes findings a lower bound).
+**Assessability & Confidence.** Static screenshot: High-confidence ceiling only when the element is measurably far from the primary task area AND critical to task completion; otherwise Medium confidence — promotion path: confirm attentional focus with user observation (usability testing is the gold standard; design review alone cannot reliably confirm or rule this out — curse of knowledge). Context axis: C2 (task goal) softens under its default; C1 gates disconfirmation (a) only — absent C1, candidates cannot be cleared on habituation grounds and stay flagged; C3 modifies likelihood globally (its default makes findings a lower bound).
 
 **Attribution.**
 - Variable Outcome: an effectively invisible mode indicator is evidence toward Variable Outcome, but outcome variation must be independently confirmed; when confirmed, this Trap is typically root cause (fixing the indicator's noticeability resolves the outcome surprise).

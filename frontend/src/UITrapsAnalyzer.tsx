@@ -156,6 +156,7 @@ export const UITrapsAnalyzer: React.FC<UITrapsAnalyzerProps> = ({
               usage={state.usage || undefined}
               showStatistics={showStatistics}
               showUsageInfo={showUsageInfo}
+              isDark={theme === 'dark'}
               onNewAnalysis={handleNewAnalysis}
             />
           </div>

@@ -1,5 +1,5 @@
 <!-- GENERATED from trap_kb_v2.1.md — do not edit; regenerate on any master edit -->
-### TRAP: INFORMATION OVERLOAD *(draft-grade)*
+### TRAP: INFORMATION OVERLOAD *(ratified 2026-07-04)*
 
 **Definition.** Information presented is understandable but exceeds what is needed: verbose instructions, wordy AI responses, cluttered displays, option-dense menus. Hick's Law prices it: decision time grows with choice count. The test is not "could there be less?" but "does the user need all of this right now?"
 
@@ -14,9 +14,9 @@
 
 **Disconfirmation (pass two).** NOT present when: (a) all of it is needed for the goal right now; (b) density is appropriate to comprehensive-sensemaking tasks; (c) progressive disclosure already gates the secondary tier.
 
-**Severity.** Medium baseline (processing tax, Hick's-slowed decisions); High when the information cost exceeds motivation and users abandon. Escalators: C4 (a cluttered daily screen taxes forever); C3 (divided attention shrinks processing budget). Expert populations (C1) can legitimately need more — soften accordingly.
+**Severity.** Medium baseline (processing tax, Hick's-slowed decisions); High when the information cost exceeds motivation and users abandon. Anchor: the dealer locator preceded by a seven-step instruction block (card example): Medium — comprehensible but burying the single field it explains; the eventual fix was one field and a button. Escalators: C4 (a cluttered daily screen taxes forever); C3 (divided attention shrinks processing budget). Expert populations (C1) can legitimately need more — soften accordingly.
 
-**Assessability & Confidence.** Probable ceiling — counts and densities measure Confirmed-grade, but necessity is goal-relative (C2 gates); promotion path: user task analysis or engagement data. Context axis: C2 gates; C1 softens for expert tools.
+**Assessability & Confidence.** Medium confidence ceiling — counts and densities measure High confidence-grade, but necessity is goal-relative (C2 gates); promotion path: user task analysis or engagement data. Context axis: C2 gates; C1 softens for expert tools.
 
 **Attribution.** Gratuitous Redundancy root cause when duplication inflates (confirm). Distraction co-occurring when specific elements also capture attention (separate evidence). Poor Grouping compounding: clutter obscures relationships — if decluttering restores the grouping read, this Trap is root cause (fix-based).
 

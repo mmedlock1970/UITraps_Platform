@@ -1,5 +1,5 @@
 <!-- GENERATED from trap_kb_v2.1.md — do not edit; regenerate on any master edit -->
-### TRAP: SYSTEM AMNESIA *(draft-grade)*
+### TRAP: SYSTEM AMNESIA *(ratified 2026-07-04)*
 
 **Definition.** The system fails to take advantage of the user's prior work, preferences, or context: re-entering known information, recommendations ignoring ownership or history, context lost between sessions, re-authentication of the already-authenticated. Either the system never collected what it was exposed to, or collected it and doesn't use it.
 
@@ -12,9 +12,9 @@
 
 **Disconfirmation (pass two).** NOT present when: (a) deliberate security/verification re-prompting (still note confirm-and-edit as superior); (b) genuine architectural inaccessibility (verified); (c) plausibly-changed information (same note).
 
-**Severity.** Medium baseline (friction, "not paying attention" perception — which directly undermines any personalization claim the product makes); High when substantial prior work must be recreated. Escalators: C4 (recurring re-entry compounds); same-session amnesia rates worse than cross-session **[JUDGMENT: proximity heuristic from the manuscript's likelihood block]**.
+**Severity.** Medium baseline (friction, "not paying attention" perception — which directly undermines any personalization claim the product makes); grade upward by recreation cost — the volume of work recreated, the recall difficulty of the recreated information, and the error stakes of recreating it wrong; High when substantial or high-stakes prior work must be recreated (the doctor's-office intake form is the anchor case: months between sessions, maximal severity). Escalators: C4 (recurring re-entry compounds, whether within one session or across visits years apart). Proximity of the original entry does not grade severity. Attribution note: when the recreated information is itself hard to remember, Memory Challenge co-occurs as a consequence — the system's failure to retain imposes the recall burden (this Trap root cause, Memory Challenge consequence).
 
-**Assessability & Confidence.** Confirmed for self-evidencing cases (single screen suffices). Otherwise Probable — knowing what the system *has* requires data-architecture knowledge or session history; promotion path: architecture review or multi-session probe. Context axis: largely context-free structurally; C2 sharpens severity (critical-path re-entry).
+**Assessability & Confidence.** High confidence for self-evidencing cases (single screen suffices). Otherwise Medium confidence — knowing what the system *has* requires data-architecture knowledge or session history; promotion path: architecture review or multi-session probe. Context axis: largely context-free structurally; C2 sharpens severity (critical-path re-entry).
 
 **Attribution.** Bad Prediction downstream: poor retention makes poor predictions — confirm both (available-but-unused data AND bad predictions) before chaining, System Amnesia as root cause. Memory Challenge pairing (above). Unwanted Disclosure tension: fixing amnesia means retaining data — remediation must note the security obligation.
 

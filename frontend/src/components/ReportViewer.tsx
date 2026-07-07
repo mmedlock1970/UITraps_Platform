@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { ReportViewerProps } from '../api/types';
 import styles from './ReportViewer.module.css';
 
@@ -193,21 +193,23 @@ export const ReportViewer: React.FC<ReportViewerProps> = ({
   usage,
   showUsageInfo = false,
   isDark = false,
-  htmlV1,
-  htmlV2,
   onContentLoaded,
 }) => {
-  const isDualReport = !!(htmlV1 && htmlV2);
-  const [activeVersion, setActiveVersion] = useState<'v1' | 'v2'>('v2');
-
-  const activeHtml = isDualReport
-    ? (activeVersion === 'v1' ? htmlV1! : htmlV2!)
-    : html;
-
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const applyDarkMode = useCallback((doc: Document, dark: boolean) => {
+    // Newer reports (new-KB, rev6 design) theme themselves via :root[data-theme]. Flip that
+    // flag so their own dark palette activates.
+    doc.documentElement?.setAttribute('data-theme', dark ? 'dark' : 'light');
+
+    // Self-theming reports must NOT receive the legacy override: its generic table/th/td
+    // rules would fight the report's own dark styles. Only legacy reports need it.
+    const selfTheming = doc.body?.dataset.selftheme === '1';
     const existing = doc.getElementById('__dark-mode-override__');
+    if (selfTheming) {
+      if (existing) existing.remove();
+      return;
+    }
     if (dark && !existing) {
       const style = doc.createElement('style');
       style.id = '__dark-mode-override__';
@@ -241,7 +243,7 @@ export const ReportViewer: React.FC<ReportViewerProps> = ({
       onLoad();
     }
     return () => iframe.removeEventListener('load', onLoad);
-  }, [activeHtml, isDark, applyDarkMode, onContentLoaded]);
+  }, [html, isDark, applyDarkMode, onContentLoaded]);
 
   // Toggle dark mode without reloading the iframe
   useEffect(() => {
@@ -270,30 +272,6 @@ export const ReportViewer: React.FC<ReportViewerProps> = ({
 
   return (
     <div className={styles.container}>
-      {/* Dual-report version toggle */}
-      {isDualReport && (
-        <div className={styles.versionToggle}>
-          <span className={styles.versionToggleLabel}>Knowledge base:</span>
-          <div className={styles.versionToggleGroup}>
-            <button
-              type="button"
-              className={`${styles.versionToggleBtn} ${activeVersion === 'v2' ? styles.versionToggleBtnActive : ''}`}
-              onClick={() => setActiveVersion('v2')}
-            >
-              V2 (current)
-            </button>
-            <button
-              type="button"
-              className={`${styles.versionToggleBtn} ${activeVersion === 'v1' ? styles.versionToggleBtnActive : ''}`}
-              onClick={() => setActiveVersion('v1')}
-            >
-              V1 (previous)
-            </button>
-          </div>
-        </div>
-      )}
-
-
       {/* Usage Info */}
       {showUsageInfo && usage && (
         <div className={styles.usageInfo}>
@@ -307,7 +285,7 @@ export const ReportViewer: React.FC<ReportViewerProps> = ({
       <iframe
         ref={iframeRef}
         className={styles.reportFrame}
-        srcDoc={activeHtml}
+        srcDoc={html}
         title="Analysis Report"
         sandbox="allow-same-origin allow-scripts allow-modals"
         style={{ width: '100%', border: 'none', minHeight: '400px' }}

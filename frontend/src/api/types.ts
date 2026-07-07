@@ -107,7 +107,11 @@ export function contentTypeToPlatform(contentType: ContentType): PlatformType {
   return mapping[contentType] || 'other';
 }
 
-export type KbVersion = 'v1' | 'v2' | 'v2.1' | 'both';
+export type KbVersion = 'v1' | 'v1.1' | 'v2' | 'v2.1';
+
+// Analysis profile. 'default' = normal pipeline (lineage-gated). 'self-serve' = raw-KB
+// condition: single-pass, minimal harness prompt + relaxed schema, rev6 template, any KB.
+export type Profile = 'default' | 'self-serve';
 
 export interface UserContext {
   users: string;
@@ -128,6 +132,8 @@ export interface UserContext {
   verbosity?: 'brief' | 'standard';
   pass1_model?: 'sonnet' | 'haiku';
   thorough_mode?: boolean;
+  mode?: 'single' | 'twopass';
+  profile?: Profile;
   report_style?: 'trap' | 'issues';
   input_type?: 'screenshot' | 'video' | 'flow_diagram';
   flow_mode?: 'screen' | 'flow';
@@ -411,11 +417,6 @@ export interface ReportViewerProps {
   showUsageInfo?: boolean;
   onNewAnalysis?: () => void;
   isDark?: boolean;
-  // Dual-report (compare mode) — when both are present a toggle is shown
-  htmlV1?: string;
-  htmlV2?: string;
-  statisticsV1?: ReportStatistics;
-  statisticsV2?: ReportStatistics;
   // Called after the inner report iframe finishes loading and has been resized
   onContentLoaded?: () => void;
 }
@@ -516,11 +517,6 @@ export interface UnifiedAskResponse {
   usage?: UsageInfo;
   error?: string;
   kb_version?: KbVersion;
-  // Dual analysis fields (kb_version="both")
-  report_html_v1?: string;
-  report_html_v2?: string;
-  statistics_v1?: ReportStatistics;
-  statistics_v2?: ReportStatistics;
 }
 
 export interface AuthState {

@@ -125,11 +125,6 @@ interface ActiveReport {
   usage?: UsageInfo;
   originalFiles?: File[];
   originalContext?: UserContext;
-  // Dual-report compare mode
-  htmlV1?: string;
-  htmlV2?: string;
-  statisticsV1?: ReportStatistics;
-  statisticsV2?: ReportStatistics;
 }
 
 export const App: React.FC = () => {
@@ -310,20 +305,14 @@ export const App: React.FC = () => {
   const effectiveToken = auth.token || (devMode ? 'dev-mode' : '');
 
   const handleAnalysisComplete = useCallback((result: UnifiedAskResponse, fileNames: string[], files?: File[], context?: UserContext, formSnapshot?: FormSnapshot) => {
-    // Dual-report (compare mode) — report_html_v1 and report_html_v2 are both present
-    const isDualReport = !!(result.report_html_v1 && result.report_html_v2);
-    if (isDualReport || result.report_html) {
+    if (result.report_html) {
       const report: ActiveReport = {
-        html: result.report_html ?? result.report_html_v2 ?? '',
+        html: result.report_html,
         markdown: result.report_markdown,
-        statistics: isDualReport ? result.statistics_v2 : result.statistics,
+        statistics: result.statistics,
         usage: result.usage,
         originalFiles: files,
         originalContext: context,
-        htmlV1: result.report_html_v1,
-        htmlV2: result.report_html_v2,
-        statisticsV1: result.statistics_v1,
-        statisticsV2: result.statistics_v2,
       };
       setActiveReport(report);
       setView('report');
@@ -333,8 +322,8 @@ export const App: React.FC = () => {
       saveAnalysis({
         timestamp: new Date().toISOString(),
         fileNames,
-        statistics: isDualReport ? result.statistics_v2 : result.statistics,
-        html: (result.report_html ?? result.report_html_v2) || '',
+        statistics: result.statistics,
+        html: result.report_html,
         markdown: result.report_markdown,
         formSnapshot,
       });
@@ -411,23 +400,18 @@ export const App: React.FC = () => {
       const inputFiles = files.length > 0 ? files : [];
       const imageTimeout = Math.min(180000 + (files.length || 1) * 120000, 1800000);
 
-      const kbVersionForRequest = context?.kb_version;
-      const effectiveTimeout = kbVersionForRequest === 'both'
-        ? Math.min(imageTimeout * 2, 3600000)
-        : imageTimeout;
-
       const result = await unifiedAsk({
         apiEndpoint,
         token: effectiveToken,
         files: inputFiles,
         context,
-        kbVersion: kbVersionForRequest,
-        timeout: effectiveTimeout,
+        kbVersion: context?.kb_version,
+        timeout: imageTimeout,
       });
 
       formElapsed.stop();
 
-      if (result.report_html || (result.report_html_v1 && result.report_html_v2)) {
+      if (result.report_html) {
         handleAnalysisComplete(
           result,
           files.map(f => f.name),
@@ -653,10 +637,6 @@ export const App: React.FC = () => {
                 showStatistics={true}
                 showUsageInfo={false}
                 isDark={theme === 'dark'}
-                htmlV1={activeReport.htmlV1}
-                htmlV2={activeReport.htmlV2}
-                statisticsV1={activeReport.statisticsV1}
-                statisticsV2={activeReport.statisticsV2}
                 onContentLoaded={handleReportContentLoaded}
               />
             </div>

@@ -430,7 +430,7 @@ export interface UnifiedAskOptions {
 export async function unifiedAsk(options: UnifiedAskOptions): Promise<UnifiedAskResponse> {
   const { apiEndpoint, token, message, files = [], context,
           conversationHistory, chatContext, kbVersion, signal } = options;
-  const timeout = (kbVersion === 'both') ? 300000 : (options.timeout ?? 120000);
+  const timeout = options.timeout ?? 120000;
 
   const imageFiles = files.filter(f => f.type.startsWith('image/'));
   const otherFiles = files.filter(f => !f.type.startsWith('image/'));
@@ -459,6 +459,8 @@ export async function unifiedAsk(options: UnifiedAskOptions): Promise<UnifiedAsk
     if (context.verbosity) formData.append('verbosity', context.verbosity);
     if (context.pass1_model) formData.append('pass1_model', context.pass1_model);
     if (context.thorough_mode) formData.append('thorough_mode', 'true');
+    if (context.mode) formData.append('mode', context.mode);
+    if (context.profile) formData.append('profile', context.profile);
     formData.append('report_style', context.report_style ?? 'trap');
     if (context.input_type) formData.append('input_type', context.input_type);
     if (context.flow_mode) formData.append('flow_mode', context.flow_mode);

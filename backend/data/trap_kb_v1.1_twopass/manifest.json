@@ -2,113 +2,168 @@
  "kb_version": "v1.1",
  "structure": "two-pass",
  "source": "trap_kb_v1.1.md",
+ "master_sha256": "e185f5226c41560c29bf0dd85b41d96b296336b585608a4248c61bc457e34670",
  "note": "regenerate all derived files on any master edit",
  "pass1": "pass1_detection_pack.md",
  "pass2_core": "pass2_core_pack.md",
  "traps": [
   {
    "trap": "Invisible Element",
+   "grade": "",
    "chunk_file": "chunks/invisible_element.md"
   },
   {
    "trap": "Effectively Invisible Element",
+   "grade": "",
    "chunk_file": "chunks/effectively_invisible_element.md"
   },
   {
    "trap": "Distraction",
+   "grade": "",
    "chunk_file": "chunks/distraction.md"
   },
   {
    "trap": "Uncomprehended Element",
+   "grade": "",
    "chunk_file": "chunks/uncomprehended_element.md"
   },
   {
    "trap": "Inviting Dead End",
+   "grade": "",
    "chunk_file": "chunks/inviting_dead_end.md"
   },
   {
    "trap": "Poor Grouping",
+   "grade": "",
    "chunk_file": "chunks/poor_grouping.md"
   },
   {
    "trap": "Forced Syntax",
+   "grade": "",
    "chunk_file": "chunks/forced_syntax.md"
   },
   {
    "trap": "Memory Challenge",
+   "grade": "",
    "chunk_file": "chunks/memory_challenge.md"
   },
   {
    "trap": "Feedback Failure",
+   "grade": "",
    "chunk_file": "chunks/feedback_failure.md"
   },
   {
    "trap": "Physical Challenge",
+   "grade": "",
    "chunk_file": "chunks/physical_challenge.md"
   },
   {
    "trap": "Accidental Activation",
+   "grade": "",
    "chunk_file": "chunks/accidental_activation.md"
   },
   {
    "trap": "Slow or No Response",
+   "grade": "",
    "chunk_file": "chunks/slow_or_no_response.md"
   },
   {
    "trap": "Captive Wait",
+   "grade": "",
    "chunk_file": "chunks/captive_wait.md"
   },
   {
    "trap": "Unnecessary Step",
+   "grade": "",
    "chunk_file": "chunks/unnecessary_step.md"
   },
   {
    "trap": "System Amnesia",
+   "grade": "",
    "chunk_file": "chunks/system_amnesia.md"
   },
   {
    "trap": "Information Overload",
+   "grade": "",
    "chunk_file": "chunks/information_overload.md"
   },
   {
    "trap": "Bad Prediction",
+   "grade": "",
    "chunk_file": "chunks/bad_prediction.md"
   },
   {
    "trap": "Irreversible Action",
+   "grade": "",
    "chunk_file": "chunks/irreversible_action.md"
   },
   {
    "trap": "Unwanted Disclosure",
+   "grade": "",
    "chunk_file": "chunks/unwanted_disclosure.md"
   },
   {
    "trap": "Data Loss",
+   "grade": "",
    "chunk_file": "chunks/data_loss.md"
   },
   {
    "trap": "Gratuitous Redundancy",
+   "grade": "",
    "chunk_file": "chunks/gratuitous_redundancy.md"
   },
   {
    "trap": "Variable Outcome",
+   "grade": "",
    "chunk_file": "chunks/variable_outcome.md"
   },
   {
    "trap": "Wandering Element",
+   "grade": "",
    "chunk_file": "chunks/wandering_element.md"
   },
   {
    "trap": "Inconsistent Appearance",
+   "grade": "",
    "chunk_file": "chunks/inconsistent_appearance.md"
   },
   {
    "trap": "Ambiguous Home",
+   "grade": "",
    "chunk_file": "chunks/ambiguous_home.md"
   },
   {
    "trap": "Unattractive Appearance",
+   "grade": "",
    "chunk_file": "chunks/unattractive_appearance.md"
   }
- ]
+ ],
+ "verbatim_definitions": {
+  "Invisible Element": "No cue (label, icon, affordance, or prompt) is provided to signal to the user how to achieve a goal, and the user has insufficient prior learning to overcome its absence.",
+  "Effectively Invisible Element": "A provided cue (label, icon, affordance, or prompt) is not noticed, or is slow to be noticed, because its appearance or location differs from what the user expects.",
+  "Distraction": "Something in the UI suddenly appears or otherwise draws the user's attention, distracting them from their goal.",
+  "Uncomprehended Element": "A cue (label, icon, affordance, or prompt) critical to achieving a goal is noticed, but its meaning, or the required method of interacting with it, is unclear.",
+  "Inviting Dead End": "A cue (label, icon, affordance, or prompt) is incorrectly judged as a means for achieving a goal. It looks right, but is wrong.",
+  "Poor Grouping": "A critical relationship between two or more otherwise noticeable cues (labels, icons, affordances, or prompts) is not obvious.",
+  "Forced Syntax": "The system does not allow the user to issue a command or complete a sequence of actions in the order or manner that is most natural to them.",
+  "Memory Challenge": "The system requires the user to remember information that is easy to forget.",
+  "Feedback Failure": "The system fails to provide noticeable, comprehensible, and actionable feedback in response to user actions.",
+  "Physical Challenge": "An action the system requires the user to perform is physically effortful, difficult, or impossible.",
+  "Accidental Activation": "The system misinterprets a user's physical actions resulting in an unintended outcome.",
+  "Slow or No Response": "The user is prevented from achieving a goal in a timely manner because of actual or perceived poor system performance.",
+  "Captive Wait": "The user is prevented from achieving a goal in a timely manner because the system intentionally prevents them from advancing and/or backing out of a process.",
+  "Unnecessary Step": "When the product is being used as intended, the number of actual or perceived steps required to achieve a goal is too high.",
+  "System Amnesia": "The system re-prompts the user for information it previously gathered, or otherwise fails to leverage the user's prior work.",
+  "Information Overload": "Information presented to the user is comprehensible, but there is too much of it.",
+  "Bad Prediction": "The system incorrectly predicts or interprets the user's intent or preference, resulting in the user having to work around the problem.",
+  "Irreversible Action": "The system does not allow the user to undo an action they have taken.",
+  "Unwanted Disclosure": "The system makes the user's data or behavior public in a way that is harmful or embarrassing to the user.",
+  "Data Loss": "The system can lose the user's work through some action or inaction on the user's part.",
+  "Gratuitous Redundancy": "The system presents duplicate cues (labels, icons, affordances, or prompts) for the same action on the same level, or a directly nested level of the UI.",
+  "Variable Outcome": "The system responds differently at different times to the same user action.",
+  "Wandering Element": "The physical location of a cue (label, icon, affordance, or prompt) for a given action varies across the UI.",
+  "Inconsistent Appearance": "The visual appearance of a cue (label, icon, affordance, or prompt) for a given action varies across the UI.",
+  "Ambiguous Home": "The UI provides no single place the user can return to at any time to begin a new task or get re-oriented.",
+  "Unattractive Appearance": "The UI is aesthetically unpleasing, inconsistent, and/or inappropriate for its intended users."
+ }
 }

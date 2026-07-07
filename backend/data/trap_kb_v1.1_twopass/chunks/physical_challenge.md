@@ -15,7 +15,7 @@
 
 **Severity.** Place on the ladder by the worst plausible outcome for the stated goals; apply C3/C4 escalators. No Trap-specific severity anchors exist in this source.
 
-**Assessability & Confidence.** visible demands (target size, text size/contrast) are artifact-assessable; other physical properties are not assessable from the artifact — declare.
+**Assessability & Confidence.** Contrast ratio is pixel-derivable and eligible for High confidence from the artifact alone. Target size, spacing, and rendered text size are physical quantities: High confidence only with calibration (device class and resolution, or an in-artifact reference of known physical size); on uncalibrated artifacts the ceiling is Medium confidence, promotion path "measure on the target device against the applicable standard for the asserted input modality" — per the calibration-gated ceilings rule, and symmetrically for clearances (an uncalibrated artifact can neither confirm nor clear a size threshold). Other physical properties are not assessable from the artifact — declare.
 
 **Attribution.** Apply G3. No Trap-specific attribution rules exist in this source.
 

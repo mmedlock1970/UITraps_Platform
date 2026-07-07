@@ -22,6 +22,16 @@ from typing import Dict, List, Optional, Tuple
 _DATA_DIR = Path(__file__).parent.parent / "data"
 ANALYSIS_REFERENCE_PATH = _DATA_DIR / "trap_kb_v2.0.md"
 ANALYSIS_REFERENCE_PATH_V1 = _DATA_DIR / "trap_kb_v1.0.md"
+
+# Detection-pass KB master per version. Single mode injects the whole file for the
+# selected version. v1.1 / v2.1 are the new self-instructing masters; before this
+# mapping existed, both silently fell through to trap_kb_v2.0.md.
+_ANALYSIS_REFERENCE_PATHS = {
+    "v1":   ANALYSIS_REFERENCE_PATH_V1,
+    "v1.1": _DATA_DIR / "trap_kb_v1.1.md",
+    "v2":   ANALYSIS_REFERENCE_PATH,
+    "v2.1": _DATA_DIR / "trap_kb_v2.1.md",
+}
 FULL_BOOK_PATH = _DATA_DIR / "UI_Tenets_Traps.txt"
 BOOK_IMAGES_DIR = _DATA_DIR / "book_images"
 BOOK_IMAGES_DIR_V1 = BOOK_IMAGES_DIR / "v1"
@@ -64,40 +74,65 @@ TRAP_NAMES = [
     "POOR AESTHETIC",
 ]
 
-# Module-level caches — loaded once per process
-_analysis_reference_cache: str | None = None
-_analysis_reference_cache_v1: str | None = None
+# Module-level caches — one entry per version, loaded once per process
 _full_book_cache: str | None = None
+_analysis_reference_caches: dict[str, str | None] = {
+    v: None for v in _ANALYSIS_REFERENCE_PATHS
+}
+
+
+def _strip_non_analysis_sections(text: str) -> str:
+    """
+    Remove any top-level (``## ``) section the KB self-marks as not-for-analysis —
+    e.g. ``## VERBATIM DEFINITIONS (report display only — never loaded into analysis
+    passes)`` and ``## AUTHORING STANDARDS (... never loaded into the analyzer)``.
+
+    Single mode injects the whole master file into the analysis pass, so any section
+    the KB says must never reach analysis has to be stripped here. The contract is the
+    KB's own marker: a ``## `` heading containing the phrase "never loaded" (case-
+    insensitive) drops that section up to the next ``## `` heading. Masters without any
+    such marker are returned unchanged.
+    """
+    out, skipping = [], False
+    for line in text.split("\n"):
+        if line.startswith("## "):  # top-level heading (h2); trap chunks are h3 (### )
+            # Contract: a heading the KB marks "never loaded" is not-for-analysis and is
+            # dropped up to the next ## heading. This is generic — the KB decides what to
+            # exclude by marking it, so new display/maintainer sections are handled without
+            # a tool change. (OPEN ITEMS is not marked yet; recommend the KB add the marker.)
+            skipping = "never loaded" in line.lower()
+        if not skipping:
+            out.append(line)
+    return "\n".join(out)
 
 
 def load_analysis_reference(version: str = "v2") -> str:
     """
-    Load the condensed AI analysis reference (Pass 1 knowledge base).
-    Cached after first load.
+    Load the condensed AI analysis reference (Pass 1 knowledge base) for the
+    given KB version. Cached per version after first load.
+
+    Sections the master marks "never loaded into analysis" (verbatim definitions,
+    authoring standards) are stripped before caching so they cannot contaminate the
+    analysis pass — single mode injects this whole string into the model.
 
     Args:
-        version: "v2" (default) or "v1"
+        version: one of "v1", "v1.1", "v2", "v2.1". Unknown versions fall back
+            to "v2" (the deployed legacy KB).
     """
-    global _analysis_reference_cache, _analysis_reference_cache_v1
+    if version not in _ANALYSIS_REFERENCE_PATHS:
+        version = "v2"
 
-    if version == "v1":
-        if _analysis_reference_cache_v1 is None:
-            if not ANALYSIS_REFERENCE_PATH_V1.exists():
-                raise FileNotFoundError(
-                    f"v1 analysis reference not found at {ANALYSIS_REFERENCE_PATH_V1}. "
-                    f"Ensure trap_kb_v1.0.md is in the data/ directory."
-                )
-            _analysis_reference_cache_v1 = ANALYSIS_REFERENCE_PATH_V1.read_text(encoding="utf-8")
-        return _analysis_reference_cache_v1
-    else:
-        if _analysis_reference_cache is None:
-            if not ANALYSIS_REFERENCE_PATH.exists():
-                raise FileNotFoundError(
-                    f"Analysis reference not found at {ANALYSIS_REFERENCE_PATH}. "
-                    f"Ensure trap_kb_v2.0.md is in the data/ directory."
-                )
-            _analysis_reference_cache = ANALYSIS_REFERENCE_PATH.read_text(encoding="utf-8")
-        return _analysis_reference_cache
+    if _analysis_reference_caches.get(version) is None:
+        path = _ANALYSIS_REFERENCE_PATHS[version]
+        if not path.exists():
+            raise FileNotFoundError(
+                f"Analysis reference for KB version {version!r} not found at {path}. "
+                f"Ensure {path.name} is in the data/ directory."
+            )
+        _analysis_reference_caches[version] = _strip_non_analysis_sections(
+            path.read_text(encoding="utf-8")
+        )
+    return _analysis_reference_caches[version]
 
 
 # ---------------------------------------------------------------------------

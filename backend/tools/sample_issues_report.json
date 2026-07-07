@@ -1,0 +1,105 @@
+{
+  "summary_headline": "New users can complete the core task, but a cluttered home screen and an unlabeled primary action slow them down and risk early drop-off.",
+  "summary_narrative": "The home screen presents several competing calls to action with no clear starting point, and the main action button relies on an icon whose meaning is easy to misread. Together these make the first 30 seconds harder than they need to be, especially for the first-time visitors this product is trying to win over. A few smaller issues around feedback and grouping compound the effect.",
+  "issues": [
+    {
+      "severity_label": "High",
+      "confidence": "High",
+      "headline": "The screen offers no obvious place to start, so first-time users have to guess.",
+      "traps": [
+        {
+          "trap_name": "Distraction",
+          "tenet": "Understandable",
+          "relationship": "root_cause",
+          "definition": "The interface draws attention toward elements that are not relevant to the user's current goal, pulling focus away from the primary task."
+        },
+        {
+          "trap_name": "Poor Grouping",
+          "tenet": "Understandable",
+          "relationship": "co-occurring",
+          "definition": "Related items are not visually grouped, so users cannot tell which controls belong together or which are most important."
+        }
+      ],
+      "description": "The home screen shows six equally-weighted cards plus a promo banner and two toolbar actions, none of which is visually dominant. The sheer number of simultaneous options edges into information overload, and a first-time visitor scanning for \"where do I begin\" has no anchor, so the eye bounces between competing options. Because the cards are also poorly grouped, there's no secondary cue — a section heading, a size difference — to recover the hierarchy, which compounds the distraction.",
+      "region": {"caption": "Home screen — six competing cards, no dominant entry point"},
+      "recommendation": "Establish one clear primary action and demote the rest. Give the main task a full-width, high-contrast button or hero card at the top, and group the remaining cards under a labeled secondary section so their lower priority reads at a glance."
+    },
+    {
+      "severity_label": "High",
+      "confidence": "High",
+      "headline": "The primary action is an unlabeled icon that's easy to misread as \"settings.\"",
+      "traps": [
+        {
+          "trap_name": "Uncomprehended Element",
+          "tenet": "Understandable",
+          "relationship": "root_cause",
+          "definition": "An element's function is not clear from its appearance, forcing the user to guess, experiment, or seek help to understand what it does."
+        }
+      ],
+      "description": "The main call-to-action in the top-right is a bare gear-like glyph with no text label. Users are likely to read it as a settings control rather than the primary \"Create\" action it actually triggers. Since this is the one control the core task depends on, a misread here stalls the whole flow.",
+      "recommendation": "Pair the icon with a visible text label (\"Create\") or replace it with a labeled button. If space is tight, at minimum use a plus glyph — a widely understood \"create\" convention — rather than a gear."
+    },
+    {
+      "severity_label": "Medium",
+      "confidence": "Medium",
+      "headline": "Tapping \"Save\" gives no confirmation, so users may tap it repeatedly.",
+      "traps": [
+        {
+          "trap_name": "Feedback Failure",
+          "tenet": "Understandable",
+          "relationship": "root_cause",
+          "definition": "The system does not acknowledge a user action, leaving the user unsure whether it registered and prone to repeating or abandoning it."
+        }
+      ],
+      "description": "After the Save control is pressed there is no visible state change — no spinner, no toast, no disabled state. A user who isn't sure the tap registered is likely to press again, risking duplicate saves. This is inferred from the static screen; the live behavior would confirm it.",
+      "recommendation": "Acknowledge the tap immediately: disable the button and show a brief inline spinner, then confirm success with a short toast (\"Saved\") and re-enable."
+    },
+    {
+      "severity_label": "Low",
+      "confidence": "Low",
+      "headline": "The back chevron and app logo sit close enough to be mistaken for one control.",
+      "traps": [
+        {
+          "trap_name": "Ambiguous Home",
+          "tenet": "Habituating",
+          "relationship": "conditional — enumerated",
+          "definition": "It is unclear which element returns the user to a known home or starting location, so users are unsure how to get back to safe ground."
+        },
+        {
+          "trap_name": "Inconsistent Appearance",
+          "tenet": "Habituating",
+          "relationship": "conditional — enumerated",
+          "definition": "The same type of element is styled differently in different places, so users cannot rely on appearance to predict behavior."
+        }
+      ],
+      "description": "The back chevron and the app wordmark are tucked into the same top-left cluster with little separation. Depending on how users interpret the logo (some products make it a home link, some don't), the two could be confused — and the same control is styled inconsistently from screen to screen, so users can't rely on its appearance. This is a low-confidence call: the artifact alone can't confirm the logo's behavior.",
+      "recommendation": "Add clear spacing between the back control and the logo, and decide deliberately whether the logo is a home link — then make that behavior consistent across screens."
+    }
+  ],
+  "traps_checked_not_found": [
+    {"trap_name": "Physical Challenge", "coverage_status": "partially_assessed", "detail": "assessed within scope: tap targets on the visible screen meet the minimum size. not assessable from this artifact: gestures and drag interactions that only appear during use."},
+    {"trap_name": "Bad Prediction", "coverage_status": "partially_assessed", "detail": "assessed within scope: the visible defaults look reasonable. not assessable: whether predicted values match what returning users actually intend."},
+    {"trap_name": "Invisible Element", "coverage_status": "not_present"},
+    {"trap_name": "Forced Syntax", "coverage_status": "not_present"},
+    {"trap_name": "Memory Challenge", "coverage_status": "not_present"},
+    {"trap_name": "Gratuitous Redundancy", "coverage_status": "not_present"},
+    {"trap_name": "System Amnesia", "coverage_status": "not_assessable_artifact"},
+    {"trap_name": "Unnecessary Step(s)", "coverage_status": "not_assessable_artifact"},
+    {"trap_name": "Inviting Dead End", "coverage_status": "not_assessable_context"},
+    {"trap_name": "Effectively Invisible Element", "coverage_status": "not_present"},
+    {"trap_name": "Accidental Activation", "coverage_status": "not_present"},
+    {"trap_name": "Incorrect Information", "coverage_status": "not_present"},
+    {"trap_name": "Variable Outcome", "coverage_status": "not_present"},
+    {"trap_name": "Wandering Element", "coverage_status": "not_present"},
+    {"trap_name": "Slow or No Response", "coverage_status": "not_assessable_artifact"},
+    {"trap_name": "Captive Wait", "coverage_status": "not_assessable_artifact"},
+    {"trap_name": "Irreversible Action", "coverage_status": "not_assessable_artifact"},
+    {"trap_name": "Unwanted Disclosure", "coverage_status": "not_assessable_artifact"},
+    {"trap_name": "Data Loss", "coverage_status": "not_assessable_artifact"},
+    {"trap_name": "Poor Aesthetic", "coverage_status": "not_assessable_context"}
+  ],
+  "positive_observations": [
+    "The color palette holds strong contrast throughout, so text stays legible against every background used here.",
+    "The bottom navigation labels each destination with both an icon and a word, which helps first-time users build a mental map quickly."
+  ]
+}

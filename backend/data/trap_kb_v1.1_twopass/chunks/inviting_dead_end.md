@@ -15,7 +15,7 @@
 
 **Severity.** Place on the ladder by the worst plausible outcome for the stated goals; apply C3/C4 escalators. No Trap-specific severity anchors exist in this source.
 
-**Assessability & Confidence.** wrongness is verifiable where the artifact shows destinations/outcomes (Confirmed); plausibility of the wrong judgment is C1/C2-gated.
+**Assessability & Confidence.** wrongness is verifiable where the artifact shows destinations/outcomes (High confidence); plausibility of the wrong judgment is C1/C2-gated.
 
 **Attribution.** Apply G3. No Trap-specific attribution rules exist in this source.
 

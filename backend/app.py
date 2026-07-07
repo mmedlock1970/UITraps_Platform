@@ -446,11 +446,6 @@ class UnifiedAskResponse(BaseModel):
     statistics: Optional[dict] = None
     usage: Optional[dict] = None
     error: Optional[str] = None
-    # Dual analysis fields (kb_version="both")
-    report_html_v1: Optional[str] = None
-    report_html_v2: Optional[str] = None
-    statistics_v1: Optional[dict] = None
-    statistics_v2: Optional[dict] = None
     kb_version: Optional[str] = None
 
 
@@ -979,6 +974,18 @@ async def get_capabilities():
         "supported_video_types": ["video/mp4", "video/quicktime", "video/webm"],
         "supported_document_types": ["application/pdf"]
     }
+
+
+@app.get("/runs")
+async def get_run_log(limit: int = 50):
+    """Recent analysis runs (Phase 4 run log): kb_hash, mode, report_style, model, tokens,
+    cost, timestamp — so 'what did run N use?' is answerable after the fact."""
+    try:
+        from src.run_logger import read_runs
+    except ImportError:
+        from run_logger import read_runs
+    runs = read_runs(limit=max(1, min(int(limit or 50), 500)))
+    return {"count": len(runs), "runs": runs}
 
 
 @app.get("/reports")
@@ -1912,6 +1919,8 @@ async def unified_ask(
     verbosity: str = Form("standard"),
     pass1_model: Optional[str] = Form(None),
     thorough_mode: Optional[str] = Form(None),
+    mode: str = Form("single"),
+    profile: str = Form("default"),
     task_list: Optional[str] = Form(None),
     input_type: Optional[str] = Form(None),
     flow_mode: Optional[str] = Form(None),
@@ -2139,16 +2148,20 @@ async def unified_ask(
                     logger.info(f"[/api/ask pdf] {len(_pdf_img_paths)} page(s) extracted from {_pdf_file.filename}")
 
                     if len(_pdf_img_paths) == 1:
-                        result = get_analyzer().analyze_design(
-                            design_file=_pdf_img_paths[0],
-                            user_context=user_context,
-                            chat_context=chat_context,
-                            kb_version=kb_version,
-                            report_style=report_style,
-                            verbosity=verbosity,
-                            pass1_model=pass1_model,
-                            thorough_mode=(thorough_mode == 'true'),
-                        )
+                        def _run_pdf_analysis():
+                            return get_analyzer().analyze_design(
+                                design_file=_pdf_img_paths[0],
+                                user_context=user_context,
+                                chat_context=chat_context,
+                                kb_version=kb_version,
+                                report_style=report_style,
+                                verbosity=verbosity,
+                                pass1_model=pass1_model,
+                                thorough_mode=(thorough_mode == 'true'),
+                                mode=mode,
+                                profile=profile,
+                            )
+                        result = await asyncio.get_running_loop().run_in_executor(None, _run_pdf_analysis)
                         save_analysis_report(
                             analysis_result=result,
                             analysis_type="single_image",
@@ -2165,9 +2178,12 @@ async def unified_ask(
                             "statistics": result.get("statistics"),
                         }
                     else:
-                        result = get_multi_analyzer().analyze_images(
-                            _pdf_img_paths, user_context, chat_context=chat_context
-                        )
+                        _multi_opts = {"kb_version": kb_version, "verbosity": verbosity, "pass1_model": pass1_model, "thorough_mode": (thorough_mode == 'true'), "mode": mode, "profile": profile}
+                        def _run_multi_pdf_analysis():
+                            return get_multi_analyzer().analyze_images(
+                                _pdf_img_paths, user_context, chat_context=chat_context, analysis_opts=_multi_opts
+                            )
+                        result = await asyncio.get_running_loop().run_in_executor(None, _run_multi_pdf_analysis)
                         save_analysis_report(
                             analysis_result=result,
                             analysis_type="multi_image",
@@ -2215,86 +2231,40 @@ async def unified_ask(
                 user_context = {"users": users, "tasks": tasks, "format": format, "content_type": content_type, "extra_context": extra_context or "", "product_context": product_context or "", "physical_env": physical_env or "", "lighting": lighting or "", "grip_position": grip_position or "", "attentional_state": attentional_state or "", "tenet_filter": tenet_filter or "", "design_name": design_name or "", "task_list": _task_list_parsed, "input_type": _input_type}
                 user_id = str(user.get("id") or user.get("userId", ""))
 
-                if kb_version == "both":
-                    loop = asyncio.get_running_loop()
-                    analyzer_v2 = UITrapsAnalyzer()
-                    analyzer_v1 = UITrapsAnalyzer()
-
-                    logger.info("[/api/ask analysis] running dual analysis in parallel")
-                    _thorough = thorough_mode == 'true'
-                    result_v2, result_v1 = await asyncio.gather(
-                        loop.run_in_executor(
-                            None,
-                            lambda: analyzer_v2.analyze_design(
-                                design_file=tmp_path, user_context=user_context,
-                                chat_context=chat_context, kb_version="v2",
-                                report_style=report_style,
-                                verbosity=verbosity, pass1_model=pass1_model,
-                                thorough_mode=_thorough,
-                            )
-                        ),
-                        loop.run_in_executor(
-                            None,
-                            lambda: analyzer_v1.analyze_design(
-                                design_file=tmp_path, user_context=user_context,
-                                chat_context=chat_context, kb_version="v1",
-                                report_style=report_style,
-                                verbosity=verbosity, pass1_model=pass1_model,
-                                thorough_mode=_thorough,
-                            )
-                        ),
-                    )
-                    logger.info("[/api/ask analysis] dual analysis complete")
-
-                    save_analysis_report(
-                        analysis_result=result_v2,
-                        analysis_type="single_image",
-                        user_context=user_context,
-                        metadata={"file_name": image.filename, "kb_version": "both"},
-                        user_id=user_id
-                    )
-                    _save_report_db(user_id, result_v2, "single_image",
-                                    design_name=design_name or "", file_name=image.filename)
-
-                    return {
-                        "success": True,
-                        "mode": "analysis",
-                        "kb_version": "both",
-                        "report_html_v1": result_v1.get("html"),
-                        "report_html_v2": result_v2.get("html"),
-                        "report_markdown": result_v2.get("markdown"),
-                        "statistics_v1": result_v1.get("statistics"),
-                        "statistics_v2": result_v2.get("statistics"),
-                    }
-                else:
-                    logger.info(f"[/api/ask analysis] calling analyze_design (kb_version={kb_version} verbosity={verbosity} pass1_model={pass1_model} thorough={thorough_mode})")
-                    result = get_analyzer().analyze_design(
+                logger.info(f"[/api/ask analysis] calling analyze_design (kb_version={kb_version} verbosity={verbosity} pass1_model={pass1_model} thorough={thorough_mode} mode={mode})")
+                def _run_single_analysis():
+                    return get_analyzer().analyze_design(
                         design_file=tmp_path, user_context=user_context,
                         chat_context=chat_context, kb_version=kb_version,
                         report_style=report_style,
                         verbosity=verbosity, pass1_model=pass1_model,
                         thorough_mode=(thorough_mode == 'true'),
+                        mode=mode,
+                        profile=profile,
                     )
-                    logger.info("[/api/ask analysis] analyze_design complete")
+                # Run the blocking multi-pass analysis off the event loop so it doesn't
+                # stall other requests for its whole (possibly minutes-long) duration.
+                result = await asyncio.get_running_loop().run_in_executor(None, _run_single_analysis)
+                logger.info("[/api/ask analysis] analyze_design complete")
 
-                    save_analysis_report(
-                        analysis_result=result,
-                        analysis_type="single_image",
-                        user_context=user_context,
-                        metadata={"file_name": image.filename},
-                        user_id=user_id
-                    )
-                    _save_report_db(user_id, result, "single_image",
-                                    design_name=design_name or "", file_name=image.filename)
+                save_analysis_report(
+                    analysis_result=result,
+                    analysis_type="single_image",
+                    user_context=user_context,
+                    metadata={"file_name": image.filename},
+                    user_id=user_id
+                )
+                _save_report_db(user_id, result, "single_image",
+                                design_name=design_name or "", file_name=image.filename)
 
-                    return {
-                        "success": True,
-                        "mode": "analysis",
-                        "kb_version": kb_version,
-                        "report_html": result.get("html"),
-                        "report_markdown": result.get("markdown"),
-                        "statistics": result.get("statistics"),
-                    }
+                return {
+                    "success": True,
+                    "mode": "analysis",
+                    "kb_version": kb_version,
+                    "report_html": result.get("html"),
+                    "report_markdown": result.get("markdown"),
+                    "statistics": result.get("statistics"),
+                }
             except Exception as e:
                 logger.error(f"[/api/ask analysis] error: {e}\n{traceback.format_exc()}")
                 raise _friendly_api_error(e)
@@ -2319,7 +2289,10 @@ async def unified_ask(
                         tmp_paths.append(tmp.name)
 
                 user_context = {"users": users, "tasks": tasks, "format": format, "content_type": content_type, "extra_context": extra_context or "", "product_context": product_context or "", "physical_env": physical_env or "", "lighting": lighting or "", "grip_position": grip_position or "", "attentional_state": attentional_state or "", "tenet_filter": tenet_filter or "", "design_name": design_name or "", "task_list": _task_list_parsed, "input_type": _input_type}
-                result = get_multi_analyzer().analyze_images(tmp_paths, user_context, chat_context=chat_context)
+                _multi_opts = {"kb_version": kb_version, "verbosity": verbosity, "pass1_model": pass1_model, "thorough_mode": (thorough_mode == 'true'), "mode": mode, "profile": profile}
+                def _run_multi_analysis():
+                    return get_multi_analyzer().analyze_images(tmp_paths, user_context, chat_context=chat_context, analysis_opts=_multi_opts)
+                result = await asyncio.get_running_loop().run_in_executor(None, _run_multi_analysis)
 
                 user_id = str(user.get("id") or user.get("userId", ""))
                 save_analysis_report(
@@ -2375,7 +2348,16 @@ async def unified_ask(
                 "format": format or "Website or application",
                 "content_type": content_type,
             }
-            result = get_analyzer().analyze_design(design_file=tmp_path, user_context=user_context, report_style=report_style)
+            def _run_hybrid_analysis():
+                return get_analyzer().analyze_design(
+                    design_file=tmp_path, user_context=user_context,
+                    chat_context=chat_context, kb_version=kb_version,
+                    report_style=report_style, verbosity=verbosity,
+                    pass1_model=pass1_model, thorough_mode=(thorough_mode == 'true'),
+                    mode=mode,
+                    profile=profile,
+                )
+            result = await asyncio.get_running_loop().run_in_executor(None, _run_hybrid_analysis)
 
             # If chat is available, also answer the question with RAG + analysis context
             chat_response = None

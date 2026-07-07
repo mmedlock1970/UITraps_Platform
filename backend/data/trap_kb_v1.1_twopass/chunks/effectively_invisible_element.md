@@ -15,7 +15,7 @@
 
 **Severity.** Place on the ladder by the worst plausible outcome for the stated goals; apply C3/C4 escalators. No Trap-specific severity anchors exist in this source.
 
-**Assessability & Confidence.** user-context gated: expectation (appearance/location) derives from C1 prior learning and C2 task focus; ceiling Probable from statics.
+**Assessability & Confidence.** user-context gated: expectation (appearance/location) derives from C1 prior learning and C2 task focus; ceiling Medium confidence from statics.
 
 **Attribution.** Apply G3. No Trap-specific attribution rules exist in this source.
 

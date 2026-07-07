@@ -1,5 +1,5 @@
 <!-- GENERATED from trap_kb_v2.1.md — do not edit; regenerate on any master edit -->
-### TRAP: WANDERING ELEMENT *(draft-grade)*
+### TRAP: WANDERING ELEMENT *(ratified 2026-07-04)*
 *Sub-tenet: Consistent with Expectations*
 
 **Definition.** The same interface element is presented in a different location at different times — controls, status indicators, or content that move across screens, contexts, or app versions. Spatial memory is among the most powerful automaticities available to designers, and it costs nothing but the discipline of keeping things where they are; wandering squanders it — every displaced encounter pulls the user back into conscious search.
@@ -11,11 +11,11 @@
 2. Map each recurring element's position per context (coordinates/regions in design files make this directly auditable).
 3. Flag every placement inconsistency, recording the contexts and displacement; note ecosystem-level wandering (the same platform control placed differently across an app family).
 
-**Disconfirmation (pass two).** Per Boundary conditions.
+**Disconfirmation (pass two).** Simultaneously visible duplicates are never this Trap (author-ruled 2026-07-05) — it requires the SAME element appearing in DIFFERENT locations at different times; two elements present at once on one screen route to Gratuitous Redundancy (same function) or its lookalike fork (different functions). Per Boundary conditions.
 
-**Severity.** Medium baseline — slowed habituation, conscious search on every encounter; escalates on C4 (high-frequency, time-sensitive controls: navigation, edit, search) and C3 (searching for a moved control while driving or under pressure). **[JUDGMENT: High when displacement of a critical control under time pressure costs the task.]**
+**Severity.** Medium baseline — slowed habituation, conscious search on every encounter. Anchor: the Edit control appearing in different positions across sibling apps (card example): Medium — conscious search on every encounter. Escalates on C4 (high-frequency, time-sensitive controls: navigation, edit, search) and C3 (searching for a moved control while driving or under pressure). High when displacement of a critical control under time pressure costs the task (C3 conversion).
 
-**Assessability & Confidence.** Confirmed from multi-screen design files — cross-context placement comparison is directly auditable, one of the most automatable Traps, and precisely the audit human task-based reviews skip (an AI-native strength). Context axis: C4 gates severity weighting (frequency); largely population-independent for presence.
+**Assessability & Confidence.** High confidence from multi-screen design files — cross-context placement comparison is directly auditable, one of the most automatable Traps, and precisely the audit human task-based reviews skip (an AI-native strength). Context axis: C4 gates severity weighting (frequency); largely population-independent for presence.
 
 **Attribution.** Inconsistent Appearance: independent co-audit (both may be present; separate evidence). Effectively Invisible Element downstream (fix-based, above). This Trap is invisible to task-based evaluation — flag the methodology gap in reports where relevant.
 

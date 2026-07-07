@@ -1,15 +1,18 @@
 <!-- GENERATED from trap_kb_v1.1.md — do not edit; regenerate on any master edit -->
 # PASS ONE — DETECTION PACK (KB v1.1, two-pass structure)
 
-**Role of this pass:** permissive detection. Run every procedure below. Flag every candidate with named evidence. Do NOT filter, weigh disconfirmation, or assign severity. Emit candidates as `TRAP | screen | cue(s)/element(s) | condition(s)` — one line each, no prose.
+**Role of this pass:** permissive detection. Run every procedure below against the artifact. Flag every candidate with named evidence. Do NOT filter, do NOT weigh disconfirmation, do NOT assign severity — over-reporting at this stage is correct behavior. Adjudication happens in pass two with different materials.
+
+**Harness guidance (not KB content):** for speed, instruct the model to emit candidates in a terse line format — `TRAP | screen | element(s) | triggering condition(s)` — one line per candidate, no prose. Decode time scales with output length; adjudication needs the evidence, not an essay.
 
 **G1. Exact trap names.** Use full, exact Trap names; several Traps have near-identical names that denote different problems.
 
 **G2. Two-pass discipline, with selective loading.**
-- **Pass one (detection):** load only the Detection Procedures for all 26 Traps, plus the Context Intake Schema. Run each procedure. Flag every candidate. Do not filter, do not weigh disconfirmation, do not assign severity. Over-reporting at this stage is correct behavior.
+- **Pass one (detection):** load only the Detection Procedures for all 26 Traps, plus the Context Intake Schema. Run each procedure. Flag every candidate. Do not filter, do not weigh disconfirmation, do not assign severity. Over-reporting at this stage is correct behavior. Candidate-line economy: the triggering-condition clause is telegraphic — at most ~15 words, no explanatory subordinate clauses. Pass one routes chunks; pass two explains.
 - **Pass two (adjudication):** load the full chunks for candidate Traps only, plus the Taxonomy Index. For each candidate, apply in order: (1) Disconfirmation; (2) the one-problem-one-issue procedure (G3); (3) the Assessability lookup (G4/G5); (4) Severity and Confidence; (5) assemble the issue per G8.
+- **Mode-agnostic discipline:** the staging above describes the two-pass runtime. In single-call execution the same discipline applies sequentially within one response: complete the full permissive detection sweep across ALL Traps first, then adjudicate the resulting candidates. Never filter, weigh disconfirmation, or assign severity during the detection sweep, in any mode.
 
-**G6. Named evidence.** Every flag, in either pass, must cite the specific cue(s)/element(s) and condition(s) that triggered it. General impressions are not findings. (Per the deck's How to Use, step 3: identify and log any Traps observed; note their severity; log all.)
+**G6. Named evidence — symmetric.** Every flag, in either pass, must cite the specific cue(s)/element(s) and condition(s) that triggered it. General impressions are not findings. (Per the deck's How to Use, step 3: identify and log any Traps observed; note their severity; log all.) Clearances are held to the same bar: a "Not present" verdict must cite the specific disconfirming observation or the scope the procedure actually ran against, with the same specificity required of a finding — and must address the Trap's full definitional scope. Clearing one manifestation (one cue class, one screen region, one definitional clause) does not clear the Trap; state the scope actually cleared. A clearance without named evidence is not a clearance — emit the applicable not-assessable label from G4 instead. Per-instance enumeration (author-ruled 2026-07-06): any claim that an element, badge, or indicator is present on some parallel instances and absent on others must enumerate every instance with its observed state before the claim is made. Presence/absence patterns across repeated elements are the highest-risk observation class; unenumerated pattern claims are not findings.
 
 **G7. Unit of analysis.** Detection Procedures declare their unit: per-screen, cross-screen, or both. For multi-screen artifacts: run per-screen steps on every screen in scope; run cross-screen steps where declared; a persistent element rendered across screens is ONE element. Every finding cites the screen(s) where its evidence sits.
 
@@ -17,7 +20,7 @@
 
 ## CONTEXT INTAKE SCHEMA (C1–C4)
 
-**C1. User Knowledge.** Products and conventions the users have already internalized; domain expertise; novice/expert mix; prior exposure to this product's conventions. *Default when absent:* general adult population familiar with mainstream web/mobile conventions — declare it. Brand-specific, domain-insider, and novel cues cannot be cleared under the default.
+**C1. User Knowledge.** Products and conventions the users have already internalized; domain expertise; novice/expert mix; prior exposure to this product's conventions. ONE sub-population per evaluation (J26): C1 names a single population; evaluating multiple segments means running multiple evaluations. If a mixed population is provided anyway, analyze against the FIRST-NAMED segment and emit one prominent Coverage line: \"Context named multiple populations; this analysis is conditioned on [first-named]. Run a separate evaluation for [others].\" *Default when absent:* general adult population familiar with mainstream web/mobile conventions — declare it. Brand-specific, domain-insider, and novel cues cannot be cleared under the default.
 
 **C2. Goals.** The user's primary tasks and critical paths — AND the fuller set of goals users might plausibly bring to each screen. *Default when absent:* infer the apparent primary task from the screen itself and declare it; findings requiring the full goal set are degraded under this default.
 
@@ -32,7 +35,7 @@
 ## DETECTION PROCEDURES (all 26 Traps)
 
 ### Invisible Element
-**Definitional conditions (decomposed from the definition sentence; the Trap requires all):** (a) no cue signals how to achieve a goal the user plausibly holds (C2); (b) the user population lacks sufficient prior learning to overcome the absence (C1).
+*No cue (label, icon, affordance, or prompt) is provided to signal to the user how to achieve a goal, and the user has insufficient prior learning to overcome its absence.*
 
 **Detection procedure (pass one — flag, do not filter).** *Unit: per-screen, against the goal set.*
 1. From the C2 goal set, survey the artifact for the definitional conditions above.
@@ -42,7 +45,7 @@
 ---
 
 ### Effectively Invisible Element
-**Definitional conditions (decomposed from the definition sentence; the Trap requires all):** (a) a cue is provided; (b) it is likely to go unnoticed or be slow to be noticed; (c) because its appearance or location differs from what the user expects (C1/C2).
+*A provided cue (label, icon, affordance, or prompt) is not noticed, or is slow to be noticed, because its appearance or location differs from what the user expects.*
 
 **Detection procedure (pass one — flag, do not filter).** *Unit: per-screen.*
 1. From the C2 goal set, survey the artifact for the definitional conditions above.
@@ -52,7 +55,7 @@
 ---
 
 ### Distraction
-**Definitional conditions (decomposed from the definition sentence; the Trap requires all):** (a) something in the UI suddenly appears or otherwise draws attention; (b) it distracts the user from their goal (C2).
+*Something in the UI suddenly appears or otherwise draws the user's attention, distracting them from their goal.*
 
 **Detection procedure (pass one — flag, do not filter).** *Unit: per-screen; appearing elements need flow/live evidence.*
 1. From the C2 goal set, survey the artifact for the definitional conditions above.
@@ -62,7 +65,7 @@
 ---
 
 ### Uncomprehended Element
-**Definitional conditions (decomposed from the definition sentence; the Trap requires all):** (a) the cue is critical to achieving a goal (C2); (b) it is noticed; (c) its meaning or required interaction method is unclear to the population (C1).
+*A cue (label, icon, affordance, or prompt) critical to achieving a goal is noticed, but its meaning, or the required method of interacting with it, is unclear.*
 
 **Detection procedure (pass one — flag, do not filter).** *Unit: per-screen.*
 1. From the C2 goal set, survey the artifact for the definitional conditions above.
@@ -72,7 +75,7 @@
 ---
 
 ### Inviting Dead End
-**Definitional conditions (decomposed from the definition sentence; the Trap requires all):** (a) a cue is likely to be judged a means to a goal the user plausibly holds (C2); (b) it is in fact wrong for that goal.
+*A cue (label, icon, affordance, or prompt) is incorrectly judged as a means for achieving a goal. It looks right, but is wrong.*
 
 **Detection procedure (pass one — flag, do not filter).** *Unit: per-screen for candidates; destination verification needs flows/live/code.*
 1. From the C2 goal set, survey the artifact for the definitional conditions above.
@@ -82,7 +85,7 @@
 ---
 
 ### Poor Grouping
-**Definitional conditions (decomposed from the definition sentence; the Trap requires all):** (a) two or more noticeable cues bear a relationship; (b) the relationship is critical to a goal (C2); (c) the relationship is not obvious.
+*A critical relationship between two or more otherwise noticeable cues (labels, icons, affordances, or prompts) is not obvious.*
 
 **Detection procedure (pass one — flag, do not filter).** *Unit: per-screen.*
 1. From the C2 goal set, survey the artifact for the definitional conditions above.
@@ -92,7 +95,7 @@
 ---
 
 ### Forced Syntax
-**Definitional conditions (decomposed from the definition sentence; the Trap requires all):** (a) a command or action sequence exists for a goal; (b) the order or manner most natural to the user (C1) is not allowed by the system.
+*The system does not allow the user to issue a command or complete a sequence of actions in the order or manner that is most natural to them.*
 
 **Detection procedure (pass one — flag, do not filter).** *Unit: cross-screen/flow by nature; statics show risk only.*
 1. From the C2 goal set, survey the artifact for the definitional conditions above.
@@ -102,7 +105,7 @@
 ---
 
 ### Memory Challenge
-**Definitional conditions (decomposed from the definition sentence; the Trap requires all):** (a) the system requires the user to remember information; (b) that information is easy to forget.
+*The system requires the user to remember information that is easy to forget.*
 
 **Detection procedure (pass one — flag, do not filter).** *Unit: cross-screen (carries) and per-screen (recall demands).*
 1. From the C2 goal set, survey the artifact for the definitional conditions above.
@@ -112,7 +115,7 @@
 ---
 
 ### Feedback Failure
-**Definitional conditions (decomposed from the definition sentence; the Trap requires all):** (a) a user action occurs; (b) the feedback in response is not noticeable, or not comprehensible, or not actionable.
+*The system fails to provide noticeable, comprehensible, and actionable feedback in response to user actions.*
 
 **Detection procedure (pass one — flag, do not filter).** *Unit: cross-screen: audit action→response pairs; visible messages auditable per-screen.*
 1. From the C2 goal set, survey the artifact for the definitional conditions above.
@@ -122,7 +125,7 @@
 ---
 
 ### Physical Challenge
-**Definitional conditions (decomposed from the definition sentence; the Trap requires all):** (a) the system requires a physical action; (b) that action is physically effortful, difficult, or impossible for the population (C1) in the context (C3).
+*An action the system requires the user to perform is physically effortful, difficult, or impossible.*
 
 **Detection procedure (pass one — flag, do not filter).** *Unit: per-screen for visible physical demands.*
 1. From the C2 goal set, survey the artifact for the definitional conditions above.
@@ -132,7 +135,7 @@
 ---
 
 ### Accidental Activation
-**Definitional conditions (decomposed from the definition sentence; the Trap requires all):** (a) the user takes a physical action; (b) the system misinterprets it; (c) an unintended outcome results.
+*The system misinterprets a user's physical actions resulting in an unintended outcome.*
 
 **Detection procedure (pass one — flag, do not filter).** *Unit: whole-artifact; behavior evidence needed.*
 1. From the C2 goal set, survey the artifact for the definitional conditions above.
@@ -142,7 +145,7 @@
 ---
 
 ### Slow or No Response
-**Definitional conditions (decomposed from the definition sentence; the Trap requires all):** (a) the user pursues a goal (C2); (b) actual or perceived system performance prevents timely achievement.
+*The user is prevented from achieving a goal in a timely manner because of actual or perceived poor system performance.*
 
 **Detection procedure (pass one — flag, do not filter).** *Unit: per-interaction; live/measured artifacts.*
 1. From the C2 goal set, survey the artifact for the definitional conditions above.
@@ -152,7 +155,7 @@
 ---
 
 ### Captive Wait
-**Definitional conditions (decomposed from the definition sentence; the Trap requires all):** (a) the user is in a process toward a goal (C2); (b) the system intentionally prevents advancing and/or backing out; (c) timely achievement is prevented.
+*The user is prevented from achieving a goal in a timely manner because the system intentionally prevents them from advancing and/or backing out of a process.*
 
 **Detection procedure (pass one — flag, do not filter).** *Unit: cross-screen (flow states).*
 1. From the C2 goal set, survey the artifact for the definitional conditions above.
@@ -162,7 +165,7 @@
 ---
 
 ### Unnecessary Step
-**Definitional conditions (decomposed from the definition sentence; the Trap requires all):** (a) the product is used as intended; (b) actual or perceived steps to a goal (C2) exceed what is needed.
+*When the product is being used as intended, the number of actual or perceived steps required to achieve a goal is too high.*
 
 **Detection procedure (pass one — flag, do not filter).** *Unit: cross-screen (flows); statics show risk only.*
 1. From the C2 goal set, survey the artifact for the definitional conditions above.
@@ -172,7 +175,7 @@
 ---
 
 ### System Amnesia
-**Definitional conditions (decomposed from the definition sentence; the Trap requires all):** (a) the system previously gathered information or prior work exists; (b) the system re-prompts for it or fails to leverage it.
+*The system re-prompts the user for information it previously gathered, or otherwise fails to leverage the user's prior work.*
 
 **Detection procedure (pass one — flag, do not filter).** *Unit: cross-screen/cross-session.*
 1. From the C2 goal set, survey the artifact for the definitional conditions above.
@@ -182,7 +185,7 @@
 ---
 
 ### Information Overload
-**Definitional conditions (decomposed from the definition sentence; the Trap requires all):** (a) information presented is comprehensible; (b) there is more of it than the goal (C2) requires.
+*Information presented to the user is comprehensible, but there is too much of it.*
 
 **Detection procedure (pass one — flag, do not filter).** *Unit: per-screen.*
 1. From the C2 goal set, survey the artifact for the definitional conditions above.
@@ -192,7 +195,7 @@
 ---
 
 ### Bad Prediction
-**Definitional conditions (decomposed from the definition sentence; the Trap requires all):** (a) the system predicts or interprets intent/preference; (b) the prediction is incorrect for this user (C1/C2); (c) the user must work around it.
+*The system incorrectly predicts or interprets the user's intent or preference, resulting in the user having to work around the problem.*
 
 **Detection procedure (pass one — flag, do not filter).** *Unit: whole-artifact feature inventory.*
 1. From the C2 goal set, survey the artifact for the definitional conditions above.
@@ -202,7 +205,7 @@
 ---
 
 ### Irreversible Action
-**Definitional conditions (decomposed from the definition sentence; the Trap requires all):** (a) the user takes an action; (b) the system provides no way to undo it.
+*The system does not allow the user to undo an action they have taken.*
 
 **Detection procedure (pass one — flag, do not filter).** *Unit: cross-screen (flows/code).*
 1. From the C2 goal set, survey the artifact for the definitional conditions above.
@@ -212,7 +215,7 @@
 ---
 
 ### Unwanted Disclosure
-**Definitional conditions (decomposed from the definition sentence; the Trap requires all):** (a) the system makes user data or behavior public; (b) the disclosure is harmful or embarrassing to the user (C3 context).
+*The system makes the user's data or behavior public in a way that is harmful or embarrassing to the user.*
 
 **Detection procedure (pass one — flag, do not filter).** *Unit: whole-artifact + settings.*
 1. From the C2 goal set, survey the artifact for the definitional conditions above.
@@ -222,7 +225,7 @@
 ---
 
 ### Data Loss
-**Definitional conditions (decomposed from the definition sentence; the Trap requires all):** (a) the user creates work; (b) a user action or inaction can cause the system to lose it.
+*The system can lose the user's work through some action or inaction on the user's part.*
 
 **Detection procedure (pass one — flag, do not filter).** *Unit: cross-screen + failure modes.*
 1. From the C2 goal set, survey the artifact for the definitional conditions above.
@@ -232,7 +235,7 @@
 ---
 
 ### Gratuitous Redundancy
-**Definitional conditions (decomposed from the definition sentence; the Trap requires all):** (a) two or more cues serve the same action; (b) they sit on the same level or a directly nested level.
+*The system presents duplicate cues (labels, icons, affordances, or prompts) for the same action on the same level, or a directly nested level of the UI.*
 
 **Detection procedure (pass one — flag, do not filter).** *Unit: per-screen/per-level.*
 1. From the C2 goal set, survey the artifact for the definitional conditions above.
@@ -242,7 +245,7 @@
 ---
 
 ### Variable Outcome
-**Definitional conditions (decomposed from the definition sentence; the Trap requires all):** (a) the same user action occurs at different times; (b) the system's response differs.
+*The system responds differently at different times to the same user action.*
 
 **Detection procedure (pass one — flag, do not filter).** *Unit: cross-state/cross-time.*
 1. From the C2 goal set, survey the artifact for the definitional conditions above.
@@ -252,7 +255,7 @@
 ---
 
 ### Wandering Element
-**Definitional conditions (decomposed from the definition sentence; the Trap requires all):** (a) the same cue serves a given action in multiple UI contexts; (b) its physical location varies across them.
+*The physical location of a cue (label, icon, affordance, or prompt) for a given action varies across the UI.*
 
 **Detection procedure (pass one — flag, do not filter).** *Unit: cross-screen by nature.*
 1. From the C2 goal set, survey the artifact for the definitional conditions above.
@@ -262,7 +265,7 @@
 ---
 
 ### Inconsistent Appearance
-**Definitional conditions (decomposed from the definition sentence; the Trap requires all):** (a) the same cue serves a given action in multiple UI contexts; (b) its visual appearance varies across them.
+*The visual appearance of a cue (label, icon, affordance, or prompt) for a given action varies across the UI.*
 
 **Detection procedure (pass one — flag, do not filter).** *Unit: cross-screen by nature.*
 1. From the C2 goal set, survey the artifact for the definitional conditions above.
@@ -272,7 +275,7 @@
 ---
 
 ### Ambiguous Home
-**Definitional conditions (decomposed from the definition sentence; the Trap requires all):** (a) users need a place to begin new tasks or re-orient; (b) no single such place is reliably reachable at any time.
+*The UI provides no single place the user can return to at any time to begin a new task or get re-oriented.*
 
 **Detection procedure (pass one — flag, do not filter).** *Unit: whole-IA / cross-screen.*
 1. From the C2 goal set, survey the artifact for the definitional conditions above.
@@ -282,9 +285,11 @@
 ---
 
 ### Unattractive Appearance
-**Definitional conditions (decomposed from the definition sentence; the Trap requires all):** (a) the UI's aesthetics are unpleasing, inconsistent, and/or inappropriate; (b) judged against its intended users (C1).
+*The UI is aesthetically unpleasing, inconsistent, and/or inappropriate for its intended users.*
 
 **Detection procedure (pass one — flag, do not filter).** *Unit: per-screen + cross-screen consistency.*
 1. From the C2 goal set, survey the artifact for the definitional conditions above.
 2. Flag every candidate where the conditions appear present; name the specific cue(s)/element(s) and the condition(s) observed (G6).
 3. Where a condition cannot be evaluated from this artifact or without a context field, record that as the reason per G4 rather than silently skipping.
+
+---

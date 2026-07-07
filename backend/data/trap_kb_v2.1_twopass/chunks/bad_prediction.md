@@ -1,5 +1,5 @@
 <!-- GENERATED from trap_kb_v2.1.md — do not edit; regenerate on any master edit -->
-### TRAP: BAD PREDICTION *(draft-grade)*
+### TRAP: BAD PREDICTION *(ratified 2026-07-04)*
 
 **Definition.** The system fails in its attempt to anticipate the user's intent, preference, or context — it guesses wrong: autocorrect errors, irrelevant recommendations, ill-timed suggestions, proactive automation misfires. The user understands what the system did; they just didn't want it. The evaluation is economic: a 10%-wrong autocomplete can be net-positive; a 10%-wrong auto-*sender* cannot — acting demands a far higher accuracy bar than suggesting.
 
@@ -9,15 +9,15 @@
 1. Inventory every predictive/proactive feature: autocomplete/correct, recommendations, auto-actions, sensor-triggered behaviors, "helpful" interjections.
 2. For each, record: does it *act* or *suggest*? Is a wrong guess dismissible at near-zero cost, or does it require undoing? Is the acted-upon outcome reversible? What signals feed it (rich context vs. ambiguous single sensor)?
 3. Flag structurally (no accuracy data needed): any feature that ACTS on a prediction whose wrong outcome is irreversible or privacy/safety-relevant — the acting-threshold is unmet regardless of hit rate; any prediction requiring meaningful effort to dismiss or undo.
-4. When user context (C1/C2) is stated: flag surfaced content, recommendations, or defaults that visibly contradict the stated user's demographics, goals, or tasks — this is static-screenshot detectable, and objective contradictions reach Confirmed without usage data.
+4. When user context (C1/C2) is stated: flag surfaced content, recommendations, or defaults that visibly contradict the stated user's demographics, goals, or tasks — this is static-screenshot detectable, and objective contradictions reach High confidence without usage data.
 5. Flag proactively surfaced content that occludes content the user is actively attending to (hover covers, overlay suggestions) — the system's guess about what helps is overriding what the user chose to attend to.
 6. With usage/observation data: flag features whose correction cost exceeds their saving.
 
 **Disconfirmation (pass two).** NOT present when: (a) the prediction economy is net-positive AND error cost is trivial; (b) wrong guesses dismiss themselves without disruption or effort.
 
-**Severity.** Low for dismissible suggestions (residual cost: occupied space that pushes relevant content away); Medium–High for embarrassment/social harm (autocorrect in sent messages) and effortful workarounds; Critical for irreversible or safety/privacy misfires (false 911, unconsented recording). Escalators: C3 (ambient/shared contexts raise disclosure stakes); C4 (a daily-loop misprediction compounds).
+**Severity.** Low for dismissible suggestions (residual cost: occupied space that pushes relevant content away); Medium–High for embarrassment/social harm and effortful workarounds — anchor: autocorrect rewriting a sent message (card example): Medium–High, social harm, effortful correction, and the message is already delivered; High for irreversible or safety/privacy misfires (false 911, unconsented recording). Escalators: C3 (ambient/shared contexts raise disclosure stakes); C4 (a daily-loop misprediction compounds).
 
-**Assessability & Confidence.** Confirmed for the structural act-vs-consequence flags (feature design convicts itself). Actual accuracy: not assessable without usage data — declare; promotion path: observation of hesitation/correction/frustration after system-initiated actions. Context axis: C2 gates welcomeness (the same suggestion is welcome or painful by moment); C1/C3 shape it.
+**Assessability & Confidence.** High confidence for the structural act-vs-consequence flags (feature design convicts itself). Actual accuracy: not assessable without usage data — declare; promotion path: observation of hesitation/correction/frustration after system-initiated actions. Scoped coverage: "Bad Prediction — assessed within scope: act-vs-suggest structure, dismissal cost, stated-context contradictions; not assessable from this artifact: prediction accuracy — usage observation would settle." Context axis: C2 gates welcomeness (the same suggestion is welcome or painful by moment); C1/C3 shape it.
 
 **Attribution.** Downstream chains per Boundary — each independently evidenced, this Trap as root cause where the fix (predict-when-certain, or suggest-don't-act) dissolves them. System Amnesia upstream (confirm available-but-unused context).
 

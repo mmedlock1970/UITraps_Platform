@@ -28,6 +28,7 @@ export interface FormSnapshot {
   verbosity: 'brief' | 'standard';
   pass1Model: 'sonnet' | 'haiku';
   thoroughMode: boolean;
+  mode?: 'single' | 'twopass';
   reportStyle?: 'trap' | 'issues';
   lockedInputType: 'screenshot' | 'video' | 'flow_diagram' | null;
 }

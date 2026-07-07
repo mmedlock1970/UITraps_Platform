@@ -1,5 +1,5 @@
 <!-- GENERATED from trap_kb_v2.1.md — do not edit; regenerate on any master edit -->
-### TRAP: UNWANTED DISCLOSURE *(draft-grade)*
+### TRAP: UNWANTED DISCLOSURE *(ratified 2026-07-04)*
 
 **Definition.** The system exposes personal data or behavior in a way that is harmful, embarrassing, or unexpected. Two dimensions: *remote/digital* (data shared to third parties, opt-out defaults, location surfacing, history visible to household members) and *physical/real-time* (a notification read aloud in a crowded room, sensitive content on a visible screen, unsilenceable sounds). The governing test is contextual integrity: not "is this data secret?" but "does this flow match what the user would expect given the context in which they shared it?"
 
@@ -14,9 +14,9 @@
 
 **Disconfirmation (pass two).** Per Boundary (a)–(c).
 
-**Severity.** High baseline for sensitive categories (health, location, finance, sexuality) — inherently high-consequence; Critical when disclosure is irreversible and harmful (it usually is — disclosure cannot be undone, placing most confirmed instances at the ladder's top **[JUDGMENT: severity floor inference]**); Medium for social embarrassment (spoiled gifts — which still drove users to competitors). Escalators: C3 (shared/ambient devices, public contexts).
+**Severity.** High baseline for sensitive categories (health, location, finance, sexuality) — inherently high-consequence; High when disclosure is irreversible and harmful (irreversibility is the norm for disclosure — what varies is the harm branch; grade by it); Medium for social embarrassment (spoiled gifts — which still drove users to competitors). Anchor: the partner-site purchase feed (card example): embarrassment-grade harm, Medium by harm branch — yet irreversible, and it drove a class action and feature shutdown; harm-branch grading is not a reason to under-weigh business risk in the description. Escalators: C3 (shared/ambient devices, public contexts).
 
-**Assessability & Confidence.** Confirmed for structural findings: opt-out defaults on sensitive data, ungated audio output of content (artifact/settings suffice). Whether a specific flow violates expectations: Probable, gated by C3 social context — promotion path: context-of-use inquiry. Context axis: C3 is primary (the privacy clause exists for this Trap); C1 norms shape expectation.
+**Assessability & Confidence.** High confidence for structural findings: opt-out defaults on sensitive data, ungated audio output of content (artifact/settings suffice). Whether a specific flow violates expectations: Medium confidence, gated by C3 social context — promotion path: context-of-use inquiry. Static single screens: the settings/defaults audit is not assessable — declare "Not assessable from this artifact — settings audit or flows would settle"; physical-dimension flags (visible sensitive surfaces, audio indicators) remain assessable. Context axis: C3 is primary (the privacy clause exists for this Trap); C1 norms shape expectation.
 
 **Attribution.** Bad Prediction upstream (confirm). Feedback Failure co-occurrence (undisclosed sharing). System Amnesia tension: its remediation (retain more) raises this Trap's stakes — cross-note both ways.
 

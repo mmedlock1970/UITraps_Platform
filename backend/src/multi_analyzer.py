@@ -24,12 +24,19 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from .analyzer import UITrapsAnalyzer
 
 
-def _analyze_with_retry(analyzer, path, user_context, max_retries=3, chat_context=None):
-    """Call analyze_design with exponential backoff on 429 rate limit errors."""
+def _analyze_with_retry(analyzer, path, user_context, max_retries=3, chat_context=None, analysis_opts=None):
+    """Call analyze_design with exponential backoff on 429 rate limit errors.
+
+    analysis_opts forwards the per-run toggles (kb_version, verbosity, pass1_model,
+    thorough_mode, mode, ...) so multi-image runs honor the user's selections instead of
+    silently using analyze_design's legacy defaults."""
     delay = 60  # seconds to wait on first 429
     for attempt in range(max_retries):
         try:
-            return analyzer.analyze_design(design_file=path, user_context=user_context, chat_context=chat_context)
+            return analyzer.analyze_design(
+                design_file=path, user_context=user_context,
+                chat_context=chat_context, **(analysis_opts or {}),
+            )
         except Exception as e:
             if '429' in str(e) and attempt < max_retries - 1:
                 print(f"[UITraps] Rate limited. Waiting {delay}s before retry {attempt + 2}/{max_retries}...")
@@ -37,6 +44,9 @@ def _analyze_with_retry(analyzer, path, user_context, max_retries=3, chat_contex
                 delay = min(delay * 2, 300)  # cap at 5 minutes
             else:
                 raise
+    # Defensive: with max_retries<=0 the loop body never runs — never return an implicit None
+    # that the caller would store as a successful result.
+    raise RuntimeError(f"analyze_design did not run (max_retries={max_retries})")
 
 
 # Frame quality classification prompt (lightweight, fast)
@@ -292,7 +302,8 @@ class MultiAnalyzer:
         image_paths: List[str],
         user_context: Dict[str, str],
         progress_callback: callable = None,
-        chat_context: str = None
+        chat_context: str = None,
+        analysis_opts: Dict[str, Any] = None,
     ) -> Dict[str, Any]:
         """
         Analyze multiple images and aggregate results.
@@ -305,6 +316,16 @@ class MultiAnalyzer:
         Returns:
             Aggregated analysis result with HTML and markdown reports
         """
+        # The self-serve profile emits issue-grouped output (issues[]), which the legacy
+        # multi-image aggregator (_aggregate_results, which reads critical/moderate/minor
+        # arrays) cannot combine — it would silently drop every finding. Self-serve is a
+        # single-screenshot condition; fail loudly rather than return an empty report.
+        if (analysis_opts or {}).get("profile") == "self-serve" and len(image_paths) > 1:
+            raise ValueError(
+                "The self-serve profile analyzes a single screenshot at a time. "
+                "Please upload one image (multi-image aggregation is not supported for this profile)."
+            )
+
         results = []
         total = len(image_paths)
 
@@ -316,7 +337,7 @@ class MultiAnalyzer:
             image_data = _load_image_as_base64(path)
 
             try:
-                result = _analyze_with_retry(self.analyzer, path, user_context, chat_context=chat_context)
+                result = _analyze_with_retry(self.analyzer, path, user_context, chat_context=chat_context, analysis_opts=analysis_opts)
                 results.append({
                     'path': path,
                     'filename': os.path.basename(path),

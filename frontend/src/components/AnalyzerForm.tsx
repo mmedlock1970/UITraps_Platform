@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { ContentType, KbVersion, UserContext } from '../api/types';
+import { ContentType, KbVersion, Profile, UserContext } from '../api/types';
 import { FormSnapshot } from '../services/analysisHistory';
 import styles from './AnalyzerForm.module.css';
 
@@ -59,13 +59,14 @@ function assembleContext(fields: {
   physicalEnv: string; lighting: string; gripPosition: string; attentionalState: string;
   kbVersion: KbVersion; selectedTenets: string[];
   verbosity: 'brief' | 'standard'; pass1Model: 'sonnet' | 'haiku';
-  figmaLink: string; thoroughMode: boolean; reportStyle: 'trap' | 'issues';
+  figmaLink: string; thoroughMode: boolean; mode: 'single' | 'twopass'; reportStyle: 'trap' | 'issues';
+  profile: Profile;
   inputType: 'screenshot' | 'video' | 'flow_diagram';
 }): UserContext {
   const { platform, productDomain, screenName, expLevel, techSavvy,
           frequency, taskList, priorProducts, userDesc, extraContext, productContext,
           physicalEnv, lighting, gripPosition, attentionalState, kbVersion, selectedTenets,
-          verbosity, pass1Model, figmaLink, thoroughMode, reportStyle, inputType } = fields;
+          verbosity, pass1Model, figmaLink, thoroughMode, mode, reportStyle, profile, inputType } = fields;
 
   const combinedExtra = [
     (figmaLink.trim() && inputType !== 'flow_diagram') ? `Design file: ${figmaLink.trim()}` : '',
@@ -111,6 +112,9 @@ function assembleContext(fields: {
     verbosity,
     pass1_model: pass1Model,
     thorough_mode: thoroughMode || undefined,
+    // Two-pass is only supported for new KBs; never send it for legacy v1/v2.
+    mode: (kbVersion === 'v1.1' || kbVersion === 'v2.1') ? mode : 'single',
+    profile,
     report_style: reportStyle,
     input_type: inputType,
     figma_url: (figmaLink.trim() && inputType === 'flow_diagram') ? figmaLink.trim() : undefined,
@@ -180,12 +184,15 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
   const [extraContext, setExtraContext] = useState(iv?.extraContext ?? '');
 
   // Card 5 — Analysis Scope
-  const [kbVersion, setKbVersion] = useState<KbVersion>(iv?.kbVersion ?? 'v2');
+  const [kbVersion, setKbVersion] = useState<KbVersion>(iv?.kbVersion ?? 'v2.1');
   const [selectedTenets, setSelectedTenets] = useState<string[]>(iv?.selectedTenets ?? [...ALL_TENETS]);
   const [verbosity, setVerbosity] = useState<'brief' | 'standard'>(iv?.verbosity ?? 'standard');
   const [pass1Model, setPass1Model] = useState<'sonnet' | 'haiku'>(iv?.pass1Model ?? 'sonnet');
   const [thoroughMode, setThoroughMode] = useState(iv?.thoroughMode ?? false);
+  const [mode, setMode] = useState<'single' | 'twopass'>(iv?.mode ?? 'single');
   const [reportStyle, setReportStyle] = useState<'trap' | 'issues'>(iv?.reportStyle ?? 'trap');
+  // Analysis profile — 'self-serve' routes a raw KB through the minimal-harness condition.
+  const [profile, setProfile] = useState<Profile>('default');
   const [lockedInputType, setLockedInputType] = useState<'screenshot' | 'video' | 'flow_diagram' | null>(iv?.lockedInputType ?? null);
   const [autoDetectedType, setAutoDetectedType] = useState<'flow_diagram' | null>(null);
   const inputType = lockedInputType ?? autoDetectedType ?? inferFileType(files, figmaLink);
@@ -294,17 +301,17 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
       figmaLink, screenName, platform, productDomain, productContext,
       expLevel, techSavvy, frequency, tasks, userDesc, priorProducts,
       physicalEnv, lighting, gripPosition, attentionalState, extraContext,
-      kbVersion, selectedTenets, verbosity, pass1Model, thoroughMode, reportStyle, lockedInputType,
+      kbVersion, selectedTenets, verbosity, pass1Model, thoroughMode, mode, reportStyle, lockedInputType,
     };
     const context = assembleContext({ platform, productDomain, screenName,
       expLevel, techSavvy, frequency, taskList: tasks, priorProducts, userDesc, extraContext, productContext,
       physicalEnv, lighting, gripPosition, attentionalState, kbVersion, selectedTenets,
-      verbosity, pass1Model, figmaLink, thoroughMode, reportStyle, inputType });
+      verbosity, pass1Model, figmaLink, thoroughMode, mode, reportStyle, profile, inputType });
     onSubmit({ files, context, formSnapshot });
   }, [disabled, validate, files, figmaLink, screenName, platform, productDomain, productContext,
       expLevel, techSavvy, frequency, tasks, userDesc, priorProducts, extraContext,
       physicalEnv, lighting, gripPosition, attentionalState, kbVersion, selectedTenets,
-      verbosity, pass1Model, thoroughMode, reportStyle, lockedInputType, onSubmit]);
+      verbosity, pass1Model, thoroughMode, mode, reportStyle, lockedInputType, onSubmit]);
 
   const handleFileChange = useCallback((newFiles: FileList | null) => {
     if (!newFiles || newFiles.length === 0) return;
@@ -943,7 +950,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
           <div className={styles.field}>
             <label className={styles.fieldLabel}>Knowledge base version</label>
             <div className={styles.kbVersionGroup}>
-              {(['v2', 'v2.1', 'v1', 'both'] as KbVersion[]).map(v => (
+              {(['v1', 'v2', 'v1.1', 'v2.1'] as KbVersion[]).map(v => (
                 <button
                   key={v}
                   type="button"
@@ -951,15 +958,37 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
                   onClick={() => setKbVersion(v)}
                   disabled={disabled}
                 >
-                  {v === 'both' ? 'Compare v1 vs v2' : v.toUpperCase()}
+                  {v.toUpperCase()}
                 </button>
               ))}
             </div>
             <p className={styles.fieldHint}>
               {kbVersion === 'v2' && 'Current knowledge engine (recommended).'}
-              {kbVersion === 'v2.1' && 'Streamlined v2: tenet overviews, why-it-occurs notes, and remediation guidance removed. Faster analysis, same trap detection accuracy.'}
+              {kbVersion === 'v2.1' && 'New v2.1 knowledge base — all evaluation rules self-contained in the KB. Reports use a High/Medium/Low severity and confidence scale and a Coverage-notes section.'}
+              {kbVersion === 'v1.1' && 'New v1.1 knowledge base (card-deck lineage, 26 traps). Same new report vocabulary as v2.1.'}
               {kbVersion === 'v1' && 'Previous knowledge engine.'}
-              {kbVersion === 'both' && 'Runs two parallel analyses — one with each engine. Results are shown side-by-side with a toggle. Takes roughly twice as long.'}
+            </p>
+          </div>
+
+          {/* Tool coaching — how much scaffolding the tool adds on top of the KB */}
+          <div className={styles.field}>
+            <label className={styles.fieldLabel}>Tool coaching</label>
+            <div className={styles.kbVersionGroup}>
+              {(['default', 'self-serve'] as Profile[]).map(p => (
+                <button
+                  key={p}
+                  type="button"
+                  className={`${styles.kbVersionBtn} ${profile === p ? styles.kbVersionBtnActive : ''}`}
+                  onClick={() => setProfile(p)}
+                  disabled={disabled}
+                >
+                  {p === 'default' ? 'Prompting + KB' : 'KB only'}
+                </button>
+              ))}
+            </div>
+            <p className={styles.fieldHint}>
+              {profile === 'default' && 'Prompting + KB: the standard pipeline — the tool adds its detection procedures, severity rules, and output scaffolding on top of the selected knowledge base.'}
+              {profile === 'self-serve' && 'KB only: the selected KB is injected verbatim with just a minimal instruction — no detection/severity guidance added by the tool. Single-pass, By-Issue. For measuring the KB on its own.'}
             </p>
           </div>
 
@@ -986,6 +1015,33 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
               {thoroughMode && 'Runs one focused pass per Tenet in parallel, then merges findings. More consistent results, similar speed. Recommended for final reviews.'}
             </p>
           </div>
+
+          {/* Analysis architecture — new KBs (v1.1 / v2.1) only */}
+          {(kbVersion === 'v1.1' || kbVersion === 'v2.1') && (
+            <>
+              <hr className={styles.fieldDivider} />
+              <div className={styles.field}>
+                <label className={styles.fieldLabel}>Analysis architecture</label>
+                <div className={styles.kbVersionGroup}>
+                  {(['single', 'twopass'] as const).map(v => (
+                    <button
+                      key={v}
+                      type="button"
+                      className={`${styles.kbVersionBtn} ${mode === v ? styles.kbVersionBtnActive : ''}`}
+                      onClick={() => setMode(v)}
+                      disabled={disabled}
+                    >
+                      {v === 'single' ? 'Single-pass' : 'Two-pass'}
+                    </button>
+                  ))}
+                </div>
+                <p className={styles.fieldHint}>
+                  {mode === 'single' && 'One call with the whole knowledge base. Fast, and the default.'}
+                  {mode === 'twopass' && 'Detection pass surfaces candidate traps, then an adjudication pass confirms each one against only the relevant trap definitions. Higher recall and cleaner attribution; slower and more tokens.'}
+                </p>
+              </div>
+            </>
+          )}
 
           <hr className={styles.fieldDivider} />
 

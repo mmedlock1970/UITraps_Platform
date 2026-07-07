@@ -4,6 +4,53 @@ JSON Schema for UI Traps Analyzer structured output
 Copyright © 2009-present UI Traps LLC. All Rights Reserved.
 PROPRIETARY & CONFIDENTIAL - UI Tenets & Traps Framework
 """
+import copy
+
+# KB generations that carry all evaluative logic in the KB file itself and use the
+# new output vocabulary (Severity & Confidence: High/Medium/Low; G4 coverage labels;
+# G8 report sections). The legacy v1/v2 path is unchanged.
+NEW_KB_VERSIONS = frozenset({"v1.1", "v2.1"})
+
+
+def is_new_kb(version: str | None) -> bool:
+    """True when the selected KB carries the new (v2.1-lineage) output vocabulary."""
+    return version in NEW_KB_VERSIONS
+
+
+# New-KB output vocabulary (see trap_kb_v2.1.md §SEVERITY & CONFIDENCE and G4/G8)
+NEW_KB_CONFIDENCE_LEVELS = ["High", "Medium", "Low"]
+NEW_KB_SEVERITY_LABELS = ["High", "Medium", "Low"]
+NEW_KB_COVERAGE_STATUSES = [
+    "not_present", "not_assessable_artifact", "not_assessable_context",
+    # J27 scoped coverage: a trap with a declared artifact-inaccessible sub-domain (e.g.
+    # Physical Challenge, Slow or No Response, Invisible Element) — assessed in part, not in
+    # full. May co-exist with the trap also appearing as an Issue (mutual-exclusivity relaxed).
+    "partially_assessed",
+]
+
+# G3 issue-composition — the per-Trap `relationship` marker the model emits (bracketed
+# values verbatim from the KB's G3 block). Rendering maps these to three layouts:
+# single-trap (none / root_cause / conditional — primary), multi-trap co-occurring, and
+# multi-trap conditional — enumerated; a `consequence` trap is folded into prose, not shown.
+NEW_KB_RELATIONSHIP_VALUES = [
+    "none", "root_cause", "consequence", "co-occurring",
+    "conditional — primary", "conditional — enumerated",
+]
+
+# Canonical snake_case token per relationship, for tolerant rendering (the model may vary
+# hyphen/en-dash/em-dash/spacing on the multi-word values).
+_RELATIONSHIP_CANON = {
+    "none": "none", "root_cause": "root_cause", "rootcause": "root_cause",
+    "consequence": "consequence", "co_occurring": "co_occurring", "cooccurring": "co_occurring",
+    "conditional_primary": "conditional_primary", "conditional_enumerated": "conditional_enumerated",
+}
+
+
+def normalize_relationship(value: str | None) -> str:
+    """Map a G3 relationship marker (any hyphen/dash/spacing variant) to a canonical token."""
+    import re as _re
+    key = _re.sub(r"_+", "_", _re.sub(r"[^a-z]+", "_", (value or "").lower())).strip("_")
+    return _RELATIONSHIP_CANON.get(key, "none")
 
 # The 27 valid UI Trap names - ONLY these are allowed
 VALID_TRAP_NAMES = [
@@ -35,6 +82,19 @@ VALID_TRAP_NAMES = [
     "AMBIGUOUS HOME",
     "POOR AESTHETIC",
 ]
+
+# v1 lineage (v1 / v1.1) carries 26 traps: UNNECESSARY STEP (no "(S)"), UNATTRACTIVE
+# APPEARANCE (not POOR AESTHETIC), and no INCORRECT INFORMATION. Used to make the new-KB
+# schema's trap-name enum version-aware so v1.1 adjudication isn't validated against v2 names.
+VALID_TRAP_NAMES_V1 = [
+    {"UNNECESSARY STEP(S)": "UNNECESSARY STEP", "POOR AESTHETIC": "UNATTRACTIVE APPEARANCE"}.get(_n, _n)
+    for _n in VALID_TRAP_NAMES if _n != "INCORRECT INFORMATION"
+]
+
+
+def _valid_trap_names(version: str | None) -> list:
+    """The canonical trap-name set for a version's lineage (26 for v1/v1.1, 27 for v2/v2.1)."""
+    return VALID_TRAP_NAMES_V1 if version in ("v1", "v1.1") else VALID_TRAP_NAMES
 
 # The 9 valid UI Tenet names
 VALID_TENET_NAMES = [
@@ -414,14 +474,147 @@ UI_ANALYSIS_SCHEMA = {
 }
 
 
-def get_ui_analysis_schema():
+def _new_kb_analysis_schema(version: str = "v2.1"):
+    """
+    Derive the analysis schema for new-KB (v2.1-lineage) versions from the legacy
+    schema. Only the vocabulary changes — field names and array structure are
+    preserved so the whole downstream pipeline (enrichment, crops, formatter,
+    front end) keeps working:
+
+    - confidence enum → High / Medium / Low
+    - each issue gains an optional `severity_label` (High/Medium/Low ladder)
+    - `traps_checked_not_found` items carry a G4 `coverage_status` label instead of
+      the legacy `testable` boolean
+    - the tier-specific `flagged_for_human_review` / `incomplete_flow_findings`
+      buckets are dropped (they have no G8 home; uncertain findings route to
+      `potential_issues` = "Worth a closer look")
+    """
+    schema = copy.deepcopy(UI_ANALYSIS_SCHEMA)
+    props = schema["properties"]
+    trap_names = _valid_trap_names(version)
+
+    for sev in ("critical_issues", "moderate_issues", "minor_issues"):
+        item = props[sev]["items"]
+        item_props = item["properties"]
+        # Version-aware trap-name enum — v1.1 must validate against the 26-name v1 set, not v2's 27.
+        if "trap_name" in item_props and "enum" in item_props["trap_name"]:
+            item_props["trap_name"]["enum"] = trap_names
+        # severity_label is required — an omitted label silently miscounts the scorecard
+        # (a High finding falls back to Medium). The system prompt already asks for it.
+        if "severity_label" not in item.get("required", []):
+            item.setdefault("required", []).append("severity_label")
+        item_props["confidence"] = {
+            "type": "string",
+            "enum": NEW_KB_CONFIDENCE_LEVELS,
+            "description": (
+                "Confidence this issue is real: High (directly evidenced), "
+                "Medium (strong evidence; a named check would settle it), or Low "
+                "(partial evidence, or leaning on a declared default). "
+                "State the promotion path for every non-High finding."
+            ),
+        }
+        item_props["severity_label"] = {
+            "type": "string",
+            "enum": NEW_KB_SEVERITY_LABELS,
+            "description": (
+                "Severity ladder level — the worst plausible outcome for the stated goals: "
+                "High (task failure or irreversible harm), Medium (recoverable failure or "
+                "recurring friction), Low (one-time friction, delay, polish). Populate this "
+                "AND place the issue in the array indicated by the system prompt's severity mapping."
+            ),
+        }
+
+    tcnf = props["traps_checked_not_found"]
+    tcnf["description"] = (
+        "Coverage notes (G8 section 3): traps assessed and not present (with the condition "
+        "that ruled them out), and traps not assessable (with what would settle them). "
+        "Never include a trap reported as an issue."
+    )
+    tcnf["items"]["properties"] = {
+        "trap_name": {"type": "string", "description": "Name of the trap"},
+        "coverage_status": {
+            "type": "string",
+            "enum": NEW_KB_COVERAGE_STATUSES,
+            "description": (
+                "G4 label. not_present: the artifact can show this trap, required context is "
+                "available or a declared default covers it, the detection procedure ran, and "
+                "nothing survived. not_assessable_artifact: 'Not assessable from this artifact'. "
+                "not_assessable_context: 'Not assessable without user context'. partially_assessed: "
+                "J27 scoped coverage — assessable in part but not in full (declared artifact-"
+                "inaccessible sub-domain); emit even when the trap is also reported as an Issue."
+            ),
+        },
+        "detail": {
+            "type": "string",
+            "description": (
+                "MANDATORY G6 evidence, one line. not_present → either "
+                "'procedure run against [scope], no triggering conditions' or "
+                "'disconfirmed: [named observation]'. not_assessable_artifact → the artifact "
+                "that would settle it. not_assessable_context → which C1–C4 context field "
+                "would settle it. partially_assessed → 'assessed within scope: [...]; not "
+                "assessable from this artifact: [...] — [what would settle]'. A bare trap name "
+                "with no evidence is not a valid entry."
+            ),
+        },
+    }
+    tcnf["items"]["required"] = ["trap_name", "coverage_status", "detail"]
+
+    # "Worth a closer look" (G8 §2): pivotal, assessability-blocked unknowns — questions,
+    # not findings. Replace the legacy potential_issues shape with the richer entry the KB
+    # requested (why-it-matters / the check + cost / both-way implications; no confidence).
+    potential = props["potential_issues"]
+    potential["description"] = (
+        "Worth a closer look (G8 section 2): pivotal unknowns that cannot be settled from this "
+        "artifact but would change the picture if real. Entry ticket is a hard AND: pivotal to a "
+        "stated goal, the worst branch clears Medium severity, and a specific named check exists. "
+        "These are questions, not findings — anything whose evidence clears its Trap's bar is an "
+        "Issue instead."
+    )
+    potential["items"]["properties"] = {
+        "trap_name": {"type": "string", "enum": trap_names, "description": "The trap this unknown concerns."},
+        "tenet": {"type": "string", "enum": VALID_TENET_NAMES},
+        "location": {"type": "string", "description": "The element/screen the unknown concerns."},
+        "observation": {"type": "string", "description": "What is factually visible that raises the question."},
+        "why_it_matters": {"type": "string", "description": "Why this is pivotal to the stated goal (entry-ticket gate a)."},
+        "why_uncertain": {"type": "string", "description": "What specifically cannot be determined from this artifact."},
+        "check": {"type": "string", "description": "The specific named check that would settle it (entry-ticket gate c)."},
+        "check_cost": {"type": "string", "description": "Cost of that check, e.g. 'one click', 'five-user test', 'code audit'."},
+        "implication_if_confirmed": {"type": "string", "description": "What it means for the user if the check confirms the problem."},
+        "implication_if_ruled_out": {"type": "string", "description": "What it means if the check rules it out (often itself a live trap)."},
+    }
+    potential["items"]["required"] = [
+        "trap_name", "tenet", "location", "observation", "why_it_matters", "check", "check_cost",
+    ]
+
+    # Drop tier-specific buckets that have no place in the G8 report structure.
+    for legacy_field in ("flagged_for_human_review", "incomplete_flow_findings"):
+        props.pop(legacy_field, None)
+
+    return schema
+
+
+# Cache the derived new-KB schema PER LINEAGE — v1.1 (26 traps) and v2.1 (27 traps) differ.
+_NEW_KB_ANALYSIS_SCHEMA_CACHE: dict = {}
+
+
+def get_ui_analysis_schema(version: str = "v2"):
     """
     Get the JSON schema for UI analysis structured output.
+
+    Args:
+        version: KB version. New-KB versions (v1.1/v2.1) get the remapped
+            vocabulary with a version-aware trap-name enum; others get the legacy schema.
 
     Returns:
         Dictionary containing the JSON schema
     """
-    return UI_ANALYSIS_SCHEMA
+    if not is_new_kb(version):
+        return UI_ANALYSIS_SCHEMA
+    lineage = "v1" if version in ("v1", "v1.1") else "v2"
+    cached = _NEW_KB_ANALYSIS_SCHEMA_CACHE.get(lineage)
+    if cached is None:
+        cached = _NEW_KB_ANALYSIS_SCHEMA_CACHE[lineage] = _new_kb_analysis_schema(version)
+    return cached
 
 
 # Schema for Pass 3 user-issues synthesis output
@@ -551,8 +744,162 @@ USER_ISSUES_SCHEMA = {
 
 
 def get_user_issues_schema():
-    """Get the JSON schema for Pass 3 user-issues synthesis output."""
+    """Get the JSON schema for Pass 3 user-issues synthesis output (legacy v1/v2)."""
     return USER_ISSUES_SCHEMA
+
+
+def _new_kb_coverage_items():
+    """The coverage-note item shape shared by the new-KB analysis and issues schemas."""
+    return {
+        "type": "object",
+        "properties": {
+            "trap_name": {"type": "string", "description": "Name of the trap"},
+            "coverage_status": {"type": "string", "enum": NEW_KB_COVERAGE_STATUSES},
+            "detail": {"type": "string", "description": "MANDATORY G6 one-line evidence."},
+        },
+        "required": ["trap_name", "coverage_status", "detail"],
+    }
+
+
+def _new_kb_issues_schema(version: str = "v2.1", self_serve: bool = False):
+    """
+    By-Issue output schema for the new (v2.1-lineage) KBs — the adjudication pass emits this
+    directly when report_style='issues' (Option A). Issue-centric per G8 §1, with each
+    aligned Trap carrying its G3 `relationship` marker. The tool injects each trap's verbatim
+    `definition` post-hoc from the manifest, so the model does not transcribe it here.
+
+    self_serve=True relaxes the contract for the raw-KB profile: trap names come from the
+    injected material (no enum), tenet/relationship are optional (no relationship semantics
+    are given to the model), coverage/positives are optional, and every issue field except a
+    headline may be omitted. The model may drop any field it cannot ground.
+    """
+    trap_names = _valid_trap_names(version)
+    _trap_name = {"type": "string"} if self_serve else {"type": "string", "enum": trap_names}
+    _tenet = {"type": "string"} if self_serve else {"type": "string", "enum": VALID_TENET_NAMES}
+    _relationship = ({"type": "string", "description": "Optional relationship marker; omit if not defined by the material."}
+                     if self_serve else
+                     {"type": "string", "enum": NEW_KB_RELATIONSHIP_VALUES, "description": "G3 designation for this trap within the issue (bracketed G3 value)."})
+    _trap_required = ["trap_name"] if self_serve else ["trap_name", "tenet", "relationship"]
+    _issue_required = ["headline"] if self_serve else ["headline", "severity_label", "confidence", "traps", "description", "recommendation"]
+    _top_required = (["summary_headline", "summary_narrative", "issues"] if self_serve
+                     else ["summary_headline", "summary_narrative", "issues", "positive_observations", "traps_checked_not_found"])
+    return {
+        "type": "object",
+        "properties": {
+            "summary_headline": {"type": "string", "description": "A punchy verdict (16–24 words) on how well the design supports the stated goal. No counts."},
+            "summary_narrative": {"type": "string", "description": "One paragraph on the user-experience implications. Hedged language; no counts, no enumerations."},
+            "issues": {
+                "type": "array",
+                "description": "User-facing issues (G8 §1). Each groups the Trap(s) that align to it per G3 composition.",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "headline": {"type": "string", "description": "Plain-language, user-facing statement of the problem (8–14 words). No trap jargon."},
+                        "severity_label": {"type": "string", "enum": NEW_KB_SEVERITY_LABELS, "description": "Highest severity among this issue's traps. Severity ≠ likelihood."},
+                        "confidence": {"type": "string", "enum": NEW_KB_CONFIDENCE_LEVELS, "description": "Lowest confidence among this issue's traps."},
+                        "traps": {
+                            "type": "array",
+                            "description": "The Trap(s) aligned to this issue per G3. A `consequence` trap is included here (it renders in prose, not as a separate entry). One entry per trap.",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "trap_name": _trap_name,
+                                    "tenet": _tenet,
+                                    "relationship": _relationship,
+                                },
+                                "required": _trap_required,
+                            },
+                        },
+                        "description": {"type": "string", "description": "Problem-first prose: what the user experiences and why. Reference traps only to aid understanding/fixing; state any cascade or conditional-branch condition here, not as jargon. Hedged language."},
+                        "recommendation": {"type": "string", "description": "The fix direction, advisory language."},
+                        "region": {
+                            "type": "object",
+                            "description": "Optional bounding box of the element. Normalized 0.0–1.0, origin top-left. Omit if no single element bounds it.",
+                            "properties": {
+                                "x": {"type": "number"}, "y": {"type": "number"},
+                                "width": {"type": "number"}, "height": {"type": "number"},
+                                "caption": {"type": "string"},
+                            },
+                            "required": ["x", "y", "width", "height"],
+                        },
+                    },
+                    "required": _issue_required,
+                },
+            },
+            "positive_observations": {"type": "array", "items": {"type": "string"}},
+            "traps_checked_not_found": {
+                "type": "array",
+                "description": "Coverage notes (G8 §3), same shape as the by-trap report. Includes partially_assessed (J27 scoped) entries even when the trap is also an Issue.",
+                "items": _new_kb_coverage_items(),
+            },
+        },
+        "required": _top_required,
+        "additionalProperties": bool(self_serve),
+    }
+
+
+def _self_serve_issues_schema(version: str = "v1"):
+    """BARE output schema for the KB-only (self-serve) profile. It defines ONLY the report
+    shape — no field-level guidance, no G3 relationship semantics, no G4 coverage taxonomy.
+    The KB (injected verbatim) and the screenshot are the only inputs; the harness supplies
+    just the labels (High/Medium/Low) and the container. Coverage notes are derived by the
+    tool afterward (the complement of the reported traps), so the model is never shown the
+    coverage vocabulary. Fields are omittable (headline is the only requirement)."""
+    return {
+        "type": "object",
+        "properties": {
+            "summary_headline": {"type": "string"},
+            "summary_narrative": {"type": "string"},
+            "issues": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "headline": {"type": "string"},
+                        "severity_label": {"type": "string", "enum": NEW_KB_SEVERITY_LABELS},
+                        "confidence": {"type": "string", "enum": NEW_KB_CONFIDENCE_LEVELS},
+                        "traps": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {"trap_name": {"type": "string"}},
+                                "required": ["trap_name"],
+                            },
+                        },
+                        "description": {"type": "string"},
+                        "recommendation": {"type": "string"},
+                    },
+                    "required": ["headline"],
+                },
+            },
+            "positive_observations": {"type": "array", "items": {"type": "string"}},
+        },
+        "required": ["summary_headline", "summary_narrative", "issues"],
+        "additionalProperties": True,
+    }
+
+
+_NEW_KB_ISSUES_SCHEMA_CACHE: dict = {}
+
+
+def get_ui_issues_schema(version: str = "v2", self_serve: bool = False):
+    """By-Issue schema. New KBs get the issue-centric relationship schema (per lineage);
+    legacy v1/v2 get the existing USER_ISSUES_SCHEMA (Pass-3 synthesis). The self-serve
+    (raw-KB) profile uses the RELAXED issue schema for ANY version — it renders through the
+    rev6 template regardless of lineage, and lets the model omit fields it cannot ground."""
+    lineage = "v1" if version in ("v1", "v1.1") else "v2"
+    if self_serve:
+        key = ("self_serve", lineage)
+        cached = _NEW_KB_ISSUES_SCHEMA_CACHE.get(key)
+        if cached is None:
+            cached = _NEW_KB_ISSUES_SCHEMA_CACHE[key] = _self_serve_issues_schema(version)
+        return cached
+    if not is_new_kb(version):
+        return USER_ISSUES_SCHEMA
+    cached = _NEW_KB_ISSUES_SCHEMA_CACHE.get(lineage)
+    if cached is None:
+        cached = _NEW_KB_ISSUES_SCHEMA_CACHE[lineage] = _new_kb_issues_schema(version)
+    return cached
 
 
 # Interaction Analysis Schema

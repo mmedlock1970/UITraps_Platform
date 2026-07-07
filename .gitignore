@@ -35,3 +35,17 @@ test_output_*/
 .pytest_cache/
 backend/_ul
 tests/smoke/.env.test
+
+# Nested working clones / side projects — never part of this repo
+/UITraps_Platform/
+/Traps-Chat/
+/ui-traps-analyzer/
+
+# Runtime outputs & local junk
+/analyses/
+backend/logs/
+nul
+*.timestamp-*.mjs
+
+# Generated report mockups (regenerate via backend/tools/render_*.py)
+backend/tools/*.html

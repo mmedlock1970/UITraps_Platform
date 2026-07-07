@@ -1,5 +1,5 @@
 <!-- GENERATED from trap_kb_v2.1.md — do not edit; regenerate on any master edit -->
-### TRAP: AMBIGUOUS HOME *(draft-grade)*
+### TRAP: AMBIGUOUS HOME *(ratified 2026-07-04)*
 *Sub-tenet: Well-Oriented*
 
 **Definition.** The interface presents multiple, competing locations for getting oriented and initiating tasks. A single reliable home — one place, reachable from anywhere by one consistent action — is the anchor from which navigational habituation flows and the automatic recovery point when users get lost. When home is ambiguous, users must hold the structure in conscious memory and reason their way back — the burden habituation should have removed.
@@ -14,9 +14,9 @@
 
 **Disconfirmation (pass two).** Per Boundary conditions.
 
-**Severity.** Medium — disorientation, orientation attention-tax on every task start; High when users cannot recover from being lost (deep hierarchies where home is the recovery mechanism) or abandon. Escalators: C4 (orientation happens every session, forever); product complexity.
+**Severity.** Medium — disorientation, orientation attention-tax on every task start; High when users cannot recover from being lost (deep hierarchies where home is the recovery mechanism) or abandon. Anchor: two competing Start/Home experiences, one per input mode (card example): Medium–High — orientation is the recovery mechanism, and it forked. Escalators: C4 (orientation happens every session, forever); product complexity.
 
-**Assessability & Confidence.** Probable from design files (candidate homes and return-action consistency are structural; which one users *conceptualize* as home needs user knowledge) — promotion path: ask users unprompted where they'd go to start a task or recover; inconsistent answers confirm. Confirmed for the return-action inconsistency half (directly auditable). Context axis: C1 gates the conceptualization judgment; C4 weights severity.
+**Assessability & Confidence.** Medium confidence from design files (candidate homes and return-action consistency are structural; which one users *conceptualize* as home needs user knowledge) — promotion path: ask users unprompted where they'd go to start a task or recover; inconsistent answers confirm. High confidence for the return-action inconsistency half (directly auditable). Context axis: C1 gates the conceptualization judgment; C4 weights severity.
 
 **Attribution.** Per Boundary — each co-Trap independently evidenced; this Trap is root cause where consolidation dissolves the others (fix-based).
 

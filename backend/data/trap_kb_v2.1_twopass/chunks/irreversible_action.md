@@ -1,5 +1,5 @@
 <!-- GENERATED from trap_kb_v2.1.md — do not edit; regenerate on any master edit -->
-### TRAP: IRREVERSIBLE ACTION *(draft-grade)*
+### TRAP: IRREVERSIBLE ACTION *(ratified 2026-07-04)*
 
 **Definition.** The user cannot backtrack or undo an action they have taken — a purchase that can't cancel, a message that can't recall, a file that can't restore. The Trap applies when recovery is *possible but unsupported* (Instagram's 30-day restore was always feasible; it simply hadn't been designed). Genuinely unavoidable real-world irreversibility (processed payment, delivered-and-read message) is scoped out — but a time-limited recovery window often exists even there.
 
@@ -13,12 +13,12 @@
 
 **Disconfirmation (pass two).** Per Boundary (a)–(c).
 
-**Severity.** Scales with stakes: Low for trivial unrecoverable acts; High for consequential purchases/deletions; Critical for real-world irreversible harm (flight purchased, legal filing, safety actions). Likelihood risers: the action is reachable in fewer steps than its weight suggests; labels understate commitment; time pressure (C3).
+**Severity.** Scales with stakes: Low for trivial unrecoverable acts; High for consequential purchases/deletions; High for real-world irreversible harm (flight purchased, legal filing, safety actions). Anchor: the Reserve-that-purchases flight (card example): High — consequential purchase, no undo, label understating commitment. Likelihood risers: the action is reachable in fewer steps than its weight suggests; labels understate commitment; time pressure (C3).
 
-**Assessability & Confidence.** Probable from flows/design (absence of visible undo is structural; whether recovery is *technically feasible* needs architecture knowledge) — promotion path: technical review. Confirmed from code showing no recovery path for a feasible one. Context axis: C2 sharpens stakes; C3 (pressure) raises likelihood.
+**Assessability & Confidence.** Medium confidence from flows/design (absence of visible undo is structural; whether recovery is *technically feasible* needs architecture knowledge) — promotion path: technical/architecture review (hours, not users). Static single screens: largely not assessable — undo affordances and recovery windows are flow properties; declare "Not assessable from this artifact — flow or code would settle." High confidence from code showing no recovery path for a feasible one. Context axis: C2 sharpens stakes; C3 (pressure) raises likelihood.
 
 **Attribution.** Data Loss pairing (fix-based, above). Unnecessary Step(s) pairing (reversibility beats confirmation). Inviting Dead End entry (above). Bad Prediction note: proactive error-prevention prompts ("send without attachment?") are predictions — hold them to predict-when-certain.
 
 **Report fragments.** Finding: "[Action] cannot be undone; no recovery mechanism (undo, time-limited window, or non-habituating confirmation) exists." Why it matters: "Users who act unintentionally or under misapprehension have no path back — the cost of the error is permanent."
 
-**Remediation.** Design forwards and backwards: for every consequential action, what does a user who changed their mind do? Reversibility over confirmation — it removes the risk and the step. Where truly irreversible: time-limited recovery window if feasible; else a non-habituating confirmation (typed phrase). Proactively prevent where prediction is certain.
+**Remediation.** Design forwards and backwards: for every consequential action, what does a user who changed their mind do? Reversibility over confirmation — it removes the risk and the step. Where truly irreversible: time-limited recovery window if feasible; else a non-habituating confirmation (typed phrase). Hazard note: typed-phrase confirmations trade friction for safety — reserve them for genuinely irreversible, high-stakes acts, or they become Unnecessary Step(s). Proactively prevent where prediction is certain.

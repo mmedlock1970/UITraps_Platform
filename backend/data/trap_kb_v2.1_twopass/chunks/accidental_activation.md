@@ -1,5 +1,5 @@
 <!-- GENERATED from trap_kb_v2.1.md — do not edit; regenerate on any master edit -->
-### TRAP: ACCIDENTAL ACTIVATION *(draft-grade)*
+### TRAP: ACCIDENTAL ACTIVATION *(ratified 2026-07-04)*
 *Sub-tenet: —*
 
 **Definition.** It's easy for the user to unintentionally trigger an action during normal use: controls at natural grip points, overloaded gestures, wake words overlapping ordinary speech, hair-trigger sensors.
@@ -14,9 +14,9 @@
 
 **Disconfirmation (pass two).** NOT present when: (a) activation requires a deliberate, non-incidental action unlikely during normal handling; (b) the input vocabulary doesn't overlap natural behavior in the context of use (C3).
 
-**Severity.** Scales with consequence × reversibility of the triggered action: accidental screenshot Low; accidental purchase High; accidental emergency call or recording Critical — for privacy/safety actions the acceptable false-trigger rate approaches zero. Escalators: C3 (motion, encumbrance, and pocketed/gripped carrying multiply incidental contact).
+**Severity.** Scales with consequence × reversibility of the triggered action: accidental screenshot Low; accidental purchase High; accidental emergency call or recording High — for privacy/safety actions the acceptable false-trigger rate approaches zero. Anchor: the hand gesture read as a navigation swipe when the user scratched their ear (card example): Medium — unintended navigation, recoverable; the same false trigger on a purchase or recording action grades High. Escalators: C3 (motion, encumbrance, and pocketed/gripped carrying multiply incidental contact).
 
-**Assessability & Confidence.** Probable ceiling from design files (placement vs. known grip zones flags candidates); actual activation behavior requires hardware testing — promotion path: realistic-use hardware trials. Context axis: C3 gates (grip, mobility, environment determine what "normal use" contacts); device class knowledge required — declare when absent.
+**Assessability & Confidence.** Medium confidence ceiling from design files (placement vs. known grip zones flags candidates); actual activation behavior requires hardware testing — promotion path: realistic-use hardware trials. Context axis: C3 gates (grip, mobility, environment determine what "normal use" contacts); device class knowledge required — declare when absent.
 
 **Attribution.** Bad Prediction routing (Boundary). Variable Outcome: overloaded controls whose outcome depends on unattended state make accidents worse — consistency is the root cause there; evidence separately.
 
