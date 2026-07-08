@@ -21,6 +21,18 @@ from anthropic import Anthropic
 
 logger = logging.getLogger(__name__)
 
+# Floor for the per-request API timeout on an analysis pass. A heavy two-pass adjudication
+# (many matched traps → many chunks loaded + up to 8,000 output tokens) can take several
+# minutes to generate; the old 120s default timed out mid-generation and forced SDK retries
+# that wasted the whole attempt. 600s lets a single attempt finish. (Anthropic recommends
+# streaming for high max_tokens; this floor is the low-risk fix pending that.)
+_ANALYSIS_API_TIMEOUT_S = 600
+
+# Multi-screen (flow) analysis sends all screens in ONE call; the output ceiling and cross-screen
+# reasoning are tuned for short flows. Hard-cap the screen count — a clear stop beats silent
+# output truncation or the model self-limiting. Revisit if longer flows are genuinely needed.
+MAX_FLOW_SCREENS = 6
+
 # Public list price per 1M tokens (USD): (input, output, cache_write, cache_read).
 # Used only for the estimated-cost line in the report header — not billing.
 _MODEL_PRICING = {
@@ -59,16 +71,16 @@ def _sum_usage(*usages):
 try:
     from .validators import validate_file_format, validate_context, is_figma_url
     from .prompts import (
-        build_system_prompt, build_user_message, build_figma_message,
+        build_system_prompt, build_user_message, build_figma_message, build_multi_screen_blocks,
         INTERACTION_ANALYSIS_SYSTEM_PROMPT, build_interaction_message,
         build_enrichment_system_prompt, build_enrichment_user_message,
-        build_synthesis_system_prompt, build_synthesis_user_message,
     )
     try:
-        from .formatters import parse_claude_response, format_report_as_markdown, format_report_as_html, get_report_statistics, format_issues_report_as_html, format_new_kb_issues_markdown
+        from .formatters import parse_claude_response, format_report_as_markdown, format_report_as_html, get_report_statistics, format_issues_report_as_html, format_bytrap_report_as_html, format_new_kb_issues_markdown
     except ImportError:
         from .formatters import parse_claude_response, format_report_as_markdown, format_report_as_html, get_report_statistics, format_new_kb_issues_markdown
         format_issues_report_as_html = None
+        format_bytrap_report_as_html = None
     from .schema import get_ui_analysis_schema, get_interaction_analysis_schema, get_user_issues_schema, get_ui_issues_schema, is_new_kb, normalize_relationship
     from .knowledge_extractor import collect_found_trap_names, extract_trap_sections, extract_trap_images
     from .knowledge_base import get_chunks_for_traps
@@ -78,16 +90,16 @@ except ImportError:
     # Fallback for direct script execution
     from validators import validate_file_format, validate_context, is_figma_url
     from prompts import (
-        build_system_prompt, build_user_message, build_figma_message,
+        build_system_prompt, build_user_message, build_figma_message, build_multi_screen_blocks,
         INTERACTION_ANALYSIS_SYSTEM_PROMPT, build_interaction_message,
         build_enrichment_system_prompt, build_enrichment_user_message,
-        build_synthesis_system_prompt, build_synthesis_user_message,
     )
     try:
-        from formatters import parse_claude_response, format_report_as_markdown, format_report_as_html, get_report_statistics, format_issues_report_as_html, format_new_kb_issues_markdown
+        from formatters import parse_claude_response, format_report_as_markdown, format_report_as_html, get_report_statistics, format_issues_report_as_html, format_bytrap_report_as_html, format_new_kb_issues_markdown
     except ImportError:
         from formatters import parse_claude_response, format_report_as_markdown, format_report_as_html, get_report_statistics, format_new_kb_issues_markdown
         format_issues_report_as_html = None
+        format_bytrap_report_as_html = None
     from schema import get_ui_analysis_schema, get_interaction_analysis_schema, get_user_issues_schema, get_ui_issues_schema, is_new_kb, normalize_relationship
     from knowledge_extractor import collect_found_trap_names, extract_trap_sections, extract_trap_images
     from knowledge_base import get_chunks_for_traps
@@ -136,10 +148,11 @@ class UITrapsAnalyzer:
         design_file: str,
         user_context: Dict[str, str],
         timeout: int = 120,
+        additional_design_files: Optional[List[str]] = None,
         user_id: Optional[str] = None,
         page_context: Optional[Dict[str, Any]] = None,
         chat_context: Optional[str] = None,
-        kb_version: str = "v2",
+        kb_version: str = "v2.1",
         verbosity: str = "standard",
         pass1_model: Optional[str] = None,
         thorough_mode: bool = False,
@@ -161,7 +174,8 @@ class UITrapsAnalyzer:
                 - page_url: URL of this page
                 - site_pages: List of other page titles on the site
                 - relevant_tasks: Tasks appropriate for this page type
-            thorough_mode: Run one _pass1 per tenet group in parallel for deeper coverage.
+            thorough_mode: Deprecated/ignored. The legacy tenet-parallel pipeline was removed;
+                accepted only for API backward-compatibility.
             report_style: "trap" (default) for per-Trap HTML report; "issues" for user-centric issues synthesis.
 
         Returns:
@@ -192,16 +206,32 @@ class UITrapsAnalyzer:
         # conditions, and the minimal prompt is deliberately NOT strengthened.
         _self_serve = (profile == "self-serve")
         if _self_serve:
+            # Self-serve is always ONE call against the raw KB — force single-pass and off
+            # thorough (a separate legacy pipeline that would bypass the self-serve
+            # prompt/schema). report_style is honored: 'issues' → bare issues schema, 'trap' →
+            # bare per-trap schema; both use the minimal KB-only prompt, no coaching, no
+            # enrichment pass. This keeps the KB-only condition clean for either report style.
             mode = "single"
-            report_style = "issues"
-            # thorough (tenet-parallel) is a separate legacy pipeline that would bypass the
-            # self-serve prompt/schema and emit trap-shaped output — force it off so self-serve
-            # always takes the single-pass issues path.
             thorough_mode = False
+
+        # Multi-screen (flow) analysis: load ALL screens and pack them into one labeled
+        # image_data_list so the model reasons across the whole flow in a SINGLE call
+        # (flow-aware, per KB G7) rather than per-screen in isolation. Single-image runs keep
+        # preloaded_images=None and behave exactly as before.
+        _design_files = [design_file] + [p for p in (additional_design_files or []) if p]
+        if len(_design_files) > MAX_FLOW_SCREENS:
+            raise ValueError(
+                f"Multi-screen flow analysis supports at most {MAX_FLOW_SCREENS} screens in one "
+                f"analysis; received {len(_design_files)}. Please submit {MAX_FLOW_SCREENS} or fewer."
+            )
+        preloaded_images = None
+        if len(_design_files) > 1:
+            _image_dicts = [self._load_image(p) for p in _design_files]
+            preloaded_images = build_multi_screen_blocks(_image_dicts)
 
         # Steps 2–5: Pass 1 visual analysis. Mode selects the architecture:
         #   "twopass" — detection→adjudication over sliced packs (new KBs only)
-        #   "single"  — one call with the whole KB (thorough_mode fans out per tenet group)
+        #   "single"  — one call with the whole KB
         if mode == "twopass" and is_new_kb(kb_version):
             report = self._twopass(
                 design_file=design_file,
@@ -212,6 +242,7 @@ class UITrapsAnalyzer:
                 pass1_model=pass1_model,
                 chat_context=chat_context,
                 page_context=page_context,
+                preloaded_images=preloaded_images,
                 report_style=report_style,
             )
         elif mode == "twopass":
@@ -228,22 +259,10 @@ class UITrapsAnalyzer:
                 page_context=page_context,
                 report_style=report_style,
             )
-        elif thorough_mode and not is_new_kb(kb_version):
-            report = self._run_tenet_parallel(
-                design_file=design_file,
-                user_context=user_context,
-                timeout=timeout,
-                kb_version=kb_version,
-                verbosity=verbosity,
-                pass1_model=pass1_model,
-                chat_context=chat_context,
-            )
         else:
-            # Single-pass. New-KB + thorough lands here too: the legacy tenet-parallel merge
-            # speaks the old vocabulary (counts, critical/moderate/minor, `testable`) and would
-            # corrupt new-KB output, so thorough is not supported for new KBs.
-            if thorough_mode and is_new_kb(kb_version):
-                print(f"[UITraps] thorough_mode is not supported for new KB {kb_version!r}; running single-pass")
+            # Single-pass. The Thorough coverage option (the legacy tenet-parallel pipeline)
+            # is deprecated and removed; `thorough_mode` is still accepted for API
+            # compatibility but is ignored for every supported config.
             report = self._pass1_issues_retry(
                 design_file=design_file,
                 user_context=user_context,
@@ -253,11 +272,13 @@ class UITrapsAnalyzer:
                 pass1_model=pass1_model,
                 chat_context=chat_context,
                 page_context=page_context,
+                preloaded_images=preloaded_images,
                 report_style=report_style,
                 profile=profile,
             )
 
         report["_design_file"] = design_file
+        report["_design_files"] = _design_files
         # Did the pass emit the issue-grouped structure directly (Option A / self-serve)?
         _is_new_kb_issues = (
             (is_new_kb(kb_version) or _self_serve) and report_style == "issues"
@@ -298,8 +319,26 @@ class UITrapsAnalyzer:
                 # The minimal self-serve prompt produces no coverage notes, so derive the
                 # "not reported" list = the KB's full trap set minus the traps named in issues.
                 self._derive_selfserve_coverage(report, kb_version)
-            self._crop_issues_report_regions(report, design_file)
+            self._crop_issues_report_regions(report, _design_files)
             issues_report = report
+        elif _self_serve:
+            # Self-serve BY-TRAP: the single call already produced the per-trap report. This is
+            # the KB-only condition, so there is NO enrichment pass (that would be a second call
+            # carrying legacy guidance) and NO legacy completeness backfill. The tool fills only
+            # presentation the model was never asked for: the tenet for each finding's pill
+            # (derived from its trap name) and the coverage complement (traps not reported).
+            # Keep only dict findings — the bare schema is permissive, and a stray non-dict
+            # item (string/None) would crash the formatter's per-finding reads. traps_checked
+            # is derived below (overwritten); positives are strings.
+            for _opt in ('critical_issues', 'moderate_issues', 'minor_issues'):
+                report[_opt] = [f for f in (report.get(_opt) or []) if isinstance(f, dict)]
+            for _opt in ('positive_observations', 'traps_checked_not_found'):
+                if not isinstance(report.get(_opt), list):
+                    report[_opt] = []
+            self._fill_selfserve_trap_tenets(report)
+            self._derive_selfserve_trap_coverage(report, kb_version)
+            self._crop_issue_regions(report, _design_files)
+            # issues_report stays None → renders via the legacy By-Trap formatter, unchanged.
         else:
             # Step 7: Pass 2 — Enrich findings using full book sections (per-trap path)
             try:
@@ -317,22 +356,16 @@ class UITrapsAnalyzer:
                          'flagged_for_human_review', 'incomplete_flow_findings']:
                 if not isinstance(report.get(_opt), list):
                     report[_opt] = []
+            # Drop any non-dict finding element — the formatter reads .get() per finding and a
+            # stray string/None would crash the whole render (positives are strings, so skip them).
+            for _opt in ('critical_issues', 'moderate_issues', 'minor_issues',
+                         'potential_issues', 'flagged_for_human_review', 'incomplete_flow_findings'):
+                report[_opt] = [f for f in report[_opt] if isinstance(f, dict)]
 
             # Guarantee report completeness across KB versions: backfill the per-trap
             # "Could Not Evaluate" breakdown. This makes v1 and v2 reports symmetric.
             self._normalize_report_completeness(report, kb_version=kb_version)
-            self._crop_issue_regions(report, design_file)
-
-            # Pass 3 — legacy synthesis into user-issues format (only when requested).
-            # New KBs never reach here: they emit the issue structure directly above.
-            if report_style == "issues" and is_new_kb(kb_version):
-                print(f"[UITraps] issues requested for new KB {kb_version!r} but the adjudication "
-                      f"did not emit an issue structure; returning the per-trap report")
-            elif report_style == "issues":
-                try:
-                    issues_report = self._synthesize_issues(report, timeout=timeout)
-                except Exception as e:
-                    print(f"[UITraps] Pass 3 synthesis skipped (non-fatal): {e}")
+            self._crop_issue_regions(report, _design_files)
         _accrue_usage(issues_report)
 
         if chat_context and chat_context.strip():
@@ -364,7 +397,10 @@ class UITrapsAnalyzer:
             # The output contract (tool schema + minimal instruction) is harness-provided and
             # identical in kind across all conditions — the KB material supplies content, not
             # the output shape. Recorded so comparative runs can attest the contract was fixed.
-            metadata['output_contract'] = 'harness-provided (self-serve): minimal instruction + ui_issues_report schema; KB injected verbatim, no evaluation guidance'
+            # Pivot on "issues" (as build_system_prompt / _pass1 / _is_new_kb_issues all do), so
+            # the recorded tool name matches the tool the call actually used for any report_style.
+            _ss_tool = 'ui_issues_report' if report_style == 'issues' else 'ui_analysis_report'
+            metadata['output_contract'] = f'harness-provided (self-serve): minimal instruction + {_ss_tool} schema; KB injected verbatim, no evaluation guidance'
         if _truncated:
             logger.error("[UITraps] Analysis returned with truncated output (max_tokens) — report is incomplete.")
         if _twopass_meta is not None:
@@ -375,6 +411,11 @@ class UITrapsAnalyzer:
             markdown_report = format_report_as_markdown(report, user_context, kb_version=kb_version)
         if issues_report is not None and format_issues_report_as_html is not None:
             html_report = format_issues_report_as_html(issues_report, user_context, analysis_settings=_analysis_settings)
+        elif (report_style == "trap" and (is_new_kb(kb_version) or _self_serve)
+              and format_bytrap_report_as_html is not None):
+            # rev6 BY-TRAP report (v2.1 Prompting+KB and v1.0 KB-only). Trap-shaped report dict
+            # (critical/moderate/minor); the public entry escapes settings at the boundary.
+            html_report = format_bytrap_report_as_html(report, user_context, analysis_settings=_analysis_settings)
         else:
             html_report = format_report_as_html(report, user_context, analysis_settings=_analysis_settings)
         statistics = get_report_statistics(report)
@@ -427,43 +468,61 @@ class UITrapsAnalyzer:
             "status": "success"
         }
 
-    def _crop_issue_regions(self, report: Dict[str, Any], image_path: str) -> None:
-        """Crop region screenshots from the source image and attach as base64 to each issue."""
+    def _crop_findings_regions(self, findings, image_paths) -> None:
+        """Crop every finding's regions[] against the screen each box names (0-based
+        screen_index) and attach the base64 PNG to that region entry as region['image_b64'].
+        `image_paths` is a list of screen paths (index 0 = first/only screen). Screens are opened
+        once and reused across all findings/boxes."""
         try:
             from PIL import Image
-            import io
-            img = Image.open(image_path)
-            img_w, img_h = img.size
-            for severity in ['critical_issues', 'moderate_issues', 'minor_issues']:
-                for issue in report.get(severity, []):
-                    region = issue.get('region')
-                    if not region:
-                        continue
-                    try:
-                        x = max(0.0, min(1.0, float(region.get('x', 0))))
-                        y = max(0.0, min(1.0, float(region.get('y', 0))))
-                        w = max(0.01, min(1.0 - x, float(region.get('width', 0))))
-                        h = max(0.01, min(1.0 - y, float(region.get('height', 0))))
-                        # 15% padding on each side, clamped to image bounds
-                        pad_x, pad_y = w * 0.15, h * 0.15
-                        x1 = max(0, int((x - pad_x) * img_w))
-                        y1 = max(0, int((y - pad_y) * img_h))
-                        x2 = min(img_w, int((x + w + pad_x) * img_w))
-                        y2 = min(img_h, int((y + h + pad_y) * img_h))
-                        if x2 > x1 and y2 > y1:
-                            crop = img.crop((x1, y1, x2, y2))
-                            # Skip near-blank crops (uniform dark/empty region → black box).
-                            _lo, _hi = crop.convert("L").getextrema()
-                            if (_hi - _lo) < 12:
-                                continue
-                            buf = io.BytesIO()
-                            crop.save(buf, format='PNG', optimize=True)
-                            issue['region_image_b64'] = base64.standard_b64encode(buf.getvalue()).decode('utf-8')
-                    except Exception as crop_err:
-                        print(f"[UITraps] Region crop skipped ({issue.get('trap_name', '?')}): {crop_err}")
-            img.close()
         except Exception as e:
             print(f"[UITraps] Region crop unavailable: {e}")
+            return
+        cache: Dict[int, Any] = {}
+        def _screen(idx):
+            if idx not in cache:
+                cache[idx] = None
+                if 0 <= idx < len(image_paths):
+                    try:
+                        im = Image.open(image_paths[idx])
+                        cache[idx] = (im, im.size[0], im.size[1])
+                    except Exception as e:
+                        print(f"[UITraps] screen {idx} unavailable for crop: {e}")
+            return cache[idx]
+        try:
+            for f in findings:
+                if not isinstance(f, dict):
+                    continue
+                for region in (f.get('regions') or []):
+                    if not isinstance(region, dict):
+                        continue
+                    try:
+                        idx = int(region.get('screen_index', 0) or 0)
+                    except (TypeError, ValueError):
+                        idx = 0
+                    got = _screen(idx)
+                    if not got:
+                        continue
+                    b64 = self._crop_one_region(got[0], got[1], got[2], region)
+                    if b64:
+                        region['image_b64'] = b64
+        finally:
+            for v in cache.values():
+                if v:
+                    try:
+                        v[0].close()
+                    except Exception:
+                        pass
+
+    def _crop_issue_regions(self, report: Dict[str, Any], image_paths) -> None:
+        """By-Trap: crop each finding's regions[] (across all severities). `image_paths` may be a
+        single path (single-screen) or a list of screen paths (multi-screen flow)."""
+        if isinstance(image_paths, str):
+            image_paths = [image_paths]
+        findings = []
+        for severity in ('critical_issues', 'moderate_issues', 'minor_issues'):
+            findings += [f for f in (report.get(severity) or []) if isinstance(f, dict)]
+        self._crop_findings_regions(findings, image_paths)
 
     def _crop_one_region(self, img, img_w, img_h, region) -> Optional[str]:
         """Crop a single normalized region (15% padding, clamped) → base64 PNG, or None."""
@@ -493,20 +552,13 @@ class UITrapsAnalyzer:
             print(f"[UITraps] Region crop skipped: {crop_err}")
         return None
 
-    def _crop_issues_report_regions(self, report: Dict[str, Any], image_path: str) -> None:
-        """Crop each by-issue entry's region → issue['region_image_b64']."""
-        try:
-            from PIL import Image
-            img = Image.open(image_path)
-            img_w, img_h = img.size
-            for issue in report.get('issues', []):
-                if isinstance(issue, dict) and issue.get('region'):
-                    b64 = self._crop_one_region(img, img_w, img_h, issue['region'])
-                    if b64:
-                        issue['region_image_b64'] = b64
-            img.close()
-        except Exception as e:
-            print(f"[UITraps] Region crop unavailable (issues): {e}")
+    def _crop_issues_report_regions(self, report: Dict[str, Any], image_paths) -> None:
+        """By-Issue: crop each finding's regions[] against the screen each box names →
+        region['image_b64']. `image_paths` may be a single path or a list of screen paths."""
+        if isinstance(image_paths, str):
+            image_paths = [image_paths]
+        findings = [f for f in (report.get('issues') or []) if isinstance(f, dict)]
+        self._crop_findings_regions(findings, image_paths)
 
     def _inject_issue_trap_definitions(self, report: Dict[str, Any], kb_version: str) -> None:
         """Attach each aligned trap's verbatim definition (from the pack manifest) to the
@@ -554,6 +606,46 @@ class UITrapsAnalyzer:
             for name in all_traps if _nz(name) not in reported
         ]
 
+    def _fill_selfserve_trap_tenets(self, report: Dict[str, Any]) -> None:
+        """The KB-only By-Trap prompt never asks the model to name a tenet, so derive each
+        finding's tenet from its trap name (canonical map) for the pill — presentation only,
+        tool-side, does not touch the model's reasoning. Mirrors the definition/tenet the
+        by-issue formatter derives. Only fills a tenet that is missing or blank."""
+        try:
+            from .formatters import _tenet_for
+        except ImportError:
+            from formatters import _tenet_for
+        for _arr in ('critical_issues', 'moderate_issues', 'minor_issues'):
+            for f in report.get(_arr, []):
+                if isinstance(f, dict) and f.get('trap_name') and not (f.get('tenet') or '').strip():
+                    _t = _tenet_for(f['trap_name'])
+                    if _t:
+                        f['tenet'] = _t  # UPPER, matching the coached (v2.1) trap schema's enum
+
+    def _derive_selfserve_trap_coverage(self, report: Dict[str, Any], kb_version: str) -> None:
+        """By-Trap twin of _derive_selfserve_coverage: coverage = every trap in the KB's set
+        NOT named in a critical/moderate/minor finding. ALWAYS replaces any coverage the model
+        emitted (the KB-only condition is never shown coverage vocabulary). Marked not_present
+        ('Did not find')."""
+        try:
+            from .schema import _valid_trap_names
+        except ImportError:
+            from schema import _valid_trap_names
+        _nz = lambda s: re.sub(r"[^a-z0-9]", "", (s or "").lower())
+        reported = set()
+        for _arr in ('critical_issues', 'moderate_issues', 'minor_issues'):
+            for f in report.get(_arr, []):
+                if isinstance(f, dict) and f.get('trap_name'):
+                    reported.add(_nz(f['trap_name']))
+        all_traps = _valid_trap_names(kb_version) or []
+        # Emit BOTH coverage vocabularies so the entry renders correctly regardless of the KB
+        # lineage the legacy formatter branches on: new-KB reads `coverage_status`, legacy
+        # (v1/v2) reads the `testable` boolean. testable=True ⇒ "evaluated, not present".
+        report["traps_checked_not_found"] = [
+            {"trap_name": name, "coverage_status": "not_present", "testable": True}
+            for name in all_traps if _nz(name) not in reported
+        ]
+
     def _raw_kb_file_sha(self, kb_version: str) -> Optional[str]:
         """sha256 of the RAW KB file on disk for this version (the exact bytes, pre-stripping).
         Used by the self-serve profile so the condition is reproducible from the file itself."""
@@ -585,92 +677,6 @@ class UITrapsAnalyzer:
             return hashlib.sha256(load_training_content(version=kb_version).encode("utf-8")).hexdigest()
         except Exception:
             return None
-
-    # Analysis groups for thorough_mode=True.
-    # UNDERSTANDABLE and HABITUATING are split by sub-tenet; no group exceeds 5 traps.
-    _ANALYSIS_GROUPS = [
-        # UNDERSTANDABLE — 3 sub-tenet groups
-        {'label': 'UNDERSTANDABLE/Noticeable',
-         'traps': ['INVISIBLE ELEMENT', 'EFFECTIVELY INVISIBLE ELEMENT', 'DISTRACTION']},
-        {'label': 'UNDERSTANDABLE/Comprehensible',
-         'traps': ['UNCOMPREHENDED ELEMENT', 'INVITING DEAD END', 'POOR GROUPING',
-                   'FORCED SYNTAX', 'MEMORY CHALLENGE']},
-        {'label': 'UNDERSTANDABLE/Confirmatory',
-         'traps': ['FEEDBACK FAILURE']},
-        # Full tenets
-        {'label': 'COMFORTABLE',  'tenet': 'COMFORTABLE'},
-        {'label': 'RESPONSIVE',   'tenet': 'RESPONSIVE'},
-        {'label': 'EFFICIENT',    'tenet': 'EFFICIENT'},
-        {'label': 'ACCURATE',     'tenet': 'ACCURATE'},
-        {'label': 'PROTECTIVE',   'tenet': 'PROTECTIVE'},
-        # HABITUATING — 3 sub-tenet groups
-        {'label': 'HABITUATING/Non-Redundant',
-         'traps': ['GRATUITOUS REDUNDANCY']},
-        {'label': 'HABITUATING/Consistent-with-Expectations',
-         'traps': ['VARIABLE OUTCOME', 'WANDERING ELEMENT', 'INCONSISTENT APPEARANCE']},
-        {'label': 'HABITUATING/Oriented',
-         'traps': ['AMBIGUOUS HOME']},
-        # Full tenet
-        {'label': 'BEAUTIFUL',    'tenet': 'BEAUTIFUL'},
-    ]
-
-    def _run_tenet_parallel(
-        self,
-        design_file: str,
-        user_context: Dict[str, str],
-        timeout: int = 120,
-        kb_version: str = "v2",
-        verbosity: str = "standard",
-        pass1_model: Optional[str] = None,
-        chat_context: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """Run one _pass1 per analysis group concurrently, return merged report."""
-        import concurrent.futures
-        from copy import deepcopy
-
-        groups = list(self._ANALYSIS_GROUPS)
-        print(f"[UITraps] Thorough mode: running {len(groups)} parallel sub-analyses")
-
-        # Pre-load image once — avoids 12 concurrent PIL decode/resize operations
-        preloaded_image = self._load_image(design_file)
-        # Narrower token budget per sub-call (1-5 traps scope, not 27)
-        sub_max_tokens = 1500 if verbosity == "brief" else 2500
-
-        def analyze_one(group: dict) -> Dict[str, Any]:
-            ctx = deepcopy(user_context)
-            if 'traps' in group:
-                ctx['trap_filter'] = group['traps']
-                ctx.pop('tenet_filter', None)
-            else:
-                ctx['tenet_filter'] = [group['tenet']]
-                ctx.pop('trap_filter', None)
-            return self._pass1(
-                design_file=design_file,
-                user_context=ctx,
-                timeout=timeout,
-                kb_version=kb_version,
-                verbosity=verbosity,
-                pass1_model=pass1_model,
-                chat_context=chat_context,
-                preloaded_image=preloaded_image,
-                max_tokens_override=sub_max_tokens,
-            )
-
-        reports = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=len(groups)) as executor:
-            future_to_group = {executor.submit(analyze_one, g): g for g in groups}
-            for future in concurrent.futures.as_completed(future_to_group):
-                label = future_to_group[future]['label']
-                try:
-                    reports.append(future.result())
-                    print(f"[UITraps] Group complete: {label}")
-                except Exception as e:
-                    print(f"[UITraps] Group failed ({label}): {e}")
-
-        if not reports:
-            raise Exception("All parallel sub-analyses failed")
-
-        return self._merge_reports(reports)
 
     @staticmethod
     def _merge_reports(reports: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -865,15 +871,15 @@ class UITrapsAnalyzer:
 
         self._normalize_report_completeness(merged, kb_version=kb_version)
 
-        # Save region crops before enrichment — Pass 2 rewrites findings from scratch
-        # and drops region_image_b64. Keyed by (trap_name, location) so we can restore
-        # them after enrichment.
+        # Save region crops before enrichment — Pass 2 rewrites findings from scratch and drops
+        # regions[] (incl. their image_b64 crops). Keyed by (trap_name, location) so we can
+        # restore them after enrichment.
         _saved_crops: dict = {}
         for _sev in ('critical_issues', 'moderate_issues', 'minor_issues'):
             for _issue in merged.get(_sev, []):
-                if _issue.get('region_image_b64'):
+                if _issue.get('regions'):
                     _key = (_issue.get('trap_name', ''), _issue.get('location', ''))
-                    _saved_crops[_key] = _issue['region_image_b64']
+                    _saved_crops[_key] = _issue['regions']
 
         try:
             merged = self._enrich_report(merged, timeout=timeout, kb_version=kb_version, verbosity=verbosity)
@@ -884,10 +890,10 @@ class UITrapsAnalyzer:
         if _saved_crops:
             for _sev in ('critical_issues', 'moderate_issues', 'minor_issues'):
                 for _issue in merged.get(_sev, []):
-                    if not _issue.get('region_image_b64'):
+                    if not _issue.get('regions'):
                         _key = (_issue.get('trap_name', ''), _issue.get('location', ''))
                         if _key in _saved_crops:
-                            _issue['region_image_b64'] = _saved_crops[_key]
+                            _issue['regions'] = _saved_crops[_key]
 
         return merged
 
@@ -896,12 +902,13 @@ class UITrapsAnalyzer:
         design_file: str,
         user_context: Dict[str, str],
         timeout: int = 120,
-        kb_version: str = "v2",
+        kb_version: str = "v2.1",
         verbosity: str = "standard",
         pass1_model: Optional[str] = None,
         chat_context: Optional[str] = None,
         page_context: Optional[Dict[str, Any]] = None,
         preloaded_image: Optional[Dict[str, Any]] = None,
+        preloaded_images: Optional[list] = None,
         max_tokens_override: Optional[int] = None,
         system_prompt_override: Optional[list] = None,
         extra_user_blocks: Optional[list] = None,
@@ -909,6 +916,10 @@ class UITrapsAnalyzer:
         profile: str = "default",
     ) -> Dict[str, Any]:
         """Run Pass 1 visual analysis and return the raw report dict.
+
+        preloaded_images (multi-screen flow): a pre-built content list of interleaved SCREEN
+        labels + image blocks (see prompts.build_multi_screen_blocks). When provided it takes
+        precedence over preloaded_image / design_file and all screens go to the model in ONE call.
 
         For new KBs with report_style='issues' this emits the issue-grouped output
         (ui_issues_report tool) directly (Option A); otherwise the per-trap report.
@@ -919,6 +930,10 @@ class UITrapsAnalyzer:
         candidate list."""
         _model_map = {"sonnet": self.model, "haiku": self.enrich_model}
         effective_model = _model_map.get(pass1_model or "", self.model)
+        # Multi-screen (flow) analysis sends N screens in ONE call; count them for the output
+        # ceiling and for build_system_prompt's multi-screen note (screen_index reinforcement).
+        _n_screens = (sum(1 for b in preloaded_images if isinstance(b, dict) and b.get("type") == "image")
+                      if preloaded_images else 1)
         # New-KB single mode does the whole analysis in this one call, so its output ceiling
         # must clear the KB's ≥8,000-token floor — truncation drops the coverage section and
         # can cut off adjudication (a run error, not a formatting artifact). Legacy v1/v2 keep
@@ -928,8 +943,9 @@ class UITrapsAnalyzer:
             pass1_max_tokens = max_tokens_override
         elif is_new_kb(kb_version) or profile == "self-serve":
             # New KBs and the self-serve profile emit the verbose by-issue report — a legacy
-            # 3–5K cap truncates it. Give them the full ceiling.
-            pass1_max_tokens = 8000
+            # 3–5K cap truncates it. Give them the full ceiling, scaled with screen count for
+            # multi-screen flows (more screens → more findings + more coverage rows).
+            pass1_max_tokens = min(8000 + max(0, _n_screens - 1) * 1500, 16000)
         else:
             pass1_max_tokens = 3000 if verbosity == "brief" else 5000
 
@@ -941,24 +957,33 @@ class UITrapsAnalyzer:
             system_prompt = system_prompt_override
         else:
             system_prompt = build_system_prompt(
-                use_caching=self.use_caching, version=kb_version, image_count=1,
+                use_caching=self.use_caching, version=kb_version, image_count=_n_screens,
                 report_style=report_style, profile=profile,
             )
 
-        if preloaded_image is not None:
-            image_data = preloaded_image
+        # NOTE: page_context is passed by KEYWORD below. It was previously passed positionally
+        # as the 3rd arg, which binds to build_user_message's `image_data_list` slot — a latent
+        # bug (benign only because page_context was None on this path).
+        if preloaded_images is not None:
+            # Multi-screen flow: labeled SCREEN blocks + images already built upstream.
+            user_message = build_user_message(
+                user_context, image_data_list=preloaded_images, page_context=page_context,
+                verbosity=verbosity, version=kb_version, profile=profile,
+            )
         else:
-            if is_figma_url(design_file):
-                raise NotImplementedError(
-                    "Figma URL support requires additional implementation. "
-                    "Please export your Figma design as PNG/JPG and upload the image file."
-                )
-            image_data = self._load_image(design_file)
-
-        user_message = build_user_message(
-            user_context, image_data, page_context, verbosity=verbosity, version=kb_version,
-            profile=profile,
-        )
+            if preloaded_image is not None:
+                image_data = preloaded_image
+            else:
+                if is_figma_url(design_file):
+                    raise NotImplementedError(
+                        "Figma URL support requires additional implementation. "
+                        "Please export your Figma design as PNG/JPG and upload the image file."
+                    )
+                image_data = self._load_image(design_file)
+            user_message = build_user_message(
+                user_context, image_data, page_context=page_context, verbosity=verbosity,
+                version=kb_version, profile=profile,
+            )
 
         if chat_context and chat_context.strip():
             context_block = {
@@ -984,7 +1009,9 @@ class UITrapsAnalyzer:
             tool_name = "ui_issues_report"
             tool_desc = "Submit the complete UI Tenets & Traps BY-ISSUE report"
         else:
-            schema = get_ui_analysis_schema(version=kb_version)
+            # self_serve here means By-Trap KB-only: the BARE per-trap schema (no enums, no
+            # guidance), parallel to the bare issues schema. Default keeps the full trap schema.
+            schema = get_ui_analysis_schema(version=kb_version, self_serve=_self_serve)
             tool_name = "ui_analysis_report"
             tool_desc = "Submit the complete UI Tenets & Traps analysis report"
         _t_call = time.time()
@@ -1001,7 +1028,9 @@ class UITrapsAnalyzer:
                     "input_schema": schema
                 }],
                 tool_choice={"type": "tool", "name": tool_name},
-                timeout=timeout
+                # Give a heavy generation room to finish in one attempt rather than timing out
+                # mid-stream and burning retries; honor a caller that explicitly asked for more.
+                timeout=max(timeout or 0, _ANALYSIS_API_TIMEOUT_S),
             )
         except Exception as e:
             raise Exception(f"Claude API call failed: {e}")
@@ -1178,10 +1207,14 @@ class UITrapsAnalyzer:
         chat_context: Optional[str] = None,
         page_context: Optional[Dict[str, Any]] = None,
         preloaded_image: Optional[Dict[str, Any]] = None,
+        preloaded_images: Optional[list] = None,
         report_style: str = "trap",
     ) -> Dict[str, Any]:
         """
         Two-pass analysis for the new (v2.1-lineage) KBs.
+
+        preloaded_images (multi-screen flow): interleaved SCREEN-labeled image blocks sent to
+        BOTH passes in one call each; takes precedence over preloaded_image / design_file.
 
         Pass 1 (detection): the whole master's detection procedures are injected and the
         model emits a recall-oriented candidate list — no adjudication. We match those
@@ -1204,8 +1237,13 @@ class UITrapsAnalyzer:
         # Staleness guard: regenerate derived packs if the master changed. Automatic swap.
         manifest = pack_generator.ensure_current(kb_version)
 
-        # Load the artifact once and reuse across both passes.
-        if preloaded_image is not None:
+        # Load the artifact once and reuse across both passes. Multi-screen flow: the labeled
+        # SCREEN blocks (image_data_list) are the artifact; image_data stays None.
+        image_data = None
+        _n_screens = 1
+        if preloaded_images is not None:
+            _n_screens = sum(1 for b in preloaded_images if isinstance(b, dict) and b.get("type") == "image")
+        elif preloaded_image is not None:
             image_data = preloaded_image
         elif is_figma_url(design_file):
             raise NotImplementedError(
@@ -1220,13 +1258,20 @@ class UITrapsAnalyzer:
 
         # ── Pass 1: detection (candidate list, no tool) ─────────────────────────
         detection_system = build_system_prompt(
-            use_caching=self.use_caching, version=kb_version, image_count=1,
+            use_caching=self.use_caching, version=kb_version, image_count=_n_screens,
             training_override=pack_generator.load_pack(kb_version, "pass1"), mode="detect",
         )
-        detection_user = build_user_message(
-            user_context, image_data, page_context,
-            verbosity=verbosity, version=kb_version, mode="detect",
-        )
+        # page_context passed by KEYWORD (was positionally in the image_data_list slot — a bug).
+        if preloaded_images is not None:
+            detection_user = build_user_message(
+                user_context, image_data_list=preloaded_images, page_context=page_context,
+                verbosity=verbosity, version=kb_version, mode="detect",
+            )
+        else:
+            detection_user = build_user_message(
+                user_context, image_data, page_context=page_context,
+                verbosity=verbosity, version=kb_version, mode="detect",
+            )
         if chat_context and chat_context.strip():
             detection_user = [{
                 "type": "text",
@@ -1237,15 +1282,19 @@ class UITrapsAnalyzer:
                 )
             }] + list(detection_user)
 
+        # A truncated candidate list loses recall. Scale the ceiling with screen count — a
+        # multi-screen flow surfaces candidates on every screen, so a fixed 4000 would clip the
+        # tail (and the tail is exactly the cross-screen traps this rebuild exists to catch).
+        _detection_max_tokens = min(4000 + max(0, _n_screens - 1) * 1000, 8000)
         _t_det = time.time()
         try:
             det_response = self.client.messages.create(
                 model=effective_model,
-                max_tokens=4000,                 # detection floor — a truncated list loses recall
+                max_tokens=_detection_max_tokens,
                 temperature=0,
                 system=detection_system,
                 messages=[{"role": "user", "content": detection_user}],
-                timeout=timeout,
+                timeout=max(timeout or 0, _ANALYSIS_API_TIMEOUT_S),
             )
         except Exception as e:
             raise Exception(f"Claude API call failed (detection pass): {e}")
@@ -1253,7 +1302,7 @@ class UITrapsAnalyzer:
         _det_stop = getattr(det_response, "stop_reason", None)
 
         if _det_stop == "max_tokens":
-            print("[UITraps][twopass][RUN ERROR] Detection pass truncated at max_tokens=4000 — candidate list may be incomplete (lost recall)")
+            print(f"[UITraps][twopass][RUN ERROR] Detection pass truncated at max_tokens={_detection_max_tokens} — candidate list may be incomplete (lost recall)")
 
         raw_candidates = "".join(
             b.text for b in det_response.content if getattr(b, "type", None) == "text"
@@ -1304,7 +1353,7 @@ class UITrapsAnalyzer:
         # core_pack is the stable cached prefix; the variable flagged-trap chunks go in the
         # uncached extra_training slot so the core pack keeps hitting cache across runs.
         adjudication_system = build_system_prompt(
-            use_caching=self.use_caching, version=kb_version, image_count=1,
+            use_caching=self.use_caching, version=kb_version, image_count=_n_screens,
             training_override=core_pack,
             extra_training=(chunks_text if chunks_text.strip() else None),
             mode="report", report_style=report_style,
@@ -1320,6 +1369,7 @@ class UITrapsAnalyzer:
             chat_context=chat_context,
             page_context=page_context,
             preloaded_image=image_data,
+            preloaded_images=preloaded_images,
             system_prompt_override=adjudication_system,
             extra_user_blocks=[candidate_block],
         )
@@ -1352,7 +1402,7 @@ class UITrapsAnalyzer:
             report["_truncated"] = True
         return report
 
-    def _enrich_report(self, pass1_report: Dict[str, Any], timeout: int = 120, kb_version: str = "v2", verbosity: str = "standard") -> Dict[str, Any]:
+    def _enrich_report(self, pass1_report: Dict[str, Any], timeout: int = 120, kb_version: str = "v2.1", verbosity: str = "standard") -> Dict[str, Any]:
         """
         Pass 2: Enrich Pass 1 findings using full book sections for found traps.
 
@@ -1429,7 +1479,7 @@ class UITrapsAnalyzer:
                 }
             ],
             tool_choice={"type": "tool", "name": "ui_analysis_report"},
-            timeout=timeout
+            timeout=max(timeout or 0, _ANALYSIS_API_TIMEOUT_S),
         )
 
         # Parse enriched report
@@ -1466,85 +1516,7 @@ class UITrapsAnalyzer:
             enriched["_usage_last"] = _u
         return enriched
 
-    def _synthesize_issues(
-        self,
-        enriched_report: Dict[str, Any],
-        timeout: int = 120,
-    ) -> Optional[Dict[str, Any]]:
-        """
-        Pass 3: Synthesise enriched per-Trap findings into user-centric issues.
-
-        Groups Traps that share a common design element or root cause into a
-        single user-facing issue. Grounds all synthesis in the confirmed Trap
-        findings — does not introduce new problems.
-
-        Unlike Pass 2, this pass does not use prompt caching (short context, single-use).
-
-        Args:
-            enriched_report: Pass 1+2 report (per-Trap findings).
-            timeout: API call timeout in seconds.
-
-        Returns:
-            User-issues report matching USER_ISSUES_SCHEMA, or None if no
-            confirmed findings exist or the API call fails.
-        """
-        total = sum(
-            len(enriched_report.get(k, []))
-            for k in ("critical_issues", "moderate_issues", "minor_issues")
-        )
-        if total == 0:
-            return None
-
-        system_prompt = build_synthesis_system_prompt()
-        kb_version = enriched_report.get("_meta", {}).get("kb_version", "v2")
-        user_message = build_synthesis_user_message(enriched_report, kb_version=kb_version)
-        schema = get_user_issues_schema()
-
-        print(f"[UITraps] Pass 3: synthesising {total} Trap finding(s) into user issues")
-
-        response = self.client.messages.create(
-            model=self.enrich_model,
-            max_tokens=4096,
-            temperature=0,
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_message}],
-            tools=[
-                {
-                    "name": "ui_issues_report",
-                    "description": "Submit the synthesised user-issues report",
-                    "input_schema": schema,
-                }
-            ],
-            tool_choice={"type": "tool", "name": "ui_issues_report"},
-            timeout=timeout,
-        )
-
-        for block in response.content:
-            if block.type == "tool_use" and block.name == "ui_issues_report":
-                result = block.input
-                # Pass-through Pass 1 fields that the formatter needs but
-                # the synthesis schema does not produce.
-                result['traps_checked_not_found'] = enriched_report.get('traps_checked_not_found', [])
-                # Build trap_name → crop lookup so the formatter can attach
-                # the Pass 1 screenshot crop to the matching issue card.
-                region_by_trap: dict[str, dict] = {}
-                for _sev in ("critical_issues", "moderate_issues", "minor_issues"):
-                    for _f in enriched_report.get(_sev, []) or []:
-                        _name = (_f.get("trap_name") or "").upper().strip()
-                        _b64 = _f.get("region_image_b64")
-                        if _name and _b64:
-                            _caption = (_f.get("region") or {}).get("caption") or _f.get("location", "")
-                            region_by_trap[_name] = {"b64": _b64, "caption": _caption}
-                result['_region_by_trap'] = region_by_trap
-                _u = _usage_from_response(response, self.enrich_model)
-                if _u:
-                    result["_usage_last"] = _u
-                return result
-
-        print("[UITraps] Pass 3: no tool-use block in response, synthesis skipped")
-        return None
-
-    def _normalize_report_completeness(self, report: Dict[str, Any], kb_version: str = "v2") -> None:
+    def _normalize_report_completeness(self, report: Dict[str, Any], kb_version: str = "v2.1") -> None:
         """
         Make v1 and v2 reports structurally symmetric. Mutates report in place.
 
@@ -1825,7 +1797,7 @@ class UITrapsAnalyzer:
                     }
                 ],
                 tool_choice={"type": "tool", "name": "interaction_analysis_report"},
-                timeout=timeout
+                timeout=max(timeout or 0, _ANALYSIS_API_TIMEOUT_S),
             )
         except Exception as e:
             raise Exception(f"Claude API call failed: {e}")

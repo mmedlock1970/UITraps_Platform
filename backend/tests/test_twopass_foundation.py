@@ -13,7 +13,7 @@ import pytest
 from src import pack_generator as pg
 
 
-VERSIONS = ["v1.1", "v2.1"]
+VERSIONS = ["v2.1"]  # v1.1 retired from the active test matrix (pack support retained)
 
 
 @pytest.mark.parametrize("version", VERSIONS)
@@ -38,7 +38,7 @@ def test_ensure_current_refuses_when_regeneration_disabled_and_stale(version, mo
 @pytest.mark.parametrize("version", VERSIONS)
 def test_manifest_trap_count(version):
     manifest = pg.ensure_current(version)
-    expected = 26 if version == "v1.1" else 27
+    expected = 27  # v2.1 taxonomy
     assert len(manifest["traps"]) == expected
     assert len(manifest["verbatim_definitions"]) == expected
 

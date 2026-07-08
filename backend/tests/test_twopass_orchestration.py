@@ -147,6 +147,6 @@ def test_twopass_rejects_legacy_kb(analyzer):
         analyzer._twopass(
             design_file="dummy.png",
             user_context={"users": "u", "tasks": "t", "format": "PNG"},
-            kb_version="v2",
+            kb_version="v1",
             preloaded_image={"type": "image", "source": {}},
         )

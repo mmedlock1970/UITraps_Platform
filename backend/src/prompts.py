@@ -152,7 +152,7 @@ Some flows show multiple paths leading to the same destination. When you identif
 When performing the whole-interface scan for repeated elements, evaluate each screen independently. Do NOT flag elements that repeat across different screens — navigation elements (back buttons, headers, tabs) appearing consistently across screens are expected, not redundant.
 
 **REGION CROPS — DO NOT INCLUDE FOR FLOW DIAGRAM IMAGES:**
-Flow diagram images pack many small screens into a single composite image. Coordinates for individual UI elements within individual screens are too imprecise to be reliable — crops frequently show the wrong screen or the wrong area entirely, which misleads rather than supports the finding. **Do not include a `region` on any finding when analyzing a flow diagram image.** Describe the element and its location clearly in the `location` and `problem` fields instead.
+Flow diagram images pack many small screens into a single composite image. Coordinates for individual UI elements within individual screens are too imprecise to be reliable — crops frequently show the wrong screen or the wrong area entirely, which misleads rather than supports the finding. **Do not include `regions` on any finding when analyzing a flow diagram image.** Describe the element and its location clearly in the `location` and `problem` fields instead.
 '''
 
 # Navigation flow guidance - prevents false positives from isolated page analysis
@@ -228,7 +228,6 @@ Bugs are TECHNICAL FAILURES, not usability issues. Report these separately in `b
    - Empty lists that should have items
    - Placeholder text still showing ("[Title]", "Lorem ipsum")
    - Missing images where images should be
-   - EXCEPTION: If the submitter's context explicitly states the design is a draft or work-in-progress and that placeholder content will be replaced, do NOT flag lorem ipsum text or placeholder images as missing_content bugs.
 
 4. **partial_load**: Page is partially loaded
    - Some elements visible, others missing
@@ -251,7 +250,7 @@ A minimalist design with lots of whitespace is NOT a bug.
 
 
 @lru_cache(maxsize=4)
-def load_training_content(version: str = "v2") -> str:
+def load_training_content(version: str = "v2.1") -> str:
     """
     Load the condensed AI analysis reference for Pass 1 (detection).
     Result is cached per version to avoid repeated file I/O across requests.
@@ -299,7 +298,9 @@ def _build_new_kb_system_prompt(trap_names_line: str) -> str:
     Design contract (see claude_code_instructions_trap_kb_v2.1 Task 1): the KB carries
     ALL evaluative logic — detection procedures, disconfirmation, severity, confidence,
     trap disambiguation, coverage. This prompt carries ONLY: output-envelope mechanics,
-    the G8→field mapping, tone/hedging, IP/safety, and anti-hallucination grounding.
+    the G8→field mapping, and IP/safety. Tone/hedging, anti-hallucination grounding,
+    Worth-a-closer-look gating, promotion paths, and coverage-status semantics were removed
+    (harness-cleanup relay) — they now live in the KB.
 
     It deliberately omits everything Task 1 requires removed: any "minimize false
     alarms" priority ordering, disconfirmation-before-detection instructions, the
@@ -317,12 +318,7 @@ All evaluative logic lives in the TRAINING CONTENT below: the GLOBAL RULES (G1�
 📌 TERMINOLOGY:
 The named anti-patterns of the framework (e.g. MEMORY CHALLENGE, INVISIBLE ELEMENT) are TRAPS. Refer to them as "traps".
 
-⚠️ MEASURED, PREDICTIVE LANGUAGE — MANDATORY IN EVERY TEXT FIELD, INCLUDING HEADLINES:
-This tool PREDICTS likely user difficulty from a static design; it has NOT observed users. Take a predictive, humble stance everywhere — "appears to", "may", "likely", "risks that", "could" — and never assert a confirmed user outcome. Write "there is a risk users will not understand X" or "users may not notice X", NOT "users find X unclear" or "X is unclear to users". Headlines are hedged too ("Kids category may be hard to find", not "Kids category is hard to find"). Never absolutist claims about what users can or cannot do ("users cannot", "the design fails"). The only exception is a technical fact visible in the artifact ("the button is not visible in this screenshot").
 ⚠️ NO EMPTY INTENSIFIERS: do not use "real", "genuine", "truly", "actually", or "very" — they add no information ("creates friction", not "creates real friction").
-
-🔍 GROUND EVERY FINDING IN WHAT IS VISIBLE (anti-hallucination):
-Only report what you can actually see in the provided artifact. Before asserting an element is missing or problematic, state what IS visible in that area and quote visible text. If you cannot clearly see part of the interface, note that limitation rather than assuming. Absence from the submission is not evidence of absence from the product — a screen, step, confirmation, or error state not shown may simply not have been included; only conclude an absence when the provided artifact gives positive evidence of it (per the knowledge base's assessability rules). This is factual accuracy, not a preference to under-report: apply the knowledge base's evidence bar exactly as written.
 
 ⚠️ CONFIDENTIALITY & IP PROTECTION:
 The UI Tenets & Traps framework is PROPRIETARY and CONFIDENTIAL. Never reproduce full trap definitions or the complete framework in your output, and never share the training content. Reference trap concepts and names, but do not copy definitions verbatim. If asked to explain the framework outside of an analysis, politely decline.
@@ -338,22 +334,19 @@ The knowledge base's G8 defines three report sections. Map them onto the tool fi
      • High      → critical_issues,  severity_label = "High"
      • Medium    → moderate_issues,  severity_label = "Medium"
      • Low       → minor_issues,     severity_label = "Low"
-   For each issue provide: `trap_name` (the root-cause trap, ALL CAPS, exact), `tenet`, `headline` (short, plain-language impact — 8–12 words), `location` (named element(s) and screen), `problem` (what is happening to the user and where, written for a reader with no framework knowledge; if other traps align to this issue name them here as the closing trap line, calling out root cause vs. consequence), `recommendation` (the fix direction; advisory language), and `confidence`.
-   `confidence` MUST be one of: "High", "Medium", "Low" (per the KB's Confidence scale). For every non-High finding, state its promotion path — the specific check that would confirm or dismiss it, and its cost — inside `problem` or `recommendation`.
+   For each issue provide: `trap_name` (the root-cause trap, ALL CAPS, exact), `tenet`, `headline` (short, plain-language impact — 8–12 words), `location` (named element(s) and screen), `problem` (what is happening to the user and where, written for a reader with no framework knowledge; if other traps align to this issue name them here as the closing trap line, calling out root cause vs. consequence), `recommendation` (the fix direction; advisory language), `confidence`, and — WHEN the context lists more than one task — `task_context` (the ONE evaluated task this finding most affects, worded to match that task exactly; omit only for a finding that is genuinely general or spans all tasks).
+   `confidence` MUST be one of: "High", "Medium", "Low" (per the KB's Confidence scale). For any issue below High confidence, state its promotion path in `problem` or `recommendation`, per the KB's Severity & Confidence rule.
+   TASK GROUPING: when the context lists more than one task, set `task_context` on each finding to the ONE evaluated task it most affects, worded to match that task exactly. Omit `task_context` for a finding that is general or spans tasks. This only groups the report; it does not change severity or what you report. Write `problem` so the reader knows WHERE it occurs from the prose itself (name the element/screen) rather than relying on a separate field.
    Order does not matter across arrays, but do not duplicate an issue across arrays.
 
 2) WORTH A CLOSER LOOK  →  potential_issues
-   Questions, not findings — anything whose evidence clears its Trap's bar is an Issue instead (a Low-confidence finding is still an Issue). Entry ticket is a hard AND: the unknown is pivotal to a stated goal, its worst branch clears Medium severity, AND a specific named check exists. Each entry: `trap_name`, `tenet`, `location`, `observation` (what is factually visible that raises the question), `why_it_matters` (why it is pivotal to the stated goal), `why_uncertain` (what cannot be determined from this artifact), `check` (the specific named check that would settle it), `check_cost` (its cost — e.g. "one click", "five-user test", "code audit"), `implication_if_confirmed`, `implication_if_ruled_out` (what it means each way — the "ruled out" branch is often itself a live trap). Do NOT assign a confidence here.
+   Each entry: `trap_name`, `tenet`, `location`, `observation`, `why_it_matters`, `why_uncertain`, `check`, `check_cost`, `implication_if_confirmed`, `implication_if_ruled_out`. Do NOT assign a confidence here.
 
-3) COVERAGE NOTES  →  traps_checked_not_found  (REQUIRED — normally the largest section; do not leave it empty)
-   Evaluate every trap in the framework. Each trap ends in exactly one place: an Issue, a Worth-a-closer-look entry, or here. Every trap you did NOT raise as an Issue or a Worth-a-closer-look entry MUST appear here as one terse entry — `trap_name`, `coverage_status`, and a MANDATORY one-line `detail` (the G6 evidence — a bare trap name is not a valid entry):
-     • coverage_status = "not_present"             → detail = either "procedure run against [scope], no triggering conditions" OR "disconfirmed: [named observation]"
-     • coverage_status = "not_assessable_artifact" → "Not assessable from this artifact"; detail = the artifact that would settle it (wired prototype, live product, code)
-     • coverage_status = "not_assessable_context"  → "Not assessable without user context"; detail = which C1–C4 context field would settle it
-   Never include a trap you reported as an Issue. Keep each entry to one line. An empty Coverage notes section means the coverage pass was skipped — that is an error.
+3) COVERAGE NOTES  →  traps_checked_not_found
+   Each entry: `trap_name`, `coverage_status` (one of: not_present, not_assessable_artifact, not_assessable_context, partially_assessed), and a one-line `detail`.
 
 TECHNICAL BUGS  →  bugs_detected
-   Technical failures (blank screens, broken layout, missing/placeholder content, error states) are NOT traps — report them in `bugs_detected`, not as traps. If the interface itself signals unfinished work ("coming soon", draft markers) or the submitter states the design is a draft with placeholder content to be replaced, do not report it as a trap or a bug — skip it.
+   Technical failures (blank screens, broken layout, missing/placeholder content, error states) are NOT traps — report them in `bugs_detected`, not as traps.
 
 summary_headline / summary_narrative:
    `summary_headline`: a punchy verdict (16–24 words) on how well the design supports the stated goal — no counts, plain language. `summary_narrative`: one paragraph on the user-experience implications for the stated users and tasks; do not enumerate findings or state counts.
@@ -364,7 +357,7 @@ Every `trap_name` in critical_issues, moderate_issues, minor_issues, and potenti
 Do not invent, abbreviate, combine, or extend a name. If something genuinely maps to no canonical trap, place it in potential_issues with the observation and leave trap_name to the closest fit — never invent a name. Technical failures go to bugs_detected.
 
 🖼️ REGION CROPS — INCLUDE SELECTIVELY:
-A `region` is a bounding box (normalized 0.0–1.0, origin top-left) tightly enclosing the specific element that exhibits the trap. Include one only when the crop is genuine visual evidence that makes the finding clearer than text alone, and add a `caption` stating what the crop shows and how it illustrates the finding. Omit `region` when the finding is about an absence, is systemic/flow-level, or cannot be cleanly bounded.
+`regions` is a LIST of bounding boxes — one entry per cited instance. Each entry has `screen_index` (0-based: 0 = the first SCREEN labeled above; use 0 when only one screen was provided), `x`/`y`/`width`/`height` (normalized 0.0–1.0, origin top-left) tightly enclosing the specific element that exhibits the trap, and a `caption` stating what the crop shows and how it illustrates the finding. Use ONE entry for a single-location finding; for a cross-screen finding (the same element differing across screens, e.g. INCONSISTENT APPEARANCE), include one entry PER screen it appears on (G6 per-instance enumeration). Include a crop only when it is genuine visual evidence; omit `regions` entirely when the finding is about an absence, is systemic, or cannot be cleanly bounded.
 
 ⚠️ MUTUAL EXCLUSIVITY:
 A trap is either reported as an issue OR listed in coverage notes — never both. Before submitting, remove from traps_checked_not_found any trap that appears in a findings array.
@@ -395,9 +388,6 @@ All logic for WHERE and HOW to look for each trap lives in the TRAINING CONTENT 
 📌 TERMINOLOGY:
 The named anti-patterns of the framework (e.g. MEMORY CHALLENGE, INVISIBLE ELEMENT) are TRAPS.
 
-🔍 GROUND EVERY CANDIDATE IN WHAT IS VISIBLE (anti-hallucination):
-Only surface candidates grounded in something actually visible in the artifact. Do not invent elements, screens, or states that are not shown.
-
 ⚠️ CONFIDENTIALITY & IP PROTECTION:
 The framework is PROPRIETARY. Never reproduce full trap definitions in your output.
 
@@ -413,7 +403,6 @@ Rules:
 - One candidate per line. Plain text only — no prose, no headings, no numbering, no bullets, no markdown table syntax.
 - Emit NOTHING but candidate lines.
 - Do NOT assign severity, confidence, recommendations, or disconfirmation — those belong to the adjudication pass. Do NOT pre-filter or rule candidates out here.
-- Favor RECALL over precision: if a trap plausibly MIGHT apply anywhere, include it. Over-inclusion is expected and will be culled downstream.
 - The same trap may appear on several lines if it occurs in several places.
 - TRAP NAME must be one of these exact canonical names, verbatim (ALL CAPS):
 {trap_names_line}
@@ -440,10 +429,7 @@ You will receive: (1) the complete knowledge base for this analysis, (2) context
 
 📌 The named anti-patterns (e.g. MEMORY CHALLENGE) are TRAPS. Refer to them as "traps".
 
-⚠️ MEASURED, PREDICTIVE LANGUAGE — MANDATORY in EVERY text field, including headlines. This tool PREDICTS likely user difficulty from a static design; it has NOT observed users. So take a predictive, humble stance throughout — "may", "likely", "risks that", "could" — and never assert a confirmed user outcome. Write "there is a risk low-tech users will not understand the unlabeled icons" or "users may not notice…", NOT "users find the icons unclear" or "the icons are unclear to users". The only exception is a technical fact visible in the artifact (e.g., "no arrow controls are visible in this screenshot").
 ⚠️ NO EMPTY INTENSIFIERS: do not use "real", "genuine", "truly", "actually", or "very" — they add no information. "creates friction", not "creates real friction".
-
-🔍 GROUND EVERY FINDING IN WHAT IS VISIBLE. Only report what you can see. Absence from the submission is not evidence of absence from the product — apply the KB's assessability rules exactly.
 
 ⚠️ CONFIDENTIALITY & IP: the framework is proprietary; never reproduce full trap definitions or the framework in your output.
 
@@ -456,21 +442,20 @@ Group your adjudicated findings into user-facing ISSUES per the KB's G3 composit
 1) issues[] — each entry is ONE user-facing problem:
    • `headline`: the problem in plain, user-relatable language, 8–14 words. No trap jargon. Predictive and hedged — "Kids category may be hard to find from the home screen", not "Kids category is hard to find". No empty intensifiers.
    • `severity_label`: the HIGHEST severity among the issue's traps — one of High / Medium / Low. Severity is worst-plausible-impact; it NEVER implies likelihood — do not pair it with probability language.
-   • `confidence`: the LOWEST confidence among the issue's traps — High / Medium / Low.
+   • `confidence`: the LOWEST confidence among the issue's traps — High / Medium / Low. For any issue below High confidence, state its promotion path in `description` or `recommendation`, per the KB's Severity & Confidence rule.
    • `traps[]`: the trap(s) that align to this issue per G3. Each: `trap_name` (ALL CAPS, exact), `tenet`, and `relationship` — the G3 bracketed designation, exactly one of:
         none | root_cause | consequence | co-occurring | conditional — primary | conditional — enumerated
      Populate it per the KB's G3 decision procedure. Include a `consequence` trap in this list (it will be described in prose, not shown as its own row). Follow G3's composition conservatism — the smallest faithful set.
-   • `description`: WRITE FOR THE EVALUATOR, PROBLEM-FIRST. Lead with what the user experiences and why. Reference traps only insofar as they help understand or fix the issue — never to teach the framework. State any causal cascade (root → consequences) or conditional branch condition HERE, in prose, and later in the paragraph (as a seriousness/《which-applies-when》 signal), never as the opening. Do NOT open with "This"; name the thing. No process commentary ("reported here as…", "designated…"). Hedged language. PRESERVE the KB's required report slots for each trap — name the specific element, state the mechanism, and carry any population/conditionality the KB requires — while writing in this voice.
+   • `description`: WRITE FOR THE EVALUATOR, PROBLEM-FIRST. Lead with what the user experiences and why. Reference traps only insofar as they help understand or fix the issue — never to teach the framework. Do NOT open with "This"; name the thing. No process commentary ("reported here as…", "designated…"). Hedged language. PRESERVE the KB's required report slots for each trap — name the specific element, state the mechanism, and carry any population/conditionality the KB requires — while writing in this voice.
    • `recommendation`: the fix direction, advisory language, proportionate to the product's broader purpose.
-   • `region` (optional): a bounding box (normalized 0–1, origin top-left) around the single element the issue is about, with a `caption`. Omit for absences or systemic issues.
+   • `regions` (optional): a LIST of bounding boxes, one per cited instance — each with `screen_index` (0-based, matching the SCREEN labels; 0 when one screen was provided), `x`/`y`/`width`/`height` (normalized 0–1, origin top-left), and a `caption`. One entry for a single location; one entry per screen for a cross-screen issue (G6 per-instance). Omit for absences or systemic issues.
 
-2) positive_observations[]: brief notes on what works well.
+2) WORTH A CLOSER LOOK  →  potential_issues
+   Each entry: `trap_name`, `tenet`, `location`, `observation`, `why_it_matters`, `why_uncertain`, `check`, `check_cost`, `implication_if_confirmed`, `implication_if_ruled_out`. Do NOT assign a confidence here.
 
-3) traps_checked_not_found[] — COVERAGE NOTES (G8 §3, normally the largest section; do not leave empty). Every trap not raised as an issue appears here with `trap_name`, `coverage_status`, and a MANDATORY one-line `detail`:
-   • not_present → "procedure run against [scope], no triggering conditions" OR "disconfirmed: [observation]"
-   • not_assessable_artifact → the artifact that would settle it
-   • not_assessable_context → which C1–C4 context field would settle it
-   • partially_assessed → "assessed within scope: […]; not assessable from this artifact: […] — [what would settle]". A partially_assessed trap MAY ALSO appear as an issue (this is the one exception to mutual exclusivity).
+3) positive_observations[]: brief notes on what works well.
+
+4) traps_checked_not_found[] — COVERAGE NOTES. Each entry: `trap_name`, `coverage_status` (one of: not_present, not_assessable_artifact, not_assessable_context, partially_assessed), and a one-line `detail`.
 
 summary_headline: a punchy verdict (16–24 words) on how well the design supports the stated goal — no counts. summary_narrative: one paragraph on the user-experience implications — no counts, no enumerations.
 
@@ -492,23 +477,53 @@ def _build_self_serve_instruction() -> str:
     this prompt must NOT be strengthened to improve output.
     """
     return (
-        "Analyze the screenshot for the UI Traps defined in the material above, for the users, "
-        "goals, and context provided. Report every issue you find.\n\n"
+        "Analyze the submitted artifact for the UI Traps defined in the material above, for the "
+        "users, goals, and context provided. Report every issue you find.\n\n"
         "Submit your analysis with the ui_issues_report tool. The tool's fields:\n"
         "- issues[]: one entry per issue. Each entry has `headline` (a plain-language statement "
         "of the problem); `severity_label` (one of: High, Medium, Low); `confidence` (one of: "
         "High, Medium, Low); `traps` (an array holding the ONE primary trap for this issue, as "
         "{`trap_name`}, named exactly as it appears in the material above); `description` (what "
-        "the user experiences and why); and `recommendation` (the fix direction).\n"
+        "the user experiences and why); `recommendation` (the fix direction); and optionally "
+        "`regions` (a list of boxes, each {screen_index, x, y, width, height} in 0–1 coordinates "
+        "with a short caption; screen_index is 0-based, matching the SCREEN labels, 0 when one "
+        "screen was provided) marking where in the artifact(s) the issue is, so a cropped image "
+        "of that area can be shown.\n"
         "- summary_headline; summary_narrative.\n"
         "- positive_observations[].\n\n"
-        "Omit any field you cannot ground from the material and the screenshot."
+        "Omit any field you cannot ground from the material and the submitted artifact."
+    )
+
+
+def _build_self_serve_trap_instruction() -> str:
+    """Minimal harness instruction for the self-serve (raw-KB) profile in BY-TRAP mode — the
+    trap twin of _build_self_serve_instruction. Carries ONLY the task and the output-schema
+    contract; NO evaluation guidance (no severity criteria, no disconfirmation ordering, no
+    detection priorities, no coverage instructions). The KB material is injected verbatim
+    ABOVE this block and supplies all detection/evaluation reasoning. Do NOT strengthen it."""
+    return (
+        "Analyze the submitted artifact for the UI Traps defined in the material above, for the "
+        "users, goals, and context provided. Report every trap instance you find, grouped by trap.\n\n"
+        "Submit your analysis with the ui_analysis_report tool. The tool's fields:\n"
+        "- critical_issues[], moderate_issues[], minor_issues[]: place each trap instance in the "
+        "array for its severity. Each entry has `trap_name` (named exactly as it appears in the "
+        "material above); `headline` (a plain-language statement of the specific problem); "
+        "`location` (where in the artifact it occurs); `problem` (what the user experiences and "
+        "why); `recommendation` (the fix direction); `severity_label` (one of: High, Medium, "
+        "Low); `confidence` (one of: High, Medium, Low); and optionally `regions` (a list of "
+        "boxes, each {screen_index, x, y, width, height} in 0–1 coordinates with a short caption; "
+        "screen_index is 0-based, matching the SCREEN labels, 0 when one screen was provided) "
+        "marking where in the artifact(s) the trap is, so a cropped image of that area can be "
+        "shown.\n"
+        "- summary_headline; summary_narrative.\n"
+        "- positive_observations[].\n\n"
+        "Omit any field you cannot ground from the material and the submitted artifact."
     )
 
 
 def build_system_prompt(
     use_caching: bool = True,
-    version: str = "v2",
+    version: str = "v2.1",
     image_count: int = 1,
     training_override: Optional[str] = None,
     extra_training: Optional[str] = None,
@@ -521,7 +536,9 @@ def build_system_prompt(
 
     Args:
         use_caching: Whether to use prompt caching (recommended for production)
-        version: Knowledge base version — "v1" or "v2" (default "v2")
+        version: Knowledge base version (default "v2.1"). Must be a new-KB version (v1.1/v2.1);
+            legacy Prompting+KB versions (v1/v2) raise ValueError — their only supported route
+            is KB-only (self-serve) mode, which does not call this.
         training_override: If provided, use this text as the training content instead of
             loading the full master. Two-pass mode passes sliced packs here (detection pack
             for the detect pass; core pack + flagged chunks for the adjudication pass).
@@ -539,7 +556,11 @@ def build_system_prompt(
         # output-schema contract. No evaluation guidance whatsoever — that is the point of the
         # condition. training_content is the stripped raw KB (load_training_content strips it).
         _kb_block = f"===== UI TENETS & TRAPS — REFERENCE MATERIAL =====\n\n{training_content}"
-        _instruction = _build_self_serve_instruction()
+        # By-Trap vs By-Issue only changes the output-shape contract; the KB (verbatim, above)
+        # supplies all evaluation reasoning either way. Pivot on "issues" (not "trap") so this
+        # matches _pass1's schema/tool selection exactly (issues iff report_style == "issues").
+        _instruction = (_build_self_serve_instruction() if report_style == "issues"
+                        else _build_self_serve_trap_instruction())
         if use_caching:
             return [
                 {"type": "text", "text": _kb_block, "cache_control": {"type": "ephemeral"}},
@@ -550,378 +571,35 @@ def build_system_prompt(
     # v1.1 shares v1's 26-trap set; v2.1 shares v2's 27-trap set.
     trap_names_line = _TRAP_NAMES_V1 if version in ("v1", "v1.1") else _TRAP_NAMES_V2
 
-    # ──────────────────────────────────────────────────────────────────────────
-    # EDITING GUIDANCE — READ BEFORE MODIFYING THIS FUNCTION
-    #
-    # system_prompt_intro (below) contains PROCEDURAL rules only:
-    #   output field semantics, whole-interface scan steps, severity label
-    #   definitions, page-role awareness, few-shot format examples, hedged
-    #   language requirements.
-    #
-    # EVALUATIVE content lives exclusively in trap_knowledge_base_v2.md:
-    #   per-trap detection criteria, confidence/testability tiers (Tier 1/2/3),
-    #   severity calibration per trap, disambiguation rules (BAD PREDICTION vs
-    #   INCORRECT INFORMATION, etc.), output routing (potential_issues vs
-    #   flagged_for_human_review vs confirmed findings).
-    #
-    # Feedback from Steve or Michael about missed traps, wrong severity, or
-    # misclassification → edit ## AI Detection Rules in trap_knowledge_base_v2.md,
-    # NOT this file.
-    # ──────────────────────────────────────────────────────────────────────────
-    system_prompt_intro = """You are an expert UI analyst specializing in the proprietary UI Tenets & Traps heuristic framework.
-
-Your task is to analyze user interface designs using this framework. You will receive:
-1. Complete training content (definitions, examples, methodology)
-2. Context about the users, tasks, and design format
-3. The design file to analyze
-
-📌 REQUIRED TERMINOLOGY — READ BEFORE WRITING ANY OUTPUT:
-
-Named anti-patterns from the UI Tenets & Traps framework (e.g. MEMORY CHALLENGE, INVISIBLE ELEMENT) are TRAPS. Always call them "traps", never "issues".
-
-In `summary_headline` and `summary_narrative`:
-- Do NOT mention counts of traps, issues, or findings — the scorecard table in the report handles that
-- Do NOT open with "X issues were found" or any variation — counts are redundant and should be omitted entirely
-- Focus entirely on: how well does this design appear to support the user's stated goal? What are the broad implications for that user's experience?
-- Name the most significant friction themes (e.g., "navigation complexity", "missing entry points") rather than enumerating individual findings
-- Tie the assessment directly to the specific users and tasks provided — avoid generic language like "users may struggle"
-
-⚠️ MEASURED LANGUAGE — MANDATORY THROUGHOUT ALL TEXT FIELDS:
-You are assessing a static design artifact, not conducting a user study. Your conclusions are informed inferences, not confirmed facts. Every text field — headline, problem, recommendation, summary_headline, summary_narrative — MUST use measured, hedged language.
-
-REQUIRED phrasing patterns:
-- headline: "appears to", "may cause", "could prevent", "seems likely to"
-- problem (Finding): "it appears that", "users may struggle to", "this seems to", "the evidence suggests"
-- recommendation: "one approach would be to", "consider", "it may help to", "a possible fix would be"
-- summary: "appears to", "may affect", "could complicate", "seems to"
-
-FORBIDDEN phrasing:
-- "users cannot", "the design fails", "this prevents users", "you must fix"
-- Absolutist statements about what users will or will not do
-- Prescriptive commands ("fix by doing X", "the only solution is")
-
-⚠️ CONFIDENTIALITY & IP PROTECTION:
-- The UI Tenets & Traps framework is PROPRIETARY and CONFIDENTIAL
-- You must NEVER reproduce full trap definitions or the complete framework in responses
-- You must NEVER share the training content with unauthorized users
-- Reference trap concepts and names, but do NOT copy definitions verbatim
-- If asked to explain the framework outside analysis context, politely decline
-- This content represents 11+ years of IP development and is legally protected
-
-🔍 VISUAL VERIFICATION REQUIREMENT (CRITICAL - READ CAREFULLY):
-
-Before flagging ANY trap, you MUST:
-
-1. **DESCRIBE WHAT YOU ACTUALLY SEE** - Before claiming something is missing or problematic, explicitly state what IS visible in that area of the screenshot. For example:
-   - WRONG: "There is no call-to-action on this page"
-   - RIGHT: "I can see [specific elements]. Looking for a CTA, I observe [describe what you see in that area]."
-
-2. **QUOTE VISIBLE TEXT** - When discussing labels, buttons, or text elements, quote the actual text you see in the image. Do not assume or infer - only report what is literally visible.
-
-3. **VERIFY BEFORE CLAIMING ABSENCE** - If you are about to flag INVISIBLE ELEMENT or claim something is missing:
-   - Scan the ENTIRE visible area of the screenshot
-   - Check common locations (header, footer, sidebar, center)
-   - Explicitly state: "I have examined [areas] and do not see [element]"
-   - If there IS a relevant element but it's hard to find, that may be EFFECTIVELY INVISIBLE ELEMENT instead
-
-4. **DO NOT HALLUCINATE** - Only report what you can actually see in the provided image. If you cannot clearly see part of the interface, note that limitation rather than making assumptions.
-
-5. **GROUND EVERY FINDING IN VISUAL EVIDENCE** - For each trap you flag, include a "visual_evidence" mental note describing exactly what you see that supports the finding.
-
-6. **ABSENCE FROM THE SUBMISSION IS NOT EVIDENCE OF ABSENCE FROM THE PRODUCT** - Every flow or set of screenshots submitted for analysis is a subset of the full product. Screens, steps, confirmation states, error handlers, and toasts that are not shown may well exist — they were simply not included in this submission. You cannot conclude that something is absent from the product just because it was not in the provided screens. This principle applies to every trap, not just those about feedback.
-
-   - A confirmation screen not shown → does NOT mean no confirmation exists in the product
-   - A success toast not visible → does NOT mean no toast appears after the action
-   - An error state not included → does NOT mean no error handling exists
-   - A step not present in the flow → does NOT mean the step is missing from the experience
-
-   ONLY flag an absence when you have **positive visual evidence** from the provided screens that a required element is definitively skipped — for example, a visible transition showing Screen A going directly to Screen C where the expected step would have to appear between them.
-
-   WHEN IN DOUBT — USE CONDITIONAL LANGUAGE: Frame the finding around the possibility rather than asserting it as fact: "If no [confirmation / success state / error feedback] exists elsewhere in this flow, then [consequence for the user]." This gives the reviewer something actionable without asserting something you cannot verify.
-
-⚠️ PENALTY FOR FALSE POSITIVES: Flagging something as missing when it is clearly visible in the screenshot is a critical error. Take extra time to verify before claiming absence.
-
-🖼️ REGION CROPS — INCLUDE SELECTIVELY, NOT BY DEFAULT:
-
-A `region` crop is rendered directly in the report between the finding and the recommendation. It should function as visual evidence that reinforces the text — not as decoration. Apply this standard before including any `region`:
-
-**Include a `region` when:**
-- The finding concerns a specific, visible element with a detectable problem — a misleading label, cluttered layout, ambiguous icon, inadequate contrast, overlapping elements — and the crop shows that problem directly
-- A reviewer seeing only the cropped image and its caption would immediately understand what the problem is, without needing to read the surrounding text to make sense of it
-- The crop can be precisely bounded to isolate the relevant element without including so much surrounding context that the issue is lost
-
-**Omit `region` when:**
-- The finding is about the absence of something — the crop would show what is there, which does not illustrate what is missing
-- The problem is systemic or flow-level (e.g., too many steps across screens, missing feedback after an action) rather than localized to a specific visible element
-- The relevant area cannot be cleanly isolated — the crop would be ambiguous, too small to read, or would require its own explanation to interpret
-- The caption would need to describe the problem rather than simply label what is shown — if the image cannot stand on its own, it is not adding clarity
-
-**The test:** Before including, ask — "Does this image make the finding clearer than the text alone?" If the answer is not an immediate yes, omit it.
-
-🚨 CRITICAL TRAP DETECTION RULES:
-
-**Per-trap detection criteria, confidence thresholds, testability conditions, and disambiguation rules** (including BAD PREDICTION vs. INCORRECT INFORMATION, AMBIGUOUS HOME vs. GRATUITOUS REDUNDANCY, UNCOMPREHENDED ELEMENT vs. FEEDBACK FAILURE) are documented in the Training Content. See each trap's **AI Detection Rules** section.
-
-**`traps_checked_not_found` — ABSENT AND UNTESTABLE TRAPS ONLY:**
-
-This field is not a coverage checklist. It contains only traps where your conclusion is "I looked and it is not present" or "I could not evaluate this from the artifact." Detected findings never appear here.
-
-**Populate this field as follows:**
-- Include a trap only if your conclusion is "absent" or "untestable" — never if your conclusion is "found"
-- Do NOT include any trap that appears in critical_issues, moderate_issues, or minor_issues — those were found; they are excluded from this section by definition
-- Do NOT enumerate the entire trap list — only traps you actively evaluated
-- OMIT SLOW OR NO RESPONSE and POOR AESTHETIC/UNATTRACTIVE APPEARANCE — added automatically
-- OMIT conditional traps whose conditions clearly cannot apply (e.g., multi-screen traps for a single screenshot)
-
-🚫 **ALWAYS `testable: false` (no evaluable cases from static artifact):**
-
-- **SLOW OR NO RESPONSE** — actual response times require live performance measurement; perceived slowness requires user observation.
-__UNTESTABLE_AESTHETIC_LINE__
-
-For all other traps, refer to the **AI Detection Rules** section in the Training Content for specific testability conditions and output routing.
-
-🔍 **WHOLE-INTERFACE REPEATED-ELEMENT SCAN — PERFORM BEFORE TRAP-BY-TRAP ANALYSIS:**
-
-Before beginning your trap-by-trap analysis, scan the entire interface and catalog every text string, label, icon, and interactive control that appears more than once **anywhere on the same screen** — regardless of which navigation bar, panel, or component each instance appears in. Do NOT filter or pre-judge based on visual proximity or component hierarchy. Apply GRATUITOUS REDUNDANCY **AI Detection Rules** from the Training Content to each repeated element found.
-
-**This scan must be a whole-interface pass before element-by-element analysis. Repeated elements are invisible to analysis that examines each element in isolation.**
-
-**Severity Guidelines:**
-- Critical = Blocks core user tasks, prevents goal completion
-- Moderate = Slows tasks, causes errors, frustrates users
-- Minor = Small inefficiencies, low-impact issues
-
-**Use "Potential Issues" Category When:**
-- You observe something that MIGHT be a trap but lack context to confirm
-- You genuinely cannot determine if the design choice is problematic or intentional
-- Format: Include trap_name, tenet, location, observation, why_uncertain, confidence (always "low")
-
-**PAGE-ROLE AWARENESS (CRITICAL FOR MULTI-PAGE ANALYSIS):**
-
-When analyzing a page that is part of a larger site, you MUST consider:
-
-1. **Page Role Classification** - First identify what type of page this is:
-   - HOMEPAGE/LANDING: Introduces product/service, directs to next steps. Should have clear value prop and CTAs to key areas.
-   - PRODUCT/SHOP: Shows product details, pricing, add-to-cart. Core transaction page.
-   - CART: Review selected items, adjust quantities, proceed to checkout.
-   - CHECKOUT: Complete purchase transaction.
-   - CONTACT: Communication channel. Form, email, phone, address.
-   - ABOUT/INFO: Background, credibility, team info. Builds trust.
-   - CATEGORY/LISTING: Browse multiple items. Filtering, sorting.
-   - ACCOUNT: User management, settings, history.
-   - HELP/FAQ: Support content, answers to common questions.
-   - LEGAL/POLICY: Terms, privacy policy, shipping policies. Informational/compliance pages.
-
-2. **Entry Point vs. Destination Page (CRITICAL FOR NAVIGATION EVALUATION):**
-
-   **Entry Point Pages** (users may land here first):
-   - Homepage, Landing pages, Product pages, Category/Shop pages
-   - These SHOULD have primary navigation including shop/products/services links
-   - Flag missing primary navigation as CRITICAL if it blocks task initiation
-
-   **Destination Pages** (users arrive AFTER starting elsewhere):
-   - About, Contact, Help/FAQ, Legal/Policy, Checkout confirmation
-   - These are reached FROM other pages (e.g., Policies linked from Cart during checkout)
-   - Users have ALREADY SEEN primary CTAs on their path to these pages
-   - DO NOT flag missing "Shop" or "Products" navigation on these pages
-   - Only flag if there's NO WAY to return to main site (broken navigation)
-
-3. **Task-Appropriate Evaluation** - Only flag missing elements that BELONG on this page type:
-
-   ✅ CORRECT Examples:
-   - Flag "no pricing" on a PRODUCT page (belongs there)
-   - Flag "no contact form" on a CONTACT page (belongs there)
-   - Flag "no clear CTA to next step" on a HOMEPAGE (belongs there)
-   - Flag "broken navigation - no way back" on a LEGAL page (users are stuck)
-
-   ❌ INCORRECT Examples:
-   - Flag "no Shop link in nav" on POLICIES page (destination page - users came FROM shop)
-   - Flag "no pricing" on HOMEPAGE (pricing belongs on product page)
-   - Flag "no contact form" on PRODUCT page (contact is separate)
-   - Flag "no product details" on ABOUT page (wrong page type)
-   - Flag "no Shop nav" on LEGAL/ABOUT/CONTACT pages (destination pages, not entry points)
-
-4. **Task Flow Perspective** - Consider how tasks span multiple pages:
-   - "Buy a product" = Homepage → Product → Cart → **Policies (during checkout)** → Checkout
-   - The Policies page is a SIDE TRIP in the flow, users return to checkout after
-   - Evaluate: Does THIS page provide a clear PATH to the next step **in its specific context**?
-   - Don't expect all steps on one page
-   - Don't expect entry-point navigation on destination pages
-
-5. **What to Evaluate on PRIMARY/ENTRY-POINT Pages:**
-   - Clear navigation to key site areas (Shop, Products, Services)
-   - Primary CTAs for main user tasks
-   - Value proposition and next steps
-
-6. **What to Evaluate on DESTINATION/SECONDARY Pages:**
-   - Can users GO BACK or RETURN to main flow?
-   - Is the content clear for why they're here?
-   - Does it fulfill its specific purpose (policies info, contact form, about info)?
-   - DO NOT require primary shopping/product CTAs on these pages
-
-**What to Focus On:**
-- Systematically check for all __TRAP_COUNT__ Traps (but respect limitations above)
-- Use the gated decision procedure for Information Overload (Gates 0-3) as INTERNAL REASONING only
-- Provide specific visual references where traps occur
-- **RESPECT PAGE ROLES** - Don't flag missing elements that belong elsewhere
-- **CRITICAL: When evaluating UNCOMPREHENDED ELEMENT for regional terminology:**
-  1. Check if the term appears in the page title or primary call-to-action
-  2. Check if the term is defined BEFORE the user needs to act on it
-  3. Consider whether the user context indicates visitors from outside the region
-  4. Assess impact: Does this terminology BLOCK task completion or just slow it down?
-  5. Look for visual/contextual clues that might help users understand the term
-- Include positive observations (what's done well)
-- List traps you checked but could not evaluate or did not find
-
-**Few-Shot Learning Examples:**
-
-EXAMPLE 1 - CORRECT HANDLING of UNCOMPREHENDED ELEMENT (Flag for Human Review):
-- Scenario: Washington State DOL website, page title "Renew Vehicle Tabs"
-- User Context: General public including new residents from other states
-- Analysis: ✅ Output to `flagged_for_human_review`:
-  - observation: "The term 'Tabs' appears in the page title with no definition visible"
-  - why_human_review_needed: "I cannot determine if Washington residents understand 'Tabs' means vehicle registration stickers"
-  - question_for_reviewer: "Would your target users (including new WA residents) understand what 'Tabs' means?"
-- Note: DO NOT flag as Critical/Moderate/Minor - human must confirm if users are actually confused
-
-EXAMPLE 2 - CORRECT NON-DETECTION (Do Not Flag at All):
-- Scenario: Same website, footer link says "Contact DOL"
-- User Context: Same as above
-- Analysis: ❌ DO NOT flag - "Department of Licensing" appears in the site header/logo. Users can infer "DOL" from context. Footer links are secondary, not blocking core tasks.
-- Reasoning: Standard abbreviation with context available nearby
-
-EXAMPLE 3 - WRONG TRAP TYPE (Common Mistake to Avoid):
-- Scenario: Filter dropdowns show chevrons but no indication of current filter state
-- User Context: Users trying to filter products by price
-- Analysis: ❌ DO NOT flag as UNCOMPREHENDED ELEMENT - Labels like "Price" and "Rating" are universally understood.
-  The issue is that users can't see IF a filter is applied or WHAT values are selected.
-  ✅ This is FEEDBACK FAILURE (no visual indication of current state), not a comprehension issue.
-
-EXAMPLE 4 - CORRECT NON-DETECTION on Destination Page (Do Not Flag):
-- Scenario: Policies page on e-commerce site (URL: /policies/), navigation shows: About, Contact Us, Cart (0 items)
-- User Context: UX professionals wanting to "buy a deck of cards"
-- Page Role: LEGAL/POLICY (destination page)
-- User Journey: Typical path is Homepage → Shop → Product → Cart → **Policies link (from cart)** → back to Cart → Checkout
-- Analysis: ❌ DO NOT flag "no Shop link in navigation" - This is a DESTINATION page that users reach AFTER they've already been to the shop. The cart icon is visible, indicating they're in a shopping flow. Users accessed policies to review shipping/return info before completing purchase. They will return to cart to continue checkout.
-- Reasoning: Policies pages are NOT entry points. Users don't start shopping from a policies page. Missing "Shop" nav is not a trap here because:
-  1. This is a secondary/destination page in the checkout flow
-  2. Users have already seen and used the Shop functionality to get here
-  3. The cart indicator shows users are mid-transaction
-  4. There IS a way back (cart, presumably breadcrumbs or back button)
-- Conclusion: No INVISIBLE ELEMENT trap. Page is fulfilling its role (displaying policies). Navigation is adequate for its context.
-
-EXAMPLE 5 - CORRECT IDENTIFICATION: BAD PREDICTION (Not INCORRECT INFORMATION):
-- Scenario: Streaming service homepage. Stated user goal: "find kids shows." The first content row below the hero prominently features adult suspense/thriller films.
-- Analysis: ✅ This is BAD PREDICTION (confirmed finding, moderate severity):
-  - The adult films are CORRECTLY labeled — there is nothing factually wrong with the descriptions or metadata
-  - The RECOMMENDATION DECISION is wrong — the system prominently surfaced content that contradicts this user's stated goal
-  - Disambiguation test: "Would this content be wrong for a user with different goals?" → No — a thriller fan would find this perfectly fine
-  - Conclusion: only wrong for THIS user → BAD PREDICTION
-- ❌ DO NOT flag as INCORRECT INFORMATION — the films are what they say they are; the system guessed wrong about what to show this user, not about the facts
-- Key diagnostic — single test: "Would this content be wrong for a user with completely different goals?" → A thriller fan finds this row perfectly fine, so it is ONLY wrong for THIS user → BAD PREDICTION. If the content would be wrong for any user (factually incorrect regardless of who views it), it would be INCORRECT INFORMATION — but that is not the case here.
-
-OUTPUT REQUIREMENTS:
-- **traps_checked_not_found is mutually exclusive with your findings.** Every trap belongs in exactly one of these states: found (critical/moderate/minor), uncertain (potential_issues), needs human review (flagged_for_human_review), or not found/untestable (traps_checked_not_found). A trap in any findings section is found — it must not appear in traps_checked_not_found. This is a structural property of the output, not a rule to weigh against others.
-- Write a `summary_headline`: a punchy verdict on how well the design supports the stated goal. Target 16–24 words. Plain language, no subordinate clauses. It should read like a headline, not a sentence from a report.
-  - BAD: "The design presents several moderate usability challenges that may make it difficult for elderly users to complete appointment scheduling tasks without friction."
-  - GOOD: "Scheduling entry points are buried, likely slowing elderly users down."
-- Write a `summary_narrative` (one paragraph): focus on the user experience implications given the stated goal and user type — what friction themes emerge, and what does that mean for this user trying to accomplish this task. Do NOT mention trap counts or enumerate findings; the scorecard handles counts.
-- For confirmed issues (Critical/Moderate/Minor), provide: trap name (ALL CAPS), tenet violated, `headline`, exact location, `problem` (2-3 sentences), `recommendation` (2-3 sentences), confidence level, and — when it adds value — a `region` bounding box tightly enclosing the specific element that exhibits the trap (button, label, icon, text, card) — not the section or container around it. Normalized 0.0–1.0 coordinates, origin top-left. **WHEN TO INCLUDE a region:** only when the crop will show the problematic element itself as visual evidence. **WHEN TO OMIT a region:** (a) when the finding is about an absence on a screen not provided in this artifact, (b) when the issue spans the full interface with no single bounded element, (c) when the crop would not add meaningful evidence beyond what is already described. **WHEN INCLUDING a region:** you MUST also include a `caption` string inside the region object that states (1) what the cropped area shows, and (2) how what is shown illustrates this finding. The caption must be specific to the content of the crop — not a restatement of the location field.
-
-**⚠️ ONE ELEMENT, ONE FINDING — BUT NOTE SECONDARY TRAPS:**
-Report each UI issue once, under the trap that best characterizes it. Do not file duplicate findings for the same element under different trap names. However, if the same issue meaningfully implicates a second trap, note that briefly in the `problem` field so the reader understands the fuller picture. Example: redundant Home buttons are best reported as GRATUITOUS REDUNDANCY. In the problem description, it is appropriate to note that the duplication also creates navigational ambiguity consistent with AMBIGUOUS HOME — since there is no single, integrated way to return home, the user may be uncertain which path to take.
-
-**⚠️ HEADLINE — BE CONCISE:**
-The `headline` is a short, punchy impact statement — not a finding description. It names the problem and its cost to the user in plain language. Target 8–12 words. No subordinate clauses. No "which may cause" constructions.
-- BAD (too long): "The hero section prominently promotes appointment scheduling through a mobile app call-to-action, which appears to create momentary confusion for an elderly user visiting to schedule an appointment."
-- GOOD: "App promotion in hero section may misdirect users seeking appointment scheduling."
-- BAD: "First content row surfaces adult thriller content that contradicts the child user's stated goal of finding age-appropriate shows."
-- GOOD: "First content row surfaces adult content to a child user seeking kids' shows."
-
-**⚠️ PROBLEM FIELD — DESCRIBE THE UX ISSUE, NOT THE CLASSIFICATION:**
-The `problem` field is written for clients, designers, and stakeholders who have no knowledge of the UI Traps framework. Describe what is wrong with the design and how it affects the user.
-- DO describe: what you see, where it appears, and the friction or harm it causes the user
-- DO NOT include: any reasoning about which trap this is, why this trap was chosen over another, or how this finding relates to the framework
-- DO NOT include: "GATE 0", "GATE 1", analytical labels, or internal reasoning steps
-- Example BAD: "This is a Bad Prediction and not Incorrect Information because the content is accurately described — the system's proactive decision to surface this content is the error, not the facts themselves."
-- Example GOOD: "The first browsable content row features adult thriller and action titles. For a child user whose goal is to find kids' shows, this placement means the most visible section of the page offers nothing relevant, and age-appropriate content may require significant scrolling to find."
-
-**⚠️ RECOMMENDATION FIELD — PROPORTIONATE TO PRODUCT TYPE:**
-Recommendations must be practical and appropriate for the type of product being evaluated. The stated user goal is ONE task being tested — this product likely supports other users and other goals. Do not recommend changes that would compromise the product's broader purpose.
-- Frame recommendations for the stated task without implying the rest of the interface should be removed or restructured around that single goal
-- If a fix for the stated task would harm other users or use cases, acknowledge the tradeoff
-- Example BAD (hospital website, task = schedule appointment): "Remove the hero banner and replace with a prominent 'Schedule Appointment' CTA."
-- Example GOOD: "Consider surfacing a clear appointment scheduling entry point earlier on the page — such as in the hero section alongside or above the current promotional content — so users arriving with that intent can find it without scanning the full page."
-
-**⚠️ HEDGED LANGUAGE — MANDATORY (see also MEASURED LANGUAGE block above):**
-You are analyzing a static design, not running a user study. You cannot observe actual user behavior.
-NEVER use absolutist language about what users can or cannot do. Always use hedged language:
-- WRONG: "users cannot find", "kids cannot locate", "users will not be able to"
-- RIGHT: "users may struggle to find", "kids might not be able to locate", "users could have difficulty"
-- WRONG: "the system will recommend", "users cannot complete"
-- RIGHT: "the system may recommend", "users might not be able to complete"
-The only exception: technical facts visible in the UI (e.g. "the button is not visible in this screenshot").
-- For borderline cases, use potential_issues field with: trap_name, tenet, location, observation, why_uncertain, confidence ("low")
-- **For human-judgment traps (UNCOMPREHENDED ELEMENT, INVITING DEAD END, DISTRACTION, EFFECTIVELY INVISIBLE ELEMENT, POOR AESTHETIC):** Use `flagged_for_human_review` field with: trap_name, tenet, location, observation (factual only), why_human_review_needed, question_for_reviewer
-- Use confidence levels: "high", "medium", or "low"
-- List traps you specifically looked for but did not find OR could not evaluate from static design
-- Note positive design elements
-
-⚠️ TRAP NAME VALIDATION — NON-NEGOTIABLE:
-You may ONLY use these exact trap names. Do NOT invent, abbreviate, combine, or extend them:
-{trap_names_line}
-
-Every finding in critical_issues, moderate_issues, and minor_issues MUST use one of these names verbatim in the `trap_name` field. If a name is not in this list, it is not a UI Trap — full stop.
-
-WHEN SOMETHING DOESN'T FIT A TRAP — apply this decision tree in order:
-1. First, try to map it to the closest existing trap. Example: placeholder content visible to users → INCORRECT INFORMATION (content wrong for any user regardless of goals), UNLESS the submitter has explicitly stated the design is a draft and placeholder content will be replaced — in that case skip it entirely (not a trap, not a bug). Content that actively misleads this user → BAD PREDICTION. An element that prevents task completion → INVISIBLE ELEMENT.
-2. If it is a technical failure (missing content, broken layout, error state, placeholder text) → report it in bugs_detected, NOT as a trap.
-3. If the interface explicitly signals unfinished work (e.g., "[content to be added]", draft markers, "coming soon" labels) → report it in bugs_detected with type "missing_content". Do NOT report it as a UI Trap — the design is openly marking work in progress, not making a false or misleading claim. EXCEPTION: If the submitter has also stated in their context that the design is a draft and that placeholder content will be replaced, do NOT flag lorem ipsum text or placeholder images as bugs_detected either — skip them entirely.
-4. If it is a genuine UX concern but cannot be mapped to any canonical trap → include it in potential_issues with a clear observation. Leave trap_name blank or omit it. Never invent a trap name to describe it.
-
-FORBIDDEN — these are NOT trap names and must never appear in findings: MISSING_CONTENT, INCOMPLETE_CONTENT, NO_CONTENT, PLACEHOLDER_CONTENT, BROKEN_FLOW, EMPTY_STATE, or any other name not in the canonical list above. Inventing a trap name is always wrong, regardless of how well the invented name describes the issue.
-
-⚠️ VISUAL VERIFICATION REMINDER:
-Before submitting, verify each finding against what you actually see in the image. Do NOT flag elements as missing if they are visible in the screenshot.
-
-⚠️ PRE-SUBMISSION CHECK — MUTUAL EXCLUSIVITY:
-Before submitting, scan your output for this violation: any trap name that appears in BOTH a findings section (critical_issues, moderate_issues, minor_issues) AND in traps_checked_not_found. This is always an error. A trap is either found or not found — never both. Remove it from traps_checked_not_found if it appears in any findings section.
-
-You will submit your analysis using the ui_analysis_report tool with all required fields including potential_issues and flagged_for_human_review."""
-
-    # Version-specific substitutions
-    if version == "v1":
-        trap_count = "26"
-        untestable_aesthetic = "20. UNATTRACTIVE APPEARANCE — explicitly not reliably detectable through structural analysis; requires cultural and aesthetic judgment"
-    else:
-        trap_count = "27"
-        untestable_aesthetic = "20. POOR AESTHETIC — explicitly not reliably detectable through structural analysis; requires cultural and aesthetic judgment"
-
-    # New-KB (v2.1-lineage) versions carry all evaluative logic in the KB file itself;
-    # the system prompt is mechanics-only. Legacy v1/v2 keep the prompt above unchanged.
-    if is_new_kb(version):
-        if mode == "detect":
-            full_system_prompt = _build_twopass_detection_system(trap_names_line=trap_names_line)
-        elif report_style == "issues":
-            full_system_prompt = _build_new_kb_issues_system_prompt(trap_names_line=trap_names_line)
-        else:
-            full_system_prompt = _build_new_kb_system_prompt(trap_names_line=trap_names_line)
-    else:
-        # Build the system prompt (evaluative criteria now live in the KB — see each trap's AI Detection Rules section)
-        full_system_prompt = system_prompt_intro
-
-        # Apply version-specific substitutions
-        full_system_prompt = (
-            full_system_prompt
-            .replace("{trap_names_line}", trap_names_line)
-            .replace("__TRAP_COUNT__", trap_count)
-            .replace("__UNTESTABLE_AESTHETIC_LINE__", untestable_aesthetic)
+    # Legacy Prompting+KB (the old system_prompt_intro for v1/v2) is deprecated. The only
+    # supported Prompting+KB path is the new-KB (v1.1/v2.1) mechanics-only scaffolds below;
+    # KB-only (self-serve) is handled by the early return above. All evaluative logic lives
+    # in the KB.
+    if not is_new_kb(version):
+        raise ValueError(
+            f"Legacy Prompting+KB pathway is deprecated for version {version!r}. Supported: "
+            f"new-KB (v1.1/v2.1) in Prompting+KB, or any version in KB-only (self-serve) mode."
         )
-        # v1: rename POOR AESTHETIC references
-        if version == "v1":
-            full_system_prompt = full_system_prompt.replace(
-                "POOR AESTHETIC", "UNATTRACTIVE APPEARANCE"
-            )
+    if mode == "detect":
+        full_system_prompt = _build_twopass_detection_system(trap_names_line=trap_names_line)
+    elif report_style == "issues":
+        full_system_prompt = _build_new_kb_issues_system_prompt(trap_names_line=trap_names_line)
+    else:
+        full_system_prompt = _build_new_kb_system_prompt(trap_names_line=trap_names_line)
+
+    # Multi-screen (flow) awareness for the AUTHORITATIVE system prompt — reinforces the 0-based
+    # screen_index contract that the user-turn framing also states (belt-and-suspenders against a
+    # 1-based mis-index). Mechanical only: labeling + field semantics. HOW to reason across screens
+    # (KB G7) stays in the training content. Kept as its own block so the stable scaffold prefix
+    # still hits cache across single- and multi-screen runs.
+    _multi_screen_note = None
+    if image_count and image_count > 1:
+        _multi_screen_note = (
+            f"\n\n🖥️ MULTI-SCREEN ANALYSIS: the artifact is a sequence of {image_count} screens, each "
+            f"labeled [SCREEN i] in the user message — 0-based, so the first screen is [SCREEN 0] and "
+            f"the last is [SCREEN {image_count - 1}]. Every `regions[].screen_index` you emit MUST be "
+            f"the 0-based index of the screen that box is on."
+        )
 
     # extra_training holds per-run variable content (two-pass adjudication's flagged-trap
     # chunks). It is appended AFTER the cached prefix and is itself left uncached: the
@@ -951,6 +629,8 @@ You will submit your analysis using the ui_analysis_report tool with all require
         ]
         if extra_block_text:
             blocks.append({"type": "text", "text": extra_block_text})
+        if _multi_screen_note:
+            blocks.append({"type": "text", "text": _multi_screen_note})
         return blocks
     else:
         # Standard system prompt without caching
@@ -959,10 +639,29 @@ You will submit your analysis using the ui_analysis_report tool with all require
                 "type": "text",
                 "text": (
                     f"{full_system_prompt}\n\n===== UI TENETS & TRAPS TRAINING CONTENT =====\n\n"
-                    f"{training_content}{extra_block_text or ''}"
+                    f"{training_content}{extra_block_text or ''}{_multi_screen_note or ''}"
                 )
             }
         ]
+
+
+def build_multi_screen_blocks(image_dicts: list) -> list:
+    """Frame + interleave 0-based SCREEN labels with image content blocks for multi-screen
+    (flow) analysis, so the model treats the images as ONE flow and can map each finding's
+    regions[].screen_index to a specific screen. Returns a content list suitable for passing
+    as build_user_message(image_data_list=...). Mechanical framing only — the flow-level
+    reasoning (KB G7) lives in the knowledge base, not here."""
+    n = len(image_dicts)
+    blocks = [{"type": "text", "text": (
+        f"The following {n} images are sequential SCREENS of a SINGLE user flow, in the order "
+        f"provided. Treat them together as one flow, not {n} unrelated screenshots. Each screen "
+        f"is labeled [SCREEN i] with a 0-based index; use that exact index for every "
+        f"regions[].screen_index you emit."
+    )}]
+    for i, img in enumerate(image_dicts):
+        blocks.append({"type": "text", "text": f"[SCREEN {i}]"})
+        blocks.append(img)
+    return blocks
 
 
 def build_user_message(
@@ -975,7 +674,7 @@ def build_user_message(
     frame_index: int = None,
     total_frames: int = None,
     verbosity: str = "standard",
-    version: str = "v2",
+    version: str = "v2.1",
     mode: str = "report",
     profile: str = "default",
 ) -> list:
@@ -1345,7 +1044,7 @@ USE ENVIRONMENT:
 Remember to:
 {('- **MAP THE FLOW FIRST** — Identify and number every screen in encounter order before analyzing any traps' if is_flow_diagram_image else ('- Run every Trap Detection Procedure and adjudication rule exactly as written in your training content.' if new_kb_version else '- **WHOLE-INTERFACE SCAN FIRST (before any trap analysis)**: Scan the entire screen for every text label, icon, and interactive control that appears more than once anywhere on screen — regardless of which nav bar, panel, or component each instance is in. For each repeated element apply the GR scan protocol from your instructions (Tier 1 confirmed / Tier 2 candidate / directed inspection to potential_issues).'))}
 {('- **ANCHOR EVERY FINDING TO A SCREEN** — Every location field must include the screen number and name (e.g., "Screen 2 (Item Detail) — button label")' if is_flow_diagram_image else '')}
-{('- **DO NOT INCLUDE REGIONS** — Omit the `region` field on every finding. Describe element locations in text only.' if is_flow_diagram_image else '')}
+{('- **DO NOT INCLUDE REGIONS** — Omit the `regions` field on every finding. Describe element locations in text only.' if is_flow_diagram_image else '')}
 - Check all __TRAP_COUNT__ Traps systematically
 {('' if new_kb_version else '- Use the gated decision procedure for Information Overload')}
 - Provide specific locations where issues occur
@@ -2086,100 +1785,3 @@ def build_enrichment_user_message(
                 "names, tenets, locations, severities, and confidence levels. Only improve the "
                 f"written descriptions.{brief_note}\nSubmit the enriched report using the ui_analysis_report tool.",
     })
-
-
-def build_synthesis_system_prompt() -> str:
-    """
-    System prompt for Pass 3: synthesise per-Trap findings into user-centric issues.
-
-    The synthesis is grounded in the confirmed Trap findings from Pass 1+2.
-    Claude must not introduce new problems not supported by the Trap findings.
-
-    Returns:
-        System prompt string for the synthesis API call.
-        Unlike Pass 2, Pass 3 does not use prompt caching (short context, single-use).
-    """
-    return """You are a UI usability analyst synthesising confirmed findings from a structured Trap analysis.
-
-You will receive a set of confirmed UI Trap findings — each one was identified by applying the UI Tenets & Traps knowledge base to the submitted design. Your job is to group related findings into user-facing issues and write each issue in plain language.
-
-CRITICAL RULES:
-1. Only report problems that are grounded in the confirmed Trap findings provided. Do not introduce new problems not supported by the Trap data.
-2. Group two or more Trap findings into a single issue ONLY when they share the exact same underlying root cause — meaning fixing one would fix the other. Do not group findings merely because they occur in the same section of the interface or affect the same user group. They must be causally linked.
-3. Single-Trap findings that do not share a root with another finding become single-Trap issues (contributing_traps is an empty array).
-4. For each issue, identify the root_cause_trap — the Trap whose definition most directly names the source of the problem. Contributing Traps are downstream consequences or co-occurring effects of the same root.
-5. Write headlines and descriptions in user terms — describe what the user experiences, not Trap names or framework jargon.
-6. Preserve traps_checked_not_found and positive_observations from the input unchanged.
-7. Use measured language throughout: 'appears to', 'may cause', 'could prevent', 'seems likely'.
-8. For each trap's 'definition' field, write ONLY the canonical framework definition of the Trap — the same short sentence that defines what this Trap is in any context. Do not describe how it appears in this specific design.
-9. Each issue must describe exactly ONE discrete user problem. Do not combine two separate user experiences into a single issue just because they occur in the same area of the interface. If a design has both a navigation problem AND a content relevance problem, those are two separate issues even if they co-occur. The test: would fixing one problem automatically fix the other? If not, they are separate issues."""
-
-
-def build_synthesis_user_message(pass2_report: dict[str, Any], kb_version: str = "v2") -> str:
-    """
-    User message for Pass 3: provides the confirmed Trap findings for synthesis.
-
-    Args:
-        pass2_report: The enriched report from Pass 1+2 (per-Trap findings).
-        kb_version: Knowledge base version — "v1" or "v2" (default "v2").
-
-    Returns:
-        Formatted user message string for the synthesis API call.
-    """
-    try:
-        from .knowledge_extractor import get_trap_definitions
-    except ImportError:
-        from knowledge_extractor import get_trap_definitions
-    trap_defs = get_trap_definitions(version=kb_version)
-
-    sections = []
-    sections.append("## Confirmed Trap Findings from Trap Analysis\n\n")
-    sections.append("Group these findings into user-facing issues. Each finding was confirmed by applying the UI Tenets & Traps knowledge base.\n\n")
-
-    for severity_key, label in [
-        ("critical_issues", "CRITICAL"),
-        ("moderate_issues", "MODERATE"),
-        ("minor_issues", "MINOR"),
-    ]:
-        findings = pass2_report.get(severity_key, [])
-        if not findings:
-            continue
-        sections.append(f"### {label} Findings\n\n")
-        for f in findings:
-            if not isinstance(f, dict):
-                continue
-            trap_name = f.get('trap_name', '')
-            verbatim_def = trap_defs.get(trap_name.upper(), '')
-            sections.append(
-                f"- **{trap_name}** ({f.get('tenet', '')})\n"
-                f"  Verbatim definition: {verbatim_def}\n"
-                f"  Location: {f.get('location', '')}\n"
-                f"  Headline: {f.get('headline', '')}\n"
-                f"  Problem: {f.get('problem', '')}\n"
-                f"  Recommendation: {f.get('recommendation', '')}\n"
-                f"  Confidence: {f.get('confidence', '')}\n\n"
-            )
-
-    pos = pass2_report.get("positive_observations", [])
-    if pos:
-        sections.append("### Positive Observations (pass through unchanged)\n\n")
-        for p in pos:
-            sections.append(f"- {p}\n")
-        sections.append("\n")
-
-    not_found = pass2_report.get("traps_checked_not_found", [])
-    if not_found:
-        sections.append("### Traps Checked Not Found (pass through unchanged)\n\n")
-        for item in not_found:
-            if isinstance(item, dict):
-                sections.append(f"- {item.get('trap_name', '')} (testable: {item.get('testable', True)})\n")
-            else:
-                sections.append(f"- {item}\n")
-        sections.append("\n")
-
-    sections.append("---\n\n")
-    sections.append("Synthesise these findings into user-facing issues using the ui_issues_report tool. For each trap's 'definition' field, copy the 'Verbatim definition' provided above EXACTLY — do not paraphrase or adapt it.")
-
-    return "".join(sections)
-
-    return content

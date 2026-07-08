@@ -198,6 +198,18 @@
   margin: 0;
 }
 
+/* Read-only display of a value that is determined by another control (no longer a toggle). */
+.fieldValueStatic {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--uitraps-text);
+  padding: 6px 10px;
+  background: var(--uitraps-surface-2, rgba(127, 127, 127, 0.10));
+  border: 1px solid var(--uitraps-border, rgba(127, 127, 127, 0.22));
+  border-radius: 6px;
+  align-self: flex-start;
+}
+
 .input,
 .select,
 .textarea {

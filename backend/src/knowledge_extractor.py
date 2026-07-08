@@ -5,7 +5,7 @@ Copyright © 2009-present UI Traps LLC. All Rights Reserved.
 PROPRIETARY & CONFIDENTIAL - UI Tenets & Traps Framework
 
 Manages loading and extraction from two knowledge sources:
-- trap_kb_v2.0.md / trap_kb_v1.0.md  →  Pass 1 (detection, condensed, AI-optimized)
+- trap_kb_v2.1.md / trap_kb_v1.0.md  →  Pass 1 (detection, condensed, AI-optimized)
 - UI_Tenets_Traps.txt             →  Pass 2 (enrichment, full book content)
 
 Book images are extracted from the source PDF and stored in data/book_images/
@@ -20,16 +20,15 @@ from typing import Dict, List, Optional, Tuple
 
 # Paths relative to this file
 _DATA_DIR = Path(__file__).parent.parent / "data"
-ANALYSIS_REFERENCE_PATH = _DATA_DIR / "trap_kb_v2.0.md"
+ANALYSIS_REFERENCE_PATH = _DATA_DIR / "trap_kb_v2.1.md"
 ANALYSIS_REFERENCE_PATH_V1 = _DATA_DIR / "trap_kb_v1.0.md"
 
 # Detection-pass KB master per version. Single mode injects the whole file for the
-# selected version. v1.1 / v2.1 are the new self-instructing masters; before this
-# mapping existed, both silently fell through to trap_kb_v2.0.md.
+# selected version. v1.1 / v2.1 are the self-instructing masters; v1 is the legacy
+# KB-only master. Unknown versions fall back to trap_kb_v2.1.md.
 _ANALYSIS_REFERENCE_PATHS = {
     "v1":   ANALYSIS_REFERENCE_PATH_V1,
     "v1.1": _DATA_DIR / "trap_kb_v1.1.md",
-    "v2":   ANALYSIS_REFERENCE_PATH,
     "v2.1": _DATA_DIR / "trap_kb_v2.1.md",
 }
 FULL_BOOK_PATH = _DATA_DIR / "UI_Tenets_Traps.txt"
@@ -106,7 +105,7 @@ def _strip_non_analysis_sections(text: str) -> str:
     return "\n".join(out)
 
 
-def load_analysis_reference(version: str = "v2") -> str:
+def load_analysis_reference(version: str = "v2.1") -> str:
     """
     Load the condensed AI analysis reference (Pass 1 knowledge base) for the
     given KB version. Cached per version after first load.
@@ -120,7 +119,7 @@ def load_analysis_reference(version: str = "v2") -> str:
             to "v2" (the deployed legacy KB).
     """
     if version not in _ANALYSIS_REFERENCE_PATHS:
-        version = "v2"
+        version = "v2.1"
 
     if _analysis_reference_caches.get(version) is None:
         path = _ANALYSIS_REFERENCE_PATHS[version]
@@ -547,7 +546,7 @@ def _extract_single_section(trap_name: str, book_text: str) -> str:
     return section_text
 
 
-def get_trap_definitions(version: str = "v2") -> dict[str, str]:
+def get_trap_definitions(version: str = "v2.1") -> dict[str, str]:
     """
     Parse the KB file and return a dict mapping trap name (uppercase) to
     its verbatim one-sentence definition.

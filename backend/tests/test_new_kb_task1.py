@@ -1,8 +1,10 @@
 """
 Task 1 (new-KB integration) verification — no API calls.
 
-Covers the four Task-1 behaviors, scoped to the new self-instructing KBs
-(v1.1 / v2.1), while asserting the legacy v1 / v2 path is unchanged:
+Covers the four Task-1 behaviors for the sole surviving Prompting+KB config
+(v2.1). The legacy Prompting+KB pathway (v1 / v2) is deprecated and now raises,
+so its regression tests are removed; v1 survives only as a KB-only (self-serve)
+version, exercised via the schema/formatter predicates below (is_new_kb=False):
 
 1. Wiring: single-mode detection loads each version's own master file.
 2. Prompt: the new-KB system prompt is mechanics-only (no false-alarm priority,
@@ -11,7 +13,7 @@ Covers the four Task-1 behaviors, scoped to the new self-instructing KBs
 3. Schema: new-KB output schema uses the new confidence enum, adds severity_label,
    swaps `testable` for `coverage_status`, and drops the tier-only buckets.
 4. Formatter: new-KB reports render Issues / Coverage notes with the new labels,
-   while legacy reports still render Traps Found / Traps Not Found.
+   while legacy (v1 KB-only) reports still render Traps Found / Traps Not Found.
 """
 import sys
 from pathlib import Path
@@ -32,8 +34,8 @@ from src.schema import (
 from src.formatters import format_report_as_html
 
 
-NEW_KBS = ["v1.1", "v2.1"]
-LEGACY_KBS = ["v1", "v2"]
+NEW_KBS = ["v2.1"]
+LEGACY_KBS = ["v1"]  # v1 survives only as a KB-only version; v1.1/v2 retired from the test matrix
 
 # Strings that must NOT appear in a new-KB system prompt (Task 1 removals).
 FORBIDDEN_IN_NEW_PROMPT = [
@@ -52,19 +54,17 @@ FORBIDDEN_IN_NEW_PROMPT = [
 
 def test_each_version_loads_its_own_master():
     v1 = load_analysis_reference("v1")
-    v11 = load_analysis_reference("v1.1")
-    v2 = load_analysis_reference("v2")
     v21 = load_analysis_reference("v2.1")
-    # Distinct content per version — v1.1/v2.1 no longer fall through to v2.0.
-    assert len({v1, v11, v2, v21}) == 4
-    assert "v1.1" in v11.splitlines()[0]
+    # Distinct content per surviving config — v1 (KB-only) vs v2.1 (Prompting+KB).
+    assert v1 != v21
     assert "v2.1" in v21.splitlines()[0]
-    # The new masters carry the new global-rules structure.
-    assert "GLOBAL RULES" in v21 and "GLOBAL RULES" in v11
+    # The new master carries the new global-rules structure.
+    assert "GLOBAL RULES" in v21
 
 
-def test_unknown_version_falls_back_to_v2():
-    assert load_analysis_reference("bogus") == load_analysis_reference("v2")
+def test_unknown_version_falls_back_to_v21():
+    # v2.0 support was removed; the analysis-reference fallback is now v2.1.
+    assert load_analysis_reference("bogus") == load_analysis_reference("v2.1")
 
 
 # ── 2. Prompt (mechanics-only) ───────────────────────────────────────────────
@@ -102,20 +102,19 @@ def test_new_kb_prompt_loads_matching_master(version):
 
 def test_new_kb_trap_name_sets():
     v21 = build_system_prompt(version="v2.1")[0]["text"]
-    v11 = build_system_prompt(version="v1.1")[0]["text"]
-    # v2.1 uses the 27-trap set (POOR AESTHETIC); v1.1 uses the 26-trap set.
+    # v2.1 uses the 27-trap set (POOR AESTHETIC + INCORRECT INFORMATION).
     assert "POOR AESTHETIC" in v21 and "INCORRECT INFORMATION" in v21
-    assert "UNATTRACTIVE APPEARANCE" in v11 and "POOR AESTHETIC" not in v11
 
 
-# ── 2b. Legacy prompt regression ─────────────────────────────────────────────
+# ── 2b. Legacy Prompting+KB is deprecated ────────────────────────────────────
 
 @pytest.mark.parametrize("version", LEGACY_KBS)
-def test_legacy_prompt_unchanged(version):
-    system_text = build_system_prompt(version=version)[0]["text"]
-    # The legacy evaluative content is intentionally preserved on v1/v2.
-    assert "PENALTY FOR FALSE POSITIVES" in system_text
-    assert "testable" in system_text
+def test_legacy_promptingkb_pathway_raises(version):
+    # The legacy (non-new-KB) Prompting+KB scaffold was removed; building a
+    # Prompting+KB system prompt for a legacy version must now raise. v1's only
+    # supported route is KB-only (self-serve), which does not call this.
+    with pytest.raises(ValueError, match="deprecated"):
+        build_system_prompt(version=version)
 
 
 # ── 2c. User message (the OTHER prompt sent to the model) ────────────────────
@@ -142,19 +141,9 @@ def test_new_kb_user_message_is_clean(version):
     assert "severity_label" in text
 
 
-def test_legacy_user_message_unchanged():
-    text = _user_text("v2")
-    assert "Tier 1 confirmed" in text
-    assert "Classify severity appropriately (Critical/Moderate/Minor)" in text
-    assert "gated decision procedure for Information Overload" in text
-    assert "RESPECT PAGE ROLES" in text
-
-
 def test_trap_count_per_version():
+    # v2.1 (Prompting+KB) is the only config whose user message runs this path.
     assert "Check all 27 Traps" in _user_text("v2.1")
-    assert "Check all 26 Traps" in _user_text("v1.1")
-    assert "Check all 27 Traps" in _user_text("v2")
-    assert "Check all 26 Traps" in _user_text("v1")
 
 
 # ── 3. Schema ────────────────────────────────────────────────────────────────
@@ -301,7 +290,7 @@ def test_new_kb_scorecard_and_severity_order():
 def test_legacy_report_renders_legacy_sections():
     html = format_report_as_html(
         _legacy_report(), {"users": "a", "tasks": "b", "format": "c"},
-        analysis_settings={"kb_version": "v2"},
+        analysis_settings={"kb_version": "v1"},
     )
     assert "<h2>Traps Found</h2>" in html
     assert "<h2>Traps Not Found</h2>" in html

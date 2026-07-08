@@ -13,18 +13,12 @@ _DATA_DIR = Path(__file__).parent.parent / "data"
 _KB_PATHS = {
     "v1":   _DATA_DIR / "trap_kb_v1.0.md",
     "v1.1": _DATA_DIR / "trap_kb_v1.1.md",
-    "v2":   _DATA_DIR / "trap_kb_v2.0.md",
     "v2.1": _DATA_DIR / "trap_kb_v2.1.md",
 }
 
 # Maps normalized uppercase analyzer names → names used in KB chunk headers.
 # Version-specific overrides: outer key is version, inner is the mapping.
 _CANONICAL_OVERRIDES: dict[str, dict[str, str]] = {
-    "v2": {
-        "INCORRECT INFO": "INCORRECT INFORMATION",
-        "UNNECESSARY STEP": "UNNECESSARY STEP(S)",
-        "UNNECESSARY STEPS": "UNNECESSARY STEP(S)",
-    },
     "v2.1": {
         "INCORRECT INFO": "INCORRECT INFORMATION",
         "UNNECESSARY STEP": "UNNECESSARY STEP(S)",
@@ -37,7 +31,7 @@ _CANONICAL_OVERRIDES: dict[str, dict[str, str]] = {
     },
 }
 
-_caches: dict[str, Optional[dict[str, str]]] = {"v1": None, "v1.1": None, "v2": None, "v2.1": None}
+_caches: dict[str, Optional[dict[str, str]]] = {"v1": None, "v1.1": None, "v2.1": None}
 
 
 def _load_chunks(version: str) -> dict[str, str]:
@@ -75,20 +69,20 @@ def _normalize(name: str, version: str) -> str:
     return overrides.get(upper, upper)
 
 
-def get_chunks_for_traps(trap_names: list[str], version: str = "v2") -> str:
+def get_chunks_for_traps(trap_names: list[str], version: str = "v2.1") -> str:
     """
     Return the knowledge base chunks for the given trap names as a single string.
 
     Args:
         trap_names: List of trap names as used in the analyzer (ALL CAPS OK).
-        version: Knowledge base version — "v1" or "v2" (default "v2").
+        version: Knowledge base version (default "v2.1"). Unknown versions fall back to "v2.1".
 
     Returns:
         Concatenated chunk texts separated by horizontal rules, or an empty
         string if none of the requested traps are found.
     """
     if version not in _KB_PATHS:
-        version = "v2"
+        version = "v2.1"
 
     chunks = _load_chunks(version)
     parts: list[str] = []

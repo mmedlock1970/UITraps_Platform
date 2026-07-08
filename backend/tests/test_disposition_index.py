@@ -50,7 +50,7 @@ def _base_report():
     }
 
 
-@pytest.mark.parametrize("version", ["v1.1", "v2.1"])
+@pytest.mark.parametrize("version", ["v2.1"])
 def test_index_lists_every_taxonomy_trap_once(version):
     html = _render(_base_report(), kb_version=version)
     assert "Trap disposition index" in html
@@ -58,6 +58,48 @@ def test_index_lists_every_taxonomy_trap_once(version):
     section = html.split("Trap disposition index", 1)[1]
     for trap in _valid_trap_names(version):
         assert f">{trap}</span>" in section, f"{trap} missing from disposition index"
+
+
+def test_worth_a_closer_look_renders_between_issues_and_coverage():
+    # Guards the By-Issue potential_issues wiring (schema field + formatter section) — the
+    # section was historically missing end-to-end in the issues path.
+    report = _base_report()
+    report["potential_issues"] = [{
+        "trap_name": "FORCED SYNTAX", "tenet": "UNDERSTANDABLE", "location": "nav bar",
+        "observation": "No visible kids filter.", "why_it_matters": "The kids goal needs a browse path.",
+        "why_uncertain": "Dropdown contents are not shown.",
+        "check": "Open the TV shows dropdown.", "check_cost": "one click",
+        "implication_if_confirmed": "Kids can browse via a sub-filter.",
+        "implication_if_ruled_out": "No kids path exists at all.",
+    }]
+    html = _render(report)
+    assert "<div class='section-eyebrow'>Worth a closer look</div>" in html
+    assert "Open the TV shows dropdown." in html and "one click" in html
+    assert "If confirmed:" in html and "If ruled out:" in html
+    # Ordered: Issues → Worth a closer look → Coverage notes.
+    assert html.index("Issues identified") < html.index("Worth a closer look") < html.index("Coverage notes")
+
+
+def test_worth_a_closer_look_absent_when_empty():
+    # No potential_issues → no empty section header.
+    html = _render(_base_report())
+    assert "Worth a closer look" not in html
+
+
+def test_disposition_index_accounts_for_potential_issues():
+    # A trap that appears ONLY as a Worth-a-closer-look entry must resolve to "Worth a closer
+    # look" in the index, NOT "Not accounted for" (the prior bug read issues + coverage only).
+    report = _base_report()
+    report["potential_issues"] = [{
+        "trap_name": "BAD PREDICTION", "tenet": "ACCURATE", "location": "search box",
+        "observation": "o", "why_it_matters": "w", "check": "c", "check_cost": "one click",
+    }]
+    html = _render(report)
+    section = html.split("Trap disposition index", 1)[1]
+    # Find BAD PREDICTION's row and confirm its disposition cell.
+    row = section.split(">BAD PREDICTION</span>", 1)[1].split("</tr>", 1)[0]
+    assert "Worth a closer look" in row, "BAD PREDICTION should be accounted for via potential_issues"
+    assert "Not accounted for" not in row
 
 
 def test_primary_links_to_its_issue():

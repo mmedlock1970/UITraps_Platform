@@ -125,6 +125,10 @@ function isImageFile(file: File) {
   return file.type.startsWith('image/');
 }
 
+// Multi-screen (flow) analysis sends all screens in one call; the backend hard-caps this too.
+// Keep in sync with MAX_FLOW_SCREENS in backend/src/analyzer.py.
+const MAX_FLOW_SCREENS = 6;
+
 function isVideoFile(file: File) {
   return file.type.startsWith('video/');
 }
@@ -155,6 +159,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
 
   // Card 1 — Interface
   const [files, setFiles] = useState<File[]>([]);
+  const [uploadNotice, setUploadNotice] = useState<string | null>(null);
   const [thumbnailUrls, setThumbnailUrls] = useState<string[]>([]);
   const [figmaLink, setFigmaLink] = useState(iv?.figmaLink ?? '');
   const [screenName, setScreenName] = useState(iv?.screenName ?? '');
@@ -184,15 +189,52 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
   const [extraContext, setExtraContext] = useState(iv?.extraContext ?? '');
 
   // Card 5 — Analysis Scope
-  const [kbVersion, setKbVersion] = useState<KbVersion>(iv?.kbVersion ?? 'v2.1');
+  // Only two configs are supported: v1 (KB only) and v2.1 (Prompting + KB). v2 / v1.1 are
+  // deprecated. A restored config (saved session / shared link) referencing a retired
+  // version can't run as requested — v2 in Prompting+KB hits the backend's legacy
+  // ValueError, and v1.1 is out of support — so we resolve it to the v2.1 default rather
+  // than dead-ending the link. Unlike the backend raise (an execution guardrail), this is
+  // a UI-restore fallback, and it is made EXPLICIT (console warning + visible notice below)
+  // instead of substituting silently.
+  const requestedKb = iv?.kbVersion;
+  const initialKb: KbVersion =
+    (requestedKb === 'v1' || requestedKb === 'v2.1') ? requestedKb : 'v2.1';
+  const [kbVersion, setKbVersion] = useState<KbVersion>(initialKb);
+  // The retired version the restore asked for, if it was resolved away (null otherwise).
+  // Cleared once the user makes any KB selection.
+  const [coercedFromKb, setCoercedFromKb] = useState<KbVersion | null>(
+    (requestedKb === 'v2' || requestedKb === 'v1.1') ? requestedKb : null,
+  );
+  useEffect(() => {
+    if (coercedFromKb) {
+      console.warn(
+        `[UITraps] Saved configuration requested knowledge base "${coercedFromKb}", which is ` +
+        `deprecated and no longer available; resolving to "v2.1". The analysis will run on v2.1, ` +
+        `not "${coercedFromKb}".`,
+      );
+    }
+    // Mount-only: report the restore-time substitution once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [selectedTenets, setSelectedTenets] = useState<string[]>(iv?.selectedTenets ?? [...ALL_TENETS]);
-  const [verbosity, setVerbosity] = useState<'brief' | 'standard'>(iv?.verbosity ?? 'standard');
+  const [verbosity, setVerbosity] = useState<'brief' | 'standard'>(iv?.verbosity ?? 'brief');
   const [pass1Model, setPass1Model] = useState<'sonnet' | 'haiku'>(iv?.pass1Model ?? 'sonnet');
-  const [thoroughMode, setThoroughMode] = useState(iv?.thoroughMode ?? false);
-  const [mode, setMode] = useState<'single' | 'twopass'>(iv?.mode ?? 'single');
-  const [reportStyle, setReportStyle] = useState<'trap' | 'issues'>(iv?.reportStyle ?? 'trap');
+  // Thorough coverage is deprecated (inert for both surviving configs) and its toggle was
+  // removed — every run is Standard. Kept as a pinned value for the payload/snapshot shape.
+  const [thoroughMode] = useState(false);
+  const [mode, setMode] = useState<'single' | 'twopass'>(iv?.mode ?? 'twopass');
+  const [reportStyle, setReportStyle] = useState<'trap' | 'issues'>(iv?.reportStyle ?? 'issues');
   // Analysis profile — 'self-serve' routes a raw KB through the minimal-harness condition.
-  const [profile, setProfile] = useState<Profile>('default');
+  // Tool coaching is no longer independently combinable: it is locked to the KB version
+  // (v1 → KB only, v2.1 → Prompting + KB).
+  const [profile, setProfile] = useState<Profile>(initialKb === 'v1' ? 'self-serve' : 'default');
+  // Selecting a KB version locks the coaching profile to that version's supported config,
+  // and dismisses any restore-time coercion notice.
+  const selectKbVersion = (v: KbVersion) => {
+    setKbVersion(v);
+    setProfile(v === 'v1' ? 'self-serve' : 'default');
+    setCoercedFromKb(null);
+  };
   const [lockedInputType, setLockedInputType] = useState<'screenshot' | 'video' | 'flow_diagram' | null>(iv?.lockedInputType ?? null);
   const [autoDetectedType, setAutoDetectedType] = useState<'flow_diagram' | null>(null);
   const inputType = lockedInputType ?? autoDetectedType ?? inferFileType(files, figmaLink);
@@ -315,7 +357,18 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
 
   const handleFileChange = useCallback((newFiles: FileList | null) => {
     if (!newFiles || newFiles.length === 0) return;
-    setFiles(prev => [...prev, ...Array.from(newFiles)]);
+    setFiles(prev => {
+      const combined = [...prev, ...Array.from(newFiles)];
+      // Cap image screens at MAX_FLOW_SCREENS with a clear message, rather than letting an
+      // over-long flow fail at the backend. Non-image files (a single video/PDF) are unaffected.
+      if (combined.filter(isImageFile).length > MAX_FLOW_SCREENS) {
+        setUploadNotice(`Flow analysis supports up to ${MAX_FLOW_SCREENS} screens — extra images were not added.`);
+        let kept = 0;
+        return combined.filter(f => !isImageFile(f) || kept++ < MAX_FLOW_SCREENS);
+      }
+      setUploadNotice(null);
+      return combined;
+    });
   }, []);
 
   const handleRemoveFile = useCallback((index: number) => {
@@ -435,6 +488,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
               disabled={disabled}
             />
             {errors.upload && <p className={styles.fieldError}>{errors.upload}</p>}
+            {uploadNotice && <p className={styles.fieldHint} role="status">{uploadNotice}</p>}
             {(files.length > 0 || figmaLink.trim()) && (
               <div className={styles.inferredTypeStrip}>
                 <span className={styles.inferredTypeLabel}>
@@ -950,12 +1004,15 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
           <div className={styles.field}>
             <label className={styles.fieldLabel}>Knowledge base version</label>
             <div className={styles.kbVersionGroup}>
-              {(['v1', 'v2', 'v1.1', 'v2.1'] as KbVersion[]).map(v => (
+              {/* Only the two supported configs are offered. V2 / V1.1 are deprecated and no
+                  longer rendered; a saved link that referenced them is resolved to V2.1 with the
+                  coercion notice below (that logic reads the restored value, not the buttons). */}
+              {(['v1', 'v2.1'] as KbVersion[]).map(v => (
                 <button
                   key={v}
                   type="button"
                   className={`${styles.kbVersionBtn} ${kbVersion === v ? styles.kbVersionBtnActive : ''}`}
-                  onClick={() => setKbVersion(v)}
+                  onClick={() => selectKbVersion(v)}
                   disabled={disabled}
                 >
                   {v.toUpperCase()}
@@ -963,85 +1020,66 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
               ))}
             </div>
             <p className={styles.fieldHint}>
-              {kbVersion === 'v2' && 'Current knowledge engine (recommended).'}
-              {kbVersion === 'v2.1' && 'New v2.1 knowledge base — all evaluation rules self-contained in the KB. Reports use a High/Medium/Low severity and confidence scale and a Coverage-notes section.'}
-              {kbVersion === 'v1.1' && 'New v1.1 knowledge base (card-deck lineage, 26 traps). Same new report vocabulary as v2.1.'}
-              {kbVersion === 'v1' && 'Previous knowledge engine.'}
+              {kbVersion === 'v2.1' && 'New v2.1 knowledge base — all evaluation rules self-contained in the KB. Reports use a High/Medium/Low severity and confidence scale and a Coverage-notes section. Runs as Prompting + KB.'}
+              {kbVersion === 'v1' && 'Original knowledge base, injected verbatim. Runs as KB only (no tool coaching added).'}
             </p>
+            {coercedFromKb && (
+              <p className={styles.fieldHint} role="status" style={{ color: 'var(--color-warning, #b45309)' }}>
+                This saved configuration requested <strong>{coercedFromKb.toUpperCase()}</strong>, which is
+                deprecated and no longer available. It has been switched to <strong>V2.1</strong> — the
+                analysis will run on V2.1, not {coercedFromKb.toUpperCase()}.
+              </p>
+            )}
           </div>
 
-          {/* Tool coaching — how much scaffolding the tool adds on top of the KB */}
+          {/* Tool coaching — no longer an independent choice; fully determined by the KB
+              version (V1 → KB only, V2.1 → Prompting + KB). Shown read-only. */}
           <div className={styles.field}>
             <label className={styles.fieldLabel}>Tool coaching</label>
-            <div className={styles.kbVersionGroup}>
-              {(['default', 'self-serve'] as Profile[]).map(p => (
-                <button
-                  key={p}
-                  type="button"
-                  className={`${styles.kbVersionBtn} ${profile === p ? styles.kbVersionBtnActive : ''}`}
-                  onClick={() => setProfile(p)}
-                  disabled={disabled}
-                >
-                  {p === 'default' ? 'Prompting + KB' : 'KB only'}
-                </button>
-              ))}
-            </div>
+            <p className={styles.fieldValueStatic}>{profile === 'default' ? 'Prompting + KB' : 'KB only'}</p>
             <p className={styles.fieldHint}>
-              {profile === 'default' && 'Prompting + KB: the standard pipeline — the tool adds its detection procedures, severity rules, and output scaffolding on top of the selected knowledge base.'}
-              {profile === 'self-serve' && 'KB only: the selected KB is injected verbatim with just a minimal instruction — no detection/severity guidance added by the tool. Single-pass, By-Issue. For measuring the KB on its own.'}
+              Set by the knowledge base version. {profile === 'default'
+                ? 'Prompting + KB: the tool adds its detection procedures, severity rules, and output scaffolding on top of V2.1.'
+                : 'KB only: V1 is injected verbatim with just a minimal instruction — no detection/severity guidance added by the tool.'}
             </p>
           </div>
 
+          {/* Analysis coverage toggle removed — Thorough is deprecated and its pipeline is gone;
+              every run is Standard (single-pass), so there is no choice to surface. thoroughMode
+              is pinned false in state. */}
+
+          {/* Analysis architecture — always visible. Meaningful for V2.1 (Prompting + KB);
+              inert for V1 (KB only forces single-pass), where it is shown disabled with an
+              explanation so the override is visible rather than the toggle silently vanishing. */}
           <hr className={styles.fieldDivider} />
-
-          {/* Analysis coverage */}
           <div className={styles.field}>
-            <label className={styles.fieldLabel}>Analysis coverage</label>
+            <label className={styles.fieldLabel}>Analysis architecture</label>
             <div className={styles.kbVersionGroup}>
-              {([false, true] as const).map(v => (
-                <button
-                  key={String(v)}
-                  type="button"
-                  className={`${styles.kbVersionBtn} ${thoroughMode === v ? styles.kbVersionBtnActive : ''}`}
-                  onClick={() => setThoroughMode(v)}
-                  disabled={disabled}
-                >
-                  {v ? 'Thorough' : 'Standard'}
-                </button>
-              ))}
+              {(['single', 'twopass'] as const).map(v => {
+                // KB only (V1) always runs single-pass regardless of the toggle value.
+                const archActive = kbVersion === 'v1' ? 'single' : mode;
+                return (
+                  <button
+                    key={v}
+                    type="button"
+                    className={`${styles.kbVersionBtn} ${archActive === v ? styles.kbVersionBtnActive : ''}`}
+                    onClick={() => setMode(v)}
+                    disabled={disabled || kbVersion === 'v1'}
+                    title={kbVersion === 'v1' ? 'KB only (V1) always runs single-pass' : undefined}
+                  >
+                    {v === 'single' ? 'Single-pass' : 'Two-pass'}
+                  </button>
+                );
+              })}
             </div>
             <p className={styles.fieldHint}>
-              {!thoroughMode && 'Single-pass analysis. Fast, good coverage for most designs.'}
-              {thoroughMode && 'Runs one focused pass per Tenet in parallel, then merges findings. More consistent results, similar speed. Recommended for final reviews.'}
+              {kbVersion === 'v1'
+                ? 'Locked to single-pass: KB only (V1) runs one call with the raw knowledge base and does not support the two-pass detection → adjudication pipeline.'
+                : mode === 'single'
+                  ? 'One call with the whole knowledge base. Fast.'
+                  : 'Detection pass surfaces candidate traps, then an adjudication pass confirms each one against only the relevant trap definitions. Higher recall and cleaner attribution; slower and more tokens.'}
             </p>
           </div>
-
-          {/* Analysis architecture — new KBs (v1.1 / v2.1) only */}
-          {(kbVersion === 'v1.1' || kbVersion === 'v2.1') && (
-            <>
-              <hr className={styles.fieldDivider} />
-              <div className={styles.field}>
-                <label className={styles.fieldLabel}>Analysis architecture</label>
-                <div className={styles.kbVersionGroup}>
-                  {(['single', 'twopass'] as const).map(v => (
-                    <button
-                      key={v}
-                      type="button"
-                      className={`${styles.kbVersionBtn} ${mode === v ? styles.kbVersionBtnActive : ''}`}
-                      onClick={() => setMode(v)}
-                      disabled={disabled}
-                    >
-                      {v === 'single' ? 'Single-pass' : 'Two-pass'}
-                    </button>
-                  ))}
-                </div>
-                <p className={styles.fieldHint}>
-                  {mode === 'single' && 'One call with the whole knowledge base. Fast, and the default.'}
-                  {mode === 'twopass' && 'Detection pass surfaces candidate traps, then an adjudication pass confirms each one against only the relevant trap definitions. Higher recall and cleaner attribution; slower and more tokens.'}
-                </p>
-              </div>
-            </>
-          )}
 
           <hr className={styles.fieldDivider} />
 

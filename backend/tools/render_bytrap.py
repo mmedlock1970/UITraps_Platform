@@ -42,10 +42,20 @@ def main():
     settings = dict(rs.DEFAULT_SETTINGS)
     settings["report_style"] = "trap"
     _inject_definitions(report, settings.get("kb_version", "v2.1"))
-    # placeholder crop on the first critical finding, to exercise the crop layout
-    if report.get("critical_issues"):
-        report["critical_issues"][0]["region_image_b64"] = rs._placeholder_crop_b64()
-        report["critical_issues"][0]["region"] = {"caption": "Top-right toolbar — unlabeled gear glyph"}
+    # Placeholder crops on several findings — including BOTH instances of the multi-instance
+    # trap — to exercise the crop layout across single- and multi-instance cards and task groups.
+    _crop = rs._placeholder_crop_b64()
+    _crop_captions = {
+        ("critical_issues", 0): "Top-right toolbar — unlabeled gear glyph",
+        ("moderate_issues", 0): "Hero banner — autoplaying motion",
+        ("moderate_issues", 1): "Sports widget — live countdown timer",
+        ("minor_issues", 0): "Content cards — badge styling varies",
+    }
+    for (arr, i), cap in _crop_captions.items():
+        _items = report.get(arr) or []
+        if len(_items) > i:
+            _items[i]["region_image_b64"] = _crop
+            _items[i]["region"] = {"caption": cap}
 
     # Escape report, user_context AND settings at the boundary — the renderer assumes
     # pre-escaped input (its meta row interpolates settings values), exactly as the live

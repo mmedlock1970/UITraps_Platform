@@ -474,6 +474,45 @@ UI_ANALYSIS_SCHEMA = {
 }
 
 
+def _regions_field(bare: bool = False) -> dict:
+    """`regions[]` — bounding box(es) locating a finding, ONE ENTRY PER CITED INSTANCE (G6
+    per-instance enumeration). A single-location finding has one entry; a cross-screen finding
+    (e.g. WANDERING ELEMENT, INCONSISTENT APPEARANCE, VARIABLE OUTCOME) has one entry per screen
+    it appears on. Coordinates are normalized 0.0–1.0, origin top-left. `screen_index` is 0-based
+    and matches the SCREEN labels in the prompt (0 = the first/only screen).
+
+    `bare=True` drops the usage-guidance prose for the self-serve (raw-KB) profile — the field
+    exists so KB-only runs can carry crops too, but no coaching is added."""
+    if bare:
+        box = {
+            "screen_index": {"type": "integer"},
+            "x": {"type": "number"}, "y": {"type": "number"},
+            "width": {"type": "number"}, "height": {"type": "number"},
+            "caption": {"type": "string"},
+        }
+        return {"type": "array", "items": {"type": "object", "properties": box,
+                                           "required": ["screen_index", "x", "y", "width", "height"]}}
+    box = {
+        "screen_index": {"type": "integer", "description": "0-based index of the screen this box is on (0 = first screen; use 0 when a single screen was provided)."},
+        "x": {"type": "number", "description": "Left edge (0.0 = left, 1.0 = right)."},
+        "y": {"type": "number", "description": "Top edge (0.0 = top, 1.0 = bottom)."},
+        "width": {"type": "number", "description": "Width as a fraction of image width."},
+        "height": {"type": "number", "description": "Height as a fraction of image height."},
+        "caption": {"type": "string", "description": "Describes (1) what the cropped area shows and (2) how it illustrates this finding."},
+    }
+    return {
+        "type": "array",
+        "description": (
+            "Bounding box(es) tightly enclosing the specific element(s) that exhibit this trap — "
+            "one entry per cited instance (G6): a single entry for a single-location finding, and "
+            "one entry per screen for a cross-screen finding. Omit entirely when no element can be "
+            "cleanly bounded (e.g. the finding is about an absence)."
+        ),
+        "items": {"type": "object", "properties": box,
+                  "required": ["screen_index", "x", "y", "width", "height"]},
+    }
+
+
 def _new_kb_analysis_schema(version: str = "v2.1"):
     """
     Derive the analysis schema for new-KB (v2.1-lineage) versions from the legacy
@@ -523,6 +562,20 @@ def _new_kb_analysis_schema(version: str = "v2.1"):
                 "AND place the issue in the array indicated by the system prompt's severity mapping."
             ),
         }
+        # Which evaluated task this finding bears on — drives the report's task grouping. Reuse
+        # the wording of one of the provided tasks; omit for a general / site-wide finding.
+        item_props["task_context"] = {
+            "type": "string",
+            "description": (
+                "The specific evaluated task this finding most affects, worded to match one of "
+                "the tasks provided in the context. Omit for a general/site-wide finding that is "
+                "not tied to a single task."
+            ),
+        }
+        # Cross-screen findings need one crop per screen (G6 per-instance enumeration) — replace
+        # the base's single `region` object with the multi-screen `regions[]` array.
+        item_props.pop("region", None)
+        item_props["regions"] = _regions_field()
 
     tcnf = props["traps_checked_not_found"]
     tcnf["description"] = (
@@ -597,20 +650,74 @@ def _new_kb_analysis_schema(version: str = "v2.1"):
 _NEW_KB_ANALYSIS_SCHEMA_CACHE: dict = {}
 
 
-def get_ui_analysis_schema(version: str = "v2"):
+def _self_serve_trap_schema(version: str = "v1"):
+    """BARE per-Trap (By-Trap) output schema for the KB-only (self-serve) profile — the trap
+    twin of _self_serve_issues_schema. Same critical/moderate/minor container the legacy
+    formatter renders, but stripped of all guidance: trap names come from the injected KB (no
+    enum), severity/confidence carry only the High/Medium/Low labels, and every field except a
+    trap name is omittable. NO tenet enum, NO definitions, NO coverage taxonomy, NO region
+    guidance, NO field-level instructions. Tenet (for the pill) and the coverage complement are
+    derived by the tool afterward, so the model is never shown that vocabulary."""
+    def _finding_array(desc):
+        return {
+            "type": "array",
+            "description": desc,
+            "items": {
+                "type": "object",
+                "properties": {
+                    "trap_name": {"type": "string"},
+                    "headline": {"type": "string"},
+                    "location": {"type": "string"},
+                    "problem": {"type": "string"},
+                    "recommendation": {"type": "string"},
+                    "severity_label": {"type": "string", "enum": NEW_KB_SEVERITY_LABELS},
+                    "confidence": {"type": "string", "enum": NEW_KB_CONFIDENCE_LEVELS},
+                    # regions[] is output-shape only (per-screen boxes the tool crops); bare, no
+                    # field guidance — the KB still supplies all reasoning.
+                    "regions": _regions_field(bare=True),
+                },
+                "required": ["trap_name"],
+            },
+        }
+    return {
+        "type": "object",
+        "properties": {
+            "summary_headline": {"type": "string"},
+            "summary_narrative": {"type": "string"},
+            "critical_issues": _finding_array("Traps you judge highest severity."),
+            "moderate_issues": _finding_array("Traps you judge medium severity."),
+            "minor_issues": _finding_array("Traps you judge lowest severity."),
+            "positive_observations": {"type": "array", "items": {"type": "string"}},
+        },
+        "required": ["summary_headline", "summary_narrative",
+                     "critical_issues", "moderate_issues", "minor_issues"],
+        "additionalProperties": True,
+    }
+
+
+def get_ui_analysis_schema(version: str = "v2", self_serve: bool = False):
     """
     Get the JSON schema for UI analysis structured output.
 
     Args:
         version: KB version. New-KB versions (v1.1/v2.1) get the remapped
             vocabulary with a version-aware trap-name enum; others get the legacy schema.
+        self_serve: When True, return the BARE By-Trap schema (raw-KB profile) for ANY
+            version — no enums, no guidance, fields omittable. The tool derives tenet and the
+            coverage complement afterward. Mirrors get_ui_issues_schema(self_serve=True).
 
     Returns:
         Dictionary containing the JSON schema
     """
+    lineage = "v1" if version in ("v1", "v1.1") else "v2"
+    if self_serve:
+        key = ("self_serve_trap", lineage)
+        cached = _NEW_KB_ANALYSIS_SCHEMA_CACHE.get(key)
+        if cached is None:
+            cached = _NEW_KB_ANALYSIS_SCHEMA_CACHE[key] = _self_serve_trap_schema(version)
+        return cached
     if not is_new_kb(version):
         return UI_ANALYSIS_SCHEMA
-    lineage = "v1" if version in ("v1", "v1.1") else "v2"
     cached = _NEW_KB_ANALYSIS_SCHEMA_CACHE.get(lineage)
     if cached is None:
         cached = _NEW_KB_ANALYSIS_SCHEMA_CACHE[lineage] = _new_kb_analysis_schema(version)
@@ -783,7 +890,7 @@ def _new_kb_issues_schema(version: str = "v2.1", self_serve: bool = False):
     _issue_required = ["headline"] if self_serve else ["headline", "severity_label", "confidence", "traps", "description", "recommendation"]
     _top_required = (["summary_headline", "summary_narrative", "issues"] if self_serve
                      else ["summary_headline", "summary_narrative", "issues", "positive_observations", "traps_checked_not_found"])
-    return {
+    schema = {
         "type": "object",
         "properties": {
             "summary_headline": {"type": "string", "description": "A punchy verdict (16–24 words) on how well the design supports the stated goal. No counts."},
@@ -812,16 +919,7 @@ def _new_kb_issues_schema(version: str = "v2.1", self_serve: bool = False):
                         },
                         "description": {"type": "string", "description": "Problem-first prose: what the user experiences and why. Reference traps only to aid understanding/fixing; state any cascade or conditional-branch condition here, not as jargon. Hedged language."},
                         "recommendation": {"type": "string", "description": "The fix direction, advisory language."},
-                        "region": {
-                            "type": "object",
-                            "description": "Optional bounding box of the element. Normalized 0.0–1.0, origin top-left. Omit if no single element bounds it.",
-                            "properties": {
-                                "x": {"type": "number"}, "y": {"type": "number"},
-                                "width": {"type": "number"}, "height": {"type": "number"},
-                                "caption": {"type": "string"},
-                            },
-                            "required": ["x", "y", "width", "height"],
-                        },
+                        "regions": _regions_field(),
                     },
                     "required": _issue_required,
                 },
@@ -836,6 +934,37 @@ def _new_kb_issues_schema(version: str = "v2.1", self_serve: bool = False):
         "required": _top_required,
         "additionalProperties": bool(self_serve),
     }
+    # "Worth a closer look" (G8 §2) — pivotal, assessability-blocked unknowns as their own
+    # section, mirroring the by-trap report's richer potential_issues entry. Coached path only;
+    # the bare self-serve issues schema (_self_serve_issues_schema) stays minimal. Kept OPTIONAL
+    # (not in _top_required) so the model omits it when nothing clears the KB's G8 entry ticket.
+    if not self_serve:
+        schema["properties"]["potential_issues"] = {
+            "type": "array",
+            "description": (
+                "Worth a closer look (G8 section 2): pivotal unknowns that cannot be settled from "
+                "this artifact but would change the picture if real. These are questions, not "
+                "findings — anything whose evidence clears its Trap's bar is an Issue instead. The "
+                "entry-ticket test lives in the KB's G8; do not restate it."
+            ),
+            "items": {
+                "type": "object",
+                "properties": {
+                    "trap_name": {"type": "string", "enum": trap_names, "description": "The trap this unknown concerns."},
+                    "tenet": {"type": "string", "enum": VALID_TENET_NAMES},
+                    "location": {"type": "string", "description": "The element/screen the unknown concerns."},
+                    "observation": {"type": "string", "description": "What is factually visible that raises the question."},
+                    "why_it_matters": {"type": "string", "description": "Why this is pivotal to the stated goal."},
+                    "why_uncertain": {"type": "string", "description": "What specifically cannot be determined from this artifact."},
+                    "check": {"type": "string", "description": "The specific named check that would settle it."},
+                    "check_cost": {"type": "string", "description": "Cost of that check, e.g. 'one click', 'five-user test', 'code audit'."},
+                    "implication_if_confirmed": {"type": "string", "description": "What it means for the user if the check confirms the problem."},
+                    "implication_if_ruled_out": {"type": "string", "description": "What it means if the check rules it out (often itself a live trap)."},
+                },
+                "required": ["trap_name", "tenet", "location", "observation", "why_it_matters", "check", "check_cost"],
+            },
+        }
+    return schema
 
 
 def _self_serve_issues_schema(version: str = "v1"):
@@ -868,6 +997,10 @@ def _self_serve_issues_schema(version: str = "v1"):
                         },
                         "description": {"type": "string"},
                         "recommendation": {"type": "string"},
+                        # regions[] is output-shape only (per-screen boxes the tool crops); bare,
+                        # no field guidance — mirror of the by-trap self-serve regions field so
+                        # KB-only By-Issue can carry crops too.
+                        "regions": _regions_field(bare=True),
                     },
                     "required": ["headline"],
                 },

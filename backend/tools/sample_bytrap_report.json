@@ -9,7 +9,8 @@
       "confidence": "High",
       "headline": "The primary action is an unlabeled icon.",
       "location": "Top-right toolbar — gear-like glyph",
-      "problem": "The main call-to-action is a bare gear-like glyph with no text label. Users are likely to read it as a settings control rather than the primary Create action it triggers.",
+      "task_context": "Get an understanding of what the site offers",
+      "problem": "The main call-to-action in the top-right toolbar is a bare gear-like glyph with no text label. Users are likely to read it as a settings control rather than the primary Create action it triggers.",
       "recommendation": "Pair the icon with a visible text label (\"Create\"), or replace it with a labeled button."
     }
   ],
@@ -21,7 +22,7 @@
       "confidence": "High",
       "headline": "The hero banner autoplays and pulls focus.",
       "location": "Hero banner (top of screen)",
-      "problem": "The hero autoplays motion on load, drawing the eye away from the entry points a first-time visitor is scanning for.",
+      "problem": "The hero banner at the top of the screen autoplays motion on load, drawing the eye away from the entry points a first-time visitor is scanning for.",
       "recommendation": "Pause hero motion until hover, or give the primary entry point stronger visual weight than the banner."
     },
     {
@@ -31,7 +32,7 @@
       "confidence": "Medium",
       "headline": "A sports countdown timer animates persistently.",
       "location": "Sports widget (mid-right)",
-      "problem": "A live countdown timer animates continuously, competing for attention with the content the user is trying to browse.",
+      "problem": "In the sports widget on the mid-right, a live countdown timer animates continuously, competing for attention with the content the user is trying to browse.",
       "recommendation": "Make the timer static, or move it below the primary content region."
     },
     {
@@ -41,7 +42,8 @@
       "confidence": "Medium",
       "headline": "Tapping Save gives no confirmation.",
       "location": "Save control (detail panel)",
-      "problem": "After the Save control is pressed there is no visible state change — no spinner, toast, or disabled state — so a user isn't sure the tap registered. Inferred from the static screen.",
+      "task_context": "Find new releases that are free",
+      "problem": "After the Save control in the detail panel is pressed there is no visible state change — no spinner, toast, or disabled state — so a user isn't sure the tap registered. Inferred from the static screen.",
       "recommendation": "Acknowledge the tap immediately: disable the button, show a brief spinner, then confirm with a short toast."
     }
   ],
@@ -53,19 +55,54 @@
       "confidence": "Low",
       "headline": "Content badges vary in style across cards.",
       "location": "Content cards (TOP 10 / TRENDING / NEW)",
-      "problem": "Badges use different colors and shapes across cards, so users can't rely on a badge's appearance to predict its meaning.",
+      "task_context": "Find kids shows",
+      "problem": "Across the content cards (TOP 10 / TRENDING / NEW), badges use different colors and shapes, so users can't rely on a badge's appearance to predict its meaning.",
       "recommendation": "Standardize badge color and shape by badge type."
     }
   ],
   "traps_checked_not_found": [
-    {"trap_name": "INVISIBLE ELEMENT", "coverage_status": "not_present"},
-    {"trap_name": "FORCED SYNTAX", "coverage_status": "not_present"},
-    {"trap_name": "MEMORY CHALLENGE", "coverage_status": "not_present"},
-    {"trap_name": "GRATUITOUS REDUNDANCY", "coverage_status": "not_present"},
-    {"trap_name": "AMBIGUOUS HOME", "coverage_status": "not_present"},
-    {"trap_name": "SYSTEM AMNESIA", "coverage_status": "not_assessable_artifact"},
-    {"trap_name": "UNNECESSARY STEP(S)", "coverage_status": "not_assessable_artifact"},
-    {"trap_name": "INVITING DEAD END", "coverage_status": "not_assessable_context"}
+    {
+      "trap_name": "PHYSICAL CHALLENGE",
+      "coverage_status": "partially_assessed",
+      "detail": "assessed within scope: tap-target sizing on the visible screen; not assessable from this artifact: gesture and drag interactions that only appear during use."
+    },
+    {
+      "trap_name": "BAD PREDICTION",
+      "coverage_status": "partially_assessed",
+      "detail": "assessed within scope: visible default values; not assessable: whether predicted values match what returning users intend."
+    },
+    {
+      "trap_name": "INVISIBLE ELEMENT",
+      "coverage_status": "not_present"
+    },
+    {
+      "trap_name": "FORCED SYNTAX",
+      "coverage_status": "not_present"
+    },
+    {
+      "trap_name": "MEMORY CHALLENGE",
+      "coverage_status": "not_present"
+    },
+    {
+      "trap_name": "GRATUITOUS REDUNDANCY",
+      "coverage_status": "not_present"
+    },
+    {
+      "trap_name": "AMBIGUOUS HOME",
+      "coverage_status": "not_present"
+    },
+    {
+      "trap_name": "SYSTEM AMNESIA",
+      "coverage_status": "not_assessable_artifact"
+    },
+    {
+      "trap_name": "UNNECESSARY STEP(S)",
+      "coverage_status": "not_assessable_artifact"
+    },
+    {
+      "trap_name": "INVITING DEAD END",
+      "coverage_status": "not_assessable_context"
+    }
   ],
   "positive_observations": [
     "The color palette holds strong contrast throughout, so text stays legible against every background used here.",

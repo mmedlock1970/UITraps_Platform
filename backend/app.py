@@ -29,7 +29,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 # Import the existing analyzer
-from src.analyzer import UITrapsAnalyzer
+from src.analyzer import UITrapsAnalyzer, MAX_FLOW_SCREENS
 from src.multi_analyzer import MultiAnalyzer
 from src.estimator import (
     estimate_single_image,
@@ -1914,7 +1914,7 @@ async def unified_ask(
     attentional_state: Optional[str] = Form(None),
     tenet_filter: Optional[str] = Form(None),
     design_name: Optional[str] = Form(None),
-    kb_version: str = Form("v2"),
+    kb_version: str = Form("v2.1"),
     report_style: str = Form("trap"),
     verbosity: str = Form("standard"),
     pass1_model: Optional[str] = Form(None),
@@ -2274,7 +2274,14 @@ async def unified_ask(
                 except Exception:
                     pass
         else:
-            # Multi-image
+            # Multi-image (flow). Hard-cap the screen count with a clear stop rather than
+            # silently truncating output past the single-call ceiling.
+            if len(files) > MAX_FLOW_SCREENS:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(f"Flow analysis supports at most {MAX_FLOW_SCREENS} screens per run. "
+                            f"You submitted {len(files)}. Please upload {MAX_FLOW_SCREENS} or fewer."),
+                )
             tmp_paths = []
             try:
                 for img in files:
@@ -2289,12 +2296,27 @@ async def unified_ask(
                         tmp_paths.append(tmp.name)
 
                 user_context = {"users": users, "tasks": tasks, "format": format, "content_type": content_type, "extra_context": extra_context or "", "product_context": product_context or "", "physical_env": physical_env or "", "lighting": lighting or "", "grip_position": grip_position or "", "attentional_state": attentional_state or "", "tenet_filter": tenet_filter or "", "design_name": design_name or "", "task_list": _task_list_parsed, "input_type": _input_type}
-                _multi_opts = {"kb_version": kb_version, "verbosity": verbosity, "pass1_model": pass1_model, "thorough_mode": (thorough_mode == 'true'), "mode": mode, "profile": profile}
-                def _run_multi_analysis():
-                    return get_multi_analyzer().analyze_images(tmp_paths, user_context, chat_context=chat_context, analysis_opts=_multi_opts)
-                result = await asyncio.get_running_loop().run_in_executor(None, _run_multi_analysis)
-
+                # Flow-aware multi-screen: analyze ALL screens together in ONE call (per KB G7),
+                # honoring the user's settings incl. report_style — replaces the retired
+                # MultiAnalyzer per-screen loop (which ignored report_style and always produced a
+                # By-Trap frame report).
                 user_id = str(user.get("id") or user.get("userId", ""))
+                def _run_multi_analysis():
+                    return get_analyzer().analyze_design(
+                        design_file=tmp_paths[0],
+                        additional_design_files=tmp_paths[1:],
+                        user_context=user_context,
+                        chat_context=chat_context,
+                        kb_version=kb_version,
+                        verbosity=verbosity,
+                        pass1_model=pass1_model,
+                        thorough_mode=(thorough_mode == 'true'),
+                        mode=mode,
+                        report_style=report_style,
+                        profile=profile,
+                        user_id=user_id,
+                    )
+                result = await asyncio.get_running_loop().run_in_executor(None, _run_multi_analysis)
                 save_analysis_report(
                     analysis_result=result,
                     analysis_type="multi_image",
