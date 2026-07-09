@@ -643,6 +643,48 @@ def _new_kb_analysis_schema(version: str = "v2.1"):
     for legacy_field in ("flagged_for_human_review", "incomplete_flow_findings"):
         props.pop(legacy_field, None)
 
+    # ── Additive issue-level relationship substrate (KB ledger 22) ──────────────────────────
+    # By-trap RENDERS per-trap findings, but the adjudication is issue-first: it ALSO emits the
+    # issue-level grouping here — co-occurring traps bound into one issue, each with its G3
+    # relationship and Tenet, plus the shared location. This is NOT rendered as trap cards; it is
+    # the substrate the report's synthesis section (Emergent Patterns) reads, so a cross-trap
+    # convergence that the per-trap decomposition scatters can be recomposed at render time.
+    props["issue_groups"] = {
+        "type": "array",
+        "description": (
+            "Issue-first adjudication substrate (G3 composition). One entry per user-facing ISSUE: "
+            "the trap(s) that co-occur in it bound together, each with its G3 relationship and "
+            "Tenet, plus the shared location. A single-trap issue is one entry with one trap. This "
+            "groups the SAME findings reported per-trap above — do NOT introduce traps that are not "
+            "present as findings, and do NOT change severities. Used only for the report's synthesis "
+            "section; it is not rendered as its own cards."
+        ),
+        "items": {
+            "type": "object",
+            "properties": {
+                "location": {"type": "string", "description": "Named element(s)/screen this issue concentrates on."},
+                "traps": {
+                    "type": "array",
+                    "description": "The trap(s) bound into this issue per G3 — root cause first, then consequence / co-occurring.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "trap_name": {"type": "string", "enum": trap_names},
+                            "tenet": {"type": "string", "enum": VALID_TENET_NAMES},
+                            "relationship": {
+                                "type": "string",
+                                "enum": NEW_KB_RELATIONSHIP_VALUES,
+                                "description": "G3 designation of this trap within the issue.",
+                            },
+                        },
+                        "required": ["trap_name", "tenet", "relationship"],
+                    },
+                },
+            },
+            "required": ["traps"],
+        },
+    }
+
     return schema
 
 
@@ -939,6 +981,16 @@ def _new_kb_issues_schema(version: str = "v2.1", self_serve: bool = False):
     # the bare self-serve issues schema (_self_serve_issues_schema) stays minimal. Kept OPTIONAL
     # (not in _top_required) so the model omits it when nothing clears the KB's G8 entry ticket.
     if not self_serve:
+        # Task attribution drives the report's General / Task-N grouping. COACHED path only — the
+        # self-serve (KB-only) condition deliberately gets no task field, so v1 stays ungrouped.
+        schema["properties"]["issues"]["items"]["properties"]["task"] = {
+            "type": "string",
+            "description": (
+                "The specific evaluated task this issue most affects, copied EXACTLY from one of "
+                "the task identifiers listed in the user turn, or 'general' for an issue spanning "
+                "all tasks. Omit when only one task is defined. Drives the report's task grouping."
+            ),
+        }
         schema["properties"]["potential_issues"] = {
             "type": "array",
             "description": (

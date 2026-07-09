@@ -348,7 +348,8 @@ class FigmaAnalyzer:
         # Get all frames
         print(f"Extracting frames...")
         frames = self.get_all_frames(file_data)
-        print(f"Found {len(frames)} frames")
+        total_frames = len(frames)  # full count before any max_frames slice (for cap enforcement)
+        print(f"Found {total_frames} frames")
 
         # Get prototype flows
         print(f"Analyzing prototype flows...")
@@ -392,7 +393,8 @@ class FigmaAnalyzer:
         return {
             'file_info': file_info,
             'frames': frames,
-            'flows': flows
+            'flows': flows,
+            'total_frames': total_frames
         }
 
 

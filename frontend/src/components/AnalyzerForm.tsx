@@ -59,7 +59,7 @@ function assembleContext(fields: {
   physicalEnv: string; lighting: string; gripPosition: string; attentionalState: string;
   kbVersion: KbVersion; selectedTenets: string[];
   verbosity: 'brief' | 'standard'; pass1Model: 'sonnet' | 'haiku';
-  figmaLink: string; thoroughMode: boolean; mode: 'single' | 'twopass'; reportStyle: 'trap' | 'issues';
+  figmaLink: string; thoroughMode: boolean; mode: 'single' | 'twopass'; reportStyle: 'trap';
   profile: Profile;
   inputType: 'screenshot' | 'video' | 'flow_diagram';
 }): UserContext {
@@ -223,7 +223,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
   // removed — every run is Standard. Kept as a pinned value for the payload/snapshot shape.
   const [thoroughMode] = useState(false);
   const [mode, setMode] = useState<'single' | 'twopass'>(iv?.mode ?? 'twopass');
-  const [reportStyle, setReportStyle] = useState<'trap' | 'issues'>(iv?.reportStyle ?? 'issues');
+  const reportStyle = 'trap' as const;  // report style is fixed to By Trap (By-Issue retired)
   // Analysis profile — 'self-serve' routes a raw KB through the minimal-harness condition.
   // Tool coaching is no longer independently combinable: it is locked to the KB version
   // (v1 → KB only, v2.1 → Prompting + KB).
@@ -956,7 +956,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
           <div className={styles.field}>
             <label className={styles.fieldLabel}>Report detail</label>
             <div className={styles.kbVersionGroup}>
-              {(['standard', 'brief'] as const).map(v => (
+              {(['brief', 'standard'] as const).map(v => (
                 <button
                   key={v}
                   type="button"
@@ -1020,8 +1020,8 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
               ))}
             </div>
             <p className={styles.fieldHint}>
-              {kbVersion === 'v2.1' && 'New v2.1 knowledge base — all evaluation rules self-contained in the KB. Reports use a High/Medium/Low severity and confidence scale and a Coverage-notes section. Runs as Prompting + KB.'}
-              {kbVersion === 'v1' && 'Original knowledge base, injected verbatim. Runs as KB only (no tool coaching added).'}
+              {kbVersion === 'v2.1' && 'New v2.1 knowledge base — all evaluation rules self-contained in the KB. Reports use a High/Medium/Low severity and confidence scale and a Coverage-notes section. Runs as Prompting + KB: the tool adds its detection procedures, severity rules, and output scaffolding on top of the KB.'}
+              {kbVersion === 'v1' && 'Original knowledge base, injected verbatim. Runs as KB only: the raw KB is used with just a minimal instruction — no detection or severity guidance added by the tool.'}
             </p>
             {coercedFromKb && (
               <p className={styles.fieldHint} role="status" style={{ color: 'var(--color-warning, #b45309)' }}>
@@ -1032,17 +1032,10 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
             )}
           </div>
 
-          {/* Tool coaching — no longer an independent choice; fully determined by the KB
-              version (V1 → KB only, V2.1 → Prompting + KB). Shown read-only. */}
-          <div className={styles.field}>
-            <label className={styles.fieldLabel}>Tool coaching</label>
-            <p className={styles.fieldValueStatic}>{profile === 'default' ? 'Prompting + KB' : 'KB only'}</p>
-            <p className={styles.fieldHint}>
-              Set by the knowledge base version. {profile === 'default'
-                ? 'Prompting + KB: the tool adds its detection procedures, severity rules, and output scaffolding on top of V2.1.'
-                : 'KB only: V1 is injected verbatim with just a minimal instruction — no detection/severity guidance added by the tool.'}
-            </p>
-          </div>
+          {/* Tool coaching control removed — it added no value as a field: the profile is fully
+              determined by the KB version (V1 → KB only, V2.1 → Prompting + KB), and that
+              detail now lives in the Knowledge base version hint above. `profile` state is still
+              derived from the KB selection and sent to the backend. */}
 
           {/* Analysis coverage toggle removed — Thorough is deprecated and its pipeline is gone;
               every run is Standard (single-pass), so there is no choice to surface. thoroughMode
@@ -1055,7 +1048,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
           <div className={styles.field}>
             <label className={styles.fieldLabel}>Analysis architecture</label>
             <div className={styles.kbVersionGroup}>
-              {(['single', 'twopass'] as const).map(v => {
+              {(['twopass', 'single'] as const).map(v => {
                 // KB only (V1) always runs single-pass regardless of the toggle value.
                 const archActive = kbVersion === 'v1' ? 'single' : mode;
                 return (
@@ -1081,34 +1074,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
             </p>
           </div>
 
-          <hr className={styles.fieldDivider} />
-
-          {/* Report Style */}
-          <div className={styles.field}>
-            <label className={styles.fieldLabel}>Report style</label>
-            <div className={styles.kbVersionGroup}>
-              <button
-                type="button"
-                className={`${styles.kbVersionBtn} ${reportStyle === 'trap' ? styles.kbVersionBtnActive : ''}`}
-                onClick={() => setReportStyle('trap')}
-                disabled={disabled}
-              >
-                By Trap
-              </button>
-              <button
-                type="button"
-                className={`${styles.kbVersionBtn} ${reportStyle === 'issues' ? styles.kbVersionBtnActive : ''}`}
-                onClick={() => setReportStyle('issues')}
-                disabled={disabled}
-              >
-                By Issue
-              </button>
-            </div>
-            <p className={styles.fieldHint}>
-              {reportStyle === 'trap' && 'Findings grouped by trap type. Best for understanding which patterns appear in your design.'}
-              {reportStyle === 'issues' && 'Findings grouped as individual issues, ranked by severity. Best for a prioritized action list.'}
-            </p>
-          </div>
+          {/* Report style toggle removed — the By-Issue report style is retired; every run is By Trap. */}
 
 
         </div>

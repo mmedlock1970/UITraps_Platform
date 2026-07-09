@@ -334,10 +334,11 @@ The knowledge base's G8 defines three report sections. Map them onto the tool fi
      • High      → critical_issues,  severity_label = "High"
      • Medium    → moderate_issues,  severity_label = "Medium"
      • Low       → minor_issues,     severity_label = "Low"
-   For each issue provide: `trap_name` (the root-cause trap, ALL CAPS, exact), `tenet`, `headline` (short, plain-language impact — 8–12 words), `location` (named element(s) and screen), `problem` (what is happening to the user and where, written for a reader with no framework knowledge; if other traps align to this issue name them here as the closing trap line, calling out root cause vs. consequence), `recommendation` (the fix direction; advisory language), `confidence`, and — WHEN the context lists more than one task — `task_context` (the ONE evaluated task this finding most affects, worded to match that task exactly; omit only for a finding that is genuinely general or spans all tasks).
+   For each issue provide: `trap_name` (the root-cause trap, ALL CAPS, exact), `tenet`, `headline` (short, plain-language impact — 8–12 words), `location` (named element(s) and screen), `problem` (what is happening to the user and where, written for a reader with no framework knowledge; if other traps align to this issue name them here as the closing trap line, calling out root cause vs. consequence), `recommendation` (the fix direction; advisory language), `confidence`, and — WHEN the context lists more than one task — `task` (the ONE evaluated task this finding most affects, copied EXACTLY from one of the task identifiers listed in the user turn, or "general" for a finding that spans all tasks; omit only when a single task is defined).
    `confidence` MUST be one of: "High", "Medium", "Low" (per the KB's Confidence scale). For any issue below High confidence, state its promotion path in `problem` or `recommendation`, per the KB's Severity & Confidence rule.
-   TASK GROUPING: when the context lists more than one task, set `task_context` on each finding to the ONE evaluated task it most affects, worded to match that task exactly. Omit `task_context` for a finding that is general or spans tasks. This only groups the report; it does not change severity or what you report. Write `problem` so the reader knows WHERE it occurs from the prose itself (name the element/screen) rather than relying on a separate field.
+   TASK GROUPING: when the context lists more than one task, set `task` on each finding to the ONE evaluated task it most affects, copied exactly from the task identifiers listed in the user turn (or "general" for a finding that spans tasks). This only groups the report; it does not change severity or what you report. Write `problem` so the reader knows WHERE it occurs from the prose itself (name the element/screen) rather than relying on a separate field.
    Order does not matter across arrays, but do not duplicate an issue across arrays.
+   ISSUE GROUPING (substrate → `issue_groups`): the findings above are the same issues decomposed one-trap-per-entry. ALSO emit the issue-first view in `issue_groups`: one entry per user-facing ISSUE, binding its co-occurring traps together per the KB's G3 composition — each trap tagged with its G3 `relationship` (root_cause / consequence / co_occurring / conditional / none) and its `tenet`, plus the shared `location`. A single-trap issue is one entry with one trap. This regroups the SAME traps you reported as findings: introduce no new traps and change no severities. It drives the report's synthesis section and is not rendered as its own cards.
 
 2) WORTH A CLOSER LOOK  →  potential_issues
    Each entry: `trap_name`, `tenet`, `location`, `observation`, `why_it_matters`, `why_uncertain`, `check`, `check_cost`, `implication_if_confirmed`, `implication_if_ruled_out`. Do NOT assign a confidence here.
@@ -448,6 +449,7 @@ Group your adjudicated findings into user-facing ISSUES per the KB's G3 composit
      Populate it per the KB's G3 decision procedure. Include a `consequence` trap in this list (it will be described in prose, not shown as its own row). Follow G3's composition conservatism — the smallest faithful set.
    • `description`: WRITE FOR THE EVALUATOR, PROBLEM-FIRST. Lead with what the user experiences and why. Reference traps only insofar as they help understand or fix the issue — never to teach the framework. Do NOT open with "This"; name the thing. No process commentary ("reported here as…", "designated…"). Hedged language. PRESERVE the KB's required report slots for each trap — name the specific element, state the mechanism, and carry any population/conditionality the KB requires — while writing in this voice.
    • `recommendation`: the fix direction, advisory language, proportionate to the product's broader purpose.
+   • `task` (ONLY when the context lists more than one task): the ONE evaluated task this issue most affects, copied EXACTLY from a task identifier given in the user turn, or "general" if it spans tasks. Omit when a single task is defined. This ONLY groups the report — it never changes severity, confidence, or what you report.
    • `regions` (optional): a LIST of bounding boxes, one per cited instance — each with `screen_index` (0-based, matching the SCREEN labels; 0 when one screen was provided), `x`/`y`/`width`/`height` (normalized 0–1, origin top-left), and a `caption`. One entry for a single location; one entry per screen for a cross-screen issue (G6 per-instance). Omit for absences or systemic issues.
 
 2) WORTH A CLOSER LOOK  →  potential_issues
@@ -1018,10 +1020,11 @@ USE ENVIRONMENT:
         _tasks_block = '\n'.join(_task_lines)
         _task_attribution = (
             "\n⚠️ MULTI-TASK ATTRIBUTION: Multiple tasks are defined above. "
-            "For every finding in critical_issues, moderate_issues, and minor_issues, "
-            "set the `task` field to one of these exact identifiers: "
+            "For every finding you report — each issue in `issues`, or each per-trap finding in "
+            "critical_issues / moderate_issues / minor_issues — set its `task` field to one of "
+            "these exact identifiers: "
             + ', '.join(f'"{tid}"' for tid in _task_ids)
-            + '. Or set it to "general" if the issue applies equally across all tasks or is not '
+            + '. Or set it to "general" if it applies equally across all tasks or is not '
             "task-specific. Copy the identifier exactly — do not paraphrase or use the full description."
         )
     else:

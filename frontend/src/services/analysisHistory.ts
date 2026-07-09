@@ -29,7 +29,7 @@ export interface FormSnapshot {
   pass1Model: 'sonnet' | 'haiku';
   thoroughMode: boolean;
   mode?: 'single' | 'twopass';
-  reportStyle?: 'trap' | 'issues';
+  reportStyle?: 'trap';
   lockedInputType: 'screenshot' | 'video' | 'flow_diagram' | null;
 }
 

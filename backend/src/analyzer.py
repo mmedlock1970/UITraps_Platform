@@ -33,6 +33,12 @@ _ANALYSIS_API_TIMEOUT_S = 600
 # output truncation or the model self-limiting. Revisit if longer flows are genuinely needed.
 MAX_FLOW_SCREENS = 6
 
+# Stream generations at/above this max_tokens ceiling. Streaming is the Anthropic-recommended path
+# for high-max_tokens calls: it keeps the HTTP connection active so a multi-minute generation can't
+# trip the idle timeout and force an SDK retry that re-runs the entire attempt. The final Message is
+# identical to messages.create()'s, so downstream parsing is unchanged.
+_STREAM_MIN_TOKENS = 8000
+
 # Public list price per 1M tokens (USD): (input, output, cache_write, cache_read).
 # Used only for the estimated-cost line in the report header — not billing.
 _MODEL_PRICING = {
@@ -159,9 +165,14 @@ class UITrapsAnalyzer:
         report_style: str = "trap",
         mode: str = "single",
         profile: str = "default",
+        frame_notice: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Analyze a UI design using the UI Tenets & Traps framework.
+
+        frame_notice: optional disclosure banner rendered at the top of the report (e.g. the
+        Figma flow path truncating a large file to the first MAX_FLOW_SCREENS frames). Reflects
+        reality in the report itself so a truncation-caused miss is never misread as a KB gap.
 
         Args:
             design_file: Path to image/video file or Figma URL
@@ -200,7 +211,13 @@ class UITrapsAnalyzer:
         if not is_valid_file:
             raise ValueError(f"Invalid file: {file_msg}")
 
-        # Self-serve (raw-KB) profile: single-pass, by-issue, rev6 template, with the harness's
+        # The By-Issue report style is retired — every run renders By Trap. Pinning here forces the
+        # by-trap schema/prompt/formatter for ALL profiles (including self-serve, 1D) and makes the
+        # legacy issue-mode branches below inert. The `report_style` param is kept for API/signature
+        # compatibility but no longer selects a rendering.
+        report_style = "trap"
+
+        # Self-serve (raw-KB) profile: single-pass, by-trap, rev6 template, with the harness's
         # minimal prompt + relaxed schema — regardless of KB lineage. This is an experimental
         # condition; the output contract is harness-provided and identical in kind to the other
         # conditions, and the minimal prompt is deliberately NOT strengthened.
@@ -244,6 +261,7 @@ class UITrapsAnalyzer:
                 page_context=page_context,
                 preloaded_images=preloaded_images,
                 report_style=report_style,
+                profile=profile,
             )
         elif mode == "twopass":
             # Guard: twopass is unsupported for legacy KBs — fall back to single, loudly.
@@ -279,12 +297,6 @@ class UITrapsAnalyzer:
 
         report["_design_file"] = design_file
         report["_design_files"] = _design_files
-        # Did the pass emit the issue-grouped structure directly (Option A / self-serve)?
-        _is_new_kb_issues = (
-            (is_new_kb(kb_version) or _self_serve) and report_style == "issues"
-            and report.get("_report_style") == "issues"
-        )
-
         # Token usage / estimated cost across all passes (read-only telemetry for the
         # report header). Each API pass attaches "_usage_last"; accrue and pop it here.
         _usage_total = {"input": 0, "output": 0, "cache_read": 0, "cache_creation": 0, "cost": 0.0}
@@ -309,19 +321,8 @@ class UITrapsAnalyzer:
             "user_id": user_id,
         }
 
-        issues_report = None
-        if _is_new_kb_issues:
-            # Option A: the adjudication already produced the issue-grouped report. Attach the
-            # verbatim definition to each aligned trap (from the manifest, case-insensitive),
-            # crop each issue's region, and hand it straight to the by-issue formatter.
-            self._inject_issue_trap_definitions(report, kb_version)
-            if _self_serve:
-                # The minimal self-serve prompt produces no coverage notes, so derive the
-                # "not reported" list = the KB's full trap set minus the traps named in issues.
-                self._derive_selfserve_coverage(report, kb_version)
-            self._crop_issues_report_regions(report, _design_files)
-            issues_report = report
-        elif _self_serve:
+        issues_report = None  # By-Issue rendering retired — the by-trap report is the sole output.
+        if _self_serve:
             # Self-serve BY-TRAP: the single call already produced the per-trap report. This is
             # the KB-only condition, so there is NO enrichment pass (that would be a second call
             # carrying legacy guidance) and NO legacy completeness backfill. The tool fills only
@@ -362,6 +363,17 @@ class UITrapsAnalyzer:
                          'potential_issues', 'flagged_for_human_review', 'incomplete_flow_findings'):
                 report[_opt] = [f for f in report[_opt] if isinstance(f, dict)]
 
+            # Retain the additive issue-level substrate (issue_groups, KB ledger 22): normalize to
+            # a list of dicts and canonicalize each bound trap's G3 relationship. This renders
+            # nothing in the report body; the Emergent Patterns synthesis section reads it.
+            _ig = report.get("issue_groups")
+            report["issue_groups"] = [g for g in _ig if isinstance(g, dict)] if isinstance(_ig, list) else []
+            for _g in report["issue_groups"]:
+                _gt = _g.get("traps")
+                _g["traps"] = [t for t in _gt if isinstance(t, dict)] if isinstance(_gt, list) else []
+                for _t in _g["traps"]:
+                    _t["relationship"] = normalize_relationship(_t.get("relationship"))
+
             # Guarantee report completeness across KB versions: backfill the per-trap
             # "Could Not Evaluate" breakdown. This makes v1 and v2 reports symmetric.
             self._normalize_report_completeness(report, kb_version=kb_version)
@@ -386,6 +398,7 @@ class UITrapsAnalyzer:
             'mode': mode,
             'profile': profile,
             'truncated': _truncated,
+            'frame_notice': frame_notice,
             'usage': dict(_usage_total),
         }
         metadata['usage'] = dict(_usage_total)
@@ -397,24 +410,16 @@ class UITrapsAnalyzer:
             # The output contract (tool schema + minimal instruction) is harness-provided and
             # identical in kind across all conditions — the KB material supplies content, not
             # the output shape. Recorded so comparative runs can attest the contract was fixed.
-            # Pivot on "issues" (as build_system_prompt / _pass1 / _is_new_kb_issues all do), so
-            # the recorded tool name matches the tool the call actually used for any report_style.
-            _ss_tool = 'ui_issues_report' if report_style == 'issues' else 'ui_analysis_report'
+            _ss_tool = 'ui_analysis_report'  # By-Trap is the sole self-serve output (By-Issue retired).
             metadata['output_contract'] = f'harness-provided (self-serve): minimal instruction + {_ss_tool} schema; KB injected verbatim, no evaluation guidance'
         if _truncated:
             logger.error("[UITraps] Analysis returned with truncated output (max_tokens) — report is incomplete.")
         if _twopass_meta is not None:
             metadata['twopass'] = _twopass_meta
-        if _is_new_kb_issues:
-            markdown_report = format_new_kb_issues_markdown(issues_report)
-        else:
-            markdown_report = format_report_as_markdown(report, user_context, kb_version=kb_version)
-        if issues_report is not None and format_issues_report_as_html is not None:
-            html_report = format_issues_report_as_html(issues_report, user_context, analysis_settings=_analysis_settings)
-        elif (report_style == "trap" and (is_new_kb(kb_version) or _self_serve)
-              and format_bytrap_report_as_html is not None):
-            # rev6 BY-TRAP report (v2.1 Prompting+KB and v1.0 KB-only). Trap-shaped report dict
-            # (critical/moderate/minor); the public entry escapes settings at the boundary.
+        markdown_report = format_report_as_markdown(report, user_context, kb_version=kb_version)
+        # rev6 BY-TRAP report for new-KB / self-serve; the legacy formatter is the fallback for any
+        # other lineage. The public entry escapes settings at the boundary.
+        if (is_new_kb(kb_version) or _self_serve) and format_bytrap_report_as_html is not None:
             html_report = format_bytrap_report_as_html(report, user_context, analysis_settings=_analysis_settings)
         else:
             html_report = format_report_as_html(report, user_context, analysis_settings=_analysis_settings)
@@ -428,8 +433,8 @@ class UITrapsAnalyzer:
             _kb_hash = self._raw_kb_file_sha(kb_version) if _self_serve else self._current_kb_hash(kb_version)
             metadata['kb_hash'] = _kb_hash
             # Count issues whenever an issues report was produced (new-KB or legacy synthesis).
-            _n_issues = len(issues_report.get('issues', [])) if isinstance(issues_report, dict) else None
-            _n_findings = None if _is_new_kb_issues else sum(
+            _n_issues = None
+            _n_findings = sum(
                 len(report.get(f, [])) for f in ('critical_issues', 'moderate_issues', 'minor_issues'))
             run_logger.log_run({
                 "timestamp": metadata.get("timestamp"),
@@ -552,79 +557,25 @@ class UITrapsAnalyzer:
             print(f"[UITraps] Region crop skipped: {crop_err}")
         return None
 
-    def _crop_issues_report_regions(self, report: Dict[str, Any], image_paths) -> None:
-        """By-Issue: crop each finding's regions[] against the screen each box names →
-        region['image_b64']. `image_paths` may be a single path or a list of screen paths."""
-        if isinstance(image_paths, str):
-            image_paths = [image_paths]
-        findings = [f for f in (report.get('issues') or []) if isinstance(f, dict)]
-        self._crop_findings_regions(findings, image_paths)
-
-    def _inject_issue_trap_definitions(self, report: Dict[str, Any], kb_version: str) -> None:
-        """Attach each aligned trap's verbatim definition (from the pack manifest) to the
-        by-issue structure — case-insensitively, since report names are ALL-CAPS and the
-        manifest keys are Title-Case. The model does not transcribe defs; the tool owns them.
-
-        Legacy KBs (v1/v2, e.g. self-serve) have no manifest of their own; fall back to the
-        same-lineage new KB's manifest (v1→v1.1, v2→v2.1), which carries the identical trap
-        set's verbatim definitions."""
-        _def_version = {"v1": "v1.1", "v2": "v2.1"}.get(kb_version, kb_version)
-        try:
-            manifest = pack_generator.ensure_current(_def_version)
-            by_upper = {k.upper(): v for k, v in (manifest.get('verbatim_definitions') or {}).items()}
-        except Exception as e:
-            print(f"[UITraps] verbatim-definition injection skipped: {e}")
-            return
-        for issue in report.get('issues', []):
-            if not isinstance(issue, dict):
-                continue
-            for t in issue.get('traps', []):
-                if isinstance(t, dict) and t.get('trap_name'):
-                    d = by_upper.get(str(t['trap_name']).upper())
-                    if d:
-                        t['definition'] = d
-
-    def _derive_selfserve_coverage(self, report: Dict[str, Any], kb_version: str) -> None:
-        """Self-serve is never shown the coverage vocabulary, so coverage is derived here: every
-        trap in the KB's trap set that was NOT named in an issue. This ALWAYS replaces any
-        coverage the model may have emitted — the derived complement is the only coverage the
-        KB-only condition reports. Each entry is marked not_present ('Did not find' bucket)."""
-        try:
-            from .schema import _valid_trap_names
-        except ImportError:
-            from schema import _valid_trap_names
-        _nz = lambda s: re.sub(r"[^a-z0-9]", "", (s or "").lower())
-        reported = set()
-        for issue in report.get("issues", []):
-            if isinstance(issue, dict):
-                for t in issue.get("traps", []):
-                    if isinstance(t, dict) and t.get("trap_name"):
-                        reported.add(_nz(t["trap_name"]))
-        all_traps = _valid_trap_names(kb_version) or []
-        report["traps_checked_not_found"] = [
-            {"trap_name": name, "coverage_status": "not_present"}
-            for name in all_traps if _nz(name) not in reported
-        ]
-
     def _fill_selfserve_trap_tenets(self, report: Dict[str, Any]) -> None:
-        """The KB-only By-Trap prompt never asks the model to name a tenet, so derive each
-        finding's tenet from its trap name (canonical map) for the pill — presentation only,
-        tool-side, does not touch the model's reasoning. Mirrors the definition/tenet the
-        by-issue formatter derives. Only fills a tenet that is missing or blank."""
+        """Self-serve BY-TRAP: the bare KB-only schema does not require `tenet`, but the by-trap
+        formatter needs it for each finding's pill. Derive a missing/blank tenet from the trap
+        name (the coached formatters get it from the model). Fills only when absent; leaves any
+        tenet the model did provide untouched. Tolerates malformed (non-dict) findings."""
         try:
             from .formatters import _tenet_for
         except ImportError:
             from formatters import _tenet_for
-        for _arr in ('critical_issues', 'moderate_issues', 'minor_issues'):
-            for f in report.get(_arr, []):
-                if isinstance(f, dict) and f.get('trap_name') and not (f.get('tenet') or '').strip():
-                    _t = _tenet_for(f['trap_name'])
+        for _sev in ('critical_issues', 'moderate_issues', 'minor_issues'):
+            for _f in (report.get(_sev) or []):
+                if isinstance(_f, dict) and not (_f.get('tenet') or '').strip():
+                    _t = _tenet_for(_f.get('trap_name', ''))
                     if _t:
-                        f['tenet'] = _t  # UPPER, matching the coached (v2.1) trap schema's enum
+                        _f['tenet'] = _t
 
     def _derive_selfserve_trap_coverage(self, report: Dict[str, Any], kb_version: str) -> None:
-        """By-Trap twin of _derive_selfserve_coverage: coverage = every trap in the KB's set
-        NOT named in a critical/moderate/minor finding. ALWAYS replaces any coverage the model
+        """By-Trap self-serve coverage: coverage = every trap in the KB's set NOT named in a
+        critical/moderate/minor finding. ALWAYS replaces any coverage the model
         emitted (the KB-only condition is never shown coverage vocabulary). Marked not_present
         ('Did not find')."""
         try:
@@ -678,224 +629,97 @@ class UITrapsAnalyzer:
         except Exception:
             return None
 
-    @staticmethod
-    def _merge_reports(reports: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Merge multiple tenet/sub-tenet Pass 1 reports into one deduplicated report."""
-        try:
-            from .formatters import _normalize_trap_name
-        except ImportError:
-            from formatters import _normalize_trap_name
-
-        merged: Dict[str, Any] = {
-            'critical_issues': [],
-            'moderate_issues': [],
-            'minor_issues': [],
-            'positive_observations': [],
-            'potential_issues': [],
-            'traps_checked_not_found': [],
-            'flagged_for_human_review': [],
-            'incomplete_flow_findings': [],
-            'bugs_detected': [],
-        }
-
-        seen_traps: set = set()
-        for report in reports:
-            for severity in ('critical_issues', 'moderate_issues', 'minor_issues'):
-                for issue in report.get(severity) or []:
-                    norm = _normalize_trap_name(issue.get('trap_name', '') or '')
-                    if norm and norm not in seen_traps:
-                        seen_traps.add(norm)
-                        merged[severity].append(issue)
-
-        seen_pos: set = set()
-        for report in reports:
-            for pos in report.get('positive_observations') or []:
-                if pos and pos not in seen_pos:
-                    seen_pos.add(pos)
-                    merged['positive_observations'].append(pos)
-
-        # Merge traps_checked_not_found across all sub-reports, deduplicating by trap_name
-        seen_tcnf: set = set()
-        for report in reports:
-            for item in report.get('traps_checked_not_found') or []:
-                if isinstance(item, dict):
-                    norm = _normalize_trap_name(item.get('trap_name', '') or '')
-                    if norm and norm not in seen_traps and norm not in seen_tcnf:
-                        seen_tcnf.add(norm)
-                        merged['traps_checked_not_found'].append(item)
-                elif isinstance(item, str) and item.strip():
-                    norm = _normalize_trap_name(item)
-                    if norm and norm not in seen_traps and norm not in seen_tcnf:
-                        seen_tcnf.add(norm)
-                        merged['traps_checked_not_found'].append({'trap_name': item, 'testable': True})
-
-        for field in ('potential_issues', 'flagged_for_human_review',
-                      'incomplete_flow_findings', 'bugs_detected'):
-            for report in reports:
-                items = report.get(field) or []
-                if items:
-                    merged[field] = items
-                    break
-
-        n_crit = len(merged['critical_issues'])
-        n_mod = len(merged['moderate_issues'])
-        n_min = len(merged['minor_issues'])
-        total = n_crit + n_mod + n_min
-
-        if total == 0:
-            merged['summary_headline'] = "No UI Traps detected"
-            merged['summary_narrative'] = (
-                "Thorough tenet-by-tenet analysis found no usability issues."
-            )
-        else:
-            parts = (
-                ([f"{n_crit} critical"] if n_crit else []) +
-                ([f"{n_mod} moderate"] if n_mod else []) +
-                ([f"{n_min} minor"] if n_min else [])
-            )
-            merged['summary_headline'] = (
-                f"{total} UI Trap{'s' if total != 1 else ''} found: {', '.join(parts)}"
-            )
-            merged['summary_narrative'] = (
-                f"Thorough tenet-by-tenet analysis identified {total} "
-                f"issue{'s' if total != 1 else ''} across the full framework "
-                f"({', '.join(parts)})."
-            )
-
-        return merged
-
     def analyze_flow_diagram(
         self,
         frames: List[Dict],
-        flow_map: Dict,
         user_context: Dict[str, str],
         timeout: int = 120,
-        kb_version: str = 'v2',
-        verbosity: str = 'standard',
+        kb_version: str = "v2.1",
+        verbosity: str = "standard",
         pass1_model: Optional[str] = None,
+        profile: str = "default",
+        report_style: str = "trap",
+        mode: str = "single",
+        chat_context: Optional[str] = None,
+        page_context: Optional[Dict[str, Any]] = None,
+        total_frames: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
-        Analyze Figma frames with flow-aware context.
+        Analyze Figma frames as ONE cross-screen flow — full parity with the image path.
 
-        Always runs both passes and merges with deduplication:
-        - Screen pass: one _pass1 per frame with per-frame flow context.
-          Produces per-screen findings with region crops.
-        - Flow pass: single _pass1 on first frame with full flow summary.
-          Catches journey-level traps that span multiple screens.
-        Screen findings are processed first so they win deduplication and
-        retain their region crops when the same trap is found by both passes.
+        The exported frames (already capped/ordered by the caller) are handed to analyze_design
+        as a single multi-screen artifact (design_file + additional_design_files), so the whole
+        flow goes to the model in ONE call with [SCREEN i] labels and the model reasons across
+        screens (KB G7) exactly as a multi-screenshot run does — NOT N stitched per-frame
+        reports. This delegates to the shared evaluation engine, so every config axis is honored
+        identically: profile (coaching lock: v1 → self-serve, so no deprecation-guard trip),
+        report_style (by-trap/by-issue), mode (one-pass via _pass1_issues_retry → _pass1 vs
+        two-pass via _twopass), verbosity, model, chat/page context, the MAX_FLOW_SCREENS
+        ceiling, and the rev6 renderer. There is no flow-specific prompt, schema, pass structure,
+        text-injected flow context, or formatter — the previous per-frame-loop + separate
+        flow-pass + _merge_reports + legacy-enrichment architecture is retired.
         """
-        try:
-            from .prompts import build_flow_context_section
-        except ImportError:
-            from prompts import build_flow_context_section
-
-        from concurrent.futures import ThreadPoolExecutor
-
         valid_frames = [f for f in frames if f.get('image_path')]
         if not valid_frames:
             raise ValueError("No exportable frames found")
-
-        # Build per-frame contexts for screen pass
-        screen_tasks: List[tuple] = []
-        for frame in valid_frames:
-            ctx = dict(user_context)
-            per_frame_ctx = flow_map.get('per_frame', {}).get(frame['id'])
-            if per_frame_ctx:
-                flow_section = build_flow_context_section(
-                    flow_context=per_frame_ctx, mode='screen'
-                )
-                existing_extra = ctx.get('extra_context', '')
-                ctx['extra_context'] = (
-                    flow_section
-                    + ('\n' + existing_extra if existing_extra else '')
-                ).strip()
-            screen_tasks.append((frame, ctx))
-
-        # Build flow pass context
-        flow_ctx = dict(user_context)
-        flow_section = build_flow_context_section(
-            flow_summary=flow_map.get('summary', ''),
-            mode='flow',
+        _paths = [f['image_path'] for f in valid_frames]
+        # Truncate-with-notice: the caller exports/passes only the first MAX_FLOW_SCREENS frames
+        # (Figma document order). When the source file had more, disclose BOTH counts in the
+        # report so a trap that lived on an un-analyzed frame reads as a truncation artifact, not
+        # a KB miss. total_frames is the full pre-truncation count (analyze_figma_file.total_frames).
+        _analyzed = len(valid_frames)
+        _frame_notice = None
+        if total_frames and total_frames > _analyzed:
+            _skipped = total_frames - _analyzed
+            _frame_notice = (
+                f"Analyzed {_analyzed} of {total_frames} frames in this file; "
+                f"{_skipped} frame{'s' if _skipped != 1 else ''} {'were' if _skipped != 1 else 'was'} "
+                f"not analyzed."
+            )
+        return self.analyze_design(
+            design_file=_paths[0],
+            additional_design_files=_paths[1:],
+            user_context=user_context,
+            timeout=timeout,
+            chat_context=chat_context,
+            page_context=page_context,
+            kb_version=kb_version,
+            verbosity=verbosity,
+            pass1_model=pass1_model,
+            report_style=report_style,
+            mode=mode,
+            profile=profile,
+            frame_notice=_frame_notice,
         )
-        frames_list = '\n'.join(f"  - {f['name']}" for f in valid_frames)
-        existing_extra = flow_ctx.get('extra_context', '')
-        flow_ctx['extra_context'] = (
-            flow_section
-            + f"\nFrames included in this flow:\n{frames_list}"
-            + ('\n' + existing_extra if existing_extra else '')
-        ).strip()
 
-        def _run_screen(args: tuple) -> Dict[str, Any]:
-            frame, ctx = args
-            report = self._pass1(
-                design_file=frame['image_path'],
-                user_context=ctx,
-                timeout=timeout,
-                kb_version=kb_version,
-                verbosity=verbosity,
-                pass1_model=pass1_model,
-            )
-            self._crop_issue_regions(report, frame['image_path'])
-            return report
+    def _create_message(self, **kwargs):
+        """Call the Messages API, STREAMING when the requested max_tokens is large.
 
-        def _run_flow(_: None = None) -> Dict[str, Any]:
-            report = self._pass1(
-                design_file=valid_frames[0]['image_path'],
-                user_context=flow_ctx,
-                timeout=timeout,
-                kb_version=kb_version,
-                verbosity=verbosity,
-                pass1_model=pass1_model,
-            )
-            self._crop_issue_regions(report, valid_frames[0]['image_path'])
-            return report
-
-        # Run all passes in parallel — screen pass tasks + flow pass task
-        n_workers = len(screen_tasks) + 1
-        with ThreadPoolExecutor(max_workers=n_workers) as executor:
-            screen_futures = [executor.submit(_run_screen, task) for task in screen_tasks]
-            flow_future = executor.submit(_run_flow)
-            # Collect screen results in original frame order
-            screen_reports = [f.result() for f in screen_futures]
-            flow_report = flow_future.result()
-
-        # Screen findings first so they win dedup over flow findings
-        merged = self._merge_reports(screen_reports + [flow_report])
-
-        for _opt in ['critical_issues', 'moderate_issues', 'minor_issues',
-                     'positive_observations', 'potential_issues', 'traps_checked_not_found',
-                     'flagged_for_human_review', 'incomplete_flow_findings']:
-            if not isinstance(merged.get(_opt), list):
-                merged[_opt] = []
-
-        self._normalize_report_completeness(merged, kb_version=kb_version)
-
-        # Save region crops before enrichment — Pass 2 rewrites findings from scratch and drops
-        # regions[] (incl. their image_b64 crops). Keyed by (trap_name, location) so we can
-        # restore them after enrichment.
-        _saved_crops: dict = {}
-        for _sev in ('critical_issues', 'moderate_issues', 'minor_issues'):
-            for _issue in merged.get(_sev, []):
-                if _issue.get('regions'):
-                    _key = (_issue.get('trap_name', ''), _issue.get('location', ''))
-                    _saved_crops[_key] = _issue['regions']
-
-        try:
-            merged = self._enrich_report(merged, timeout=timeout, kb_version=kb_version, verbosity=verbosity)
-        except Exception as e:
-            print(f"[UITraps] Flow analysis Pass 2 enrichment skipped (non-fatal): {e}")
-
-        # Restore crops that Pass 2 stripped
-        if _saved_crops:
-            for _sev in ('critical_issues', 'moderate_issues', 'minor_issues'):
-                for _issue in merged.get(_sev, []):
-                    if not _issue.get('regions'):
-                        _key = (_issue.get('trap_name', ''), _issue.get('location', ''))
-                        if _key in _saved_crops:
-                            _issue['regions'] = _saved_crops[_key]
-
-        return merged
+        Streaming keeps the connection active so a long generation can't trip the idle timeout and
+        force an SDK retry that re-runs the whole attempt. `stream().get_final_message()` returns the
+        same Message object `create()` would, so callers read `.content`/`.stop_reason`/`.usage`
+        unchanged. Falls back to `create()` when max_tokens is small, when the client's `stream` is
+        not a real context manager (e.g. a test Mock), or if streaming rejects a kwarg — so behaviour
+        (and the create-mocking test suite) degrades safely to the previous path.
+        """
+        if kwargs.get("max_tokens", 0) >= _STREAM_MIN_TOKENS:
+            _stream = getattr(self.client.messages, "stream", None)
+            if callable(_stream):
+                # Guard ONLY the construction + capability probe. Once we've decided to stream, a
+                # failure inside get_final_message() must propagate — NOT fall through to create(),
+                # which would re-run the whole (multi-minute, billed) generation.
+                _cm = None
+                try:
+                    _cm = _stream(**kwargs)
+                    # Real SDK yields a context manager; a bare Mock's type has no __enter__, so
+                    # tests (and a stream() that rejects a kwarg) fall through to create().
+                    _streamable = getattr(type(_cm), "__enter__", None) is not None
+                except (TypeError, AttributeError):
+                    _streamable = False
+                if _streamable:
+                    with _cm as _s:
+                        return _s.get_final_message()
+        return self.client.messages.create(**kwargs)
 
     def _pass1(
         self,
@@ -1016,7 +840,7 @@ class UITrapsAnalyzer:
             tool_desc = "Submit the complete UI Tenets & Traps analysis report"
         _t_call = time.time()
         try:
-            response = self.client.messages.create(
+            response = self._create_message(
                 model=effective_model,
                 max_tokens=pass1_max_tokens,
                 temperature=0,
@@ -1112,10 +936,15 @@ class UITrapsAnalyzer:
                             _t["relationship"] = normalize_relationship(_t.get("relationship"))
             else:
                 report = tool_use_block.input
-                for field in ['summary_headline', 'summary_narrative',
-                              'critical_issues', 'moderate_issues', 'minor_issues']:
-                    if field not in report:
-                        raise ValueError(f"Missing required field in response: {field}")
+                # Truncation (stop_reason == max_tokens) can return a PARTIAL dict missing later
+                # required fields. Coerce missing keys to safe defaults instead of raising — the
+                # by-issue path already tolerates this, and the _truncated banner marks the report
+                # incomplete downstream, so we degrade gracefully rather than 500 on exactly the
+                # runs that hit the length ceiling.
+                for field in ['summary_headline', 'summary_narrative']:
+                    report.setdefault(field, '')
+                for field in ['critical_issues', 'moderate_issues', 'minor_issues']:
+                    report.setdefault(field, [])
                 if not isinstance(report.get('summary_headline'), str):
                     report['summary_headline'] = ''
                 if not isinstance(report.get('summary_narrative'), str):
@@ -1209,6 +1038,7 @@ class UITrapsAnalyzer:
         preloaded_image: Optional[Dict[str, Any]] = None,
         preloaded_images: Optional[list] = None,
         report_style: str = "trap",
+        profile: str = "default",
     ) -> Dict[str, Any]:
         """
         Two-pass analysis for the new (v2.1-lineage) KBs.
@@ -1288,7 +1118,7 @@ class UITrapsAnalyzer:
         _detection_max_tokens = min(4000 + max(0, _n_screens - 1) * 1000, 8000)
         _t_det = time.time()
         try:
-            det_response = self.client.messages.create(
+            det_response = self._create_message(
                 model=effective_model,
                 max_tokens=_detection_max_tokens,
                 temperature=0,
@@ -1356,7 +1186,7 @@ class UITrapsAnalyzer:
             use_caching=self.use_caching, version=kb_version, image_count=_n_screens,
             training_override=core_pack,
             extra_training=(chunks_text if chunks_text.strip() else None),
-            mode="report", report_style=report_style,
+            mode="report", report_style=report_style, profile=profile,
         )
         report = self._pass1_issues_retry(
             design_file=design_file,
@@ -1465,7 +1295,7 @@ class UITrapsAnalyzer:
         print(f"[UITraps] Pass 2: enriching {len(found_trap_names)} trap(s): {', '.join(found_trap_names)}")
 
         pass2_max_tokens = 2200 if verbosity == "brief" else 3500
-        response = self.client.messages.create(
+        response = self._create_message(
             model=self.enrich_model,
             max_tokens=pass2_max_tokens,
             temperature=0,

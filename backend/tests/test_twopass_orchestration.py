@@ -69,7 +69,9 @@ def test_twopass_orchestration_end_to_end(analyzer, monkeypatch):
             return _text_response(detection_text)
         return _tool_response(dict(VALID_REPORT))
 
-    monkeypatch.setattr(analyzer.client.messages, "create", fake_create)
+    # Patch the analyzer's model-call seam (which routes create vs stream) so the test never hits
+    # the real API regardless of the max_tokens streaming threshold.
+    monkeypatch.setattr(analyzer, "_create_message", fake_create)
 
     fake_image = {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "x"}}
     report = analyzer._twopass(
@@ -126,7 +128,9 @@ def test_twopass_zero_candidates_still_adjudicates(analyzer, monkeypatch):
             return _text_response("NONE")
         return _tool_response(dict(VALID_REPORT))
 
-    monkeypatch.setattr(analyzer.client.messages, "create", fake_create)
+    # Patch the analyzer's model-call seam (which routes create vs stream) so the test never hits
+    # the real API regardless of the max_tokens streaming threshold.
+    monkeypatch.setattr(analyzer, "_create_message", fake_create)
     fake_image = {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "x"}}
     report = analyzer._twopass(
         design_file="dummy.png",

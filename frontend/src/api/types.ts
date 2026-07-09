@@ -134,7 +134,7 @@ export interface UserContext {
   thorough_mode?: boolean;
   mode?: 'single' | 'twopass';
   profile?: Profile;
-  report_style?: 'trap' | 'issues';
+  report_style?: 'trap';
   input_type?: 'screenshot' | 'video' | 'flow_diagram';
   flow_mode?: 'screen' | 'flow';
   figma_url?: string;

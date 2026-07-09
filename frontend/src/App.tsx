@@ -137,9 +137,9 @@ export const App: React.FC = () => {
     const p = _params.get('theme');
     if (p === 'dark') return 'dark';
     if (p === 'light') return 'light';
-    // Fall back to OS preference so the iframe inherits the user's system theme
-    // (which typically matches the WordPress site theme)
-    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    // Default to light on open when no explicit theme is provided. A ?theme= URL param or a
+    // postMessage({type:'uitraps-theme'}) still overrides (e.g. the WordPress host forcing dark).
+    return 'light';
   });
   const [externalTheme, setExternalTheme] = useState(() => _params.has('theme'));
   const [externalMode] = useState(() => _params.has('mode'));

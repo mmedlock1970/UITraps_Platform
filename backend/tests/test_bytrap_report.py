@@ -1,8 +1,9 @@
 """
 rev6 BY-TRAP report wiring — the live dispatch renders `_format_new_kb_bytrap_html` for a
 trap-style analysis on a new KB (v2.1 Prompting+KB) or the self-serve profile (v1.0 KB-only),
-through a public entry that escapes settings. Task grouping populates from findings'
-task_context (v2.1 only); the KB-only bare schema omits it and stays flat.
+through a public entry that escapes settings. Task grouping reads each finding's `task` (the
+field the live model actually fills, per the user-turn attribution) with `task_context` as a
+tolerated alias; the KB-only bare schema omits both and stays flat.
 """
 import json
 from unittest.mock import Mock
@@ -10,7 +11,7 @@ from unittest.mock import Mock
 import pytest
 from PIL import Image
 
-from src.formatters import format_bytrap_report_as_html
+from src.formatters import format_bytrap_report_as_html, format_issues_report_as_html
 from src.schema import get_ui_analysis_schema
 from src.analyzer import UITrapsAnalyzer
 
@@ -37,19 +38,62 @@ def test_bytrap_entry_renders_rev6_and_escapes_settings():
         # a hostile settings value must be escaped, not injected
         analysis_settings={"kb_version": "v2.1", "report_style": "trap", "verbosity": "<script>x</script>"},
     )
-    assert "By Trap view" in html and "trap-card-img" in html  # rev6 chrome
+    assert "UI Traps — By Trap" in html and "trap-card-img" in html  # rev6 chrome
     assert "<script>x</script>" not in html  # escaped at the boundary
     assert "UNCOMPREHENDED ELEMENT" in html and "DISTRACTION" in html
 
 
+def _multi_task_uc():
+    return {"design_name": "X", "task_list": [{"description": "Find kids shows"},
+                                              {"description": "Find new releases"}]}
+
+
 def test_bytrap_entry_groups_by_task_when_task_context_present():
-    # user_context has >1 task and a finding carries task_context → task grouping appears
-    uc = {"design_name": "X", "task_list": [{"description": "Find kids shows"},
-                                            {"description": "Find new releases"}]}
+    # Alias path: a finding carrying `task_context` still groups (back-compat).
+    uc = _multi_task_uc()
     html = format_bytrap_report_as_html(_trap_report(), uc, {"kb_version": "v2.1", "report_style": "trap"})
     assert "task-group-label" in html
     assert "Find kids shows" in html          # the task heading
     assert "General" in html                   # the untagged DISTRACTION finding
+
+
+def test_bytrap_groups_by_task_field_the_model_emits():
+    # REGRESSION: the live model fills `task` (not `task_context`). Grouping must fire on it —
+    # this is the exact real-world path that previously fell back to a flat list.
+    rep = _trap_report()
+    rep["critical_issues"][0].pop("task_context", None)
+    rep["critical_issues"][0]["task"] = "Find kids shows"
+    html = format_bytrap_report_as_html(rep, _multi_task_uc(), {"kb_version": "v2.1", "report_style": "trap"})
+    assert "task-group-label" in html
+    assert "Find kids shows" in html          # the task heading
+    assert "General" in html                   # the untagged DISTRACTION finding
+
+
+def _issues_report():
+    return {
+        "summary_headline": "h", "summary_narrative": "n",
+        "issues": [
+            {"severity_label": "High", "confidence": "High", "headline": "Unlabeled icon",
+             "problem": "A bare glyph in the toolbar.", "recommendation": "Label it",
+             "task": "Find kids shows",
+             "traps": [{"trap_name": "UNCOMPREHENDED ELEMENT", "tenet": "UNDERSTANDABLE",
+                        "relationship": "root_cause"}]},
+            {"severity_label": "Medium", "confidence": "High", "headline": "Hero autoplays",
+             "problem": "The hero pulls focus.", "recommendation": "Pause it",
+             "traps": [{"trap_name": "DISTRACTION", "tenet": "UNDERSTANDABLE",
+                        "relationship": "root_cause"}]},
+        ],
+        "potential_issues": [], "traps_checked_not_found": [], "positive_observations": [],
+    }
+
+
+def test_byissue_groups_by_task_field_the_model_emits():
+    # REGRESSION (By-Issue counterpart): issue carrying `task` groups; untagged → General.
+    html = format_issues_report_as_html(_issues_report(), _multi_task_uc(),
+                                        {"kb_version": "v2.1", "report_style": "issues"})
+    assert "task-group-label" in html
+    assert "Find kids shows" in html          # the task heading
+    assert "General" in html                   # the untagged DISTRACTION issue
 
 
 # ── schema ──────────────────────────────────────────────────────────────────
@@ -89,6 +133,6 @@ def _run(kb, profile, mode, tmp_path):
 @pytest.mark.parametrize("kb,profile,mode", [("v2.1", "default", "twopass"), ("v1", "self-serve", "single")])
 def test_live_bytrap_renders_rev6_not_legacy(kb, profile, mode, tmp_path):
     html = _run(kb, profile, mode, tmp_path)["html"]
-    assert "By Trap view" in html and "trap-card-img" in html   # rev6
+    assert "UI Traps — By Trap" in html and "trap-card-img" in html   # rev6
     assert "FINDING 1" not in html                               # not the legacy formatter
 

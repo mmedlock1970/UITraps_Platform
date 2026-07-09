@@ -693,102 +693,6 @@ def format_report_as_markdown(report: Dict[str, Any], user_context: Dict[str, st
     return "\n".join(md)
 
 
-def _build_user_issues_html(report: Dict[str, Any], user_context: Dict[str, str] = None) -> str:
-    """Build the General Issues section HTML."""
-    issues = report.get('user_issues', [])
-    if not issues:
-        return ""
-
-    impact_order = {"high": 0, "medium": 1, "low": 2}
-
-    def _render_issue_card(issue, html):
-        impact = issue.get('impact_level', 'low')
-        html.append(f"<div class='user-issue-card impact-{impact}'>")
-        html.append("<div class='user-issue-header'>")
-        html.append(f"<span class='impact-badge {impact}'>{impact.upper()} IMPACT</span>")
-        html.append(f"<h3 class='user-issue-title'>{issue.get('issue_title', '')}</h3>")
-        html.append("</div>")
-        html.append(f"<p>{issue.get('issue_description', '')}</p>")
-        traps = issue.get('contributing_traps', [])
-        if traps:
-            html.append("<div class='contributing-traps'>")
-            html.append("<span class='traps-label'>Underlying traps:</span>")
-            for t in traps:
-                sev = t.get('severity', 'minor')
-                name = t.get('trap_name', '')
-                contrib = t.get('contribution', '')
-                html.append(f"<span class='trap-pill {sev}' title='{contrib}'>{name}</span>")
-            html.append("</div>")
-        recs = issue.get('recommendations', [])
-        if recs:
-            html.append("<div class='user-issue-recs'>")
-            html.append("<strong>How to fix:</strong>")
-            html.append("<ul>")
-            for rec in recs:
-                html.append(f"<li>{rec}</li>")
-            html.append("</ul>")
-            html.append("</div>")
-        html.append("</div>")
-
-    raw_tasks = user_context.get('tasks', 'N/A') if user_context else 'N/A'
-    task_list = parse_tasks(raw_tasks)
-    multi_task = len(task_list) > 1 and task_list != ['N/A']
-
-    html = ["<div class='user-issues-section'>"]
-    html.append("<h2>General Issues</h2>")
-    html.append("<p class='user-issues-intro'>General issues are broad problems experienced by users. Each issue may stem from one or more specific traps. The traps listed under each issue identify the root causes.</p>")
-
-    if multi_task:
-        def _best_task_match(tc, tasks):
-            if not tc:
-                return None
-            tc_lower = tc.lower()
-            for t in tasks:
-                if tc_lower == t.lower() or tc_lower in t.lower() or t.lower() in tc_lower:
-                    return t
-            return tc
-
-        task_buckets = {t: [] for t in task_list}
-        general_bucket = []
-        other_buckets = {}
-        for issue in issues:
-            tc = issue.get('task_context', '').strip()
-            matched = _best_task_match(tc, task_list)
-            if matched is None:
-                general_bucket.append(issue)
-            elif matched in task_buckets:
-                task_buckets[matched].append(issue)
-            else:
-                other_buckets.setdefault(matched, []).append(issue)
-
-        for task in task_list:
-            bucket = task_buckets[task]
-            if bucket:
-                bucket = sorted(bucket, key=lambda x: impact_order.get(x.get('impact_level', 'low'), 3))
-                html.append(f"<h3 class='task-group-header'>Task: {task}</h3>")
-                for issue in bucket:
-                    _render_issue_card(issue, html)
-
-        for label, bucket in other_buckets.items():
-            bucket = sorted(bucket, key=lambda x: impact_order.get(x.get('impact_level', 'low'), 3))
-            html.append(f"<h3 class='task-group-header'>Task: {label}</h3>")
-            for issue in bucket:
-                _render_issue_card(issue, html)
-
-        if general_bucket:
-            general_bucket = sorted(general_bucket, key=lambda x: impact_order.get(x.get('impact_level', 'low'), 3))
-            html.append("<h3 class='task-group-header'>General (applies to all tasks)</h3>")
-            for issue in general_bucket:
-                _render_issue_card(issue, html)
-    else:
-        issues = sorted(issues, key=lambda x: impact_order.get(x.get('impact_level', 'low'), 3))
-        for issue in issues:
-            _render_issue_card(issue, html)
-
-    html.append("</div>")
-    return "\n".join(html)
-
-
 def get_report_base_css() -> str:
     """Return the shared CSS used by all report HTML pages."""
     return """
@@ -3249,6 +3153,57 @@ _TENET_PILL = {
     "HABITUATING": "#1C6F96", "BEAUTIFUL": "#A85408",
 }
 _SEV_CLASS = {"critical": "high", "high": "high", "medium": "medium", "low": "low"}
+# Single source for the rev6 scorecard AND card display-normalization, so the matrix tally can
+# never disagree with the per-finding cards (both formatters assign their locals from these).
+# Collapses legacy vocab (Critical→High; Confirmed/Probable/Flagged→High/Medium/Low). Fallbacks
+# applied at each call site: severity→Medium, confidence→Low.
+_SEV_NORM = {"critical": "High", "high": "High", "medium": "Medium", "low": "Low"}
+_CONF_NORM = {"confirmed": "High", "probable": "Medium", "flagged": "Low",
+              "high": "High", "medium": "Medium", "low": "Low"}
+_SCORE_ROWS = ["High", "Medium", "Low"]
+_SCORE_COLS = [("High", "task failure / high friction", "high"),
+               ("Medium", "significant friction", "med"),
+               ("Low", "low friction / polish", "low")]
+
+
+def _emit_eval_details(h: list, uc: dict) -> None:
+    """Append the rev6 'Evaluation details' section (intended users + tasks evaluated) to `h`.
+    Shared verbatim by the By-Issue and By-Trap renderers; `uc` is pre-escaped at the boundary."""
+    _users_raw = uc.get("users") or ""
+    if _users_raw.startswith("Target users: "):
+        _users_raw = _users_raw[len("Target users: "):]
+    if _users_raw:
+        _users_raw = _users_raw[0].upper() + _users_raw[1:]
+    _u_desc, _u_attrs = _parse_users_string(_users_raw) if _users_raw else ("", [])
+    _u_attrs = [(l, v) for l, v in _u_attrs if l != "Frequency of use"]
+    _tl = uc.get("task_list") or []
+    if len(_tl) > 1:
+        _task_items = [((t.get("name") or "").strip(), (t.get("description") or "").strip())
+                       for t in _tl if isinstance(t, dict)]
+    elif uc.get("tasks"):
+        _task_items = [("", t) for t in parse_tasks(uc.get("tasks", "")) if t]
+    else:
+        _task_items = []
+    _task_items = [(n, d) for n, d in _task_items if n or d]
+    _has_users = bool(_u_desc or _u_attrs or _users_raw)
+    if _has_users or _task_items:
+        h.append("<div class='section'><div class='section-eyebrow'>Evaluation details</div>")
+        h.append("<div class='eval-grid'>")
+        if _has_users:
+            h.append("<div class='eval-block'><div class='field-label'>Intended users</div><dl class='eval-dl'>")
+            if _u_desc:
+                h.append(f"<div class='eval-row'><dt>Description</dt><dd>{_u_desc}</dd></div>")
+            for _lbl, _val in _u_attrs:
+                h.append(f"<div class='eval-row'><dt>{_lbl}</dt><dd>{_val}</dd></div>")
+            if not _u_desc and not _u_attrs:
+                h.append(f"<div class='eval-row'><dt>Description</dt><dd>{_users_raw}</dd></div>")
+            h.append("</dl></div>")
+        if _task_items:
+            h.append("<div class='eval-block'><div class='field-label'>Tasks evaluated</div><ul class='eval-tasks'>")
+            for _n, _d in _task_items:
+                h.append(f"<li><b>{_n}</b> — {_d}</li>" if _n else f"<li>{_d}</li>")
+            h.append("</ul></div>")
+        h.append("</div></div>")
 
 
 _NEW_KB_ISSUES_CSS = """
@@ -3274,8 +3229,6 @@ _NEW_KB_ISSUES_CSS = """
 .r-header{padding:26px 32px 22px;border-bottom:1px solid var(--hairline)}
 .r-eyebrow{font-family:var(--font-sans);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);font-weight:600}
 .r-title{font-size:23px;margin:8px 0 2px;font-weight:680;letter-spacing:-.01em}
-.r-view{display:inline-flex;align-items:center;gap:7px;margin-top:6px;font-family:var(--font-sans);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--brand);font-weight:700}
-.r-view::before{content:"";width:7px;height:7px;border-radius:2px;background:var(--brand)}
 .r-meta{margin-top:16px;display:flex;flex-wrap:wrap;gap:6px 22px;font-size:12.5px;color:var(--ink-soft)}
 .r-meta .k{font-family:var(--font-sans);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint)}
 .trunc{margin:14px 0;padding:12px 16px;border-left:4px solid var(--sev-critical);background:var(--sev-critical-tint);border-radius:6px;color:var(--sev-critical);font-size:14px}
@@ -3358,8 +3311,8 @@ table.scorecard{border-collapse:separate;border-spacing:0;width:100%;min-width:4
    resolution for readability. transform-origin keeps the zoom anchored in the rail. */
 /* Cards that show a Trap's card artwork in the rail (By-Trap and By-Issue alike): narrow the
    rail to the card width so there's no dead space between the card and the description. */
-.card.card-trapart{--rail:170px;column-gap:20px}
-.trap-card-img{display:block;width:100%;max-width:168px;border-radius:10px;box-shadow:0 1px 5px rgba(0,0,0,.12);cursor:zoom-in;transition:transform .18s ease,box-shadow .18s ease;transform-origin:top left}
+.card.card-trapart{--rail:136px;column-gap:20px}
+.trap-card-img{display:block;width:100%;max-width:134px;border-radius:10px;box-shadow:0 1px 5px rgba(0,0,0,.12);cursor:zoom-in;transition:transform .18s ease,box-shadow .18s ease;transform-origin:top left}
 .trap-card-img:hover{transform:scale(2.1);box-shadow:0 12px 34px rgba(0,0,0,.32);position:relative;z-index:30}
 @media (prefers-reduced-motion:reduce){.trap-card-img{transition:none}}
 /* Task grouping in the By-Trap 'Traps identified' section. */
@@ -3400,7 +3353,6 @@ def _format_new_kb_issues_html(issues_report: dict, user_context: dict, settings
     _meta.append(("Architecture", "Two-pass" if settings.get("mode") == "twopass" else "Single-pass"))
     _meta.append(("Coverage", "Thorough" if settings.get("thorough_mode") else "Standard"))
     _meta.append(("Report style", "By Issue"))
-    _meta.append(("Tool coaching", "KB only" if settings.get("profile") == "self-serve" else "Prompting + KB"))
     if settings.get("verbosity"):
         _meta.append(("Verbosity", str(settings["verbosity"]).title()))
     if settings.get("pass1_model"):
@@ -3435,7 +3387,6 @@ def _format_new_kb_issues_html(issues_report: dict, user_context: dict, settings
     h.append("<div class='r-header'>")
     h.append("<div class='r-eyebrow'>UI Tenets &amp; Traps · Analysis Report</div>")
     h.append(f"<div class='r-title'>{design_name}</div>")
-    h.append("<div class='r-view'>By Issue view</div>")
     h.append("<div class='r-meta'>")
     for k, v in _meta:
         h.append(f"<span><span class='k'>{k}</span> {v}</span>")
@@ -3443,46 +3394,16 @@ def _format_new_kb_issues_html(issues_report: dict, user_context: dict, settings
 
     if settings.get("truncated"):
         h.append("<div class='trunc'>⚠️ <b>Incomplete report:</b> the analysis output was cut off at the length limit, so some issues or coverage notes may be missing. Re-running usually resolves this.</div>")
+    if settings.get("frame_notice"):
+        # Truncation disclosure (e.g. a large Figma file capped to the first N frames). States
+        # analyzed AND skipped counts so an un-analyzed-frame miss reads as truncation, not a KB gap.
+        h.append(f"<div class='trunc'>ℹ️ <b>Partial coverage:</b> {settings['frame_notice']}</div>")
 
     h.append("<div class='report-inner'>")
 
     # evaluation details — what was assessed and for whom (grounds the findings). The
     # interface name is already the report title, so it is not repeated here.
-    _users_raw = uc.get("users") or ""
-    if _users_raw.startswith("Target users: "):
-        _users_raw = _users_raw[len("Target users: "):]
-    if _users_raw:
-        _users_raw = _users_raw[0].upper() + _users_raw[1:]
-    _u_desc, _u_attrs = _parse_users_string(_users_raw) if _users_raw else ("", [])
-    _u_attrs = [(l, v) for l, v in _u_attrs if l != "Frequency of use"]
-    _tl = uc.get("task_list") or []
-    if len(_tl) > 1:
-        _task_items = [((t.get("name") or "").strip(), (t.get("description") or "").strip())
-                       for t in _tl if isinstance(t, dict)]
-    elif uc.get("tasks"):
-        _task_items = [("", t) for t in parse_tasks(uc.get("tasks", "")) if t]
-    else:
-        _task_items = []
-    _task_items = [(n, d) for n, d in _task_items if n or d]
-    _has_users = bool(_u_desc or _u_attrs or _users_raw)
-    if _has_users or _task_items:
-        h.append("<div class='section'><div class='section-eyebrow'>Evaluation details</div>")
-        h.append("<div class='eval-grid'>")
-        if _has_users:
-            h.append("<div class='eval-block'><div class='field-label'>Intended users</div><dl class='eval-dl'>")
-            if _u_desc:
-                h.append(f"<div class='eval-row'><dt>Description</dt><dd>{_u_desc}</dd></div>")
-            for _lbl, _val in _u_attrs:
-                h.append(f"<div class='eval-row'><dt>{_lbl}</dt><dd>{_val}</dd></div>")
-            if not _u_desc and not _u_attrs:
-                h.append(f"<div class='eval-row'><dt>Description</dt><dd>{_users_raw}</dd></div>")
-            h.append("</dl></div>")
-        if _task_items:
-            h.append("<div class='eval-block'><div class='field-label'>Tasks evaluated</div><ul class='eval-tasks'>")
-            for _n, _d in _task_items:
-                h.append(f"<li><b>{_n}</b> — {_d}</li>" if _n else f"<li>{_d}</li>")
-            h.append("</ul></div>")
-        h.append("</div></div>")
+    _emit_eval_details(h, uc)
 
     # summary
     h.append("<div class='section'><div class='section-eyebrow'>Summary of findings</div>")
@@ -3494,18 +3415,13 @@ def _format_new_kb_issues_html(issues_report: dict, user_context: dict, settings
     # severity × confidence matrix — nested inside the Summary of findings (one level down,
     # not its own section). Severity columns carry a short impact gloss; confidence rows are
     # labelled only (the confidence meaning lives in each issue card, not the matrix).
-    _rows = ["High", "Medium", "Low"]
-    _cols = [("High", "task failure / high friction", "high"),
-             ("Medium", "significant friction", "med"),
-             ("Low", "low friction / polish", "low")]
+    _rows, _cols = _SCORE_ROWS, _SCORE_COLS
     _counts = {(r, c[0]): 0 for r in _rows for c in _cols}
     # Normalize case + collapse any dead vocabulary (old Critical→High severity; old
     # Confirmed→High, Probable→Medium, Flagged→Low confidence) so EVERY rendered issue is
     # counted; the matrix can't disagree with the card list. Fallbacks: severity→Medium,
     # confidence→Low.
-    _sev_norm = {"critical": "High", "high": "High", "medium": "Medium", "low": "Low"}
-    _conf_norm = {"confirmed": "High", "probable": "Medium", "flagged": "Low",
-                  "high": "High", "medium": "Medium", "low": "Low"}
+    _sev_norm, _conf_norm = _SEV_NORM, _CONF_NORM
     for i in issues:
         sev = _sev_norm.get((i.get("severity_label") or "").strip().lower(), "Medium")
         conf = _conf_norm.get((i.get("confidence") or "").strip().lower(), "Low")
@@ -3539,7 +3455,9 @@ def _format_new_kb_issues_html(issues_report: dict, user_context: dict, settings
         # Confirmed/Probable/Flagged→High/Medium/Low confidence.
         sl = _sev_norm.get((issue.get("severity_label") or "").strip().lower(), "Medium")
         _cf_raw = (issue.get("confidence") or "").strip()
-        cf = _conf_norm.get(_cf_raw.lower(), _cf_raw)
+        # Use the SAME normalization+fallback the scorecard uses (blank/off-vocab → "Low") so the
+        # card can never disagree with the matrix bucket. Always rendered below.
+        cf = _conf_norm.get(_cf_raw.lower(), "Low")
         sc = sevc(sl)
 
         # ONE trap per issue — the root cause. Co-occurring / conditional / downstream traps
@@ -3620,14 +3538,24 @@ def _format_new_kb_issues_html(issues_report: dict, user_context: dict, settings
                 tcl = (tc or "").strip().lower()
                 if not tcl:
                     return None
+                # Exact match wins; otherwise the LONGEST task name in a containment relationship,
+                # so a short name listed first ("Search") can't steal a finding tagged with a
+                # longer one ("Search and filter results").
                 for nm in _task_names:
-                    if tcl == nm.lower() or tcl in nm.lower() or nm.lower() in tcl:
+                    if tcl == nm.lower():
                         return nm
-                return None
+                _best = None
+                for nm in _task_names:
+                    _nl = nm.lower()
+                    if (tcl in _nl or _nl in tcl) and (_best is None or len(nm) > len(_best)):
+                        _best = nm
+                return _best
             _general = []
             _task_buckets = {nm: [] for nm in _task_names}
             for idx, issue in _indexed:
-                m = _match_task(issue.get("task_context")) if isinstance(issue, dict) else None
+                # The model emits the task label in `task` (strong user-message attribution);
+                # `task_context` is a tolerated alias. Read either so grouping fires regardless.
+                m = _match_task(issue.get("task") or issue.get("task_context")) if isinstance(issue, dict) else None
                 (_task_buckets[m] if m in _task_buckets else _general).append((idx, issue))
             if not any(_task_buckets.values()):
                 for idx, issue in _indexed:
@@ -3703,9 +3631,20 @@ def _format_new_kb_issues_html(issues_report: dict, user_context: dict, settings
 
     # coverage — three buckets
     cov = [c for c in issues_report.get("traps_checked_not_found") or [] if isinstance(c, dict)]
+    # Mutual exclusivity (issue XOR coverage, except partially_assessed): drop any "did not find" /
+    # "couldn't evaluate" entry whose trap is also confirmed as an issue, so the report can't show
+    # the same trap as both a finding and not-found (and the disposition index can't double-count).
+    _raised = {_normalize_trap_name(t.get("trap_name", "")) for _i in issues
+               for t in (_i.get("traps") or []) if isinstance(t, dict)}
+    _raised.discard("")
+    cov = [c for c in cov if c.get("coverage_status") == "partially_assessed"
+           or _normalize_trap_name(c.get("trap_name", "")) not in _raised]
     _did_not_find = [c for c in cov if c.get("coverage_status") == "not_present"]
-    _couldnt = [c for c in cov if c.get("coverage_status") in ("not_assessable_artifact", "not_assessable_context")]
     _partial = [c for c in cov if c.get("coverage_status") == "partially_assessed"]
+    # "Couldn't evaluate" also absorbs any off-enum / missing coverage_status (e.g. from a
+    # truncated tool response). Without this catch-all such an entry matches no bucket and vanishes
+    # silently; folding it here keeps the trap visible rather than dropped from coverage.
+    _couldnt = [c for c in cov if c.get("coverage_status") not in ("not_present", "partially_assessed")]
     if cov:
         h.append("<div class='section'><div class='section-eyebrow'>Coverage notes</div>")
         # Order: Partially evaluated → Did not find → Couldn't evaluate. Each carries a
@@ -3874,14 +3813,15 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
     # Flatten every finding (instance) from the severity arrays, then group by trap name in
     # first-seen order. Each finding is one observed instance of its trap.
     from collections import OrderedDict
+    _SRC_SEV = {"critical_issues": "High", "moderate_issues": "Medium", "minor_issues": "Low"}
     _findings = []
     for _arr in ("critical_issues", "moderate_issues", "minor_issues"):
         for f in report.get(_arr) or []:
             if isinstance(f, dict) and f.get("trap_name"):
-                _findings.append(f)
-    _by_trap = OrderedDict()
-    for f in _findings:
-        _by_trap.setdefault(str(f["trap_name"]).strip().upper(), []).append(f)
+                # Tag each finding with the severity implied by the array it arrived in, so a
+                # missing/off-enum severity_label falls back to the model's array placement
+                # rather than a blanket "Medium" (self-serve by-trap leaves severity_label optional).
+                _findings.append({**f, "_src_sev": _SRC_SEV[_arr]})
 
     # ── header meta (identical to By-Issue) ──
     _meta = []
@@ -3889,7 +3829,6 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
     _meta.append(("Architecture", "Two-pass" if settings.get("mode") == "twopass" else "Single-pass"))
     _meta.append(("Coverage", "Thorough" if settings.get("thorough_mode") else "Standard"))
     _meta.append(("Report style", "By Trap"))
-    _meta.append(("Tool coaching", "KB only" if settings.get("profile") == "self-serve" else "Prompting + KB"))
     if settings.get("verbosity"):
         _meta.append(("Verbosity", str(settings["verbosity"]).title()))
     if settings.get("pass1_model"):
@@ -3919,7 +3858,6 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
     h.append("<div class='r-header'>")
     h.append("<div class='r-eyebrow'>UI Tenets &amp; Traps · Analysis Report</div>")
     h.append(f"<div class='r-title'>{design_name}</div>")
-    h.append("<div class='r-view'>By Trap view</div>")
     h.append("<div class='r-meta'>")
     for k, v in _meta:
         h.append(f"<span><span class='k'>{k}</span> {v}</span>")
@@ -3927,45 +3865,15 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
 
     if settings.get("truncated"):
         h.append("<div class='trunc'>⚠️ <b>Incomplete report:</b> the analysis output was cut off at the length limit, so some traps or coverage notes may be missing. Re-running usually resolves this.</div>")
+    if settings.get("frame_notice"):
+        # Truncation disclosure (e.g. a large Figma file capped to the first N frames). States
+        # analyzed AND skipped counts so an un-analyzed-frame miss reads as truncation, not a KB gap.
+        h.append(f"<div class='trunc'>ℹ️ <b>Partial coverage:</b> {settings['frame_notice']}</div>")
 
     h.append("<div class='report-inner'>")
 
     # evaluation details (identical to By-Issue)
-    _users_raw = uc.get("users") or ""
-    if _users_raw.startswith("Target users: "):
-        _users_raw = _users_raw[len("Target users: "):]
-    if _users_raw:
-        _users_raw = _users_raw[0].upper() + _users_raw[1:]
-    _u_desc, _u_attrs = _parse_users_string(_users_raw) if _users_raw else ("", [])
-    _u_attrs = [(l, v) for l, v in _u_attrs if l != "Frequency of use"]
-    _tl = uc.get("task_list") or []
-    if len(_tl) > 1:
-        _task_items = [((t.get("name") or "").strip(), (t.get("description") or "").strip())
-                       for t in _tl if isinstance(t, dict)]
-    elif uc.get("tasks"):
-        _task_items = [("", t) for t in parse_tasks(uc.get("tasks", "")) if t]
-    else:
-        _task_items = []
-    _task_items = [(n, d) for n, d in _task_items if n or d]
-    _has_users = bool(_u_desc or _u_attrs or _users_raw)
-    if _has_users or _task_items:
-        h.append("<div class='section'><div class='section-eyebrow'>Evaluation details</div>")
-        h.append("<div class='eval-grid'>")
-        if _has_users:
-            h.append("<div class='eval-block'><div class='field-label'>Intended users</div><dl class='eval-dl'>")
-            if _u_desc:
-                h.append(f"<div class='eval-row'><dt>Description</dt><dd>{_u_desc}</dd></div>")
-            for _lbl, _val in _u_attrs:
-                h.append(f"<div class='eval-row'><dt>{_lbl}</dt><dd>{_val}</dd></div>")
-            if not _u_desc and not _u_attrs:
-                h.append(f"<div class='eval-row'><dt>Description</dt><dd>{_users_raw}</dd></div>")
-            h.append("</dl></div>")
-        if _task_items:
-            h.append("<div class='eval-block'><div class='field-label'>Tasks evaluated</div><ul class='eval-tasks'>")
-            for _n, _d in _task_items:
-                h.append(f"<li><b>{_n}</b> — {_d}</li>" if _n else f"<li>{_d}</li>")
-            h.append("</ul></div>")
-        h.append("</div></div>")
+    _emit_eval_details(h, uc)
 
     # summary + "Number of issues found" matrix (counts the flattened instances)
     h.append("<div class='section'><div class='section-eyebrow'>Summary of findings</div>")
@@ -3973,19 +3881,14 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
         h.append(f"<p class='headline-lg'>{report['summary_headline']}</p>")
     if report.get("summary_narrative"):
         h.append(f"<p class='narrative'>{report['summary_narrative']}</p>")
-    _rows = ["High", "Medium", "Low"]
-    _cols = [("High", "task failure / high friction", "high"),
-             ("Medium", "significant friction", "med"),
-             ("Low", "low friction / polish", "low")]
+    _rows, _cols = _SCORE_ROWS, _SCORE_COLS
     _counts = {(r, c[0]): 0 for r in _rows for c in _cols}
-    _sev_norm = {"critical": "High", "high": "High", "medium": "Medium", "low": "Low"}
-    _conf_norm = {"confirmed": "High", "probable": "Medium", "flagged": "Low",
-                  "high": "High", "medium": "Medium", "low": "Low"}
+    _sev_norm, _conf_norm = _SEV_NORM, _CONF_NORM
     for i in _findings:
-        sev = _sev_norm.get((i.get("severity_label") or "").strip().lower(), "Medium")
+        sev = _sev_norm.get((i.get("severity_label") or "").strip().lower()) or i.get("_src_sev") or "Medium"
         conf = _conf_norm.get((i.get("confidence") or "").strip().lower(), "Low")
         _counts[(conf, sev)] += 1
-    h.append("<div class='sub-block'><div class='sub-label'>Number of Traps found</div><div class='scorecard-wrap'>")
+    h.append("<div class='sub-block'><div class='sub-label'>Number of instances found</div><div class='scorecard-wrap'>")
     h.append("<table class='scorecard'><thead>")
     h.append("<tr><td class='corner-blank'></td><th class='axis-top' colspan='3'>Severity</th></tr>")
     h.append("<tr><th class='axis-side'>Confidence</th>")
@@ -4039,9 +3942,11 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
             if _n > 1:
                 h.append(f"<div class='trap-count'>{_n} instances found</div>")
             for j, inst in enumerate(instances, 1):
-                sl = _sev_norm.get((inst.get("severity_label") or "").strip().lower(), "Medium")
+                sl = _sev_norm.get((inst.get("severity_label") or "").strip().lower()) or inst.get("_src_sev") or "Medium"
                 _cf_raw = (inst.get("confidence") or "").strip()
-                cf = _conf_norm.get(_cf_raw.lower(), _cf_raw)
+                # Same normalization+fallback as the scorecard (blank/off-vocab → "Low") so card
+                # and matrix agree.
+                cf = _conf_norm.get(_cf_raw.lower(), "Low")
                 sc = sevc(sl)
                 h.append("<div class='instance'>")
                 if _n > 1:
@@ -4095,14 +4000,23 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
                 tcl = (tc or "").strip().lower()
                 if not tcl:
                     return None
+                # Exact match wins; otherwise the LONGEST task name in a containment relationship,
+                # so a short name listed first ("Search") can't steal a finding tagged with a
+                # longer one ("Search and filter results").
                 for nm in _task_names:
-                    if tcl == nm.lower() or tcl in nm.lower() or nm.lower() in tcl:
+                    if tcl == nm.lower():
                         return nm
-                return None
+                _best = None
+                for nm in _task_names:
+                    _nl = nm.lower()
+                    if (tcl in _nl or _nl in tcl) and (_best is None or len(nm) > len(_best)):
+                        _best = nm
+                return _best
             _general = []
             _task_buckets = OrderedDict((nm, []) for nm in _task_names)
             for f in _findings:
-                m = _match_task(f.get("task_context")) if isinstance(f, dict) else None
+                # `task` is the field the model fills; `task_context` is a tolerated alias.
+                m = _match_task(f.get("task") or f.get("task_context")) if isinstance(f, dict) else None
                 (_task_buckets[m] if m in _task_buckets else _general).append(f)
             if not any(_task_buckets.values()):
                 # No finding was attributed to a task (e.g. the KB-only bare schema emits no
@@ -4124,11 +4038,70 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
             _emit_trap_cards(_findings, 0)
     h.append("</div>")  # traps section
 
+    # ── Worth a closer look (G8 §2) — pivotal, assessability-blocked unknowns. PARITY with the
+    # By-Issue report: without this, a coached by-trap run silently dropped every potential_issues
+    # entry the model produced. Same rev6 card style; ungrouped by task. ──
+    _closer = [c for c in report.get("potential_issues") or [] if isinstance(c, dict)]
+    if _closer:
+        h.append("<div class='section' id='worth-a-closer-look'><div class='section-eyebrow'>Worth a closer look</div>")
+        h.append("<p class='narrative'>Pivotal unknowns that couldn't be settled from this artifact — each names a check that would resolve it.</p>")
+        for _c in _closer:
+            _pname = _c.get("trap_name", "")
+            _tn = (_c.get("tenet") or "").upper() or (_tenet_for(_pname) or "").upper()
+            _color = _TENET_PILL.get(_tn, "#35597F")
+            h.append("<div class='card card-trapart'>")
+            h.append("<div class='card-rail'><div class='trap'>")
+            _img = _get_card_img(_pname)
+            if _img:
+                h.append(f"<img class='trap-card-img' src='{_img}' alt='{_pname} trap card' loading='lazy'>")
+            else:
+                if _tn:
+                    h.append(f"<span class='tenet' style='color:{_color}'>{_tn.title()}</span>")
+                h.append(f"<span class='tpill' style='background:{_color}'>{_pname}</span>")
+            h.append("</div></div>")  # .trap, .card-rail
+            h.append("<div class='card-main'>")
+            h.append("<span class='card-num'>Worth a closer look</span>")
+            _hl = _c.get("why_it_matters") or _c.get("observation") or _pname
+            if _hl:
+                h.append(f"<p class='card-headline'>{_hl}</p>")
+            _loc = _c.get("location") or ""
+            if _loc:
+                h.append(f"<div class='field muted'><div class='field-label'>Where</div><p>{_loc}</p></div>")
+            _obs = _c.get("observation") or ""
+            if _obs:
+                h.append(f"<div class='field muted'><div class='field-label'>What's visible</div><p>{_obs}</p></div>")
+            _chk = _c.get("check") or ""
+            if _chk:
+                _cost = _c.get("check_cost") or ""
+                _cost_str = f" <em>({_cost})</em>" if _cost else ""
+                h.append(f"<div class='field'><div class='field-label'>The check</div><p>{_chk}{_cost_str}</p></div>")
+            _ifc = _c.get("implication_if_confirmed") or ""
+            _ifr = _c.get("implication_if_ruled_out") or ""
+            if _ifc or _ifr:
+                h.append("<div class='field'><div class='field-label'>Implications</div>")
+                if _ifc:
+                    h.append(f"<p><strong>If confirmed:</strong> {_ifc}</p>")
+                if _ifr:
+                    h.append(f"<p><strong>If ruled out:</strong> {_ifr}</p>")
+                h.append("</div>")
+            h.append("</div>")  # .card-main
+            h.append("</div>")  # .card
+        h.append("</div>")  # worth-a-closer-look section
+
     # ── Coverage notes — traps with NO instances (identical buckets to By-Issue) ──
     cov = [c for c in report.get("traps_checked_not_found") or [] if isinstance(c, dict)]
+    # Mutual exclusivity: a trap with at least one instance among the findings must not also appear
+    # as "did not find" / "couldn't evaluate" (partially_assessed may co-exist per J27).
+    _raised = {_normalize_trap_name(f.get("trap_name", "")) for f in _findings}
+    _raised.discard("")
+    cov = [c for c in cov if c.get("coverage_status") == "partially_assessed"
+           or _normalize_trap_name(c.get("trap_name", "")) not in _raised]
     _did_not_find = [c for c in cov if c.get("coverage_status") == "not_present"]
-    _couldnt = [c for c in cov if c.get("coverage_status") in ("not_assessable_artifact", "not_assessable_context")]
     _partial = [c for c in cov if c.get("coverage_status") == "partially_assessed"]
+    # "Couldn't evaluate" also absorbs any off-enum / missing coverage_status (e.g. from a
+    # truncated tool response). Without this catch-all such an entry matches no bucket and vanishes
+    # silently; folding it here keeps the trap visible rather than dropped from coverage.
+    _couldnt = [c for c in cov if c.get("coverage_status") not in ("not_present", "partially_assessed")]
     if cov:
         h.append("<div class='section'><div class='section-eyebrow'>Coverage notes</div>")
         if _partial:
@@ -4168,12 +4141,81 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
                 h.append("</div>")
             h.append("</div></div>")
         h.append("</div>")
+    else:
+        # Parity with By-Issue: show the section with 'None reported' rather than omitting it —
+        # the absence of coverage notes is itself informative.
+        h.append("<div class='section'><div class='section-eyebrow'>Coverage notes</div>"
+                 "<p class='narrative cov-none'>None reported.</p></div>")
 
     # positives
     pos = [p for p in report.get("positive_observations") or [] if p]
     if pos:
         h.append("<div class='section'><div class='section-eyebrow'>What works well</div>")
         h.append("<p class='narrative'>" + " ".join(str(p) for p in pos) + "</p></div>")
+
+    # ── Trap Disposition Index — re-homed from By-Issue (KB accounting invariant). Every taxonomy
+    # trap resolves to EXACTLY ONE disposition, derived from data already present on the by-trap
+    # report:  a per-trap FINDING (primary) → "Reported above";  a trap bound as a secondary in an
+    # issue_groups issue with no finding of its own (consequence / co-occurring) → "Within an
+    # issue (<relationship>)";  a Worth-a-closer-look entry → linked;  a coverage bucket → its
+    # label;  nowhere structured → "Not accounted for". Precedence finding > secondary >
+    # worth-a-closer-look > coverage guarantees the exactly-once invariant.
+    try:
+        from .schema import _valid_trap_names as _vtn
+    except ImportError:
+        from schema import _valid_trap_names as _vtn
+    _taxonomy = _vtn(settings.get("kb_version", "v2.1")) or []
+    if _taxonomy:
+        _found = {_normalize_trap_name(f.get("trap_name", "")) for f in _findings}
+        _found.discard("")
+        _secondary: dict = {}
+        for _g in (report.get("issue_groups") or []):
+            if not isinstance(_g, dict):
+                continue
+            for _t in (_g.get("traps") or []):
+                if not isinstance(_t, dict):
+                    continue
+                _nm2 = _normalize_trap_name(_t.get("trap_name", ""))
+                if not _nm2 or _nm2 in _found:
+                    continue
+                _rel = normalize_relationship(_t.get("relationship"))
+                if _nm2 not in _secondary or (_secondary[_nm2] in ("none", "") and _rel not in ("none", "")):
+                    _secondary[_nm2] = _rel
+        _COV_LABEL = {"not_present": "Did not find",
+                      "not_assessable_artifact": "Couldn't evaluate",
+                      "not_assessable_context": "Couldn't evaluate",
+                      "partially_assessed": "Partially evaluated"}
+        _cov_of: dict = {}
+        for c in cov:
+            _nmc = _normalize_trap_name(c.get("trap_name", ""))
+            if _nmc and _nmc not in _cov_of:
+                _cov_of[_nmc] = _COV_LABEL.get(c.get("coverage_status"), "Coverage noted")
+        _pot_of = {_normalize_trap_name(p.get("trap_name", "")) for p in _closer}
+        _pot_of.discard("")
+        _REL_DISP = {"co_occurring": "co-occurring", "consequence": "consequence",
+                     "conditional_primary": "conditional", "conditional_enumerated": "conditional",
+                     "root_cause": "root cause"}
+        h.append("<div class='section'><div class='section-eyebrow'>Trap disposition index</div>")
+        h.append("<p class='disp-intro'>Every framework trap, accounted for exactly once — reported as a trap above, bound within an issue, flagged as worth a closer look, or noted under coverage. Scan the column to confirm nothing was silently dropped.</p>")
+        h.append("<div class='disp-wrap'><table class='disposition'><tbody>")
+        for canonical in _taxonomy:
+            _nm = _normalize_trap_name(canonical)
+            color = _TENET_PILL.get(_tenet_for(canonical).upper(), "#35597F")
+            h.append("<tr>")
+            h.append(f"<td class='dt-trap'><span class='tpill' style='background:{color}'>{canonical}</span></td>")
+            if _nm in _found:
+                h.append("<td class='dt-disp'><span class='disp-cov'>Reported above</span></td>")
+            elif _nm in _secondary:
+                _rl = _REL_DISP.get(_secondary[_nm], "secondary")
+                h.append(f"<td class='dt-disp'>Within an issue <span class='disp-rel'>({_rl})</span></td>")
+            elif _nm in _pot_of:
+                h.append("<td class='dt-disp'><a class='disp-link' href='#worth-a-closer-look'>Worth a closer look</a></td>")
+            elif _nm in _cov_of:
+                h.append(f"<td class='dt-disp'><span class='disp-cov'>{_cov_of[_nm]}</span></td>")
+            else:
+                h.append("<td class='dt-disp'><span class='disp-none'>Not accounted for</span></td>")
+            h.append("</tr>")
+        h.append("</tbody></table></div></div>")
 
     h.append("</div>")  # report-inner
     h.append("<div class='r-footer'>© UI Traps LLC · Proprietary &amp; Confidential — UI Tenets &amp; Traps Framework</div>")

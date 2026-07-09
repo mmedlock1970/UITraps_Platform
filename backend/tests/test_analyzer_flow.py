@@ -1,97 +1,203 @@
 """
-Tests for analyze_flow_diagram — conformed to the CURRENT signature/behavior.
+Flow-path (analyze_flow_diagram) PARITY tests.
 
-`analyze_flow_diagram(frames, flow_map, user_context, timeout, kb_version, verbosity,
-pass1_model)` has NO `mode` parameter: it ALWAYS runs both passes and merges them —
-  • Screen pass: one `_pass1` per valid frame, injecting "FLOW CONTEXT" into extra_context.
-  • Flow pass:   one `_pass1` on the first frame, injecting "FLOW ANALYSIS".
-So total `_pass1` calls = len(valid_frames) + 1. We distinguish the two passes by the
-context each injects rather than by a mode flag.
+The flow path now delegates to analyze_design, so a Figma run must honor the same axes as the
+image path: coaching lock (profile), report_style, pass-count (single vs two-pass), and the
+single-call cross-screen routing. These tests mock ONLY the Anthropic client — `_pass1`,
+`build_system_prompt`, the deprecation guard, schema/tool selection, and the multi-screen
+message assembly all run for real (the previous suite patched `_pass1` out, so none of that
+was covered).
+
+Call-count contract used below:
+  • a "report pass" calls the client WITH `tools` (structured tool output);
+  • the two-pass DETECTION pass calls the client WITHOUT `tools` (a text candidate list);
+  • new-KB enrichment is skipped (Pass-1 authoritative), so single-pass = exactly one report call.
 """
-from unittest.mock import patch
-from src.analyzer import UITrapsAnalyzer
+from unittest.mock import Mock
 
-MOCK_REPORT = {
-    'summary_headline': 'Test',
-    'summary_narrative': 'Test narrative',
-    'critical_issues': [],
-    'moderate_issues': [],
-    'minor_issues': [],
-    'positive_observations': [],
-    'potential_issues': [],
-    'traps_checked_not_found': [],
-    'flagged_for_human_review': [],
-    'incomplete_flow_findings': [],
-    'bugs_detected': [],
+import pytest
+from PIL import Image
+
+from src.analyzer import UITrapsAnalyzer, MAX_FLOW_SCREENS
+
+
+# ── fixtures / helpers ───────────────────────────────────────────────────────
+
+def _frames(tmp_path, n):
+    frames = []
+    for i in range(n):
+        p = tmp_path / f"frame{i}.png"
+        Image.new("RGB", (400, 300), "#ddd").save(p)
+        frames.append({"id": f"f{i}", "name": f"Screen {i}", "image_path": str(p)})
+    return frames
+
+
+_ISSUES = {
+    "summary_headline": "h", "summary_narrative": "n",
+    "issues": [{"severity_label": "High", "confidence": "High", "headline": "Icon unclear",
+                "problem": "A bare glyph in the toolbar.", "recommendation": "Label it",
+                "traps": [{"trap_name": "UNCOMPREHENDED ELEMENT", "tenet": "UNDERSTANDABLE",
+                           "relationship": "root_cause"}]}],
+    "potential_issues": [], "traps_checked_not_found": [], "positive_observations": [],
+}
+_TRAP = {
+    "summary_headline": "h", "summary_narrative": "n",
+    "critical_issues": [{"trap_name": "UNCOMPREHENDED ELEMENT", "tenet": "UNDERSTANDABLE",
+                         "headline": "Icon unclear", "problem": "A bare glyph in the toolbar.",
+                         "recommendation": "Label it", "severity_label": "High", "confidence": "High"}],
+    "moderate_issues": [], "minor_issues": [], "traps_checked_not_found": [], "positive_observations": [],
 }
 
-MOCK_FLOW_MAP = {
-    'per_frame': {
-        'f1': {'name': 'Cart', 'reached_from': [], 'leads_to': [{'screen': 'Checkout', 'via': 'tap on "Checkout"'}]},
-        'f2': {'name': 'Checkout', 'reached_from': [{'screen': 'Cart', 'via': 'tap on "Checkout"'}], 'leads_to': []},
-    },
-    'summary': 'Complete flow: Cart -> Checkout\nNavigation map:\n  Cart: Checkout -> Checkout',
-}
-
-MOCK_FRAMES = [
-    {'id': 'f1', 'name': 'Cart', 'image_path': '/tmp/cart.png'},
-    {'id': 'f2', 'name': 'Checkout', 'image_path': '/tmp/checkout.png'},
-]
-
-USER_CONTEXT = {
-    'users': 'users', 'tasks': 'buy product',
-    'format': 'app', 'content_type': 'website', 'task_list': []
-}
-
-# _enrich_report is patched on the class → called unbound (no self), so the first positional
-# arg is the report dict; pass it straight through.
-_ENRICH_PASSTHROUGH = dict(side_effect=lambda self_or_r, *args, **kwargs: self_or_r if isinstance(self_or_r, dict) else args[0])
+_UC = {"users": "first-time visitors", "tasks": "buy a sofa", "format": "app", "content_type": "website"}
 
 
-def _extra(call):
-    return (call.kwargs.get('user_context', {}) or {}).get('extra_context', '')
+def _analyzer(report_for_tool):
+    """Analyzer whose Anthropic client is a Mock recording every call. Report passes (tools
+    present) return `report_for_tool`; detection passes (no tools) return a text candidate line."""
+    calls = []
+
+    def cap(**kw):
+        calls.append(kw)
+        m = Mock()
+        if "tools" in kw:
+            m.content = [Mock(type="tool_use", name="ui_report", input=report_for_tool)]
+            m.stop_reason = "tool_use"
+        else:
+            m.content = [Mock(type="text", text="UNCOMPREHENDED ELEMENT | Screen 0 | icon | unclear")]
+            m.stop_reason = "end_turn"
+        m.usage = Mock(input_tokens=100, output_tokens=50,
+                       cache_creation_input_tokens=0, cache_read_input_tokens=0)
+        return m
+
+    a = UITrapsAnalyzer.__new__(UITrapsAnalyzer)
+    a.client = Mock()
+    a.client.messages.create.side_effect = cap
+    a.model = "m"
+    a.enrich_model = "e"
+    a.use_caching = True
+    return a, calls
 
 
-@patch.object(UITrapsAnalyzer, '_pass1', return_value=MOCK_REPORT)
-@patch.object(UITrapsAnalyzer, '_enrich_report', **_ENRICH_PASSTHROUGH)
-def test_runs_pass1_per_frame_plus_one_flow_pass(mock_enrich, mock_pass1):
-    analyzer = UITrapsAnalyzer.__new__(UITrapsAnalyzer)
-    analyzer.analyze_flow_diagram(frames=MOCK_FRAMES, flow_map=MOCK_FLOW_MAP, user_context=USER_CONTEXT)
-    assert mock_pass1.call_count == len(MOCK_FRAMES) + 1  # 2 screen + 1 flow
+def _tool_calls(calls):
+    return [kw for kw in calls if "tools" in kw]
 
 
-@patch.object(UITrapsAnalyzer, '_pass1', return_value=MOCK_REPORT)
-@patch.object(UITrapsAnalyzer, '_enrich_report', **_ENRICH_PASSTHROUGH)
-def test_skips_frames_without_image_path(mock_enrich, mock_pass1):
-    frames = MOCK_FRAMES + [{'id': 'f3', 'name': 'Error', 'image_path': None}]
-    analyzer = UITrapsAnalyzer.__new__(UITrapsAnalyzer)
-    analyzer.analyze_flow_diagram(frames=frames, flow_map=MOCK_FLOW_MAP, user_context=USER_CONTEXT)
-    assert mock_pass1.call_count == 3  # 2 valid-frame screen passes + 1 flow pass (f3 skipped)
+def _detection_calls(calls):
+    return [kw for kw in calls if "tools" not in kw]
 
 
-@patch.object(UITrapsAnalyzer, '_pass1', return_value=MOCK_REPORT)
-@patch.object(UITrapsAnalyzer, '_enrich_report', **_ENRICH_PASSTHROUGH)
-def test_screen_pass_injects_flow_context_per_frame(mock_enrich, mock_pass1):
-    analyzer = UITrapsAnalyzer.__new__(UITrapsAnalyzer)
-    analyzer.analyze_flow_diagram(frames=MOCK_FRAMES, flow_map=MOCK_FLOW_MAP, user_context=USER_CONTEXT)
-    screen_calls = [c for c in mock_pass1.call_args_list if 'FLOW CONTEXT' in _extra(c)]
-    assert len(screen_calls) == len(MOCK_FRAMES)
+def _count_images(kw):
+    msgs = kw.get("messages") or []
+    content = msgs[0]["content"] if msgs else []
+    return sum(1 for b in content if isinstance(b, dict) and b.get("type") == "image")
 
 
-@patch.object(UITrapsAnalyzer, '_pass1', return_value=MOCK_REPORT)
-@patch.object(UITrapsAnalyzer, '_enrich_report', **_ENRICH_PASSTHROUGH)
-def test_flow_pass_injects_flow_analysis_once(mock_enrich, mock_pass1):
-    analyzer = UITrapsAnalyzer.__new__(UITrapsAnalyzer)
-    analyzer.analyze_flow_diagram(frames=MOCK_FRAMES, flow_map=MOCK_FLOW_MAP, user_context=USER_CONTEXT)
-    flow_calls = [c for c in mock_pass1.call_args_list if 'FLOW ANALYSIS' in _extra(c)]
-    assert len(flow_calls) == 1
+# ── (a) v1.0 flow resolves to self-serve and does NOT trip the deprecation guard ─────────────
+
+def test_flow_v1_selfserve_does_not_trip_guard(tmp_path):
+    a, calls = _analyzer(_ISSUES)
+    result = a.analyze_flow_diagram(
+        frames=_frames(tmp_path, 2), user_context=_UC,
+        kb_version="v1", profile="self-serve", report_style="issues", mode="single",
+    )
+    assert result["status"] == "success" and result.get("html")
+    # self-serve injects the raw KB as REFERENCE MATERIAL — proof the self-serve prompt (not the
+    # coached scaffold, which would have raised the v1 guard) was the one actually built.
+    sys_texts = " ".join(b.get("text", "") for kw in calls for b in (kw.get("system") or []))
+    assert "REFERENCE MATERIAL" in sys_texts
 
 
-@patch.object(UITrapsAnalyzer, '_pass1', return_value=MOCK_REPORT)
-@patch.object(UITrapsAnalyzer, '_enrich_report', **_ENRICH_PASSTHROUGH)
-def test_screen_and_flow_contexts_are_distinct(mock_enrich, mock_pass1):
-    analyzer = UITrapsAnalyzer.__new__(UITrapsAnalyzer)
-    analyzer.analyze_flow_diagram(frames=MOCK_FRAMES, flow_map=MOCK_FLOW_MAP, user_context=USER_CONTEXT)
-    extras = [_extra(c) for c in mock_pass1.call_args_list]
-    assert sum('FLOW CONTEXT' in e for e in extras) == len(MOCK_FRAMES)
-    assert sum('FLOW ANALYSIS' in e for e in extras) == 1
+def test_flow_v1_default_profile_still_trips_guard(tmp_path):
+    # Regression: the guard is real. A coached (default) v1 flow MUST raise — only the locked
+    # self-serve profile (above) avoids it. This is the exact leak that was reported.
+    a, _ = _analyzer(_TRAP)
+    with pytest.raises(ValueError, match="deprecated for version 'v1'"):
+        a.analyze_flow_diagram(frames=_frames(tmp_path, 2), user_context=_UC,
+                               kb_version="v1", profile="default", report_style="trap", mode="single")
+
+
+# ── (d) frames route through the SINGLE-call preloaded_images path ───────────────────────────
+
+def test_flow_single_call_carries_all_screens(tmp_path):
+    a, calls = _analyzer(_TRAP)
+    a.analyze_flow_diagram(frames=_frames(tmp_path, 3), user_context=_UC,
+                           kb_version="v2.1", profile="default", report_style="trap", mode="single")
+    tcs = _tool_calls(calls)
+    assert len(tcs) == 1                 # ONE cross-screen call — not 3 stitched per-frame calls
+    assert _count_images(tcs[0]) == 3    # all three screens in that one call (_n_screens == 3)
+
+
+# ── (c) one-pass vs two-pass pass-count is observably different ──────────────────────────────
+
+def test_flow_single_pass_is_one_report_call(tmp_path):
+    a, calls = _analyzer(_TRAP)
+    a.analyze_flow_diagram(frames=_frames(tmp_path, 2), user_context=_UC,
+                           kb_version="v2.1", profile="default", report_style="trap", mode="single")
+    assert len(_tool_calls(calls)) == 1
+    assert len(_detection_calls(calls)) == 0  # no detection pass in single-pass
+
+
+def test_flow_twopass_runs_detection_then_adjudication(tmp_path):
+    a, calls = _analyzer(_TRAP)
+    a.analyze_flow_diagram(frames=_frames(tmp_path, 2), user_context=_UC,
+                           kb_version="v2.1", profile="default", report_style="trap", mode="twopass")
+    assert len(_detection_calls(calls)) == 1  # detection pass (candidate list, no tools)
+    assert len(_tool_calls(calls)) == 1       # adjudication pass (tool output)
+    # both passes carry the full multi-screen artifact
+    assert _count_images(_detection_calls(calls)[0]) == 2
+    assert _count_images(_tool_calls(calls)[0]) == 2
+
+
+# ── (b) report_style drives the tool/schema and the rendered report shape ────────────────────
+
+# (By-Issue report style retired — the by-issue-mode render test was removed; By Trap below is the
+# sole rendered style.)
+
+
+def test_flow_report_style_trap_drives_tool_and_render(tmp_path):
+    a, calls = _analyzer(_TRAP)
+    r = a.analyze_flow_diagram(frames=_frames(tmp_path, 2), user_context=_UC,
+                               kb_version="v2.1", profile="default", report_style="trap", mode="single")
+    assert "UI Traps — By Trap" in r["html"]
+    names = [t["name"] for kw in _tool_calls(calls) for t in kw["tools"]]
+    assert "ui_analysis_report" in names
+
+
+# ── unchanged contract: no exportable frames is a clear error ────────────────────────────────
+
+def test_flow_no_exportable_frames_raises(tmp_path):
+    a, _ = _analyzer(_TRAP)
+    with pytest.raises(ValueError, match="No exportable frames"):
+        a.analyze_flow_diagram(frames=[{"id": "x", "name": "x", "image_path": None}],
+                               user_context=_UC, kb_version="v2.1")
+
+
+# ── item 6: >6-frame file truncates-with-notice (NOT hard-reject / 400) ───────────────────────
+
+def test_flow_over_cap_truncates_with_notice(tmp_path):
+    # Simulates app.py exporting the first 6 of a 23-frame file. The run SUCCEEDS (no 400) and
+    # the report discloses BOTH counts so an un-analyzed-frame miss reads as truncation, not a KB gap.
+    a, calls = _analyzer(_TRAP)
+    r = a.analyze_flow_diagram(frames=_frames(tmp_path, MAX_FLOW_SCREENS), user_context=_UC,
+                               kb_version="v2.1", profile="default", report_style="trap",
+                               mode="single", total_frames=23)
+    assert r["status"] == "success"
+    assert len(_tool_calls(calls)) == 1               # still ONE cross-screen call over the 6 frames
+    assert "Analyzed 6 of 23 frames" in r["html"]
+    assert "17 frames were not analyzed" in r["html"]
+
+
+# (The by-issue truncation-notice test was retired with the By-Issue report style; the notice is
+# covered on the sole by-trap path by test_flow_over_cap_truncates_with_notice above.)
+
+
+def test_flow_within_cap_has_no_notice(tmp_path):
+    # total == analyzed (nothing skipped) → no partial-coverage banner. Same when total is unset.
+    a, _ = _analyzer(_TRAP)
+    r = a.analyze_flow_diagram(frames=_frames(tmp_path, 3), user_context=_UC, kb_version="v2.1",
+                               profile="default", report_style="trap", mode="single", total_frames=3)
+    assert "Partial coverage" not in r["html"]
+    a2, _ = _analyzer(_TRAP)
+    r2 = a2.analyze_flow_diagram(frames=_frames(tmp_path, 3), user_context=_UC, kb_version="v2.1",
+                                 profile="default", report_style="trap", mode="single")
+    assert "Partial coverage" not in r2["html"]

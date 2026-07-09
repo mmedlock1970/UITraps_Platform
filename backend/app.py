@@ -2013,22 +2013,30 @@ async def unified_ask(
                     status_code=503,
                     detail="Figma analysis not available. FIGMA_TOKEN not configured."
                 )
-            try:
+            # Offload ALL blocking work (Figma REST fetch, image downloads, one/two multi-minute
+            # Claude calls, PIL crops) to a worker thread. Running it directly on the async event
+            # loop would stall the whole FastAPI worker for the duration of a flow run — every
+            # sibling analysis path already offloads via run_in_executor.
+            def _run_flow_analysis():
                 with tempfile.TemporaryDirectory() as _tmp_dir:
                     _figma = FigmaAnalyzer()
                     _file_key, _ = _figma.parse_figma_url(figma_url.strip())
                     _cached = get_cached_figma_data(_file_key)
+                    # Export the first MAX_FLOW_SCREENS frames in Figma document order
+                    # (get_all_frames: pages in order, then in-page children) — same ceiling the
+                    # image path enforces.
                     _figma_result = _figma.analyze_figma_file(
                         figma_url.strip(), _tmp_dir,
                         cached_file_data=_cached,
-                        max_frames=10
+                        max_frames=MAX_FLOW_SCREENS
                     )
                     _frames = _figma_result['frames']
-                    _flows = _figma_result['flows']
-
-                    from src.figma_analyzer import build_flow_map
-                    _flow_map = build_flow_map(_frames, _flows)
-
+                    _total_frames = _figma_result.get('total_frames', len(_frames))
+                    # Truncate-with-notice (NOT hard-reject): a real Figma file the user didn't
+                    # curate for this run routinely has far more than MAX_FLOW_SCREENS frames, so
+                    # analyze the first 6 (document order, exported above) and disclose the skipped
+                    # count in the report. analyze_design's ValueError stays the hard ceiling (we
+                    # only ever pass it <=6). analyze_flow_diagram builds the notice from total_frames.
                     _fctx = {
                         "users": users,
                         "tasks": tasks,
@@ -2043,42 +2051,35 @@ async def unified_ask(
                         "tenet_filter": tenet_filter or "",
                         "design_name": design_name or "",
                         "task_list": _task_list_parsed,
+                        "input_type": _input_type,
                     }
+                    # Delegate to the shared engine: same cross-screen single call, dispatch
+                    # (one-pass vs two-pass), coaching lock (profile), report_style, chat context,
+                    # and rev6 rendering as the image path — no flow-specific pipeline.
                     _flow_analyzer = UITrapsAnalyzer()
-                    _t0 = time.time()
-                    _report_dict = _flow_analyzer.analyze_flow_diagram(
+                    return _flow_analyzer.analyze_flow_diagram(
                         frames=_frames,
-                        flow_map=_flow_map,
                         user_context=_fctx,
                         kb_version=kb_version,
                         verbosity=verbosity,
                         pass1_model=pass1_model,
+                        profile=profile,
+                        report_style=report_style,
+                        mode=mode,
+                        chat_context=chat_context,
+                        page_context=None,
+                        total_frames=_total_frames,
                     )
-                    _elapsed = time.time() - _t0
-                    for _opt in ['critical_issues', 'moderate_issues', 'minor_issues',
-                                 'positive_observations', 'potential_issues',
-                                 'traps_checked_not_found', 'flagged_for_human_review',
-                                 'incomplete_flow_findings']:
-                        if not isinstance(_report_dict.get(_opt), list):
-                            _report_dict[_opt] = []
-
-                    _analysis_settings = {
-                        'verbosity': verbosity,
-                        'pass1_model': pass1_model,
-                        'kb_version': kb_version,
-                        'elapsed_seconds': _elapsed,
-                        'thorough_mode': False,
-                    }
-                    _html = format_report_as_html(_report_dict, _fctx, analysis_settings=_analysis_settings)
-                    _stats = get_report_statistics(_report_dict)
-
-                    return {
-                        "success": True,
-                        "mode": "analysis",
-                        "report_html": _html,
-                        "statistics": _stats,
-                        "kb_version": kb_version,
-                    }
+            try:
+                _result = await asyncio.get_running_loop().run_in_executor(None, _run_flow_analysis)
+                return {
+                    "success": True,
+                    "mode": "analysis",
+                    "report_html": _result.get("html"),
+                    "report_markdown": _result.get("markdown"),
+                    "statistics": _result.get("statistics"),
+                    "kb_version": kb_version,
+                }
             except HTTPException:
                 raise
             except Exception as _e:
