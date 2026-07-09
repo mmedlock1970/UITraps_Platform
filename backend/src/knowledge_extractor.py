@@ -134,6 +134,144 @@ def load_analysis_reference(version: str = "v2.1") -> str:
     return _analysis_reference_caches[version]
 
 
+# ── KB-authoritative render strings — ONE source of truth (the KB), zero synced copies ──────────
+# The tenet cash-out glosses and the v1 trap→Tenet map are evaluative, KB-owned content. They are
+# parsed ONCE from the already-loaded, cached reference (no second file read) and memoized per
+# process, so the tool holds NO hand-maintained copy and can never silently disagree with the KB.
+# Parse failure is LOUD (raises) — a silent blank/guess would reintroduce exactly the drift this
+# eliminates.
+_CANON_TENETS = ("UNDERSTANDABLE", "COMFORTABLE", "RESPONSIVE", "EFFICIENT",
+                 "ACCURATE", "PROTECTIVE", "HABITUATING", "BEAUTIFUL")
+# Parser contract (KB Ledger 24): the eight glosses live in a uniquely-delimited fenced block, one
+# per line as `- less <Tenet>: "<gloss>"`. We parse ONLY within the fences — this disambiguates the
+# live glosses from the Ledger 23 prose that quotes them. Wording inside is free to reword; the
+# fences + line shape are the contract.
+_GLOSS_BLOCK_START = "<!-- TENET-GLOSSES:START -->"
+_GLOSS_BLOCK_END = "<!-- TENET-GLOSSES:END -->"
+_GLOSS_LINE_RX = re.compile(r'-\s*less\s+([A-Za-z]+)\s*:\s*"([^"]+)"')
+_tenet_gloss_cache: "dict[str, dict]" = {}
+
+
+def load_tenet_glosses(version: str = "v2.1") -> "dict[str, str]":
+    """Emergent-Patterns tenet cash-out glosses, parsed VERBATIM from the KB's TENET-GLOSSES fenced
+    block (Ledger 24: KB-owned, authoritative — the tool holds no copy). Parsed once from the loaded
+    reference, memoized per version. Raises loudly if the block is missing or any of the eight
+    canonical Tenets is absent — a parse miss must be visible, never a silent blank."""
+    cached = _tenet_gloss_cache.get(version)
+    if cached is not None:
+        return cached
+    # Anchor on the marker lines as STANDALONE lines (the real fence sits on its own line, while a
+    # backtick mention of the markers appears inside the descriptive prose above the block) — this
+    # targets the true fence, not the prose reference to it.
+    ref_lines = load_analysis_reference(version).splitlines()
+    si = next((i for i, l in enumerate(ref_lines) if l.strip() == _GLOSS_BLOCK_START), -1)
+    ei = next((i for i in range(si + 1, len(ref_lines)) if ref_lines[i].strip() == _GLOSS_BLOCK_END),
+              -1) if si != -1 else -1
+    if si == -1 or ei == -1:
+        raise ValueError(
+            f"KB gloss parse FAILED for version {version!r}: TENET-GLOSSES fenced block "
+            f"({_GLOSS_BLOCK_START} … {_GLOSS_BLOCK_END}) not found as standalone marker lines in the "
+            f"KB. The eight glosses are read from this block (Ledger 24) — do not render without it."
+        )
+    block = "\n".join(ref_lines[si + 1:ei])   # parse ONLY within the fences
+    glosses = {m.group(1).upper(): m.group(2).strip() for m in _GLOSS_LINE_RX.finditer(block)}
+    missing = [t for t in _CANON_TENETS if t not in glosses]
+    if missing:
+        raise ValueError(
+            f"KB gloss parse FAILED for version {version!r}: no gloss for {missing} in the "
+            f"TENET-GLOSSES block. Expected `- less <Tenet>: \"<gloss>\"` lines (Ledger 24)."
+        )
+    _tenet_gloss_cache[version] = glosses
+    return glosses
+
+
+# ── Runtime provenance stamps (RELAY B): facts the tool can verify at runtime, never hardcoded ──
+_kb_file_sha_cache: "dict[str, str]" = {}
+
+
+def kb_file_sha256(version: str = "v2.1") -> str:
+    """First 8 hex of sha256 of the KB FILE actually loaded for this version — computed from the
+    file bytes (matches `sha256sum <file>`), memoized per process. Never hardcoded, never derived
+    from the version label; changes when the KB file changes."""
+    if version not in _ANALYSIS_REFERENCE_PATHS:
+        version = "v2.1"
+    cached = _kb_file_sha_cache.get(version)
+    if cached is None:
+        cached = _kb_file_sha_cache[version] = hashlib.sha256(
+            _ANALYSIS_REFERENCE_PATHS[version].read_bytes()
+        ).hexdigest()[:8]
+    return cached
+
+
+_build_sha_cache: "list" = []  # one-slot memo: [] = not computed, [value_or_None] = computed
+
+
+def build_sha() -> "str | None":
+    """git short-sha (8) of the running code — from a build/deploy-provided env var if present, else
+    a live `git rev-parse` when a repo is reachable. Returns None if neither is available (the caller
+    stamps 'unavailable' and the deploy must expose one of the env vars). Memoized per process."""
+    if _build_sha_cache:
+        return _build_sha_cache[0]
+    val = None
+    for _var in ("RAILWAY_GIT_COMMIT_SHA", "GIT_COMMIT", "GIT_SHA", "SOURCE_COMMIT",
+                 "SOURCE_VERSION", "HEROKU_SLUG_COMMIT", "VERCEL_GIT_COMMIT_SHA"):
+        _v = os.environ.get(_var)
+        if _v and _v.strip():
+            val = _v.strip()[:8]
+            break
+    if val is None:
+        try:
+            import subprocess
+            _out = subprocess.run(
+                ["git", "rev-parse", "--short=8", "HEAD"],
+                cwd=str(Path(__file__).resolve().parents[2]),
+                capture_output=True, text=True, timeout=2,
+            )
+            if _out.returncode == 0 and _out.stdout.strip():
+                val = _out.stdout.strip()[:8]
+        except Exception:
+            val = None
+    _build_sha_cache.append(val)
+    return val
+
+
+_V1_TAXONOMY_HEADER = "## TENETS AND THEIR TRAPS"
+_v1_trap_tenet_cache: "dict[str, str] | None" = None
+
+
+def load_v1_trap_tenet_map() -> "dict[str, str]":
+    """The v1 trap→Tenet map, parsed from the FROZEN v1.0 card deck's `## TENETS AND THEIR TRAPS`
+    section (`+ TENET` headers, `- Trap` members). ONE source of truth: the KB. Parsed once from the
+    loaded v1 reference, memoized. Raises loudly if the section is absent or yields no groupings."""
+    global _v1_trap_tenet_cache
+    if _v1_trap_tenet_cache is not None:
+        return _v1_trap_tenet_cache
+    lines = load_analysis_reference("v1").splitlines()
+    try:
+        start = next(i for i, l in enumerate(lines) if l.strip() == _V1_TAXONOMY_HEADER)
+    except StopIteration:
+        raise ValueError(
+            f"v1 taxonomy parse FAILED: '{_V1_TAXONOMY_HEADER}' section not found in the v1.0 KB. "
+            f"The v1 tenet map reads from this section — do not render v1 without it."
+        )
+    mapping, cur = {}, None
+    for line in lines[start + 1:]:
+        s = line.strip()
+        if s.startswith("## "):          # next top-level section → end of taxonomy block
+            break
+        if s.startswith("+ "):
+            cur = s[2:].strip().upper()
+        elif s.startswith("- ") and cur:
+            mapping[re.sub(r"\s+", " ", s[2:].strip()).upper()] = cur
+    if not mapping:
+        raise ValueError(
+            f"v1 taxonomy parse FAILED: '{_V1_TAXONOMY_HEADER}' found but no `+ Tenet / - Trap` "
+            f"groupings parsed from the v1.0 KB."
+        )
+    _v1_trap_tenet_cache = mapping
+    return mapping
+
+
 # ---------------------------------------------------------------------------
 # PDF extraction helpers
 # ---------------------------------------------------------------------------

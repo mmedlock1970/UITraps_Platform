@@ -352,7 +352,7 @@ TECHNICAL BUGS  →  bugs_detected
 summary_headline / summary_narrative — THE EXECUTIVE BOTTOM LINE:
    Write these two fields for a smart, busy decision-maker who asked one question — "what did the analysis reveal?" — and wants the answer, not the workings. Plain, everyday English only: NO framework jargon (no trap names, no tenet names, none of "severity / confidence / adjudication / coverage"), NO counts, NO description of how the analysis was performed. Frame everything in terms of the specific users and the specific tasks named in the context.
    `summary_headline`: one sentence (16–24 words), verdict first — how well this interface lets those users get those tasks done. No wind-up.
-   `summary_narrative`: one tight paragraph (about 3–5 sentences), in this order:
+   `summary_narrative`: one tight paragraph — as long as needed to deliver the verdict and its essential caveats and NO longer (hard ceiling 7 sentences; typically 3–5; NEVER padded to a floor — a clear 3-sentence verdict beats a padded 6). This length rule is the single source of truth and holds identically in BOTH Brief and Standard modes. Cover, in this order:
      1) The bottom line, plainly — does the design support the stated users and tasks, and how well (what it gets right, where it breaks down).
      2) What most gets in the users' way — described as a person would experience it, grouped, not an exhaustive list.
      3) What is worth considering to improve the outcome — advisory and results-oriented ("the biggest lever is…", "consider…"), never a rigid instruction.
@@ -917,11 +917,12 @@ USE ENVIRONMENT:
     verbosity_section = (
         "\n⚡ BRIEF OUTPUT MODE — ACTIVE:\n"
         "Write concise output throughout:\n"
-        "- summary_narrative: 2 sentences maximum\n"
         "- headline: keep short (already required — comply strictly)\n"
         "- problem: 1–2 sentences maximum\n"
         "- recommendation: 1–2 sentences maximum\n"
         "Prioritize the most important information. Omit elaboration and examples.\n"
+        "(The executive summary — summary_headline / summary_narrative — is EXEMPT from this "
+        "cap; write it per its own length rule, which already forbids padding.)\n"
     ) if verbosity == "brief" else ""
 
     _task_list = user_context.get('task_list') or []

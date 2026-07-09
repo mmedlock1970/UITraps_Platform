@@ -56,6 +56,10 @@ TENET_COLORS = {
     "PROTECTIVE":     "#642FA1",
     "HABITUATING":    "#1F7DA8",
     "BEAUTIFUL":      "#E37209",
+    # v1-only Tenets (the v1 deck splits what v2.1 folded into PROTECTIVE). Colors are tool
+    # DISPLAY (the card deck defines no hex); kept in the PROTECTIVE purple family, distinct.
+    "FORGIVING":      "#7A3FB0",
+    "DISCREET":       "#4A3A8C",
 }
 
 # Canonical tenet → trap ordering for the coverage matrix
@@ -120,7 +124,9 @@ def _normalize_trap_name(name: str) -> str:
     return re.sub(r'\s+', ' ', name).strip()
 
 
-# Reverse lookup: normalized trap name → tenet name (upper)
+# Reverse lookup: normalized trap name → Tenet (upper), v2.1 lineage. v1 / v1.1 do NOT use this —
+# they read the FROZEN v1.0 map from the KB at runtime (see _tenet_for → load_v1_trap_tenet_map),
+# so there is no hand-maintained v1 copy to drift.
 _TRAP_TO_TENET: Dict[str, str] = {
     _normalize_trap_name(trap): tenet
     for tenet, traps in TENETS_AND_TRAPS
@@ -128,11 +134,23 @@ _TRAP_TO_TENET: Dict[str, str] = {
 }
 
 
-def _tenet_for(trap_name: str, fallback_tenet: str = '') -> str:
-    """Return the tenet name (upper) for a given trap name, using fallback if not found."""
+def _tenet_for(trap_name: str, fallback_tenet: str = '', version: str | None = None) -> str:
+    """Return the Tenet name (upper) for a trap name (fallback if not found).
+
+    version selects the lineage: v1 / v1.1 read the FROZEN v1.0 card-deck map FROM THE KB
+    (knowledge_extractor.load_v1_trap_tenet_map — ONE source of truth, parsed once + cached, no
+    tool copy); everything else reads the v2.1 table. Passing the wrong version to a v1 render is
+    the taxonomy leak this guards against."""
     if fallback_tenet:
         return fallback_tenet.upper()
-    return _TRAP_TO_TENET.get(_normalize_trap_name(trap_name), '')
+    nm = _normalize_trap_name(trap_name)
+    if version in ("v1", "v1.1"):
+        try:
+            from .knowledge_extractor import load_v1_trap_tenet_map
+        except ImportError:
+            from knowledge_extractor import load_v1_trap_tenet_map
+        return load_v1_trap_tenet_map().get(nm, '')
+    return _TRAP_TO_TENET.get(nm, '')
 
 
 def _tenet_pill_html(trap_name: str, tenet: str) -> str:
@@ -484,7 +502,7 @@ def format_report_as_markdown(report: Dict[str, Any], user_context: Dict[str, st
     sorted_md = []
     for sev_key in ('critical', 'moderate', 'minor'):
         group = [(s, sl, i) for s, sl, i in all_confirmed_md if s == sev_key]
-        group.sort(key=lambda x: conf_order.get(x[2].get('confidence', 'low'), 2))
+        group.sort(key=lambda x: conf_order.get((x[2].get('confidence') or 'low').lower(), 2))
         sorted_md.extend(group)
 
     md.append("## Traps Found")
@@ -2946,6 +2964,9 @@ _TENET_PILL = {
     "UNDERSTANDABLE": "#35597F", "COMFORTABLE": "#C1442B", "RESPONSIVE": "#8F6510",
     "EFFICIENT": "#A11B5E", "ACCURATE": "#34793B", "PROTECTIVE": "#5C2E93",
     "HABITUATING": "#1C6F96", "BEAUTIFUL": "#A85408",
+    # v1-only Tenets (v1 deck's split of what v2.1 folded into PROTECTIVE). Tool DISPLAY colors —
+    # the card deck defines no hex — kept in the PROTECTIVE-purple family, distinct from each other.
+    "FORGIVING": "#6E39A6", "DISCREET": "#453A82",
 }
 _SEV_CLASS = {"critical": "high", "high": "high", "medium": "medium", "low": "low"}
 # Single source for the rev6 scorecard AND card display-normalization, so the matrix tally can
@@ -3025,6 +3046,8 @@ _NEW_KB_ISSUES_CSS = """
 .r-title{font-size:23px;margin:8px 0 2px;font-weight:680;letter-spacing:-.01em}
 .r-meta{margin-top:16px;display:flex;flex-wrap:wrap;gap:6px 22px;font-size:12.5px;color:var(--ink-soft)}
 .r-meta .k{font-family:var(--font-sans);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint)}
+.r-stamp{margin-top:10px;font-family:ui-monospace,'SFMono-Regular',Menlo,Consolas,monospace;font-size:11px;color:var(--ink-faint);letter-spacing:.02em;user-select:all;-webkit-user-select:all}
+.r-attest{margin-top:5px;font-size:11px;color:var(--ink-soft);letter-spacing:.01em}
 .trunc{margin:14px 0;padding:12px 16px;border-left:4px solid var(--sev-critical);background:var(--sev-critical-tint);border-radius:6px;color:var(--sev-critical);font-size:14px}
 .report-inner{padding:28px 32px}
 .section+.section{margin-top:30px}
@@ -3132,21 +3155,9 @@ table.disposition{border-collapse:separate;border-spacing:0;width:100%;min-width
 """
 
 
-# Emergent Patterns — fixed per-Tenet cash-out glosses (KB G8 / Ledger 22). Rendered VERBATIM:
-# never paraphrased, never model-generated. EXHAUSTIVE over all eight Tenets — every fired trap's
-# Tenet maps to exactly one, no blanks. The tenet-concentration line reads ONLY over Tenets whose
-# Traps actually fired (a low/zero count is never read as strength — excluded Tenets simply do
-# not appear).
-_TENET_CASHOUT = {
-    "UNDERSTANDABLE": "hard to make sense of",
-    "HABITUATING": "hard to predict and master because things behave and appear inconsistently",
-    "EFFICIENT": "more work than the goal needs",
-    "ACCURATE": "what it shows or predicts is wrong or misleading",
-    "PROTECTIVE": "it doesn't guard users against loss, error, or exposure",
-    "BEAUTIFUL": "the look undercuts trust or fit for the audience",
-    "COMFORTABLE": "physically awkward or straining to operate",
-    "RESPONSIVE": "the system feels slow or you can't tell it's working",
-}
+# Emergent Patterns tenet cash-out glosses are KB-OWNED and read at runtime — the tool holds NO
+# copy (KB Ledger 23; superseding the old "tool holds a synced verbatim copy" model). They are
+# parsed once from the loaded KB and rendered verbatim; see knowledge_extractor.load_tenet_glosses.
 _EP_NUM = {2: "Two", 3: "Three", 4: "Four", 5: "Five", 6: "Six", 7: "Seven", 8: "Eight", 9: "Nine"}
 
 
@@ -3160,22 +3171,16 @@ def _ep_join(items: list) -> str:
     return ", ".join(items[:-1]) + ", and " + items[-1]
 
 
-def _ep_lc_first(s: str) -> str:
-    """Lower-case a headline's first letter for mid-sentence use ("Two nav bars…" → "two nav
-    bars…"), but leave acronyms / proper nouns alone (an all-caps or two-caps start stays)."""
-    s = s.strip()
-    if len(s) >= 2 and s[0].isupper() and s[1:2].islower():
-        return s[0].lower() + s[1:]
-    return s
-
-
-def _emergent_patterns_html(report: dict, findings: list) -> list:
+def _emergent_patterns_html(report: dict, findings: list, version: str = "v2.1") -> list:
     """Render-time DERIVATION (NO model call) of the opening Emergent Patterns synthesis
     (KB G8 / Ledger 22). Failure-side, observation register, descriptive-only — never an
     imperative, never a severity change. Reads the retained issue-level substrate (issue_groups)
     plus the fired findings' Tenets; no fresh cross-Trap/cross-Tenet pass. Two independent axes
     (both may fire). Omitted entirely when there are no findings. Inputs are pre-escaped by the
-    public entry, so dynamic values (location, headlines) are appended without re-escaping."""
+    public entry, so dynamic values (location, headlines) are appended without re-escaping.
+
+    The tenet cash-out glosses are read VERBATIM from the KB (version-scoped) once per render — the
+    tool holds no copy (Ledger 23)."""
     findings = [f for f in (findings or []) if isinstance(f, dict)]
     if not findings:
         return []
@@ -3221,45 +3226,63 @@ def _emergent_patterns_html(report: dict, findings: list) -> list:
     # Tenet has ≥2 fired Traps AND leads by a clear margin: top ≥ runner-up + 2, OR top ≥ 50% of
     # all fired Traps. A one-Trap margin does NOT fire; a tie for top does NOT fire.
     #
-    # Assessability leash (KB guard iii), coverage-driven, NEVER a static tenet list. A Tenet
-    # enters the ranking iff ≥1 of its Traps fired this run. THEN the STRICTER exclusion
-    # (author-ruled 2026-07-09): drop a fired Tenet from the tally when MORE of its Traps landed
-    # in "couldn't evaluate" (not_assessable_artifact / not_assessable_context) than fired — that
-    # Tenet was mostly un-inspectable, so its low fired count is an unreliable measure of
-    # concentration and must not be named, counted in the denominator, or used as the runner-up.
-    # Computed per-run from actual coverage; not_present (assessed AND absent) is successful
-    # inspection and does NOT count against a Tenet. No Tenet is ever pre-judged unassessable —
-    # a Responsive/Protective Trap that DOES fire from a screenshot counts fully.
-    counts = Counter()
+    # The whole tenet-concentration ranking is in DISTINCT-TRAP units, not instances — a trap firing
+    # N times is ONE trap. This keeps the ≥2 fire gate ("two distinct trap types", not one trap
+    # firing twice) and the assessability leash both in the same trap unit as KB guard iii.
+    #
+    # Assessability leash (KB guard iii), coverage-driven, NEVER a static tenet list. A Tenet enters
+    # the ranking iff ≥1 of its Traps fired this run. THEN the STRICTER exclusion: drop a fired Tenet
+    # when MORE of its Traps landed in "couldn't evaluate" (not_assessable_artifact / _context) than
+    # fired — that Tenet was mostly un-inspectable, so its concentration reading is unreliable and it
+    # must not be named, counted in the denominator, or used as the runner-up. Both sides count
+    # DISTINCT traps. not_present (assessed AND absent) is successful inspection and does NOT count
+    # against a Tenet. No Tenet is pre-judged unassessable — a Responsive/Protective Trap that DOES
+    # fire from a screenshot counts fully.
+    _fired_traps: "dict[str, set]" = {}
     by_tenet = OrderedDict()
     for f in findings:
         ten = str(f.get("tenet") or _tenet_for(f.get("trap_name", ""))).strip().upper()
+        nm = _normalize_trap_name(f.get("trap_name", ""))
         if not ten:
             continue
-        counts[ten] += 1
         by_tenet.setdefault(ten, []).append(f)
+        if nm:
+            _fired_traps.setdefault(ten, set()).add(nm)
+    counts = Counter({t: len(s) for t, s in _fired_traps.items()})   # DISTINCT fired traps / Tenet
     _UNASSESSABLE = {"not_assessable_artifact", "not_assessable_context"}
-    couldnt = Counter()
+    _couldnt_traps: "dict[str, set]" = {}
     for c in (report.get("traps_checked_not_found") or []):
         if isinstance(c, dict) and c.get("coverage_status") in _UNASSESSABLE:
             ct = str(c.get("tenet") or _tenet_for(c.get("trap_name", ""))).strip().upper()
-            if ct:
-                couldnt[ct] += 1
-    for t in [t for t in counts if couldnt[t] > counts[t]]:
+            cnm = _normalize_trap_name(c.get("trap_name", ""))
+            if ct and cnm:
+                _couldnt_traps.setdefault(ct, set()).add(cnm)
+    couldnt = {t: len(s) for t, s in _couldnt_traps.items()}          # DISTINCT un-inspectable / Tenet
+    for t in [t for t in counts if couldnt.get(t, 0) > counts[t]]:
         del counts[t]
         by_tenet.pop(t, None)
     if counts:
+        # Glosses read VERBATIM from the KB (parsed once, cached) — no tool copy (Ledger 23). A
+        # parse miss raises loudly inside the loader; never a silent blank.
+        try:
+            from .knowledge_extractor import load_tenet_glosses
+        except ImportError:
+            from knowledge_extractor import load_tenet_glosses
+        _glosses = load_tenet_glosses(version)
         ranked = counts.most_common()
         top_ten, top_n = ranked[0]
         runner = ranked[1][1] if len(ranked) > 1 else 0
         total = sum(counts.values())
         tie = sum(1 for _, c in ranked if c == top_n) > 1
-        if (not tie) and top_ten in _TENET_CASHOUT and top_n >= 2 and (top_n >= runner + 2 or top_n * 2 >= total):
-            named = [_ep_lc_first(str(f.get("headline") or "")) for f in by_tenet[top_ten]]
+        if (not tie) and top_ten in _glosses and top_n >= 2 and (top_n >= runner + 2 or top_n * 2 >= total):
+            # Headlines woven into the "because …" clause verbatim — NOT lowercased: a lowercased
+            # proper noun ("google login…") reads as clearly wrong, whereas an occasional
+            # mid-sentence capital ("The login…") reads as barely-off, and this is the exec summary.
+            named = [str(f.get("headline") or "").strip() for f in by_tenet[top_ten]]
             named = [h for h in named if h]
             tail = _ep_join(named[:3]) + (", among others" if len(named) > 3 else "")
             adj = top_ten.capitalize()
-            cash = _TENET_CASHOUT[top_ten]
+            cash = _glosses[top_ten]
             lines.append(
                 f"Most of what's wrong here makes the interface less {adj} — {cash}"
                 + (f" — because {tail}." if tail else "."))
@@ -3288,6 +3311,10 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
     Reuses the By-Issue CSS and chrome so the two reports look identical; only the middle
     body differs (trap-centric vs issue-centric). Input is pre-escaped."""
     uc = user_context or {}
+    # Lineage for taxonomy resolution: v1 / v1.1 renders read the FROZEN v1.0 tenet map; everything
+    # else reads the v2.1 table. Threaded into every _tenet_for call below so no v1 render is
+    # colored/labelled/grouped by the v2.1 taxonomy.
+    _ver = str(settings.get("kb_version", "v2.1")).strip().lower()
 
     def sevc(label):
         return _SEV_CLASS.get((label or "").strip().lower(), "medium")
@@ -3304,6 +3331,26 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
                 # missing/off-enum severity_label falls back to the model's array placement
                 # rather than a blanket "Medium" (self-serve by-trap leaves severity_label optional).
                 _findings.append({**f, "_src_sev": _SRC_SEV[_arr]})
+
+    # Emergent Patterns computed ONCE here and reused in the Summary body below, so the attestation
+    # line can state the ACTUAL render outcome (emitted or not), never an assumption. v1 / v1.1
+    # suppress it entirely (Ledger 22 is v2.1 material).
+    _ep_lines = _emergent_patterns_html(report, _findings, version=_ver) if _ver not in ("v1", "v1.1") else []
+
+    # ── Runtime provenance (RELAY B) — facts the tool verifies for THIS run, never hardcoded. KB
+    # sha is sha256 of the loaded KB file; build sha is env/git; the isolation / full-stack items
+    # derive from the ACTUAL config + render path (they attest INPUTS/paths, not output quality). ──
+    try:
+        from .knowledge_extractor import kb_file_sha256, build_sha
+    except ImportError:
+        from knowledge_extractor import kb_file_sha256, build_sha
+    _kb_sha = kb_file_sha256(settings.get("kb_version", "v2.1"))
+    _build = build_sha()
+    _is_v1 = _ver in ("v1", "v1.1")
+    _profile = str(settings.get("profile", "")).strip().lower()
+    _selfserve = _profile == "self-serve"
+    _twopass = settings.get("mode") == "twopass"
+    _ep_rendered = bool(_ep_lines)
 
     # ── header meta (identical to By-Issue) ──
     _meta = []
@@ -3343,7 +3390,32 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
     h.append("<div class='r-meta'>")
     for k, v in _meta:
         h.append(f"<span><span class='k'>{k}</span> {v}</span>")
-    h.append("</div></div>")
+    h.append("</div>")
+    # Provenance stamp — the true shas as facts (no staleness verdict; a-simple). Copyable.
+    h.append(f"<div class='r-stamp'>KB {_kb_sha} · build {_build or 'unavailable'}</div>")
+    # Isolation / full-stack attestation — each item a runtime fact about what was loaded/applied
+    # THIS run. v1: confirmed-clean INPUTS/paths (NOT a leak-free-output guarantee). v2.1: components
+    # PRESENT/APPLIED (NOT a performance/optimality claim). A contradicting fact is stamped as-is.
+    if _is_v1:
+        _att = [
+            f"KB {_kb_sha}",
+            "v1 taxonomy",
+            ("no Emergent Patterns" if not _ep_rendered else "Emergent Patterns RENDERED (unexpected)"),
+            ("self-serve (no v2.1 scaffolding)" if _selfserve
+             else f"profile {_profile or 'unknown'} — NOT self-serve"),
+        ]
+        h.append("<div class='r-attest'>v1.0 isolated — " + " · ".join(_att) + "</div>")
+    else:
+        _coached = not _selfserve
+        _att = [
+            f"KB {_kb_sha}",
+            ("system-prompt know-how ✓" if _coached else "system-prompt know-how — (self-serve, KB-only)"),
+            ("two-pass ✓" if _twopass else "two-pass — (not applied)"),
+            ("Emergent Patterns ✓" if _ep_rendered else "Emergent Patterns — (no findings)"),
+            ("exec-voice ✓" if _coached else "exec-voice — (self-serve, KB-only)"),
+        ]
+        h.append("<div class='r-attest'>v2.1 full stack — " + " · ".join(_att) + "</div>")
+    h.append("</div>")
 
     if settings.get("truncated"):
         h.append("<div class='trunc'>⚠️ <b>Incomplete report:</b> the analysis output was cut off at the length limit, so some traps or coverage notes may be missing. Re-running usually resolves this.</div>")
@@ -3363,10 +3435,9 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
         h.append(f"<p class='headline-lg'>{report['summary_headline']}</p>")
     if report.get("summary_narrative"):
         h.append(f"<p class='narrative'>{report['summary_narrative']}</p>")
-    # Emergent Patterns (KB G8 / Ledger 22) — opening synthesis prose folded into the Summary,
-    # ABOVE the scorecard, no subtitle. Render-time derivation over issue_groups + fired findings'
-    # Tenets; NO model call. Emits nothing when there are no findings.
-    h.extend(_emergent_patterns_html(report, _findings))
+    # Emergent Patterns — folded into the Summary ABOVE the scorecard, no subtitle. Computed once
+    # above (_ep_lines) and gated there: v2.1 material only, suppressed for v1 / v1.1 (Ledger 22).
+    h.extend(_ep_lines)
     _rows, _cols = _SCORE_ROWS, _SCORE_COLS
     _counts = {(r, c[0]): 0 for r in _rows for c in _cols}
     _sev_norm, _conf_norm = _SEV_NORM, _CONF_NORM
@@ -3402,7 +3473,7 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
         for tname, instances in by_trap.items():
             idx += 1
             first = instances[0]
-            tenet = (first.get("tenet") or "").upper() or (_tenet_for(tname) or "").upper()
+            tenet = (first.get("tenet") or "").upper() or (_tenet_for(tname, version=_ver) or "").upper()
             color = _TENET_PILL.get(tenet, "#35597F")
             definition = first.get("definition") or ""
             h.append("<div class='card card-trapart'>")
@@ -3533,7 +3604,7 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
         h.append("<p class='narrative'>Pivotal unknowns that couldn't be settled from this artifact — each names a check that would resolve it.</p>")
         for _c in _closer:
             _pname = _c.get("trap_name", "")
-            _tn = (_c.get("tenet") or "").upper() or (_tenet_for(_pname) or "").upper()
+            _tn = (_c.get("tenet") or "").upper() or (_tenet_for(_pname, version=_ver) or "").upper()
             _color = _TENET_PILL.get(_tn, "#35597F")
             h.append("<div class='card card-trapart'>")
             h.append("<div class='card-rail'><div class='trap'>")
@@ -3596,7 +3667,7 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
             h.append("<div class='coverage'>")
             for c in _partial:
                 name = c.get('trap_name', '')
-                color = _TENET_PILL.get(_tenet_for(name).upper(), "#35597F")
+                color = _TENET_PILL.get(_tenet_for(name, version=_ver).upper(), "#35597F")
                 d = (c.get("detail") or "").replace("assessed within scope:", "Checked:").replace("not assessable from this artifact:", "couldn’t check:").replace("not assessable:", "couldn’t check:")
                 h.append("<div class='cov-item assess'>")
                 h.append(f"<span class='tpill' style='background:{color}'>{name}</span>")
@@ -3610,7 +3681,7 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
             h.append("<div class='coverage'>")
             for c in _did_not_find:
                 name = c.get('trap_name', '')
-                color = _TENET_PILL.get(_tenet_for(name).upper(), "#35597F")
+                color = _TENET_PILL.get(_tenet_for(name, version=_ver).upper(), "#35597F")
                 h.append(f"<div class='cov-item'><span class='tpill' style='background:{color}'>{name}</span></div>")
             h.append("</div></div>")
         if _couldnt:
@@ -3619,7 +3690,7 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
             h.append("<div class='coverage'>")
             for c in _couldnt:
                 name = c.get('trap_name', '')
-                color = _TENET_PILL.get(_tenet_for(name).upper(), "#35597F")
+                color = _TENET_PILL.get(_tenet_for(name, version=_ver).upper(), "#35597F")
                 reason = "needs details about your users" if c.get("coverage_status") == "not_assessable_context" else "needs the live product or more screens"
                 h.append("<div class='cov-item assess'>")
                 h.append(f"<span class='tpill' style='background:{color}'>{name}</span>")
@@ -3686,7 +3757,7 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
         h.append("<div class='disp-wrap'><table class='disposition'><tbody>")
         for canonical in _taxonomy:
             _nm = _normalize_trap_name(canonical)
-            color = _TENET_PILL.get(_tenet_for(canonical).upper(), "#35597F")
+            color = _TENET_PILL.get(_tenet_for(canonical, version=_ver).upper(), "#35597F")
             h.append("<tr>")
             h.append(f"<td class='dt-trap'><span class='tpill' style='background:{color}'>{canonical}</span></td>")
             if _nm in _found:

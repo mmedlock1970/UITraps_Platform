@@ -121,6 +121,45 @@ def test_bytrap_truncated_partial_dict_does_not_raise(tmp_path):
     assert result.get("html")
 
 
+def test_issue_groups_json_string_is_recovered(tmp_path):
+    # The model occasionally JSON-ENCODES issue_groups as a string (same failure the per-finding
+    # arrays already recover from). It must be recovered, not dropped — else the Emergent Patterns
+    # regional axis and the disposition "within an issue" attribution silently go blank.
+    import json
+    rep = {"summary_headline": "h", "summary_narrative": "n",
+           "critical_issues": [{"trap_name": "POOR GROUPING", "tenet": "HABITUATING", "headline": "nav split",
+                                "problem": "p", "recommendation": "r", "severity_label": "High", "confidence": "High"}],
+           "moderate_issues": [{"trap_name": "AMBIGUOUS HOME", "tenet": "HABITUATING", "headline": "home unclear",
+                                "problem": "p", "recommendation": "r", "severity_label": "Medium", "confidence": "High"}],
+           "minor_issues": [], "traps_checked_not_found": [], "positive_observations": [],
+           "issue_groups": json.dumps([{"location": "the two nav bars", "traps": [
+               {"trap_name": "POOR GROUPING", "relationship": "root_cause"},
+               {"trap_name": "AMBIGUOUS HOME", "relationship": "consequence"}]}])}
+    img = tmp_path / "t.png"
+    Image.new("RGB", (400, 300), "#ddd").save(img)
+
+    def cap(**kw):
+        m = Mock()
+        if "tools" in kw:
+            m.content = [Mock(type="tool_use", name="ui_analysis_report", input=rep)]
+            m.stop_reason = "tool_use"
+        else:
+            m.content = [Mock(type="text", text="POOR GROUPING | s0 | nav | x")]
+            m.stop_reason = "end_turn"
+        m.usage = Mock(input_tokens=100, output_tokens=50, cache_creation_input_tokens=0, cache_read_input_tokens=0)
+        return m
+    a = UITrapsAnalyzer.__new__(UITrapsAnalyzer)
+    a.client = Mock(); a.client.messages.create.side_effect = cap
+    a.model = "m"; a.enrich_model = "e"; a.use_caching = True
+    res = a.analyze_design(
+        design_file=str(img),
+        user_context={"users": "first-time visitors", "tasks": "buy a sofa", "format": "app", "content_type": "website"},
+        kb_version="v2.1", report_style="trap", mode="single", profile="default",
+    )
+    assert isinstance(res["report"]["issue_groups"], list) and res["report"]["issue_groups"]
+    assert "concentrate on the two nav bars" in res["html"]  # regional axis fired from recovered substrate
+
+
 # ── streaming helper: streams when a real context-manager stream exists, else create() ─────────
 
 def _bare_analyzer():

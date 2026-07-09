@@ -1933,6 +1933,13 @@ async def unified_ask(
     - Files + context → Trap analysis
     - Files + question (no context) → Hybrid
     """
+    # Sonnet-only (Haiku dropped): reject any non-Sonnet model at the edge with a clean 400 —
+    # before token spend — rather than silently falling back to Sonnet, which would make the
+    # report's config line claim a model the run didn't use. analyze_design re-checks (defense in
+    # depth). None/"" defaults to Sonnet downstream.
+    if pass1_model is not None and str(pass1_model).strip().lower() not in ("", "sonnet"):
+        raise HTTPException(status_code=400, detail="model not available: only Sonnet is available.")
+
     intent = detect_intent(message, files, users, tasks, format, figma_url=figma_url, input_type=input_type)
 
     # For analysis requests, check subscription and consume a token

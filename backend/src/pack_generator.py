@@ -498,6 +498,14 @@ def _load_manifest_or_none(version: str) -> "dict | None":
         return None
 
 
+# Per-process caches keyed by (version, master sha256). The master sha is mtime-cached (cheap), so
+# a KB edit changes the sha → cache miss → fresh read of the regenerated packs — the "no restart for
+# a KB swap" contract holds. This spares the DEFAULT two-pass path ~100 KB of file reads + a JSON
+# parse per request (manifest + both packs are deterministic given the master).
+_MANIFEST_CACHE: "dict[tuple, dict]" = {}
+_PACK_TEXT_CACHE: "dict[tuple, str]" = {}
+
+
 def ensure_current(version: str, regenerate: bool = True) -> dict:
     """
     Staleness guard. Compare the packs' recorded master hash against the current master.
@@ -509,8 +517,12 @@ def ensure_current(version: str, regenerate: bool = True) -> dict:
     on hash-mismatched packs" safety net.
     """
     current = master_hash(version)
+    cached = _MANIFEST_CACHE.get((version, current))
+    if cached is not None:  # already validated fresh for this master this process
+        return cached
     manifest = _load_manifest_or_none(version)
     if manifest is not None and manifest.get("master_sha256") == current:
+        _MANIFEST_CACHE[(version, current)] = manifest
         return manifest
     if not regenerate:
         raise RuntimeError(
@@ -522,21 +534,30 @@ def ensure_current(version: str, regenerate: bool = True) -> dict:
         # Re-check under the lock: another thread may have just regenerated.
         manifest = _load_manifest_or_none(version)
         if manifest is not None and manifest.get("master_sha256") == current:
+            _MANIFEST_CACHE[(version, current)] = manifest
             return manifest
         write(version)
-        return load_manifest(version)
+        manifest = load_manifest(version)
+        _MANIFEST_CACHE[(version, current)] = manifest
+        return manifest
 
 
 _PACK_FILES = {"pass1": "pass1_detection_pack.md", "pass2": "pass2_core_pack.md"}
 
 
 def load_pack(version: str, which: str) -> str:
-    """Read the 'pass1' (detection) or 'pass2' (adjudication core) pack text."""
+    """Read the 'pass1' (detection) or 'pass2' (adjudication core) pack text. Memoized by
+    (version, which, master sha) so the default two-pass path does not re-read the packs every
+    request; a master edit changes the sha → cache miss → fresh read of the regenerated pack."""
     try:
         fname = _PACK_FILES[which]
     except KeyError:
         raise ValueError(f"unknown pack {which!r}; expected one of {sorted(_PACK_FILES)}")
-    return (_twopass_dir(version) / fname).read_text(encoding="utf-8")
+    key = (version, which, master_hash(version))
+    cached = _PACK_TEXT_CACHE.get(key)
+    if cached is None:
+        cached = _PACK_TEXT_CACHE[key] = (_twopass_dir(version) / fname).read_text(encoding="utf-8")
+    return cached
 
 
 def load_chunks(version: str, trap_names: list[str], manifest: dict | None = None) -> str:

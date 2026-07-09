@@ -10,6 +10,8 @@ Three fixtures lock the behavior most likely to be wrong — the gate:
 """
 import re
 
+import pytest
+
 from src.formatters import format_bytrap_report_as_html, _emergent_patterns_html
 
 _SET = {"kb_version": "v2.1", "report_style": "trap"}
@@ -122,7 +124,37 @@ def test_trapfest_axis_b_tenet_habituating_verbatim_cashout():
             "master because things behave and appear inconsistently — because") in seg
     # 4 Habituating findings → first three named + "among others"
     assert "among others." in seg
-    assert "two navigation bars split site navigation" in seg  # lc-first of a named finding
+    assert "Two navigation bars split site navigation" in seg  # headline verbatim, not lowercased
+
+
+def test_emergent_gloss_is_read_from_kb_verbatim():
+    # DRIFT-GUARD: the gloss the render prints must equal the gloss parsed from the KB AND appear
+    # verbatim in trap_kb_v2.1.md — proving the tool reads the KB (Ledger 23), holds no hardcoded
+    # copy. If a tool-side copy is ever reintroduced and diverges from the KB, this fails.
+    from pathlib import Path
+    from src.knowledge_extractor import load_tenet_glosses
+    kb_text = (Path(__file__).resolve().parents[1] / "data" / "trap_kb_v2.1.md").read_text(encoding="utf-8")
+    _, seg = _ep_section(_trapfest())  # fires axis (b) "less Habituating"
+    m = re.search(r"less Habituating — (.+?) — because", seg)
+    assert m, "no Habituating gloss in the rendered Emergent Patterns line"
+    rendered_gloss = m.group(1)
+    assert rendered_gloss == load_tenet_glosses("v2.1")["HABITUATING"], "render != KB-parsed gloss"
+    assert rendered_gloss in kb_text, "rendered gloss not present verbatim in trap_kb_v2.1.md (drift!)"
+
+
+def test_gloss_loader_matches_fenced_block_exactly_eight():
+    # DRIFT-GUARD: independently parse the TENET-GLOSSES fenced block from the KB file and confirm
+    # the loader matches it exactly and yields all eight (Ledger 24 contract). Parse ONLY within the
+    # fences so the Ledger 23 prose that quotes glosses is not matched.
+    from pathlib import Path
+    from src.knowledge_extractor import load_tenet_glosses
+    kb_lines = (Path(__file__).resolve().parents[1] / "data" / "trap_kb_v2.1.md").read_text(encoding="utf-8").splitlines()
+    si = next(i for i, l in enumerate(kb_lines) if l.strip() == "<!-- TENET-GLOSSES:START -->")
+    ei = next(i for i in range(si + 1, len(kb_lines)) if kb_lines[i].strip() == "<!-- TENET-GLOSSES:END -->")
+    block = "\n".join(kb_lines[si + 1:ei])
+    parsed = {k.upper(): v for k, v in re.findall(r'-\s*less\s+([A-Za-z]+)\s*:\s*"([^"]+)"', block)}
+    assert len(parsed) == 8, f"expected 8 glosses in the fenced block, parsed {len(parsed)}"
+    assert load_tenet_glosses("v2.1") == parsed, "loader drifted from the TENET-GLOSSES fenced block"
 
 
 def test_trapfest_no_imperative_no_positive():
@@ -171,6 +203,23 @@ def test_axis_b_fires_on_clear_majority():
     assert "less Habituating" in out
 
 
+@pytest.mark.parametrize("kbv", ["v1", "v1.1"])
+def test_v1_suppresses_emergent_patterns_entirely(kbv):
+    # Ledger 22 is v2.1-only material (fixed tenet glosses + concentration thresholds). A v1 run —
+    # the clean control — renders NO Emergent Patterns section in ANY form (not empty, not a stub).
+    rep = _trapfest()  # would fire both axes under v2.1
+    html = format_bytrap_report_as_html(rep, {"design_name": "T"}, {"kb_version": kbv, "report_style": "trap"})
+    assert "ep-line" not in html
+    assert "concentrate on" not in html and "Most of what's wrong here" not in html
+    assert "The single most consequential issue:" not in html
+
+
+def test_v21_still_renders_emergent_patterns():
+    rep = _trapfest()
+    html = format_bytrap_report_as_html(rep, {"design_name": "T"}, {"kb_version": "v2.1", "report_style": "trap"})
+    assert "ep-line" in html
+
+
 def _cov(trap, tenet, status="not_assessable_artifact"):
     return {"trap_name": trap, "tenet": tenet, "coverage_status": status, "detail": "x"}
 
@@ -190,6 +239,39 @@ def test_stricter_drops_mostly_unassessable_tenet():
     assert "less Protective" not in seg, "mostly-un-inspectable Tenet must not be named"
     assert "Most of what's wrong here" not in seg
     assert "The single most consequential issue:" in seg
+
+
+def test_leash_counts_distinct_traps_not_instances():
+    # One trap firing 3× is ONE distinct fired trap. With 2 of its Tenet's traps un-inspectable, the
+    # Tenet is mostly un-inspectable (1 distinct fired < 2 un-inspectable) → must be DROPPED. Counting
+    # fired INSTANCES (3) would defeat the leash (3 > 2) and fire the false concentration claim the
+    # guard exists to suppress. (Regression for the instance-vs-distinct unit bug.)
+    rep = {"summary_headline": "h", "summary_narrative": "n", "issue_groups": [],
+           "moderate_issues": [], "minor_issues": [], "positive_observations": [],
+           "critical_issues": [
+               _f("IRREVERSIBLE ACTION", "PROTECTIVE", "critical", "delete has no undo"),
+               _f("IRREVERSIBLE ACTION", "PROTECTIVE", "critical", "bulk purge is instant"),
+               _f("IRREVERSIBLE ACTION", "PROTECTIVE", "critical", "reset wipes settings"),
+               _f("POOR GROUPING", "HABITUATING", "critical", "actions are scattered"),
+           ],
+           "traps_checked_not_found": [_cov("UNWANTED DISCLOSURE", "PROTECTIVE"),
+                                       _cov("DATA LOSS", "PROTECTIVE")]}
+    _, seg = _ep_section(rep)
+    assert "less Protective" not in seg, "leash must drop a Tenet with 1 distinct fired trap vs 2 un-inspectable"
+    assert "Most of what's wrong here" not in seg  # PROTECTIVE dropped; HABITUATING has 1 distinct → no fire
+
+
+def test_fire_gate_needs_two_distinct_traps_not_one_firing_twice():
+    # One trap firing twice is a single trap type → ≥2 fire gate must NOT trip on it.
+    rep = {"summary_headline": "h", "summary_narrative": "n", "issue_groups": [],
+           "moderate_issues": [], "minor_issues": [], "positive_observations": [],
+           "traps_checked_not_found": [],
+           "critical_issues": [
+               _f("DISTRACTION", "UNDERSTANDABLE", "critical", "hero autoplays"),
+               _f("DISTRACTION", "UNDERSTANDABLE", "critical", "banner also autoplays"),
+           ]}
+    _, seg = _ep_section(rep)
+    assert "Most of what's wrong here" not in seg  # 1 distinct trap → below the ≥2 gate → no fire
 
 
 def test_fired_tenet_survives_when_mostly_inspectable():

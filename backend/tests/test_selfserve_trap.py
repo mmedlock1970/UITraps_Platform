@@ -144,6 +144,35 @@ def test_selfserve_trap_tenets_derived_upper_matching_v21():
     assert tenet and tenet == tenet.upper()
 
 
+def test_fill_selfserve_trap_tenets_pins_full_behavior():
+    """GUARD (regression): _fill_selfserve_trap_tenets was reconstructed from intent after a
+    too-wide bulk deletion removed it — and the suite passed WITHOUT it. This pins the behavior so
+    the suite now fails if the function is absent or wrong: fill a MISSING / BLANK / None tenet
+    from the trap name via _tenet_for (UPPER), PRESERVE a tenet the model already gave, and
+    TOLERATE non-dict findings without crashing."""
+    a = UITrapsAnalyzer.__new__(UITrapsAnalyzer)
+    report = {
+        "critical_issues": [
+            {"trap_name": "DISTRACTION"},                                # missing → filled
+            {"trap_name": "POOR GROUPING", "tenet": ""},                 # blank → filled
+            {"trap_name": "UNCOMPREHENDED ELEMENT", "tenet": None},      # None → filled
+            {"trap_name": "AMBIGUOUS HOME", "tenet": "habituating-CUSTOM"},  # present → preserved
+            "junk", None, 42,                                            # non-dict → tolerated
+        ],
+        "moderate_issues": [], "minor_issues": [],
+    }
+    a._fill_selfserve_trap_tenets(report)  # must not raise on the non-dict members
+    dicts = [f for f in report["critical_issues"] if isinstance(f, dict)]
+    for f in dicts:
+        if f["trap_name"] == "AMBIGUOUS HOME":
+            assert f["tenet"] == "habituating-CUSTOM", "a model-provided tenet must be preserved"
+        else:
+            assert f.get("tenet") and f["tenet"] == f["tenet"].upper(), \
+                f"tenet not derived (UPPER) for {f['trap_name']}"
+    # non-dict members are left in place, not crashed on
+    assert "junk" in report["critical_issues"] and 42 in report["critical_issues"]
+
+
 def test_selfserve_trap_coverage_carries_both_vocabularies():
     """Coverage must render under either formatter branch: new-KB reads coverage_status,
     legacy (v1/v2) reads the testable boolean."""

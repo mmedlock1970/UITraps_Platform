@@ -209,6 +209,14 @@ class UITrapsAnalyzer:
         if not is_valid_file:
             raise ValueError(f"Invalid file: {file_msg}")
 
+        # Sonnet-only (Haiku dropped). Hard-reject any non-Sonnet model instead of silently
+        # falling back — a report's config line must never claim a model the run did not use, so a
+        # silent fallback would make that line lie. None defaults to Sonnet; "sonnet" is explicit;
+        # anything else (stale client, saved config, hand-edited payload) is rejected here, the
+        # single chokepoint every call path (image, flow, multi-screen) passes through.
+        if pass1_model is not None and str(pass1_model).strip().lower() not in ("", "sonnet"):
+            raise ValueError(f"model not available: {pass1_model!r} — only Sonnet is available.")
+
         # The By-Issue report style is retired — every run renders By Trap. Pinning here forces the
         # by-trap schema/prompt/formatter for ALL profiles (including self-serve, 1D) and makes the
         # legacy issue-mode branches below inert. The `report_style` param is kept for API/signature
@@ -333,7 +341,7 @@ class UITrapsAnalyzer:
             for _opt in ('positive_observations', 'traps_checked_not_found'):
                 if not isinstance(report.get(_opt), list):
                     report[_opt] = []
-            self._fill_selfserve_trap_tenets(report)
+            self._fill_selfserve_trap_tenets(report, kb_version)
             self._derive_selfserve_trap_coverage(report, kb_version)
             self._crop_issue_regions(report, _design_files)
         else:
@@ -363,6 +371,16 @@ class UITrapsAnalyzer:
             # a list of dicts and canonicalize each bound trap's G3 relationship. This renders
             # nothing in the report body; the Emergent Patterns synthesis section reads it.
             _ig = report.get("issue_groups")
+            if isinstance(_ig, str):
+                # The model occasionally JSON-encodes an array field as a string (the same failure
+                # the per-finding arrays above recover from). Recover it so the substrate isn't
+                # silently dropped → Emergent Patterns / disposition attribution would go blank.
+                for _loader in (json.loads, ast.literal_eval):
+                    try:
+                        _ig = _loader(_ig)
+                        break
+                    except Exception:
+                        continue
             report["issue_groups"] = [g for g in _ig if isinstance(g, dict)] if isinstance(_ig, list) else []
             for _g in report["issue_groups"]:
                 _gt = _g.get("traps")
@@ -552,11 +570,12 @@ class UITrapsAnalyzer:
             print(f"[UITraps] Region crop skipped: {crop_err}")
         return None
 
-    def _fill_selfserve_trap_tenets(self, report: Dict[str, Any]) -> None:
+    def _fill_selfserve_trap_tenets(self, report: Dict[str, Any], kb_version: str = None) -> None:
         """Self-serve BY-TRAP: the bare KB-only schema does not require `tenet`, but the by-trap
         formatter needs it for each finding's pill. Derive a missing/blank tenet from the trap
-        name (the coached formatters get it from the model). Fills only when absent; leaves any
-        tenet the model did provide untouched. Tolerates malformed (non-dict) findings."""
+        name (the coached formatters get it from the model), using the version's OWN taxonomy —
+        v1 findings get v1 Tenets (the frozen v1.0 card-deck map), not the v2.1 table. Fills only
+        when absent; leaves any tenet the model did provide untouched. Tolerates non-dict findings."""
         try:
             from .formatters import _tenet_for
         except ImportError:
@@ -564,7 +583,7 @@ class UITrapsAnalyzer:
         for _sev in ('critical_issues', 'moderate_issues', 'minor_issues'):
             for _f in (report.get(_sev) or []):
                 if isinstance(_f, dict) and not (_f.get('tenet') or '').strip():
-                    _t = _tenet_for(_f.get('trap_name', ''))
+                    _t = _tenet_for(_f.get('trap_name', ''), version=kb_version)
                     if _t:
                         _f['tenet'] = _t
 
@@ -1120,7 +1139,7 @@ class UITrapsAnalyzer:
         report["_usage_last"] = _sum_usage(det_usage, _adj_usage)
 
         _det_pass = {"pass": "detection", "latency_s": _det_latency_s, "stop_reason": _det_stop,
-                     "model": effective_model, "max_tokens": 4000}
+                     "model": effective_model, "max_tokens": _detection_max_tokens}
         for _k in ("input", "output", "cache_read", "cache_creation", "cost"):
             _det_pass[_k] = (det_usage or {}).get(_k)
         _adj_pass = {"pass": "adjudication"}

@@ -985,16 +985,18 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
                   key={v}
                   type="button"
                   className={`${styles.kbVersionBtn} ${pass1Model === v ? styles.kbVersionBtnActive : ''}`}
-                  onClick={() => setPass1Model(v)}
-                  disabled={disabled}
+                  // Haiku is dropped for now — the slot stays visible (for future models) but
+                  // non-selectable. Sonnet is the only reachable model; the backend also rejects
+                  // any non-Sonnet request, so this is UI convenience, not the enforcement point.
+                  onClick={() => v === 'sonnet' && setPass1Model(v)}
+                  disabled={disabled || v === 'haiku'}
                 >
                   {v === 'sonnet' ? 'Sonnet' : 'Haiku'}
                 </button>
               ))}
             </div>
             <p className={styles.fieldHint}>
-              {pass1Model === 'sonnet' && 'Recommended. Best visual analysis accuracy for production reviews.'}
-              {pass1Model === 'haiku' && '~3× faster and cheaper. Lower accuracy — best for quick checks, not final reviews.'}
+              Sonnet only for now — additional models may be added in future releases.
             </p>
           </div>
 
