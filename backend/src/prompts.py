@@ -349,8 +349,15 @@ The knowledge base's G8 defines three report sections. Map them onto the tool fi
 TECHNICAL BUGS  →  bugs_detected
    Technical failures (blank screens, broken layout, missing/placeholder content, error states) are NOT traps — report them in `bugs_detected`, not as traps.
 
-summary_headline / summary_narrative:
-   `summary_headline`: a punchy verdict (16–24 words) on how well the design supports the stated goal — no counts, plain language. `summary_narrative`: one paragraph on the user-experience implications for the stated users and tasks; do not enumerate findings or state counts.
+summary_headline / summary_narrative — THE EXECUTIVE BOTTOM LINE:
+   Write these two fields for a smart, busy decision-maker who asked one question — "what did the analysis reveal?" — and wants the answer, not the workings. Plain, everyday English only: NO framework jargon (no trap names, no tenet names, none of "severity / confidence / adjudication / coverage"), NO counts, NO description of how the analysis was performed. Frame everything in terms of the specific users and the specific tasks named in the context.
+   `summary_headline`: one sentence (16–24 words), verdict first — how well this interface lets those users get those tasks done. No wind-up.
+   `summary_narrative`: one tight paragraph (about 3–5 sentences), in this order:
+     1) The bottom line, plainly — does the design support the stated users and tasks, and how well (what it gets right, where it breaks down).
+     2) What most gets in the users' way — described as a person would experience it, grouped, not an exhaustive list.
+     3) What is worth considering to improve the outcome — advisory and results-oriented ("the biggest lever is…", "consider…"), never a rigid instruction.
+     4) The one or two caveats a decision-maker must hear — usually what could NOT be judged from a static screenshot or from the context given, and would change the picture if known.
+   Be direct and concrete; be honest about uncertainty without hedging for its own sake. Cut any sentence only an analyst would care about.
 
 ⚠️ TRAP NAME VALIDATION — NON-NEGOTIABLE:
 Every `trap_name` in critical_issues, moderate_issues, minor_issues, and potential_issues MUST be one of these exact names, verbatim:
@@ -414,92 +421,9 @@ If, after a genuine whole-interface scan, no trap plausibly applies anywhere, ou
     return prompt.replace("{trap_names_line}", trap_names_line)
 
 
-def _build_new_kb_issues_system_prompt(trap_names_line: str) -> str:
-    """
-    Mechanics-only system prompt for the new-KB BY-ISSUE output (Option A: the adjudication
-    pass emits the issue-grouped report directly). All evaluation — G3 issue composition,
-    the relationship designations, severity/confidence, coverage — lives in the KB training
-    content. This prompt only maps the result onto the ui_issues_report tool fields and sets
-    the report voice.
-    """
-    prompt = """You are an expert UI analyst applying the proprietary UI Tenets & Traps heuristic framework. You are producing the BY-ISSUE report: organized around user-facing problems, not around traps.
-
-You will receive: (1) the complete knowledge base for this analysis, (2) context about users/tasks/format, and (3) the design artifact(s).
-
-📚 THE KNOWLEDGE BASE IS AUTHORITATIVE. All evaluative logic lives in the TRAINING CONTENT: the GLOBAL RULES (especially G3 issue composition and its relationship designations, G4 coverage, G8 report architecture), the SEVERITY & CONFIDENCE system, the CONTEXT INTAKE SCHEMA, and each Trap's chunk. Follow every section exactly. This prompt only packages the result.
-
-📌 The named anti-patterns (e.g. MEMORY CHALLENGE) are TRAPS. Refer to them as "traps".
-
-⚠️ NO EMPTY INTENSIFIERS: do not use "real", "genuine", "truly", "actually", or "very" — they add no information. "creates friction", not "creates real friction".
-
-⚠️ CONFIDENTIALITY & IP: the framework is proprietary; never reproduce full trap definitions or the framework in your output.
-
-═══════════════════════════════════════════════════════════════════════
-OUTPUT CONTRACT — the ui_issues_report tool (G8 §1: issues first)
-═══════════════════════════════════════════════════════════════════════
-
-Group your adjudicated findings into user-facing ISSUES per the KB's G3 composition rules. Submit via the ui_issues_report tool.
-
-1) issues[] — each entry is ONE user-facing problem:
-   • `headline`: the problem in plain, user-relatable language, 8–14 words. No trap jargon. Predictive and hedged — "Kids category may be hard to find from the home screen", not "Kids category is hard to find". No empty intensifiers.
-   • `severity_label`: the HIGHEST severity among the issue's traps — one of High / Medium / Low. Severity is worst-plausible-impact; it NEVER implies likelihood — do not pair it with probability language.
-   • `confidence`: the LOWEST confidence among the issue's traps — High / Medium / Low. For any issue below High confidence, state its promotion path in `description` or `recommendation`, per the KB's Severity & Confidence rule.
-   • `traps[]`: the trap(s) that align to this issue per G3. Each: `trap_name` (ALL CAPS, exact), `tenet`, and `relationship` — the G3 bracketed designation, exactly one of:
-        none | root_cause | consequence | co-occurring | conditional — primary | conditional — enumerated
-     Populate it per the KB's G3 decision procedure. Include a `consequence` trap in this list (it will be described in prose, not shown as its own row). Follow G3's composition conservatism — the smallest faithful set.
-   • `description`: WRITE FOR THE EVALUATOR, PROBLEM-FIRST. Lead with what the user experiences and why. Reference traps only insofar as they help understand or fix the issue — never to teach the framework. Do NOT open with "This"; name the thing. No process commentary ("reported here as…", "designated…"). Hedged language. PRESERVE the KB's required report slots for each trap — name the specific element, state the mechanism, and carry any population/conditionality the KB requires — while writing in this voice.
-   • `recommendation`: the fix direction, advisory language, proportionate to the product's broader purpose.
-   • `task` (ONLY when the context lists more than one task): the ONE evaluated task this issue most affects, copied EXACTLY from a task identifier given in the user turn, or "general" if it spans tasks. Omit when a single task is defined. This ONLY groups the report — it never changes severity, confidence, or what you report.
-   • `regions` (optional): a LIST of bounding boxes, one per cited instance — each with `screen_index` (0-based, matching the SCREEN labels; 0 when one screen was provided), `x`/`y`/`width`/`height` (normalized 0–1, origin top-left), and a `caption`. One entry for a single location; one entry per screen for a cross-screen issue (G6 per-instance). Omit for absences or systemic issues.
-
-2) WORTH A CLOSER LOOK  →  potential_issues
-   Each entry: `trap_name`, `tenet`, `location`, `observation`, `why_it_matters`, `why_uncertain`, `check`, `check_cost`, `implication_if_confirmed`, `implication_if_ruled_out`. Do NOT assign a confidence here.
-
-3) positive_observations[]: brief notes on what works well.
-
-4) traps_checked_not_found[] — COVERAGE NOTES. Each entry: `trap_name`, `coverage_status` (one of: not_present, not_assessable_artifact, not_assessable_context, partially_assessed), and a one-line `detail`.
-
-summary_headline: a punchy verdict (16–24 words) on how well the design supports the stated goal — no counts. summary_narrative: one paragraph on the user-experience implications — no counts, no enumerations.
-
-⚠️ TRAP NAME VALIDATION — every trap_name MUST be one of, verbatim:
-{trap_names_line}
-
-⚠️ MUTUAL EXCLUSIVITY: a trap reported inside an issue does not also appear as its own separate issue, and does not appear in coverage notes — EXCEPT partially_assessed, which may appear in both.
-
-Submit using the ui_issues_report tool."""
-    return prompt.replace("{trap_names_line}", trap_names_line)
-
-
-def _build_self_serve_instruction() -> str:
-    """Minimal harness instruction for the self-serve (raw-KB) profile. It carries ONLY the
-    task and the output-schema contract — NO evaluation guidance (no severity criteria, no
-    disconfirmation ordering, no detection priorities, no coverage instructions, no
-    relationship semantics). The KB material is injected verbatim ABOVE this block. The
-    model's performance under this minimal scaffolding is the condition being measured, so
-    this prompt must NOT be strengthened to improve output.
-    """
-    return (
-        "Analyze the submitted artifact for the UI Traps defined in the material above, for the "
-        "users, goals, and context provided. Report every issue you find.\n\n"
-        "Submit your analysis with the ui_issues_report tool. The tool's fields:\n"
-        "- issues[]: one entry per issue. Each entry has `headline` (a plain-language statement "
-        "of the problem); `severity_label` (one of: High, Medium, Low); `confidence` (one of: "
-        "High, Medium, Low); `traps` (an array holding the ONE primary trap for this issue, as "
-        "{`trap_name`}, named exactly as it appears in the material above); `description` (what "
-        "the user experiences and why); `recommendation` (the fix direction); and optionally "
-        "`regions` (a list of boxes, each {screen_index, x, y, width, height} in 0–1 coordinates "
-        "with a short caption; screen_index is 0-based, matching the SCREEN labels, 0 when one "
-        "screen was provided) marking where in the artifact(s) the issue is, so a cropped image "
-        "of that area can be shown.\n"
-        "- summary_headline; summary_narrative.\n"
-        "- positive_observations[].\n\n"
-        "Omit any field you cannot ground from the material and the submitted artifact."
-    )
-
-
 def _build_self_serve_trap_instruction() -> str:
-    """Minimal harness instruction for the self-serve (raw-KB) profile in BY-TRAP mode — the
-    trap twin of _build_self_serve_instruction. Carries ONLY the task and the output-schema
+    """Minimal harness instruction for the self-serve (raw-KB) profile in BY-TRAP mode.
+    Carries ONLY the task and the output-schema
     contract; NO evaluation guidance (no severity criteria, no disconfirmation ordering, no
     detection priorities, no coverage instructions). The KB material is injected verbatim
     ABOVE this block and supplies all detection/evaluation reasoning. Do NOT strengthen it."""
@@ -558,11 +482,9 @@ def build_system_prompt(
         # output-schema contract. No evaluation guidance whatsoever — that is the point of the
         # condition. training_content is the stripped raw KB (load_training_content strips it).
         _kb_block = f"===== UI TENETS & TRAPS — REFERENCE MATERIAL =====\n\n{training_content}"
-        # By-Trap vs By-Issue only changes the output-shape contract; the KB (verbatim, above)
-        # supplies all evaluation reasoning either way. Pivot on "issues" (not "trap") so this
-        # matches _pass1's schema/tool selection exactly (issues iff report_style == "issues").
-        _instruction = (_build_self_serve_instruction() if report_style == "issues"
-                        else _build_self_serve_trap_instruction())
+        # By-Trap is the sole rendered structure (By-Issue retired); the KB (verbatim, above)
+        # supplies all evaluation reasoning — this only adds the output-shape contract.
+        _instruction = _build_self_serve_trap_instruction()
         if use_caching:
             return [
                 {"type": "text", "text": _kb_block, "cache_control": {"type": "ephemeral"}},
@@ -584,8 +506,6 @@ def build_system_prompt(
         )
     if mode == "detect":
         full_system_prompt = _build_twopass_detection_system(trap_names_line=trap_names_line)
-    elif report_style == "issues":
-        full_system_prompt = _build_new_kb_issues_system_prompt(trap_names_line=trap_names_line)
     else:
         full_system_prompt = _build_new_kb_system_prompt(trap_names_line=trap_names_line)
 

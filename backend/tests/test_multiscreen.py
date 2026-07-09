@@ -3,9 +3,9 @@ Multi-screen (flow-aware) analysis — construction-level coverage (no API calls
 
 Covers the plumbing that turns N screenshots into ONE flow-aware analysis:
 1. build_multi_screen_blocks labels + interleaves screens (0-based, matching screen_index).
-2. All four surviving schemas expose regions[] with a screen_index (per-instance G6 shape).
+2. Both surviving trap schemas expose regions[] with a screen_index (per-instance G6 shape).
 3. _crop_findings_regions crops each regions[] entry against the screen its screen_index names.
-4. Both rev6 formatters render one crop per regions[] entry (multi-screen findings show several).
+4. The rev6 by-trap formatter renders one crop per regions[] entry (multi-screen findings show several).
 """
 import base64
 import io
@@ -14,9 +14,9 @@ import pytest
 from PIL import Image, ImageDraw
 
 from src.prompts import build_multi_screen_blocks, build_system_prompt
-from src.schema import get_ui_analysis_schema, get_ui_issues_schema
+from src.schema import get_ui_analysis_schema
 from src.analyzer import UITrapsAnalyzer, MAX_FLOW_SCREENS
-from src.formatters import format_issues_report_as_html, format_bytrap_report_as_html
+from src.formatters import format_bytrap_report_as_html
 
 
 # ── 1. Screen labeling ───────────────────────────────────────────────────────
@@ -52,9 +52,7 @@ def test_system_prompt_multi_screen_note_gated_and_cache_safe():
 
 @pytest.mark.parametrize("get_schema,arr,self_serve", [
     (lambda: get_ui_analysis_schema("v2.1"), "critical_issues", False),          # coached By-Trap
-    (lambda: get_ui_issues_schema("v2.1"), "issues", False),                     # coached By-Issue
     (lambda: get_ui_analysis_schema("v1", self_serve=True), "critical_issues", True),   # self-serve trap
-    (lambda: get_ui_issues_schema("v1", self_serve=True), "issues", True),              # self-serve issues
 ])
 def test_regions_field_shape(get_schema, arr, self_serve):
     schema = get_schema()
@@ -131,21 +129,21 @@ _B64 = base64.standard_b64encode(b"fakepng-A").decode()
 _B64B = base64.standard_b64encode(b"fakepng-B").decode()
 
 
-def test_issues_formatter_renders_a_crop_per_region():
+def test_bytrap_formatter_renders_a_crop_per_region():
     report = {
         "summary_headline": "h", "summary_narrative": "n", "positive_observations": [],
-        "traps_checked_not_found": [],
-        "issues": [{
+        "traps_checked_not_found": [], "moderate_issues": [], "minor_issues": [],
+        "critical_issues": [{
+            "trap_name": "INCONSISTENT APPEARANCE", "tenet": "HABITUATING",
             "headline": "logo styled two ways", "severity_label": "Medium", "confidence": "Medium",
-            "traps": [{"trap_name": "INCONSISTENT APPEARANCE", "tenet": "HABITUATING", "relationship": "root_cause"}],
-            "description": "d", "recommendation": "r",
+            "problem": "d", "recommendation": "r",
             "regions": [
                 {"screen_index": 0, "x": 0, "y": 0, "width": 0.2, "height": 0.2, "caption": "home header", "image_b64": _B64},
                 {"screen_index": 1, "x": 0, "y": 0, "width": 0.2, "height": 0.2, "caption": "results header", "image_b64": _B64B},
             ],
         }],
     }
-    html = format_issues_report_as_html(report, {"design_name": "T"}, {"kb_version": "v2.1"})
+    html = format_bytrap_report_as_html(report, {"design_name": "T"}, {"kb_version": "v2.1", "report_style": "trap"})
     assert html.count("<figure class='crop'>") == 2         # one crop per instance
     assert _B64 in html and _B64B in html
     assert "home header" in html and "results header" in html

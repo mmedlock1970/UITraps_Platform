@@ -82,12 +82,11 @@ try:
         build_enrichment_system_prompt, build_enrichment_user_message,
     )
     try:
-        from .formatters import parse_claude_response, format_report_as_markdown, format_report_as_html, get_report_statistics, format_issues_report_as_html, format_bytrap_report_as_html, format_new_kb_issues_markdown
+        from .formatters import parse_claude_response, format_report_as_markdown, format_report_as_html, get_report_statistics, format_bytrap_report_as_html
     except ImportError:
-        from .formatters import parse_claude_response, format_report_as_markdown, format_report_as_html, get_report_statistics, format_new_kb_issues_markdown
-        format_issues_report_as_html = None
+        from .formatters import parse_claude_response, format_report_as_markdown, format_report_as_html, get_report_statistics
         format_bytrap_report_as_html = None
-    from .schema import get_ui_analysis_schema, get_interaction_analysis_schema, get_user_issues_schema, get_ui_issues_schema, is_new_kb, normalize_relationship
+    from .schema import get_ui_analysis_schema, get_interaction_analysis_schema, get_user_issues_schema, is_new_kb, normalize_relationship
     from .knowledge_extractor import collect_found_trap_names, extract_trap_sections, extract_trap_images
     from .knowledge_base import get_chunks_for_traps
     from . import pack_generator
@@ -101,12 +100,11 @@ except ImportError:
         build_enrichment_system_prompt, build_enrichment_user_message,
     )
     try:
-        from formatters import parse_claude_response, format_report_as_markdown, format_report_as_html, get_report_statistics, format_issues_report_as_html, format_bytrap_report_as_html, format_new_kb_issues_markdown
+        from formatters import parse_claude_response, format_report_as_markdown, format_report_as_html, get_report_statistics, format_bytrap_report_as_html
     except ImportError:
-        from formatters import parse_claude_response, format_report_as_markdown, format_report_as_html, get_report_statistics, format_new_kb_issues_markdown
-        format_issues_report_as_html = None
+        from formatters import parse_claude_response, format_report_as_markdown, format_report_as_html, get_report_statistics
         format_bytrap_report_as_html = None
-    from schema import get_ui_analysis_schema, get_interaction_analysis_schema, get_user_issues_schema, get_ui_issues_schema, is_new_kb, normalize_relationship
+    from schema import get_ui_analysis_schema, get_interaction_analysis_schema, get_user_issues_schema, is_new_kb, normalize_relationship
     from knowledge_extractor import collect_found_trap_names, extract_trap_sections, extract_trap_images
     from knowledge_base import get_chunks_for_traps
     import pack_generator
@@ -281,7 +279,7 @@ class UITrapsAnalyzer:
             # Single-pass. The Thorough coverage option (the legacy tenet-parallel pipeline)
             # is deprecated and removed; `thorough_mode` is still accepted for API
             # compatibility but is ignored for every supported config.
-            report = self._pass1_issues_retry(
+            report = self._pass1(
                 design_file=design_file,
                 user_context=user_context,
                 timeout=timeout,
@@ -321,7 +319,6 @@ class UITrapsAnalyzer:
             "user_id": user_id,
         }
 
-        issues_report = None  # By-Issue rendering retired — the by-trap report is the sole output.
         if _self_serve:
             # Self-serve BY-TRAP: the single call already produced the per-trap report. This is
             # the KB-only condition, so there is NO enrichment pass (that would be a second call
@@ -339,7 +336,6 @@ class UITrapsAnalyzer:
             self._fill_selfserve_trap_tenets(report)
             self._derive_selfserve_trap_coverage(report, kb_version)
             self._crop_issue_regions(report, _design_files)
-            # issues_report stays None → renders via the legacy By-Trap formatter, unchanged.
         else:
             # Step 7: Pass 2 — Enrich findings using full book sections (per-trap path)
             try:
@@ -378,7 +374,6 @@ class UITrapsAnalyzer:
             # "Could Not Evaluate" breakdown. This makes v1 and v2 reports symmetric.
             self._normalize_report_completeness(report, kb_version=kb_version)
             self._crop_issue_regions(report, _design_files)
-        _accrue_usage(issues_report)
 
         if chat_context and chat_context.strip():
             user_context = dict(user_context)
@@ -653,8 +648,8 @@ class UITrapsAnalyzer:
         screens (KB G7) exactly as a multi-screenshot run does — NOT N stitched per-frame
         reports. This delegates to the shared evaluation engine, so every config axis is honored
         identically: profile (coaching lock: v1 → self-serve, so no deprecation-guard trip),
-        report_style (by-trap/by-issue), mode (one-pass via _pass1_issues_retry → _pass1 vs
-        two-pass via _twopass), verbosity, model, chat/page context, the MAX_FLOW_SCREENS
+        mode (one-pass via _pass1 vs two-pass via _twopass), verbosity, model, chat/page
+        context, the MAX_FLOW_SCREENS
         ceiling, and the rev6 renderer. There is no flow-specific prompt, schema, pass structure,
         text-injected flow context, or formatter — the previous per-frame-loop + separate
         flow-pass + _merge_reports + legacy-enrichment architecture is retired.
@@ -745,8 +740,7 @@ class UITrapsAnalyzer:
         labels + image blocks (see prompts.build_multi_screen_blocks). When provided it takes
         precedence over preloaded_image / design_file and all screens go to the model in ONE call.
 
-        For new KBs with report_style='issues' this emits the issue-grouped output
-        (ui_issues_report tool) directly (Option A); otherwise the per-trap report.
+        Emits the per-trap report (ui_analysis_report tool); By-Issue rendering is retired.
 
         system_prompt_override / extra_user_blocks let twopass mode reuse this call's
         parse+normalize machinery for its adjudication pass: the system prompt carries
@@ -773,9 +767,7 @@ class UITrapsAnalyzer:
         else:
             pass1_max_tokens = 3000 if verbosity == "brief" else 5000
 
-        # New-KB by-issue emits the issue-grouped structure directly (Option A).
         _self_serve = (profile == "self-serve")
-        _issues_mode = (is_new_kb(kb_version) or _self_serve) and report_style == "issues"
 
         if system_prompt_override is not None:
             system_prompt = system_prompt_override
@@ -828,16 +820,11 @@ class UITrapsAnalyzer:
         if extra_user_blocks:
             user_message = list(extra_user_blocks) + list(user_message)
 
-        if _issues_mode:
-            schema = get_ui_issues_schema(version=kb_version, self_serve=_self_serve)
-            tool_name = "ui_issues_report"
-            tool_desc = "Submit the complete UI Tenets & Traps BY-ISSUE report"
-        else:
-            # self_serve here means By-Trap KB-only: the BARE per-trap schema (no enums, no
-            # guidance), parallel to the bare issues schema. Default keeps the full trap schema.
-            schema = get_ui_analysis_schema(version=kb_version, self_serve=_self_serve)
-            tool_name = "ui_analysis_report"
-            tool_desc = "Submit the complete UI Tenets & Traps analysis report"
+        # self_serve here means By-Trap KB-only: the BARE per-trap schema (no enums, no
+        # guidance). Default keeps the full trap schema.
+        schema = get_ui_analysis_schema(version=kb_version, self_serve=_self_serve)
+        tool_name = "ui_analysis_report"
+        tool_desc = "Submit the complete UI Tenets & Traps analysis report"
         _t_call = time.time()
         try:
             response = self._create_message(
@@ -874,66 +861,6 @@ class UITrapsAnalyzer:
             )
             if not tool_use_block:
                 report = parse_claude_response(response.content[0].text)
-            elif _issues_mode:
-                # By-issue structure: normalize the issue list + each trap's relationship.
-                report = tool_use_block.input
-                report["_report_style"] = "issues"
-                for field in ("summary_headline", "summary_narrative"):
-                    if not isinstance(report.get(field), str):
-                        report[field] = ""
-
-                # Coerce each array field to a real list. The model occasionally JSON-encodes an
-                # array as a string (sometimes wrapped in ```json fences) instead of a native
-                # array; recover it rather than silently rendering an empty report.
-                def _coerce_list(v):
-                    if isinstance(v, list):
-                        return v
-                    if isinstance(v, str):
-                        s = v.strip()
-                        if s.startswith("```"):
-                            s = re.sub(r"^```[a-zA-Z0-9]*\s*", "", s)
-                            s = re.sub(r"\s*```$", "", s).strip()
-                        for _loader in (json.loads, ast.literal_eval):
-                            try:
-                                p = _loader(s)
-                                if isinstance(p, list):
-                                    return p
-                            except Exception:
-                                pass
-                    return []
-
-                _issues_raw = report.get("issues")
-                for list_field in ("issues", "positive_observations", "traps_checked_not_found"):
-                    report[list_field] = _coerce_list(report.get(list_field))
-
-                # Safety net: the by-issue report exists to surface issues[]. If it came back
-                # empty while the model produced a full report, that is a RUN ERROR, not "clean
-                # design" — surface it loudly and dump the raw tool input for inspection instead
-                # of shipping a misleading "No issues" report.
-                if not report["issues"]:
-                    logger.error(
-                        "[UITraps][RUN ERROR] by-issue adjudication returned NO issues "
-                        "(issues field was %s). This usually means a malformed tool call, not a "
-                        "clean design. Dumping raw tool input.", type(_issues_raw).__name__,
-                    )
-                    try:
-                        _dbg_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
-                        os.makedirs(_dbg_dir, exist_ok=True)
-                        _dbg_path = os.path.join(_dbg_dir, f"empty_issues_{time.strftime('%Y%m%d_%H%M%S')}.json")
-                        with open(_dbg_path, "w", encoding="utf-8") as _df:
-                            json.dump(dict(report), _df, ensure_ascii=False, indent=2, default=str)
-                        print(f"[UITraps][RUN ERROR] by-issue returned NO issues — raw dumped to {_dbg_path}")
-                    except Exception as _de:
-                        print(f"[UITraps][RUN ERROR] empty-issues dump failed: {_de}")
-                for _issue in report["issues"]:
-                    if not isinstance(_issue, dict):
-                        continue
-                    _traps = _issue.get("traps")
-                    if not isinstance(_traps, list):
-                        _issue["traps"] = _traps = []
-                    for _t in _traps:
-                        if isinstance(_t, dict):
-                            _t["relationship"] = normalize_relationship(_t.get("relationship"))
             else:
                 report = tool_use_block.input
                 # Truncation (stop_reason == max_tokens) can return a PARTIAL dict missing later
@@ -1004,25 +931,6 @@ class UITrapsAnalyzer:
             "model": effective_model,
             **({} if not _u else {k: _u.get(k) for k in ("input", "output", "cache_read", "cache_creation", "cost")}),
         }
-        return report
-
-    def _pass1_issues_retry(self, **kwargs):
-        """Run _pass1 and, for a BY-ISSUE call that comes back with ZERO issues (a rare
-        malformed tool call — not a clean design), retry once. A retry at temperature 0 almost
-        always yields a well-formed issues[]. The discarded attempt's token usage is folded into
-        the returned report so cost/token logging stays honest. Non-by-issue calls pass through
-        untouched."""
-        report = self._pass1(**kwargs)
-        _by_issue = ((is_new_kb(kwargs.get("kb_version")) or kwargs.get("profile") == "self-serve")
-                     and kwargs.get("report_style") == "issues")
-        if _by_issue and not report.get("issues"):
-            print("[UITraps] by-issue adjudication returned 0 issues — retrying once "
-                  "(temperature 0 usually self-corrects a malformed tool call)...")
-            logger.warning("[UITraps] by-issue returned 0 issues; retrying adjudication once.")
-            _wasted = report.get("_usage_last")
-            report = self._pass1(**kwargs)
-            if _wasted:
-                report["_usage_last"] = _sum_usage(_wasted, report.get("_usage_last"))
         return report
 
     def _twopass(
@@ -1188,7 +1096,7 @@ class UITrapsAnalyzer:
             extra_training=(chunks_text if chunks_text.strip() else None),
             mode="report", report_style=report_style, profile=profile,
         )
-        report = self._pass1_issues_retry(
+        report = self._pass1(
             design_file=design_file,
             user_context=user_context,
             timeout=timeout,

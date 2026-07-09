@@ -16,7 +16,6 @@ from src.schema import get_ui_analysis_schema, UI_ANALYSIS_SCHEMA, _self_serve_t
 from src.prompts import (
     build_system_prompt,
     _build_self_serve_trap_instruction,
-    _build_self_serve_instruction,
 )
 from src.analyzer import UITrapsAnalyzer
 
@@ -72,20 +71,11 @@ def test_selfserve_trap_instruction_is_minimal_and_artifact_neutral():
         assert leak not in low, f"trap instruction leaks guidance: {leak!r}"
 
 
-def test_selfserve_issues_instruction_wording_fixed():
-    # regression: the issues instruction no longer says "the screenshot"
-    issues = _build_self_serve_instruction()
-    assert "submitted artifact" in issues and "the screenshot" not in issues
-
-
 def test_build_system_prompt_selfserve_trap_routes_trap_instruction():
     blocks = build_system_prompt(version="v1", profile="self-serve", report_style="trap")
     assert len(blocks) == 2  # [stripped KB, minimal instruction]
     instr = blocks[1]["text"]
     assert "grouped by trap" in instr and "ui_analysis_report" in instr
-    # issues variant still routes to the issues instruction
-    issues_blocks = build_system_prompt(version="v1", profile="self-serve", report_style="issues")
-    assert "ui_issues_report" in issues_blocks[1]["text"]
 
 
 # ── analyzer wiring / isolation ────────────────────────────────────────────────

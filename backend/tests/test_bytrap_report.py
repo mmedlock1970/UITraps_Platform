@@ -11,7 +11,7 @@ from unittest.mock import Mock
 import pytest
 from PIL import Image
 
-from src.formatters import format_bytrap_report_as_html, format_issues_report_as_html
+from src.formatters import format_bytrap_report_as_html
 from src.schema import get_ui_analysis_schema
 from src.analyzer import UITrapsAnalyzer
 
@@ -67,33 +67,6 @@ def test_bytrap_groups_by_task_field_the_model_emits():
     assert "task-group-label" in html
     assert "Find kids shows" in html          # the task heading
     assert "General" in html                   # the untagged DISTRACTION finding
-
-
-def _issues_report():
-    return {
-        "summary_headline": "h", "summary_narrative": "n",
-        "issues": [
-            {"severity_label": "High", "confidence": "High", "headline": "Unlabeled icon",
-             "problem": "A bare glyph in the toolbar.", "recommendation": "Label it",
-             "task": "Find kids shows",
-             "traps": [{"trap_name": "UNCOMPREHENDED ELEMENT", "tenet": "UNDERSTANDABLE",
-                        "relationship": "root_cause"}]},
-            {"severity_label": "Medium", "confidence": "High", "headline": "Hero autoplays",
-             "problem": "The hero pulls focus.", "recommendation": "Pause it",
-             "traps": [{"trap_name": "DISTRACTION", "tenet": "UNDERSTANDABLE",
-                        "relationship": "root_cause"}]},
-        ],
-        "potential_issues": [], "traps_checked_not_found": [], "positive_observations": [],
-    }
-
-
-def test_byissue_groups_by_task_field_the_model_emits():
-    # REGRESSION (By-Issue counterpart): issue carrying `task` groups; untagged → General.
-    html = format_issues_report_as_html(_issues_report(), _multi_task_uc(),
-                                        {"kb_version": "v2.1", "report_style": "issues"})
-    assert "task-group-label" in html
-    assert "Find kids shows" in html          # the task heading
-    assert "General" in html                   # the untagged DISTRACTION issue
 
 
 # ── schema ──────────────────────────────────────────────────────────────────

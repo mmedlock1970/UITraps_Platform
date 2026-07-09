@@ -8,6 +8,7 @@ import base64
 import html
 import json
 import re
+from collections import Counter, OrderedDict
 from pathlib import Path
 from typing import Dict, Any, Optional
 from datetime import datetime
@@ -2940,212 +2941,6 @@ def format_report_as_html(
     return "\n".join(html)
 
 
-_ISSUES_REPORT_CSS = """
-  /* ── Base reset and typography ───────────────────────────────────────── */
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-         font-size: 15px; line-height: 1.6; color: #1a1a1a; background: #f5f5f5; }
-  .report-container { max-width: 860px; margin: 0 auto; padding: 32px 24px; }
-
-  /* ── Section titles (outside cards) ─────────────────────────────────── */
-  h2 { font-size: 1.2em; font-weight: 700; color: #111; margin: 32px 0 10px; }
-  .report-header + h2 { margin-top: 0; }
-
-  /* ── Header ─────────────────────────────────────────────────────────── */
-  .report-header { margin-bottom: 28px; padding-bottom: 20px;
-                   border-bottom: 1px solid #e8e8e8; }
-  .report-header h1 { font-size: 1.5em; font-weight: 700; color: #111; }
-  .report-subtitle { font-size: 0.88em; color: #666; margin-top: 3px;
-                     text-transform: uppercase; letter-spacing: .05em; }
-  .report-date { font-size: 0.82em; color: #999; margin-top: 8px; line-height: 1.6; }
-
-  /* ── Summary ─────────────────────────────────────────────────────────── */
-  .summary-section { background: #fff; border-radius: 12px; padding: 24px 28px 28px;
-                     margin-bottom: 0; box-shadow: 0 2px 8px rgba(0,0,0,.09); }
-  .summary-inner { }
-  .summary-headline { font-size: 1.08em; font-weight: 700; color: #111;
-                      margin-top: 20px; margin-bottom: 6px; line-height: 1.45; }
-  .summary-narrative { color: #555; line-height: 1.75; font-size: 0.97em; }
-
-  /* ── Scorecard table ─────────────────────────────────────────────────── */
-  .scorecard-title { font-size: 0.75em; font-weight: 700; color: #888;
-                     text-transform: uppercase; letter-spacing: .08em;
-                     margin-bottom: 12px; margin-top: 0; }
-  .scorecard-table { border-collapse: collapse; margin-bottom: 4px; }
-  .scorecard-table th, .scorecard-table td { padding: 7px 24px; text-align: center; font-size: 0.9em; }
-  .scorecard-table thead th { font-size: 0.78em; font-weight: 700; letter-spacing: .04em;
-                              border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; }
-  .scorecard-label { text-align: left !important; color: #666; font-size: 0.84em;
-                     padding-left: 0 !important; }
-  .scorecard-th-high     { color: #c0392b; }
-  .scorecard-th-moderate { color: #e67e22; }
-  .scorecard-th-low      { color: #27ae60; }
-  .scorecard-val-high    { color: #c0392b; font-weight: 700; font-size: 1.15em; }
-  .scorecard-val-moderate{ color: #e67e22; font-weight: 700; font-size: 1.15em; }
-  .scorecard-val-low     { color: #27ae60; font-weight: 700; font-size: 1.15em; }
-  .scorecard-empty { color: #ddd; font-weight: 400; font-size: 1em; }
-
-  /* ── Issues section ──────────────────────────────────────────────────── */
-  .issues-section { margin-bottom: 0; }
-
-  /* ── Issue card ──────────────────────────────────────────────────────── */
-  .issue-card { background: #fff; border-radius: 12px; padding: 0;
-                margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,.09);
-                overflow: hidden; }
-  .issue-number { font-size: 0.68em; font-weight: 700; letter-spacing: .1em;
-                  color: #aaa; padding: 18px 22px 4px; text-transform: uppercase; }
-  .issue-headline { font-size: 1.05em; font-weight: 700; color: #111;
-                    padding: 2px 22px 12px; line-height: 1.45; }
-  .issue-meta { display: flex; align-items: center; gap: 8px; padding: 0 22px 14px; flex-wrap: wrap; }
-  .severity-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-  .severity-label { font-size: 0.88em; font-weight: 600; color: #333; }
-  .meta-divider { color: #ccc; font-size: 0.85em; }
-  .confidence-label { font-size: 0.85em; color: #666; }
-
-  /* ── Traps block ─────────────────────────────────────────────────────── */
-  .issue-traps-section { border-top: 1px solid #f2f2f2; padding: 16px 22px; background: #fafafa; }
-  .traps-label { font-size: 0.68em; font-weight: 700; letter-spacing: .1em;
-                 color: #aaa; text-transform: uppercase; margin-bottom: 12px; }
-  .trap-item { margin-bottom: 12px; }
-  .trap-item:last-child { margin-bottom: 0; }
-  .trap-item-header { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; flex-wrap: wrap; }
-  .root-cause-label { font-size: 0.7em; color: #999; font-style: italic; }
-  .trap-item-definition { font-size: 0.82em; color: #666; line-height: 1.55;
-                          padding-left: 0; font-style: italic; }
-
-  /* ── Description / Recommendation ───────────────────────────────────── */
-  .issue-body-section { border-top: 1px solid #f2f2f2; padding: 16px 22px; }
-  .body-label { font-size: 0.68em; font-weight: 700; letter-spacing: .1em;
-                color: #aaa; text-transform: uppercase; margin-bottom: 10px; }
-  .issue-body-section p { color: #333; line-height: 1.75; font-size: 0.97em; }
-
-  /* ── Region crop ─────────────────────────────────────────────────────── */
-  .region-crop { margin: 14px 0 6px; }
-  .region-crop img { max-width: 100%; border-radius: 8px;
-                     border: 1px solid #e8e8e8; display: block;
-                     box-shadow: 0 2px 6px rgba(0,0,0,.08); }
-  .region-crop figcaption { font-size: 0.79em; color: #888;
-                             font-style: italic; margin-top: 8px; }
-
-  /* ── Positives ───────────────────────────────────────────────────────── */
-  .positives-section { background: #fff; border-radius: 12px; padding: 20px 24px 22px 28px;
-                       margin-bottom: 0; box-shadow: 0 2px 8px rgba(0,0,0,.09);
-                       border-left: 5px solid #27ae60; }
-  .positives-section ul { padding-left: 18px; }
-  .positives-section li { color: #444; margin-bottom: 7px; line-height: 1.65; font-size: 0.97em; }
-
-  /* ── Traps not found ─────────────────────────────────────────────────── */
-  .traps-not-found { background: #fff; border-radius: 12px; padding: 20px 24px;
-                     margin-bottom: 0; box-shadow: 0 2px 8px rgba(0,0,0,.09); }
-  .section-intro { color: #777; font-size: 0.88em; margin-bottom: 4px; }
-  .trap-name-list { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-  .tenet-pill { display: inline-block; color: #fff; font-size: 0.76em; font-weight: 700;
-                letter-spacing: .04em; padding: 4px 11px; border-radius: 4px; }
-
-  /* ── Footer ──────────────────────────────────────────────────────────── */
-  .footer { border-top: 1px solid #ebebeb; padding-top: 18px; margin-top: 16px;
-            font-size: 0.8em; color: #aaa; text-align: center; }
-
-  /* ── Evaluation Details ──────────────────────────────────────────────── */
-  .eval-details { background: #fff; border-radius: 12px; padding: 20px 24px;
-                  margin-bottom: 0; box-shadow: 0 2px 8px rgba(0,0,0,.09); }
-  .context-body p { color: #444; margin-bottom: 6px; font-size: 0.9em; }
-  .context-body ul { margin: 4px 0 8px; padding-left: 20px; }
-  .users-detail { margin: 0 0 8px; }
-  .users-detail-label { margin: 0 0 8px; }
-  .users-table { width: 100%; border-collapse: collapse; font-size: 0.93em;
-                 border: 1px solid #e4e1dc; border-radius: 6px; overflow: hidden; }
-  .users-table td { padding: 7px 12px; border: 1px solid #e4e1dc; vertical-align: top; line-height: 1.5; }
-  .users-table .ut-label { width: 170px; text-align: right; font-size: 0.78em; font-weight: 700;
-                            letter-spacing: 0.06em; text-transform: uppercase; color: #8a8680;
-                            white-space: nowrap; background: #faf9f7; }
-  .users-table .ut-value { color: #2c2c2c; }
-"""
-
-
-def _render_trap_bar_html(trap: dict[str, Any], is_root: bool) -> str:
-    """Render a trap entry for an issue card — pill + optional root-cause label + definition."""
-    trap_name = trap.get("trap_name", "")
-    tenet = trap.get("tenet", "")
-    definition = trap.get("definition", "")
-    color = TENET_COLORS.get(tenet.upper(), "#4a4744")
-
-    root_label = "<span class='root-cause-label'>root cause</span>" if is_root else ""
-    pill = f"<span class='tenet-pill' style='background:{color}'>{trap_name.upper()}</span>"
-    return (
-        f"<div class='trap-item'>"
-        f"<div class='trap-item-header'>{pill}{root_label}</div>"
-        f"<div class='trap-item-definition'>{definition}</div>"
-        f"</div>"
-    )
-
-
-def _render_issue_card_html(idx: int, issue: dict[str, Any], region_by_trap: dict[str, Any] | None = None) -> str:
-    """Render one issue card for the user-issues report."""
-    out = []
-    severity = issue.get("severity", "moderate")
-    confidence = issue.get("confidence", "medium")
-    headline = _cap_terms(issue.get("headline", ""))
-    description = _cap_terms(issue.get("description", ""))
-    recommendation = _cap_terms(issue.get("recommendation", ""))
-
-    sev_color = {"critical": "#c0392b", "moderate": "#e67e22", "minor": "#27ae60"}.get(severity, "#888")
-
-    out.append(f"<div class='issue-card'>")
-    out.append(f"<div class='issue-number'>ISSUE {idx}</div>")
-    out.append(f"<div class='issue-headline'>{headline}</div>")
-    out.append(
-        f"<div class='issue-meta'>"
-        f"<span class='severity-dot' style='background:{sev_color}'></span>"
-        f"<span class='severity-label'>Severity: {severity.capitalize()}</span>"
-        f"<span class='meta-divider'>|</span>"
-        f"<span class='confidence-label'>Confidence: {confidence.capitalize()}</span>"
-        f"</div>"
-    )
-
-    # Traps section
-    root = issue.get("root_cause_trap", {})
-    contributing = issue.get("contributing_traps", [])
-    if root:
-        out.append("<div class='issue-traps-section'>")
-        trap_label = "TRAP" if not contributing else "TRAPS"
-        out.append(f"<div class='traps-label'>{trap_label}</div>")
-        has_contributing = bool(contributing)
-        out.append(_render_trap_bar_html(root, is_root=has_contributing))
-        for trap in contributing:
-            out.append(_render_trap_bar_html(trap, is_root=False))
-        out.append("</div>")
-
-    # Description
-    out.append("<div class='issue-body-section'>")
-    out.append("<div class='body-label'>DESCRIPTION</div>")
-    out.append(f"<p>{description}</p>")
-
-    # Region crop: look up the root cause trap's Pass 1 screenshot crop.
-    # Only shown when Pass 1 identified a specific region with high confidence.
-    root_name = (root.get("trap_name") or "").upper().strip() if root else ""
-    region_entry = (region_by_trap or {}).get(root_name, {}) if root_name else {}
-    crop_b64 = region_entry.get("b64")
-    caption = region_entry.get("caption", "")
-    if crop_b64:
-        out.append(f"<figure class='region-crop'>")
-        out.append(f"<img src='data:image/png;base64,{crop_b64}' alt='Design detail'/>")
-        if caption:
-            out.append(f"<figcaption>{caption}</figcaption>")
-        out.append("</figure>")
-
-    out.append("</div>")
-
-    # Recommendation
-    out.append("<div class='issue-body-section'>")
-    out.append("<div class='body-label'>RECOMMENDATION</div>")
-    out.append(f"<p>{recommendation}</p>")
-    out.append("</div>")
-
-    out.append("</div>")  # .issue-card
-    return "\n".join(out)
-
-
 # Tenet → solid pill background (white-text-safe on both themes), from the rev6 design.
 _TENET_PILL = {
     "UNDERSTANDABLE": "#35597F", "COMFORTABLE": "#C1442B", "RESPONSIVE": "#8F6510",
@@ -3164,7 +2959,6 @@ _SCORE_ROWS = ["High", "Medium", "Low"]
 _SCORE_COLS = [("High", "task failure / high friction", "high"),
                ("Medium", "significant friction", "med"),
                ("Low", "low friction / polish", "low")]
-
 
 def _emit_eval_details(h: list, uc: dict) -> None:
     """Append the rev6 'Evaluation details' section (intended users + tasks evaluated) to `h`.
@@ -3338,466 +3132,154 @@ table.disposition{border-collapse:separate;border-spacing:0;width:100%;min-width
 """
 
 
-def _format_new_kb_issues_html(issues_report: dict, user_context: dict, settings: dict) -> str:
-    """Render the new-KB (v2.1-lineage) BY-ISSUE report (rev6 design). Input is pre-escaped."""
-    uc = user_context or {}
-    issues = [i for i in issues_report.get("issues") or [] if isinstance(i, dict)]
+# Emergent Patterns — fixed per-Tenet cash-out glosses (KB G8 / Ledger 22). Rendered VERBATIM:
+# never paraphrased, never model-generated. EXHAUSTIVE over all eight Tenets — every fired trap's
+# Tenet maps to exactly one, no blanks. The tenet-concentration line reads ONLY over Tenets whose
+# Traps actually fired (a low/zero count is never read as strength — excluded Tenets simply do
+# not appear).
+_TENET_CASHOUT = {
+    "UNDERSTANDABLE": "hard to make sense of",
+    "HABITUATING": "hard to predict and master because things behave and appear inconsistently",
+    "EFFICIENT": "more work than the goal needs",
+    "ACCURATE": "what it shows or predicts is wrong or misleading",
+    "PROTECTIVE": "it doesn't guard users against loss, error, or exposure",
+    "BEAUTIFUL": "the look undercuts trust or fit for the audience",
+    "COMFORTABLE": "physically awkward or straining to operate",
+    "RESPONSIVE": "the system feels slow or you can't tell it's working",
+}
+_EP_NUM = {2: "Two", 3: "Three", 4: "Four", 5: "Five", 6: "Six", 7: "Seven", 8: "Eight", 9: "Nine"}
 
-    def sevc(label):
-        return _SEV_CLASS.get((label or "").strip().lower(), "medium")
 
-    # ── header meta (all eval toggles + telemetry) ──────────────────────────
-    _meta = []
-    _kb = settings.get("kb_version", "v2.1")
-    _meta.append(("KB", _kb))
-    _meta.append(("Architecture", "Two-pass" if settings.get("mode") == "twopass" else "Single-pass"))
-    _meta.append(("Coverage", "Thorough" if settings.get("thorough_mode") else "Standard"))
-    _meta.append(("Report style", "By Issue"))
-    if settings.get("verbosity"):
-        _meta.append(("Verbosity", str(settings["verbosity"]).title()))
-    if settings.get("pass1_model"):
-        _meta.append(("Pass-1 model", str(settings["pass1_model"]).title()))
-    _el = settings.get("elapsed_seconds")
-    if _el is not None:
-        _m, _s = divmod(int(_el), 60)
-        _meta.append(("Time", f"{_m}m {_s}s" if _m else f"{_s}s"))
-    _usage = settings.get("usage") or {}
-    _tok = (_usage.get("input", 0) or 0) + (_usage.get("output", 0) or 0) + (_usage.get("cache_read", 0) or 0) + (_usage.get("cache_creation", 0) or 0)
-    if _tok:
-        _meta.append(("Tokens", f"{_tok:,}"))
-    if _usage.get("cost") is not None:
-        _meta.append(("Est. cost", f"${_usage['cost']:,.4f}"))
+def _ep_join(items: list) -> str:
+    """Oxford-comma join of already-cleaned phrases."""
+    items = [i for i in items if i]
+    if len(items) <= 1:
+        return items[0] if items else ""
+    if len(items) == 2:
+        return f"{items[0]} and {items[1]}"
+    return ", ".join(items[:-1]) + ", and " + items[-1]
 
-    users_raw = uc.get("users") or ""
-    design_name = uc.get("design_name") or "UI analysis"
 
-    h = ['<!DOCTYPE html>', "<html lang='en'>", "<head><meta charset='UTF-8'>",
-         "<meta name='viewport' content='width=device-width, initial-scale=1.0'>",
-         "<title>UI Traps — By Issue</title>",
-         # Load Montserrat (the app/form font) so the report matches the rest of the UI.
-         "<link rel='preconnect' href='https://fonts.googleapis.com'>",
-         "<link rel='preconnect' href='https://fonts.gstatic.com' crossorigin>",
-         "<link href='https://fonts.googleapis.com/css2?family=Montserrat:wght@400..700&display=swap' rel='stylesheet'>",
-         f"<style>{_NEW_KB_ISSUES_CSS}</style>",
-         # data-selftheme signals the viewer this report themes itself via :root[data-theme];
-         # the viewer flips data-theme instead of injecting its legacy dark-override CSS.
-         "</head><body data-selftheme='1'>", "<div class='wrap'>", "<div class='report'>"]
+def _ep_lc_first(s: str) -> str:
+    """Lower-case a headline's first letter for mid-sentence use ("Two nav bars…" → "two nav
+    bars…"), but leave acronyms / proper nouns alone (an all-caps or two-caps start stays)."""
+    s = s.strip()
+    if len(s) >= 2 and s[0].isupper() and s[1:2].islower():
+        return s[0].lower() + s[1:]
+    return s
 
-    # header
-    h.append("<div class='r-header'>")
-    h.append("<div class='r-eyebrow'>UI Tenets &amp; Traps · Analysis Report</div>")
-    h.append(f"<div class='r-title'>{design_name}</div>")
-    h.append("<div class='r-meta'>")
-    for k, v in _meta:
-        h.append(f"<span><span class='k'>{k}</span> {v}</span>")
-    h.append("</div></div>")
 
-    if settings.get("truncated"):
-        h.append("<div class='trunc'>⚠️ <b>Incomplete report:</b> the analysis output was cut off at the length limit, so some issues or coverage notes may be missing. Re-running usually resolves this.</div>")
-    if settings.get("frame_notice"):
-        # Truncation disclosure (e.g. a large Figma file capped to the first N frames). States
-        # analyzed AND skipped counts so an un-analyzed-frame miss reads as truncation, not a KB gap.
-        h.append(f"<div class='trunc'>ℹ️ <b>Partial coverage:</b> {settings['frame_notice']}</div>")
+def _emergent_patterns_html(report: dict, findings: list) -> list:
+    """Render-time DERIVATION (NO model call) of the opening Emergent Patterns synthesis
+    (KB G8 / Ledger 22). Failure-side, observation register, descriptive-only — never an
+    imperative, never a severity change. Reads the retained issue-level substrate (issue_groups)
+    plus the fired findings' Tenets; no fresh cross-Trap/cross-Tenet pass. Two independent axes
+    (both may fire). Omitted entirely when there are no findings. Inputs are pre-escaped by the
+    public entry, so dynamic values (location, headlines) are appended without re-escaping."""
+    findings = [f for f in (findings or []) if isinstance(f, dict)]
+    if not findings:
+        return []
 
-    h.append("<div class='report-inner'>")
+    lines = []  # axis sentences, order: (a) regional, then (b) tenet
 
-    # evaluation details — what was assessed and for whom (grounds the findings). The
-    # interface name is already the report title, so it is not repeated here.
-    _emit_eval_details(h, uc)
-
-    # summary
-    h.append("<div class='section'><div class='section-eyebrow'>Summary of findings</div>")
-    if issues_report.get("summary_headline"):
-        h.append(f"<p class='headline-lg'>{issues_report['summary_headline']}</p>")
-    if issues_report.get("summary_narrative"):
-        h.append(f"<p class='narrative'>{issues_report['summary_narrative']}</p>")
-
-    # severity × confidence matrix — nested inside the Summary of findings (one level down,
-    # not its own section). Severity columns carry a short impact gloss; confidence rows are
-    # labelled only (the confidence meaning lives in each issue card, not the matrix).
-    _rows, _cols = _SCORE_ROWS, _SCORE_COLS
-    _counts = {(r, c[0]): 0 for r in _rows for c in _cols}
-    # Normalize case + collapse any dead vocabulary (old Critical→High severity; old
-    # Confirmed→High, Probable→Medium, Flagged→Low confidence) so EVERY rendered issue is
-    # counted; the matrix can't disagree with the card list. Fallbacks: severity→Medium,
-    # confidence→Low.
-    _sev_norm, _conf_norm = _SEV_NORM, _CONF_NORM
-    for i in issues:
-        sev = _sev_norm.get((i.get("severity_label") or "").strip().lower(), "Medium")
-        conf = _conf_norm.get((i.get("confidence") or "").strip().lower(), "Low")
-        _counts[(conf, sev)] += 1
-    h.append("<div class='sub-block'><div class='sub-label'>Number of issues found</div><div class='scorecard-wrap'>")
-    h.append("<table class='scorecard'><thead>")
-    # Labelled axes: a SEVERITY super-header spanning the three value columns, and a
-    # CONFIDENCE label in the stub column above the row labels. No directional arrows.
-    h.append("<tr><td class='corner-blank'></td><th class='axis-top' colspan='3'>Severity</th></tr>")
-    h.append("<tr><th class='axis-side'>Confidence</th>")
-    for label, cap, cls in _cols:
-        h.append(f"<th class='sc-{cls}'>{label.upper()}<span class='cap'>{cap}</span></th>")
-    h.append("</tr></thead><tbody>")
-    for rlabel in _rows:
-        h.append(f"<tr><td class='rowlab'>{rlabel}</td>")
-        for label, cap, cls in _cols:
-            n = _counts[(rlabel, label)]
-            if n:
-                h.append(f"<td class='count {cls}'>{n}</td>")
-            else:
-                h.append("<td class='count zero'>—</td>")
-        h.append("</tr>")
-    h.append("</tbody></table></div></div></div>")  # close scorecard-wrap, sub-block, summary section
-
-    # issues
-    def _emit_issue_card(idx, issue):
-        """One issue card. `idx` is the issue's ORIGINAL position so its id/label stay stable
-        across task groups (the Trap Disposition Index links to #issue-{idx})."""
-        # Normalize any legacy vocab for display (reusing the scorecard maps) so a card can
-        # never disagree with the scorecard: old Critical→High severity, and
-        # Confirmed/Probable/Flagged→High/Medium/Low confidence.
-        sl = _sev_norm.get((issue.get("severity_label") or "").strip().lower(), "Medium")
-        _cf_raw = (issue.get("confidence") or "").strip()
-        # Use the SAME normalization+fallback the scorecard uses (blank/off-vocab → "Low") so the
-        # card can never disagree with the matrix bucket. Always rendered below.
-        cf = _conf_norm.get(_cf_raw.lower(), "Low")
-        sc = sevc(sl)
-
-        # ONE trap per issue — the root cause. Co-occurring / conditional / downstream traps
-        # are woven into the prose by the model (KB Related-Trap prose test), never pilled.
-        _traps = [t for t in issue.get("traps") or [] if isinstance(t, dict)]
-        primary = next((t for t in _traps if normalize_relationship(t.get("relationship")) == "root_cause"), None)
-        if primary is None:
-            primary = next((t for t in _traps if normalize_relationship(t.get("relationship")) != "consequence"), None)
-        if primary is None and _traps:
-            primary = _traps[0]
-
-        # card-trapart → narrow rail sized to the Trap card artwork.
-        h.append(f"<div class='card card-trapart' id='issue-{idx}'>")
-        # LEFT RAIL — the root-cause Trap's card artwork (same as By-Trap). Falls back to the
-        # tenet eyebrow + pill + text definition when no card art exists for the trap.
-        h.append("<div class='card-rail'>")
-        if primary:
-            _pname = primary.get("trap_name", "")
-            tenet = (primary.get("tenet") or "").upper() or (_tenet_for(_pname) or "").upper()
-            color = _TENET_PILL.get(tenet, "#35597F")
-            h.append("<div class='trap'>")
-            _card_img = _get_card_img(_pname)
-            if _card_img:
-                h.append(f"<img class='trap-card-img' src='{_card_img}' alt='{_pname} trap card' loading='lazy'>")
-            else:
-                if tenet:
-                    h.append(f"<span class='tenet' style='color:{color}'>{tenet.title()}</span>")
-                h.append(f"<span class='tpill' style='background:{color}'>{_pname}</span>")
-                if primary.get("definition"):
-                    h.append(f"<p class='tdef' style='border-color:{color}'>{primary['definition']}</p>")
-            h.append("</div>")
-        h.append("</div>")  # .card-rail
-
-        # MAIN — number, headline, severity/confidence, description, crop, recommendation
-        h.append("<div class='card-main'>")
-        h.append(f"<span class='card-num'>Issue {idx:02d}</span>")
-        if issue.get("headline"):
-            h.append(f"<p class='card-headline'>{issue['headline']}</p>")
-        h.append("<div class='readouts-inline'>")
-        h.append(f"<span class='ri-k'>Severity</span><span class='ro-v s-{sc}'>{sl}</span>")
-        if cf:
-            h.append(f"<span class='ri-sep'>|</span><span class='ri-k'>Confidence</span><span class='ro-v c-{cf.strip().lower()}'>{cf}</span>")
-        h.append("</div>")
-        if issue.get("description"):
-            h.append(f"<div class='field muted'><div class='field-label'>Description</div><p>{issue['description']}</p></div>")
-        # One crop per cited instance (regions[]). Multi-screen findings show a crop per screen.
-        for _rg in (issue.get("regions") or []):
-            if not isinstance(_rg, dict) or not _rg.get("image_b64"):
+    # ── Axis (a): regional concentration ── issue_groups binding ≥2 DISTINCT Traps to one
+    # location WITH an established relationship (≥1 bound trap's relationship ≠ none).
+    regions = []
+    for g in (report.get("issue_groups") or []):
+        if not isinstance(g, dict):
+            continue
+        loc = str(g.get("location") or "").strip()
+        if not loc:
+            continue
+        names, rels, seen = [], [], set()
+        for t in (g.get("traps") or []):
+            if not isinstance(t, dict):
                 continue
-            cap = _rg.get("caption") or ""
-            h.append("<figure class='crop'>")
-            h.append(f"<img src='data:image/png;base64,{_rg['image_b64']}' alt='Region crop'>")
-            if cap:
-                h.append(f"<figcaption>{cap}</figcaption>")
-            h.append("</figure>")
-        if issue.get("recommendation"):
-            h.append(f"<div class='field'><div class='field-label'>Recommendation</div><p>{issue['recommendation']}</p></div>")
-        h.append("</div>")  # .card-main
-        h.append("</div>")  # .card
-
-    h.append("<div class='section'><div class='section-eyebrow'>Issues identified</div>")
-    if not issues:
-        h.append("<p class='narrative'>No issues were raised for the stated users and tasks.</p>")
-    else:
-        # Task grouping — when the context lists more than one task, group issue cards under
-        # "General" then "Task N: <name>" by each issue's task_context (best-match). Issue index
-        # stays the ORIGINAL position so the Disposition Index anchors keep working.
-        _tl = uc.get("task_list") or []
-        _task_names = [(_t.get("name") or _t.get("description") or "").strip()
-                       for _t in _tl if isinstance(_t, dict) and (_t.get("name") or _t.get("description"))]
-        if len(_task_names) <= 1 and uc.get("tasks"):
-            _pt = [t for t in parse_tasks(uc.get("tasks", "")) if t]
-            if len(_pt) > 1:
-                _task_names = _pt
-        _indexed = list(enumerate(issues, 1))
-        if len(_task_names) > 1:
-            def _match_task(tc):
-                tcl = (tc or "").strip().lower()
-                if not tcl:
-                    return None
-                # Exact match wins; otherwise the LONGEST task name in a containment relationship,
-                # so a short name listed first ("Search") can't steal a finding tagged with a
-                # longer one ("Search and filter results").
-                for nm in _task_names:
-                    if tcl == nm.lower():
-                        return nm
-                _best = None
-                for nm in _task_names:
-                    _nl = nm.lower()
-                    if (tcl in _nl or _nl in tcl) and (_best is None or len(nm) > len(_best)):
-                        _best = nm
-                return _best
-            _general = []
-            _task_buckets = {nm: [] for nm in _task_names}
-            for idx, issue in _indexed:
-                # The model emits the task label in `task` (strong user-message attribution);
-                # `task_context` is a tolerated alias. Read either so grouping fires regardless.
-                m = _match_task(issue.get("task") or issue.get("task_context")) if isinstance(issue, dict) else None
-                (_task_buckets[m] if m in _task_buckets else _general).append((idx, issue))
-            if not any(_task_buckets.values()):
-                for idx, issue in _indexed:
-                    _emit_issue_card(idx, issue)
-            else:
-                if _general:
-                    h.append("<div class='task-group'><div class='task-group-label'>General</div>")
-                    for idx, issue in _general:
-                        _emit_issue_card(idx, issue)
-                    h.append("</div>")
-                for _i, nm in enumerate(_task_names, 1):
-                    if _task_buckets[nm]:
-                        h.append(f"<div class='task-group'><div class='task-group-label'>Task {_i}: {nm}</div>")
-                        for idx, issue in _task_buckets[nm]:
-                            _emit_issue_card(idx, issue)
-                        h.append("</div>")
+            nm = _normalize_trap_name(t.get("trap_name", ""))
+            if not nm or nm in seen:
+                continue
+            seen.add(nm)
+            names.append(nm)
+            rels.append(normalize_relationship(t.get("relationship")))
+        if len(names) < 2 or not any(r not in ("none", "") for r in rels):
+            continue
+        if "root_cause" in rels:
+            share = "one is the root cause of the others"
+        elif all(r == "co_occurring" for r in rels):
+            share = "a common underlying cause"
         else:
-            for idx, issue in _indexed:
-                _emit_issue_card(idx, issue)
-    h.append("</div>")  # issues section
+            share = "a shared remedy"
+        regions.append((len(names), loc, share))
+    regions.sort(key=lambda r: -r[0])
+    for n, loc, share in regions:
+        nword = _EP_NUM.get(n, str(n))
+        lines.append(
+            f"{nword} Traps concentrate on {loc}; the adjudication finds {share}, so that region "
+            f"is a single locus of risk despite surfacing as several Traps below.")
 
-    # ── Worth a closer look (G8 §2) — pivotal, assessability-blocked unknowns as their own
-    # section between Issues and Coverage. Mirrors the by-trap Worth-a-closer-look content in
-    # the rev6 card style (section/section-eyebrow + card-trapart). Ungrouped by task. ──
-    _closer = [c for c in issues_report.get("potential_issues") or [] if isinstance(c, dict)]
-    if _closer:
-        h.append("<div class='section' id='worth-a-closer-look'><div class='section-eyebrow'>Worth a closer look</div>")
-        h.append("<p class='narrative'>Pivotal unknowns that couldn't be settled from this artifact — each names a check that would resolve it.</p>")
-        for _c in _closer:
-            _pname = _c.get("trap_name", "")
-            _tn = (_c.get("tenet") or "").upper() or (_tenet_for(_pname) or "").upper()
-            _color = _TENET_PILL.get(_tn, "#35597F")
-            h.append("<div class='card card-trapart'>")
-            # LEFT RAIL — root-cause trap card art (same treatment as issue cards).
-            h.append("<div class='card-rail'><div class='trap'>")
-            _img = _get_card_img(_pname)
-            if _img:
-                h.append(f"<img class='trap-card-img' src='{_img}' alt='{_pname} trap card' loading='lazy'>")
-            else:
-                if _tn:
-                    h.append(f"<span class='tenet' style='color:{_color}'>{_tn.title()}</span>")
-                h.append(f"<span class='tpill' style='background:{_color}'>{_pname}</span>")
-            h.append("</div></div>")  # .trap, .card-rail
-            # MAIN — the pivotal-unknown fields (question, not finding).
-            h.append("<div class='card-main'>")
-            h.append("<span class='card-num'>Worth a closer look</span>")
-            _hl = _c.get("why_it_matters") or _c.get("observation") or _pname
-            if _hl:
-                h.append(f"<p class='card-headline'>{_hl}</p>")
-            _loc = _c.get("location") or ""
-            if _loc:
-                h.append(f"<div class='field muted'><div class='field-label'>Where</div><p>{_loc}</p></div>")
-            _obs = _c.get("observation") or ""
-            if _obs:
-                h.append(f"<div class='field muted'><div class='field-label'>What's visible</div><p>{_obs}</p></div>")
-            _chk = _c.get("check") or ""
-            if _chk:
-                _cost = _c.get("check_cost") or ""
-                _cost_str = f" <em>({_cost})</em>" if _cost else ""
-                h.append(f"<div class='field'><div class='field-label'>The check</div><p>{_chk}{_cost_str}</p></div>")
-            _ifc = _c.get("implication_if_confirmed") or ""
-            _ifr = _c.get("implication_if_ruled_out") or ""
-            if _ifc or _ifr:
-                h.append("<div class='field'><div class='field-label'>Implications</div>")
-                if _ifc:
-                    h.append(f"<p><strong>If confirmed:</strong> {_ifc}</p>")
-                if _ifr:
-                    h.append(f"<p><strong>If ruled out:</strong> {_ifr}</p>")
-                h.append("</div>")
-            h.append("</div>")  # .card-main
-            h.append("</div>")  # .card
-        h.append("</div>")  # worth-a-closer-look section
+    # ── Axis (b): tenet concentration ── ranks ONLY Tenets whose Traps FIRED. Fires when the top
+    # Tenet has ≥2 fired Traps AND leads by a clear margin: top ≥ runner-up + 2, OR top ≥ 50% of
+    # all fired Traps. A one-Trap margin does NOT fire; a tie for top does NOT fire.
+    #
+    # Assessability leash (KB guard iii), coverage-driven, NEVER a static tenet list. A Tenet
+    # enters the ranking iff ≥1 of its Traps fired this run. THEN the STRICTER exclusion
+    # (author-ruled 2026-07-09): drop a fired Tenet from the tally when MORE of its Traps landed
+    # in "couldn't evaluate" (not_assessable_artifact / not_assessable_context) than fired — that
+    # Tenet was mostly un-inspectable, so its low fired count is an unreliable measure of
+    # concentration and must not be named, counted in the denominator, or used as the runner-up.
+    # Computed per-run from actual coverage; not_present (assessed AND absent) is successful
+    # inspection and does NOT count against a Tenet. No Tenet is ever pre-judged unassessable —
+    # a Responsive/Protective Trap that DOES fire from a screenshot counts fully.
+    counts = Counter()
+    by_tenet = OrderedDict()
+    for f in findings:
+        ten = str(f.get("tenet") or _tenet_for(f.get("trap_name", ""))).strip().upper()
+        if not ten:
+            continue
+        counts[ten] += 1
+        by_tenet.setdefault(ten, []).append(f)
+    _UNASSESSABLE = {"not_assessable_artifact", "not_assessable_context"}
+    couldnt = Counter()
+    for c in (report.get("traps_checked_not_found") or []):
+        if isinstance(c, dict) and c.get("coverage_status") in _UNASSESSABLE:
+            ct = str(c.get("tenet") or _tenet_for(c.get("trap_name", ""))).strip().upper()
+            if ct:
+                couldnt[ct] += 1
+    for t in [t for t in counts if couldnt[t] > counts[t]]:
+        del counts[t]
+        by_tenet.pop(t, None)
+    if counts:
+        ranked = counts.most_common()
+        top_ten, top_n = ranked[0]
+        runner = ranked[1][1] if len(ranked) > 1 else 0
+        total = sum(counts.values())
+        tie = sum(1 for _, c in ranked if c == top_n) > 1
+        if (not tie) and top_ten in _TENET_CASHOUT and top_n >= 2 and (top_n >= runner + 2 or top_n * 2 >= total):
+            named = [_ep_lc_first(str(f.get("headline") or "")) for f in by_tenet[top_ten]]
+            named = [h for h in named if h]
+            tail = _ep_join(named[:3]) + (", among others" if len(named) > 3 else "")
+            adj = top_ten.capitalize()
+            cash = _TENET_CASHOUT[top_ten]
+            lines.append(
+                f"Most of what's wrong here makes the interface less {adj} — {cash}"
+                + (f" — because {tail}." if tail else "."))
 
-    # coverage — three buckets
-    cov = [c for c in issues_report.get("traps_checked_not_found") or [] if isinstance(c, dict)]
-    # Mutual exclusivity (issue XOR coverage, except partially_assessed): drop any "did not find" /
-    # "couldn't evaluate" entry whose trap is also confirmed as an issue, so the report can't show
-    # the same trap as both a finding and not-found (and the disposition index can't double-count).
-    _raised = {_normalize_trap_name(t.get("trap_name", "")) for _i in issues
-               for t in (_i.get("traps") or []) if isinstance(t, dict)}
-    _raised.discard("")
-    cov = [c for c in cov if c.get("coverage_status") == "partially_assessed"
-           or _normalize_trap_name(c.get("trap_name", "")) not in _raised]
-    _did_not_find = [c for c in cov if c.get("coverage_status") == "not_present"]
-    _partial = [c for c in cov if c.get("coverage_status") == "partially_assessed"]
-    # "Couldn't evaluate" also absorbs any off-enum / missing coverage_status (e.g. from a
-    # truncated tool response). Without this catch-all such an entry matches no bucket and vanishes
-    # silently; folding it here keeps the trap visible rather than dropped from coverage.
-    _couldnt = [c for c in cov if c.get("coverage_status") not in ("not_present", "partially_assessed")]
-    if cov:
-        h.append("<div class='section'><div class='section-eyebrow'>Coverage notes</div>")
-        # Order: Partially evaluated → Did not find → Couldn't evaluate. Each carries a
-        # plain-language intro (what was checked / what was found / what to do).
-        if _partial:
-            h.append("<div class='cov-group'><div class='cov-grouplabel'>Partially evaluated</div>")
-            h.append("<p class='cov-intro'>Checked for the parts a static screen can show. Each of these also depends on something a screenshot can't reveal — timing, motion, or what happens after you act — so that part stays open. The visible part looked okay; it's worth confirming the rest in the live product if it matters to your users.</p>")
-            h.append("<div class='coverage'>")
-            for c in _partial:
-                name = c.get('trap_name', '')
-                color = _TENET_PILL.get(_tenet_for(name).upper(), "#35597F")
-                d = (c.get("detail") or "").replace("assessed within scope:", "Checked:").replace("not assessable from this artifact:", "couldn’t check:").replace("not assessable:", "couldn’t check:")
-                h.append("<div class='cov-item assess'>")
-                h.append(f"<span class='tpill' style='background:{color}'>{name}</span>")
-                if d:
-                    h.append(f"<span class='cs'>{d}</span>")
-                h.append("</div>")
-            h.append("</div></div>")
-        if _did_not_find:
-            h.append("<div class='cov-group'><div class='cov-grouplabel'>Did not find</div>")
-            _dnf_intro = ("Framework traps that were not raised as issues in this analysis."
-                          if settings.get("profile") == "self-serve"
-                          else "Checked and not seen in what was submitted — these don't appear to be a problem here.")
-            h.append(f"<p class='cov-intro'>{_dnf_intro}</p>")
-            h.append("<div class='coverage'>")
-            for c in _did_not_find:
-                name = c.get('trap_name', '')
-                color = _TENET_PILL.get(_tenet_for(name).upper(), "#35597F")
-                h.append("<div class='cov-item'>")
-                h.append(f"<span class='tpill' style='background:{color}'>{name}</span>")
-                h.append("</div>")
-            h.append("</div></div>")
-        if _couldnt:
-            h.append("<div class='cov-group'><div class='cov-grouplabel'>Couldn't evaluate</div>")
-            h.append("<p class='cov-intro'>Couldn't be judged from what was submitted — these would need the live product, more screens, or details about your users. Treat them as unanswered, not cleared.</p>")
-            h.append("<div class='coverage'>")
-            for c in _couldnt:
-                name = c.get('trap_name', '')
-                color = _TENET_PILL.get(_tenet_for(name).upper(), "#35597F")
-                reason = "needs details about your users" if c.get("coverage_status") == "not_assessable_context" else "needs the live product or more screens"
-                h.append("<div class='cov-item assess'>")
-                h.append(f"<span class='tpill' style='background:{color}'>{name}</span>")
-                h.append(f"<span class='cs'>{reason}</span>")
-                h.append("</div>")
-            h.append("</div></div>")
-        h.append("</div>")
-    else:
-        # No coverage returned (e.g. the self-serve profile, whose minimal prompt gives no
-        # coverage instructions). Show the section with 'None reported' rather than omitting
-        # it or erroring — the absence is itself informative.
-        h.append("<div class='section'><div class='section-eyebrow'>Coverage notes</div>"
-                 "<p class='narrative cov-none'>None reported.</p></div>")
+    # ── Neither axis fired → the single most consequential issue, one line, then stop. ──
+    if not lines:
+        _rank = {"High": 3, "Medium": 2, "Low": 1}
 
-    # positives
-    pos = [p for p in issues_report.get("positive_observations") or [] if p]
-    if pos:
-        h.append("<div class='section'><div class='section-eyebrow'>What works well</div>")
-        h.append("<p class='narrative'>" + " ".join(str(p) for p in pos) + "</p></div>")
+        def _sev_key(f):
+            s = _SEV_NORM.get((f.get("severity_label") or "").strip().lower()) or f.get("_src_sev") or "Medium"
+            return _rank.get(s, 2)
 
-    # ── Trap Disposition Index — the KB's accounting invariant, made scannable ──
-    # One row per taxonomy trap, in canonical scan order. The disposition is derived purely
-    # from data the model already emitted — issues[].traps[].relationship and the coverage
-    # list — so this adds a scannable ledger without asking the model for anything new. Every
-    # trap resolves to exactly one of: found as an issue (primary → linked; secondary → linked
-    # with its relationship named), noted under coverage, or — appearing nowhere structured —
-    # "Not accounted for" (the diagnostic that catches a trap raised only in an issue's prose).
-    try:
-        from .schema import _valid_trap_names as _vtn
-    except ImportError:
-        from schema import _valid_trap_names as _vtn
-    _taxonomy = _vtn(settings.get("kb_version", "v2.1")) or []
-    if _taxonomy:
-        def _pick_primary(_ts):
-            p = next((t for t in _ts if normalize_relationship(t.get("relationship")) == "root_cause"), None)
-            if p is None:
-                p = next((t for t in _ts if normalize_relationship(t.get("relationship")) != "consequence"), None)
-            if p is None and _ts:
-                p = _ts[0]
-            return p
-        # normalized trap name → {issue_idx: {"primary": bool, "rel": canon}}. Keyed by issue
-        # so a trap listed twice in one issue collapses to a single appearance (primary wins;
-        # a named relationship beats "none") rather than rendering "Issue 01 · Issue 01".
-        _appear: dict = {}
-        for _idx, _issue in enumerate(issues, 1):
-            _ts = [t for t in _issue.get("traps") or [] if isinstance(t, dict)]
-            _prim = _pick_primary(_ts)
-            for t in _ts:
-                _nm = _normalize_trap_name(t.get("trap_name", ""))
-                if not _nm:
-                    continue
-                _slot = _appear.setdefault(_nm, {})
-                _rel = normalize_relationship(t.get("relationship"))
-                _cur = _slot.get(_idx)
-                if _cur is None:
-                    _slot[_idx] = {"primary": t is _prim, "rel": _rel}
-                else:
-                    _cur["primary"] = _cur["primary"] or (t is _prim)
-                    if _cur["rel"] in ("none", "") and _rel not in ("none", ""):
-                        _cur["rel"] = _rel
-        _COV_LABEL = {"not_present": "Did not find",
-                      "not_assessable_artifact": "Couldn't evaluate",
-                      "not_assessable_context": "Couldn't evaluate",
-                      "partially_assessed": "Partially evaluated"}
-        _cov_of: dict = {}
-        for c in cov:
-            _nm = _normalize_trap_name(c.get("trap_name", ""))
-            if _nm and _nm not in _cov_of:
-                _cov_of[_nm] = _COV_LABEL.get(c.get("coverage_status"), "Coverage noted")
-        # Worth-a-closer-look (potential_issues) is a third disposition bucket — a trap raised
-        # only as a pivotal unknown is accounted for, NOT "Not accounted for".
-        _pot_of: set = set()
-        for _p in _closer:
-            _pnm = _normalize_trap_name(_p.get("trap_name", ""))
-            if _pnm:
-                _pot_of.add(_pnm)
-        _REL_DISP = {"co_occurring": "co-occurring", "consequence": "consequence",
-                     "conditional_primary": "conditional", "conditional_enumerated": "conditional",
-                     "root_cause": "root cause"}
-        h.append("<div class='section'><div class='section-eyebrow'>Trap disposition index</div>")
-        h.append("<p class='disp-intro'>Every framework trap, accounted for exactly once — found as an issue above, flagged as worth a closer look, or noted under coverage. Scan the column to confirm nothing was silently dropped.</p>")
-        h.append("<div class='disp-wrap'><table class='disposition'><tbody>")
-        for canonical in _taxonomy:
-            _nm = _normalize_trap_name(canonical)
-            color = _TENET_PILL.get(_tenet_for(canonical).upper(), "#35597F")
-            h.append("<tr>")
-            h.append(f"<td class='dt-trap'><span class='tpill' style='background:{color}'>{canonical}</span></td>")
-            parts = _appear.get(_nm)
-            if parts:
-                # Primary appearance(s) first, then secondaries; each links to its issue card.
-                segs = []
-                for i_idx, info in parts.items():
-                    link = f"<a class='disp-link' href='#issue-{i_idx}'>Issue {i_idx:02d}</a>"
-                    if not info["primary"]:
-                        rl = _REL_DISP.get(info["rel"], "")
-                        if rl:
-                            link += f" <span class='disp-rel'>({rl})</span>"
-                    segs.append((0 if info["primary"] else 1, i_idx, link))
-                segs.sort(key=lambda s: (s[0], s[1]))
-                cell = "<span class='disp-sep'>·</span>".join(s[2] for s in segs)
-                h.append(f"<td class='dt-disp'>{cell}</td>")
-            elif _nm in _pot_of:
-                h.append("<td class='dt-disp'><a class='disp-link' href='#worth-a-closer-look'>Worth a closer look</a></td>")
-            elif _nm in _cov_of:
-                h.append(f"<td class='dt-disp'><span class='disp-cov'>{_cov_of[_nm]}</span></td>")
-            else:
-                h.append("<td class='dt-disp'><span class='disp-none'>Not accounted for</span></td>")
-            h.append("</tr>")
-        h.append("</tbody></table></div></div>")
+        top = max(findings, key=_sev_key)
+        hl = str(top.get("headline") or top.get("problem") or "").strip()
+        if not hl:
+            return []
+        lines.append(f"The single most consequential issue: {hl}")
 
-    h.append("</div>")  # report-inner
-    h.append("<div class='r-footer'>© UI Traps LLC · Proprietary &amp; Confidential — UI Tenets &amp; Traps Framework</div>")
-    h.append("</div></div></body></html>")
-    return "\n".join(h)
+    # Bare paragraphs — folded into the Summary section above the scorecard, no subtitle.
+    return [f"<p class='narrative ep-line'>{ln}</p>" for ln in lines]
 
 
 def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict) -> str:
@@ -3881,6 +3363,10 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
         h.append(f"<p class='headline-lg'>{report['summary_headline']}</p>")
     if report.get("summary_narrative"):
         h.append(f"<p class='narrative'>{report['summary_narrative']}</p>")
+    # Emergent Patterns (KB G8 / Ledger 22) — opening synthesis prose folded into the Summary,
+    # ABOVE the scorecard, no subtitle. Render-time derivation over issue_groups + fired findings'
+    # Tenets; NO model call. Emits nothing when there are no findings.
+    h.extend(_emergent_patterns_html(report, _findings))
     _rows, _cols = _SCORE_ROWS, _SCORE_COLS
     _counts = {(r, c[0]): 0 for r in _rows for c in _cols}
     _sev_norm, _conf_norm = _SEV_NORM, _CONF_NORM
@@ -3888,7 +3374,7 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
         sev = _sev_norm.get((i.get("severity_label") or "").strip().lower()) or i.get("_src_sev") or "Medium"
         conf = _conf_norm.get((i.get("confidence") or "").strip().lower(), "Low")
         _counts[(conf, sev)] += 1
-    h.append("<div class='sub-block'><div class='sub-label'>Number of instances found</div><div class='scorecard-wrap'>")
+    h.append("<div class='sub-block'><div class='sub-label'>Number of Traps found</div><div class='scorecard-wrap'>")
     h.append("<table class='scorecard'><thead>")
     h.append("<tr><td class='corner-blank'></td><th class='axis-top' colspan='3'>Severity</th></tr>")
     h.append("<tr><th class='axis-side'>Confidence</th>")
@@ -4228,305 +3714,15 @@ def format_bytrap_report_as_html(
     user_context: dict[str, Any],
     analysis_settings: Optional[dict[str, Any]] = None,
 ) -> str:
-    """Public entry for the rev6 BY-TRAP report. Escapes report, user_context AND settings at
-    the boundary (the renderer's meta row interpolates settings values — unvalidated Form
-    fields), then renders via _format_new_kb_bytrap_html. Mirrors format_issues_report_as_html."""
+    """Public entry for the rev6 BY-TRAP report — the sole rendered report structure. Escapes
+    report, user_context AND settings at the boundary (the renderer's meta row interpolates
+    settings values — unvalidated Form fields), then renders via _format_new_kb_bytrap_html."""
     report = _escape_html_deep(report)
     if user_context is not None:
         user_context = _escape_html_deep(user_context)
     if analysis_settings is not None:
         analysis_settings = _escape_html_deep(analysis_settings)
     return _format_new_kb_bytrap_html(report, user_context or {}, analysis_settings or {})
-
-
-def format_new_kb_issues_markdown(issues_report: dict) -> str:
-    """Compact markdown export for the new-KB by-issue report (summary, issues, coverage)."""
-    md = ["# UI Tenets & Traps — Analysis (By Issue)", ""]
-    if issues_report.get("summary_headline"):
-        md += [f"**{issues_report['summary_headline']}**", ""]
-    if issues_report.get("summary_narrative"):
-        md += [issues_report["summary_narrative"], ""]
-    md += ["## Issues", ""]
-    issues = [i for i in issues_report.get("issues") or [] if isinstance(i, dict)]
-    if not issues:
-        md += ["_No issues were raised for the stated users and tasks._", ""]
-    for idx, issue in enumerate(issues, 1):
-        md.append(f"### Issue {idx}: {issue.get('headline', '')}")
-        md += [f"*Severity: {issue.get('severity_label', '—')} · Confidence: {issue.get('confidence', '—')}*", ""]
-        # One trap per issue — the root cause; related traps live in the description prose.
-        _traps = [t for t in issue.get("traps") or [] if isinstance(t, dict)]
-        primary = next((t for t in _traps if normalize_relationship(t.get("relationship")) == "root_cause"), None)
-        if primary is None:
-            primary = next((t for t in _traps if normalize_relationship(t.get("relationship")) != "consequence"), None)
-        if primary is None and _traps:
-            primary = _traps[0]
-        if primary:
-            defn = f" — {primary.get('definition', '')}" if primary.get("definition") else ""
-            _tn = (primary.get("tenet") or "").strip()
-            _paren = f" ({_tn})" if _tn else ""  # omit empty parens when tenet is absent (self-serve)
-            md.append(f"- **{primary.get('trap_name', '')}**{_paren}{defn}")
-        md.append("")
-        if issue.get("description"):
-            md += ["**Description**", "", issue["description"], ""]
-        if issue.get("recommendation"):
-            md += ["**Recommendation**", "", issue["recommendation"], ""]
-    cov = [c for c in issues_report.get("traps_checked_not_found") or [] if isinstance(c, dict)]
-    if cov:
-        md += ["## Coverage notes", ""]
-        for c in cov:
-            nm = (c.get("trap_name") or "")
-            detail = c.get("detail", "")
-            md.append(f"- **{nm}** — {c.get('coverage_status', '')}: {detail}")
-        md.append("")
-    pos = [p for p in issues_report.get("positive_observations") or [] if p]
-    if pos:
-        md += ["## What works well", ""] + [f"- {p}" for p in pos] + [""]
-    return "\n".join(md)
-
-
-def format_issues_report_as_html(
-    issues_report: dict[str, Any],
-    user_context: dict[str, Any],
-    analysis_settings: Optional[dict[str, Any]] = None,
-) -> str:
-    """
-    Render the user-issues synthesis (Pass 3) as an HTML report.
-
-    Issue card layout per finding:
-      FINDING N
-      [headline]
-      Severity dot + label | Confidence label
-      TRAPS
-        [ROOT CAUSE bar] TRAP NAME — definition
-        [contributing bar] TRAP NAME — definition  (stacked, one per trap)
-      DESCRIPTION
-        [text]
-        [optional region crop]
-      RECOMMENDATION
-        [text]
-    """
-    # SECURITY: escape all model/user text once, at the boundary (see _escape_html_deep).
-    issues_report = _escape_html_deep(issues_report)
-    if user_context is not None:
-        user_context = _escape_html_deep(user_context)
-    if analysis_settings is not None:
-        analysis_settings = _escape_html_deep(analysis_settings)
-
-    # New-KB (v2.1-lineage) by-issue reports use the issue-grouped structure
-    # (issues[].traps[].relationship) and the aligned design — render via the new path.
-    _settings = analysis_settings or {}
-    if is_new_kb(_settings.get('kb_version', 'v2')) or _settings.get('profile') == 'self-serve':
-        return _format_new_kb_issues_html(issues_report, user_context, _settings)
-
-    html = []
-
-    html.append("<!DOCTYPE html>")
-    html.append("<html lang='en'>")
-    html.append("<head><meta charset='UTF-8'>")
-    html.append("<meta name='viewport' content='width=device-width, initial-scale=1.0'>")
-    html.append("<title>UI Traps Analysis — Issue View</title>")
-    html.append("<style>")
-    html.append(_ISSUES_REPORT_CSS)
-    html.append("</style>")
-    html.append("</head><body>")
-    html.append("<div class='report-container'>")
-
-    # Header
-    html.append("<div class='report-header'>")
-    html.append("<h1>UI Tenets &amp; Traps Analysis</h1>")
-    html.append("<p class='report-subtitle'>Issue View</p>")
-    _ts_lines = [f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}"]
-    if analysis_settings:
-        _v = analysis_settings.get('verbosity')
-        _ts_lines.append(f"Report detail: {'Brief' if _v == 'brief' else 'Standard'}")
-        _m = analysis_settings.get('pass1_model')
-        _ts_lines.append(f"Analysis model: {'Haiku 4.5' if _m == 'haiku' else 'Sonnet 4.6'}")
-        _kb = analysis_settings.get('kb_version')
-        if _kb:
-            _kb_display = {'v1': 'v1', 'v1.1': 'v1.1', 'v2': 'v2', 'v2.1': 'v2.1'}.get(_kb, _kb)
-            _ts_lines.append(f"Knowledge base: {_kb_display}")
-        _style = analysis_settings.get('report_style')
-        if _style:
-            _ts_lines.append(f"Report style: {'By Issue' if _style == 'issues' else 'By Trap'}")
-        _coverage = 'Thorough' if analysis_settings.get('thorough_mode') else 'Standard'
-        _ts_lines.append(f"Analysis coverage: {_coverage}")
-        if analysis_settings.get('mode') == 'twopass':
-            _ts_lines.append("Analysis architecture: Two-pass (detection → adjudication)")
-        _elapsed = analysis_settings.get('elapsed_seconds')
-        if _elapsed is not None:
-            _m2, _s = divmod(int(_elapsed), 60)
-            _time_str = f"{_m2}m {_s}s" if _m2 else f"{_s}s"
-            _ts_lines.append(f"Time to complete: {_time_str}")
-        _usage = analysis_settings.get('usage') or {}
-        _cached = (_usage.get('cache_read', 0) or 0) + (_usage.get('cache_creation', 0) or 0)
-        _tok_total = (_usage.get('input', 0) or 0) + (_usage.get('output', 0) or 0) + _cached
-        if _tok_total:
-            _ts_lines.append(
-                f"Tokens: {_tok_total:,} ({_usage.get('input', 0):,} input · "
-                f"{_usage.get('output', 0):,} output · {_cached:,} cached)"
-            )
-            _cost = _usage.get('cost')
-            if _cost is not None:
-                _ts_lines.append(f"Estimated cost: ~${_cost:,.4f}")
-    html.append(f"<p class='report-date'>{'<br>'.join(_ts_lines)}</p>")
-    html.append("</div>")
-
-    # Evaluation Details
-    if user_context:
-        html.append("<h2>Evaluation Details</h2>")
-        html.append("<div class='eval-details'>")
-        html.append("<div class='context-section'>")
-        html.append("<div class='context-body'>")
-        if user_context.get('design_name'):
-            html.append(f"<p><strong>Interface evaluated:</strong> {user_context['design_name']}</p>")
-
-        users_raw = user_context.get('users', 'N/A')
-        if users_raw and users_raw.startswith('Target users: '):
-            users_raw = users_raw[len('Target users: '):]
-        if users_raw:
-            users_raw = users_raw[0].upper() + users_raw[1:]
-
-        users_desc, users_attrs = _parse_users_string(users_raw)
-        users_attrs = [(l, v) for l, v in users_attrs if l != 'Frequency of use']
-        html.append("<div class='users-detail'>")
-        html.append("<p class='users-detail-label'><strong>Intended users:</strong></p>")
-        html.append("<table class='users-table'>")
-        if users_desc:
-            html.append(f"<tr><td class='ut-label'>Description</td><td class='ut-value'>{users_desc}</td></tr>")
-        for label, value in users_attrs:
-            html.append(f"<tr><td class='ut-label'>{label}</td><td class='ut-value'>{value}</td></tr>")
-        if not users_desc and not users_attrs:
-            html.append(f"<tr><td class='ut-label'>Description</td><td class='ut-value'>{users_raw}</td></tr>")
-        html.append("</table>")
-        html.append("</div>")
-
-        _tl = user_context.get('task_list') or []
-        if len(_tl) > 1:
-            html.append("<p><strong>Task(s) evaluated:</strong></p>")
-            html.append("<ul>")
-            for _t in _tl:
-                _n = _t.get('name', '').strip()
-                _d = _t.get('description', '').strip()
-                html.append(f"<li><strong>{_n}</strong>: {_d}</li>" if _n else f"<li>{_d}</li>")
-            html.append("</ul>")
-        else:
-            raw_tasks = user_context.get('tasks', 'N/A')
-            task_list_display = parse_tasks(raw_tasks)
-            html.append("<p><strong>Task(s) evaluated:</strong></p>")
-            html.append("<ul>")
-            for task in task_list_display:
-                html.append(f"<li>{task}</li>")
-            html.append("</ul>")
-
-        if user_context.get('format'):
-            html.append(f"<p><strong>Format:</strong> {user_context['format']}</p>")
-
-        html.append("</div>")
-        html.append("</div>")
-        html.append("</div>")
-
-    # Summary of Findings
-    headline = _cap_terms(issues_report.get("summary_headline", ""))
-    narrative = _cap_terms(issues_report.get("summary_narrative", ""))
-    issues = issues_report.get("issues") or []
-
-    def _is_high_conf(i): return i.get('confidence', '').lower() == 'high'
-    hc_critical = sum(1 for i in issues if i.get('severity') == 'critical' and _is_high_conf(i))
-    hc_moderate = sum(1 for i in issues if i.get('severity') == 'moderate' and _is_high_conf(i))
-    hc_minor    = sum(1 for i in issues if i.get('severity') == 'minor'    and _is_high_conf(i))
-    lc_critical = sum(1 for i in issues if i.get('severity') == 'critical' and not _is_high_conf(i))
-    lc_moderate = sum(1 for i in issues if i.get('severity') == 'moderate' and not _is_high_conf(i))
-    lc_minor    = sum(1 for i in issues if i.get('severity') == 'minor'    and not _is_high_conf(i))
-
-    def _sc(val): return str(val) if val else '<span class="scorecard-empty">—</span>'
-
-    html.append("<h2>Summary of Findings</h2>")
-    html.append("<div class='summary-section'>")
-    html.append("<div class='summary-inner'>")
-    html.append("<p class='scorecard-title'>Number of Issues Identified</p>")
-    html.append("<table class='scorecard-table'>")
-    html.append("<thead><tr>")
-    html.append("<th></th>")
-    html.append("<th class='scorecard-col scorecard-th-high'>Critical</th>")
-    html.append("<th class='scorecard-col scorecard-th-moderate'>Moderate</th>")
-    html.append("<th class='scorecard-col scorecard-th-low'>Minor</th>")
-    html.append("</tr></thead><tbody>")
-    html.append("<tr>")
-    html.append("<td class='scorecard-label'>Higher confidence</td>")
-    html.append(f"<td class='scorecard-col scorecard-val-high'>{_sc(hc_critical)}</td>")
-    html.append(f"<td class='scorecard-col scorecard-val-moderate'>{_sc(hc_moderate)}</td>")
-    html.append(f"<td class='scorecard-col scorecard-val-low'>{_sc(hc_minor)}</td>")
-    html.append("</tr><tr>")
-    html.append("<td class='scorecard-label'>Lower confidence</td>")
-    html.append(f"<td class='scorecard-col scorecard-val-high'>{_sc(lc_critical)}</td>")
-    html.append(f"<td class='scorecard-col scorecard-val-moderate'>{_sc(lc_moderate)}</td>")
-    html.append(f"<td class='scorecard-col scorecard-val-low'>{_sc(lc_minor)}</td>")
-    html.append("</tr></tbody></table>")
-    if headline:
-        html.append(f"<p class='summary-headline'>{headline}</p>")
-    if narrative:
-        html.append(f"<p class='summary-narrative'>{narrative}</p>")
-    html.append("</div>")  # summary-inner
-    html.append("</div>")  # summary-section
-
-    # Issues
-    region_by_trap = issues_report.get('_region_by_trap', {})
-    if issues:
-        html.append(f"<h2>{'Issue' if len(issues) == 1 else 'Issues'} Identified</h2>")
-        html.append("<div class='issues-section'>")
-        for idx, issue in enumerate(issues, 1):
-            html.append(_render_issue_card_html(idx, issue, region_by_trap))
-        html.append("</div>")
-
-    # Positive observations
-    pos = issues_report.get("positive_observations") or []
-    if pos:
-        html.append("<h2>What Works Well</h2>")
-        html.append("<div class='positives-section'>")
-        html.append("<ul>")
-        for p in pos:
-            html.append(f"<li>{_cap_terms(p)}</li>")
-        html.append("</ul>")
-        html.append("</div>")
-
-    # Traps not found
-    raw_items = issues_report.get('traps_checked_not_found', [])
-    tested_ok = []
-    untestable = []
-    for item in raw_items:
-        if isinstance(item, str):
-            tested_ok.append(item)
-        elif item.get('testable', True):
-            tested_ok.append(item['trap_name'])
-        else:
-            untestable.append(item)
-
-    if tested_ok:
-        html.append("<h2>Traps Not Found</h2>")
-        html.append("<div class='traps-not-found'>")
-        html.append("<p class='section-intro'>The following traps were specifically evaluated and do not appear to be present.</p>")
-        html.append("<ul class='trap-name-list'>")
-        for trap in tested_ok:
-            tenet = _tenet_for(trap)
-            html.append(f"<li>{_tenet_pill_html(trap, tenet)}</li>")
-        html.append("</ul></div>")
-
-    if untestable:
-        html.append("<h2>Needs More Context</h2>")
-        html.append("<div class='traps-not-found'>")
-        html.append("<p class='section-intro'>The following traps could not be fully evaluated from the submitted materials.</p>")
-        html.append("<ul class='trap-name-list'>")
-        for item in untestable:
-            tenet = _tenet_for(item['trap_name'])
-            html.append(f"<li>{_tenet_pill_html(item['trap_name'], tenet)}</li>")
-        html.append("</ul></div>")
-
-    # Footer
-    html.append("<div class='footer confidentiality-notice'>")
-    html.append("<p><em>Generated using UI Tenets &amp; Traps proprietary framework</em></p>")
-    html.append("</div>")
-    html.append("</div></body></html>")
-    return "\n".join(html)
 
 
 def get_report_statistics(report: Dict[str, Any]) -> Dict[str, Any]:
