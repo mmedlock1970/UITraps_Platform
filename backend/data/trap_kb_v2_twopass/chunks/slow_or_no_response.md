@@ -1,0 +1,23 @@
+<!-- GENERATED from trap_kb_v2.md — do not edit; regenerate on any master edit -->
+### TRAP: SLOW OR NO RESPONSE *(ratified 2026-07-04)*
+
+**Definition.** The actual or perceived time the system takes to respond exceeds what the user wants or expects. Anchored to psychophysical thresholds: continuous actions (ink, AR/VR tracking) 0–10 ms; discrete actions (tap, click, scroll) ≤100 ms feels instantaneous, >1 s disruptive, >10 s attention abandons; conversational turns ≤1 s (human gaps average ~250 ms). Perceived duration is separately designable: unoccupied waits feel 1.4–1.8× longer; uncertain and unexplained waits feel longer.
+
+**Boundary.** IS: response beyond threshold for the interaction type, OR within bounds but *feeling* slow due to absent/poor progress design. IS NOT **Captive Wait**: that Trap is about denied *control* (can't advance or exit); this is about *speed*. IS NOT present when deliberate pacing serves comprehension (transition animations that show what happened) or when a small delay corrects a too-fast response. Too-fast failures route by what the speed defeats: defeats acting (timing windows, targets expiring before they can be hit) → Physical Challenge; defeats noticing (state changes too brief to register) → Feedback Failure as the entry lens; its routing map designates the root (too-brief perceivable feedback → Physical Challenge root, FF as lens); defeats reading or using (content withdrawn before the user chose to move on) → Captive Wait; defeats comprehending (transitions too fast to parse) → Uncomprehended Element.
+
+**Detection procedure (pass one — flag, do not filter).** *Unit: per-interaction; live artifacts strongly preferred.*
+1. For live/instrumented artifacts: measure response times per significant interaction; flag every threshold violation by interaction type.
+2. For all artifacts: audit wait-state design — flag any operation >1 s without continuous progress feedback; any >10 s with no occupied-time treatment (skeleton screens, background continuation); progress indicators that jump discretely or stall.
+3. For static artifacts: response times are not assessable — declare; wait-state *design* (presence/quality of progress feedback in mocked states) remains flaggable. Scoped coverage (always emitted on statics, J27): "Slow or No Response — wait-state design; not from this artifact: actual response times — live session or screen recording would settle."
+
+**Disconfirmation (pass two).** NOT present when: (a) within thresholds AND longer operations carry well-designed progress feedback; (b) deliberate pacing serves comprehension; (c) delay is corrective for a too-fast response.
+
+**Severity.** Medium for perceptible-but-tolerated delays; High at abandonment thresholds (>10 s undisclosed) and for conversational products beyond 1 s (users attribute rudeness/unintelligence). Anchor: a flashlight app taking up to five seconds to light (card example): High — the tool's entire value is immediacy; users judge it broken and abandon. High for AR/VR tracking lag (motion sickness → Physical Challenge co-listing). Escalators: C4 (latency in a core loop taxes every use).
+
+**Assessability & Confidence.** High confidence for measured times against thresholds (among the most automatable checks — live artifacts, instrumented artifacts, and screen recordings, which carry genuine timing at frame-rate precision). Medium confidence for perceived slowness from design review; promotion path: measurement, or observation of repeat-actions/frustration signals. Context axis: C2 (expectations vary by task stakes); C1 (population norms for the product category shape expectations).
+
+**Attribution.** Feedback Failure: a slow system WITH good progress feedback has this Trap only; absent progress indication is that Trap co-occurring — separate evidence. Peak-end note for remediation prioritization: ends dominate memory; fix trailing slowness first.
+
+**Report fragments.** Finding: "[Interaction] takes [duration] — exceeding the [threshold] for its type / with no progress indication during the wait." Why it matters: "Beyond perception thresholds users repeat actions, abandon tasks, or lose confidence their input registered."
+
+**Remediation.** Immediate receipt confirmation under 100 ms even when the full response lags; continuous progress feedback beyond 1 s; never a static screen. Occupied-time techniques (skeletons, progressive loading, background continuation); pre-fetch so waits start before users mark time; make progress accelerate toward completion (peak-end). Improve actual speed in ≥20% increments to be felt — and beware the reverse: successive regressions each below ~20% are individually imperceptible and are how products rot; guard with instrumented latency budgets.

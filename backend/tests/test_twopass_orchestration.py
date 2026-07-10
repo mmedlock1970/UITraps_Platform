@@ -50,7 +50,7 @@ def analyzer():
 
 
 def test_twopass_orchestration_end_to_end(analyzer, monkeypatch):
-    manifest = pg.ensure_current("v2.1")
+    manifest = pg.ensure_current("v2")
     names = [t["trap"] for t in manifest["traps"]]
     trap_a, trap_b = names[0], names[3]
 
@@ -77,7 +77,7 @@ def test_twopass_orchestration_end_to_end(analyzer, monkeypatch):
     report = analyzer._twopass(
         design_file="dummy.png",
         user_context={"users": "u", "tasks": "t", "format": "PNG"},
-        kb_version="v2.1",
+        kb_version="v2",
         preloaded_image=fake_image,
     )
 
@@ -113,13 +113,13 @@ def test_twopass_orchestration_end_to_end(analyzer, monkeypatch):
     meta = report.get("_twopass_meta")
     assert meta and set(meta["candidates_matched"]) == {trap_a, trap_b}
     assert meta["candidates_unmatched"]  # the bogus line surfaced, not dropped
-    assert meta["kb_master_sha256"] == pg.master_hash("v2.1")
+    assert meta["kb_master_sha256"] == pg.master_hash("v2")
     u = report["_usage_last"]
     assert u["input"] == 300 and u["output"] == 350
 
 
 def test_twopass_zero_candidates_still_adjudicates(analyzer, monkeypatch):
-    pg.ensure_current("v2.1")
+    pg.ensure_current("v2")
     calls = []
 
     def fake_create(**kwargs):
@@ -135,7 +135,7 @@ def test_twopass_zero_candidates_still_adjudicates(analyzer, monkeypatch):
     report = analyzer._twopass(
         design_file="dummy.png",
         user_context={"users": "u", "tasks": "t", "format": "PNG"},
-        kb_version="v2.1",
+        kb_version="v2",
         preloaded_image=fake_image,
     )
     # Adjudication still runs (coverage notes must be produced even with no candidates).

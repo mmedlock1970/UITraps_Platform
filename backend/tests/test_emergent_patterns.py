@@ -14,7 +14,7 @@ import pytest
 
 from src.formatters import format_bytrap_report_as_html, _emergent_patterns_html
 
-_SET = {"kb_version": "v2.1", "report_style": "trap"}
+_SET = {"kb_version": "v2", "report_style": "trap"}
 
 
 def _f(trap, tenet, sev_arr, headline):
@@ -129,17 +129,17 @@ def test_trapfest_axis_b_tenet_habituating_verbatim_cashout():
 
 def test_emergent_gloss_is_read_from_kb_verbatim():
     # DRIFT-GUARD: the gloss the render prints must equal the gloss parsed from the KB AND appear
-    # verbatim in trap_kb_v2.1.md — proving the tool reads the KB (Ledger 23), holds no hardcoded
+    # verbatim in trap_kb_v2.md — proving the tool reads the KB (Ledger 23), holds no hardcoded
     # copy. If a tool-side copy is ever reintroduced and diverges from the KB, this fails.
     from pathlib import Path
     from src.knowledge_extractor import load_tenet_glosses
-    kb_text = (Path(__file__).resolve().parents[1] / "data" / "trap_kb_v2.1.md").read_text(encoding="utf-8")
+    kb_text = (Path(__file__).resolve().parents[1] / "data" / "trap_kb_v2.md").read_text(encoding="utf-8")
     _, seg = _ep_section(_trapfest())  # fires axis (b) "less Habituating"
     m = re.search(r"less Habituating — (.+?) — because", seg)
     assert m, "no Habituating gloss in the rendered Emergent Patterns line"
     rendered_gloss = m.group(1)
-    assert rendered_gloss == load_tenet_glosses("v2.1")["HABITUATING"], "render != KB-parsed gloss"
-    assert rendered_gloss in kb_text, "rendered gloss not present verbatim in trap_kb_v2.1.md (drift!)"
+    assert rendered_gloss == load_tenet_glosses("v2")["HABITUATING"], "render != KB-parsed gloss"
+    assert rendered_gloss in kb_text, "rendered gloss not present verbatim in trap_kb_v2.md (drift!)"
 
 
 def test_gloss_loader_matches_fenced_block_exactly_eight():
@@ -148,13 +148,13 @@ def test_gloss_loader_matches_fenced_block_exactly_eight():
     # fences so the Ledger 23 prose that quotes glosses is not matched.
     from pathlib import Path
     from src.knowledge_extractor import load_tenet_glosses
-    kb_lines = (Path(__file__).resolve().parents[1] / "data" / "trap_kb_v2.1.md").read_text(encoding="utf-8").splitlines()
+    kb_lines = (Path(__file__).resolve().parents[1] / "data" / "trap_kb_v2.md").read_text(encoding="utf-8").splitlines()
     si = next(i for i, l in enumerate(kb_lines) if l.strip() == "<!-- TENET-GLOSSES:START -->")
     ei = next(i for i in range(si + 1, len(kb_lines)) if kb_lines[i].strip() == "<!-- TENET-GLOSSES:END -->")
     block = "\n".join(kb_lines[si + 1:ei])
     parsed = {k.upper(): v for k, v in re.findall(r'-\s*less\s+([A-Za-z]+)\s*:\s*"([^"]+)"', block)}
     assert len(parsed) == 8, f"expected 8 glosses in the fenced block, parsed {len(parsed)}"
-    assert load_tenet_glosses("v2.1") == parsed, "loader drifted from the TENET-GLOSSES fenced block"
+    assert load_tenet_glosses("v2") == parsed, "loader drifted from the TENET-GLOSSES fenced block"
 
 
 def test_trapfest_no_imperative_no_positive():
@@ -205,9 +205,9 @@ def test_axis_b_fires_on_clear_majority():
 
 @pytest.mark.parametrize("kbv", ["v1", "v1.1"])
 def test_v1_suppresses_emergent_patterns_entirely(kbv):
-    # Ledger 22 is v2.1-only material (fixed tenet glosses + concentration thresholds). A v1 run —
+    # Ledger 22 is v2-only material (fixed tenet glosses + concentration thresholds). A v1 run —
     # the clean control — renders NO Emergent Patterns section in ANY form (not empty, not a stub).
-    rep = _trapfest()  # would fire both axes under v2.1
+    rep = _trapfest()  # would fire both axes under v2
     html = format_bytrap_report_as_html(rep, {"design_name": "T"}, {"kb_version": kbv, "report_style": "trap"})
     assert "ep-line" not in html
     assert "concentrate on" not in html and "Most of what's wrong here" not in html
@@ -216,7 +216,7 @@ def test_v1_suppresses_emergent_patterns_entirely(kbv):
 
 def test_v21_still_renders_emergent_patterns():
     rep = _trapfest()
-    html = format_bytrap_report_as_html(rep, {"design_name": "T"}, {"kb_version": "v2.1", "report_style": "trap"})
+    html = format_bytrap_report_as_html(rep, {"design_name": "T"}, {"kb_version": "v2", "report_style": "trap"})
     assert "ep-line" in html
 
 
@@ -288,15 +288,19 @@ def test_fired_tenet_survives_when_mostly_inspectable():
 
 def test_assessed_absent_does_not_count_against_a_tenet():
     # not_present = the Trap was inspected and genuinely absent → successful inspection, must NOT
-    # count as "couldn't evaluate". 2 Protective fired + 3 not_present → still fires.
+    # count as "couldn't evaluate". 2 Protective fired + 3 not_present → still fires. The three cleared
+    # Traps are real static-screenshot-floor Traps carrying cited evidence (detail), so they SURVIVE
+    # the disposition gate on the default static-screenshot artifact and stay not_present — a genuinely
+    # assessed-absent verdict, exactly what the leash must not penalize. (Fake trap names would be
+    # re-routed by the gate to "couldn't evaluate" — correctly, since an unknown Trap has no floor.)
     rep = {"summary_headline": "h", "summary_narrative": "n",
            "critical_issues": [_f("BAD PREDICTION", "PROTECTIVE", "critical", "Prot problem one"),
                                _f("INVITING DEAD END", "PROTECTIVE", "critical", "Prot problem two"),
                                _f("POOR GROUPING", "HABITUATING", "critical", "Hab problem")],
            "moderate_issues": [], "minor_issues": [], "positive_observations": [], "issue_groups": [],
-           "traps_checked_not_found": [_cov("A", "PROTECTIVE", "not_present"),
-                                       _cov("B", "PROTECTIVE", "not_present"),
-                                       _cov("C", "PROTECTIVE", "not_present")]}
+           "traps_checked_not_found": [_cov("INCORRECT INFORMATION", "PROTECTIVE", "not_present"),
+                                       _cov("UNWANTED DISCLOSURE", "PROTECTIVE", "not_present"),
+                                       _cov("SYSTEM AMNESIA", "PROTECTIVE", "not_present")]}
     _, seg = _ep_section(rep)
     assert "less Protective" in seg
 

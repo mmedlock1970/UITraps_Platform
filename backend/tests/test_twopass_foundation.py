@@ -13,7 +13,7 @@ import pytest
 from src import pack_generator as pg
 
 
-VERSIONS = ["v2.1"]  # v1.1 retired from the active test matrix (pack support retained)
+VERSIONS = ["v2"]  # v1.1 retired from the active test matrix (pack support retained)
 
 
 @pytest.mark.parametrize("version", VERSIONS)
@@ -38,13 +38,13 @@ def test_ensure_current_refuses_when_regeneration_disabled_and_stale(version, mo
 @pytest.mark.parametrize("version", VERSIONS)
 def test_manifest_trap_count(version):
     manifest = pg.ensure_current(version)
-    expected = 27  # v2.1 taxonomy
+    expected = 27  # v2 taxonomy
     assert len(manifest["traps"]) == expected
     assert len(manifest["verbatim_definitions"]) == expected
 
 
 def test_match_candidates_clean_pipe_lines():
-    manifest = pg.ensure_current("v2.1")
+    manifest = pg.ensure_current("v2")
     names = [t["trap"] for t in manifest["traps"]]
     a, b = names[0], names[5]
     raw = f"{a} | login screen | submit btn | disabled\n{b} | cart | qty field | silent cap"
@@ -54,7 +54,7 @@ def test_match_candidates_clean_pipe_lines():
 
 
 def test_match_candidates_tolerates_markdown_and_dedupes():
-    manifest = pg.ensure_current("v2.1")
+    manifest = pg.ensure_current("v2")
     name = manifest["traps"][0]["trap"]
     raw = (
         f"- **{name}** | home | hero | x\n"
@@ -69,7 +69,7 @@ def test_match_candidates_tolerates_markdown_and_dedupes():
 
 def test_match_candidates_longest_name_wins():
     """A candidate naming a longer trap must not be captured by a shorter contained name."""
-    manifest = pg.ensure_current("v2.1")
+    manifest = pg.ensure_current("v2")
     names = [t["trap"] for t in manifest["traps"]]
     # Find any pair where one normalized name contains another.
     norm = {n: pg._norm_letters(n) for n in names}
@@ -92,18 +92,18 @@ def test_match_candidates_longest_name_wins():
 
 
 def test_load_chunks_returns_full_chunk_bodies():
-    manifest = pg.ensure_current("v2.1")
+    manifest = pg.ensure_current("v2")
     first_two = [t["trap"] for t in manifest["traps"][:2]]
-    text = pg.load_chunks("v2.1", first_two, manifest=manifest)
+    text = pg.load_chunks("v2", first_two, manifest=manifest)
     assert "### TRAP:" in text
     # Both requested traps present, in manifest order.
     assert text.count("### TRAP:") == 2
 
 
 def test_load_packs_readable():
-    pg.ensure_current("v2.1")
-    p1 = pg.load_pack("v2.1", "pass1")
-    p2 = pg.load_pack("v2.1", "pass2")
+    pg.ensure_current("v2")
+    p1 = pg.load_pack("v2", "pass1")
+    p2 = pg.load_pack("v2", "pass2")
     assert p1.strip() and p2.strip()
     assert "GLOBAL RULES" in p2 or "GLOBAL" in p2
 
@@ -129,13 +129,13 @@ def test_assessability_digest_is_verbatim_static_clause():
     """The digest lifts each chunk's own assessability declaration verbatim — Irreversible
     Action must carry its 'not assessable from this artifact' clause (the misfile this fixes),
     and the text must match the chunk word-for-word (no tool authoring)."""
-    pg.ensure_current("v2.1")
-    p2 = pg.load_pack("v2.1", "pass2")
+    pg.ensure_current("v2")
+    p2 = pg.load_pack("v2", "pass2")
     digest = p2.split("## PER-TRAP ASSESSABILITY DIGEST", 1)[1]
     line = next(ln for ln in digest.splitlines() if ln.startswith("- **Irreversible Action**"))
     assert "not assessable from this artifact" in line.lower()
     # Verbatim check: the collapsed chunk block text appears in the collapsed digest line.
-    chunk = pg.load_chunks("v2.1", ["Irreversible Action"])
+    chunk = pg.load_chunks("v2", ["Irreversible Action"])
     block = pg._assessability_block(chunk)
     body = " ".join(pg._digest_line("X", block).split("—", 1)[1].split())
     assert body and body in " ".join(line.split())
@@ -173,8 +173,8 @@ def test_assessability_block_ignores_prose_mention():
 def test_assessability_digest_handles_nonstandard_label():
     """Poor Aesthetic labels its assessability content '**Boundary & assessability warning...**',
     not '**Assessability & Confidence.**'. The structural 'assessab' match must still catch it."""
-    pg.ensure_current("v2.1")
-    chunk = pg.load_chunks("v2.1", ["Poor Aesthetic"])
+    pg.ensure_current("v2")
+    chunk = pg.load_chunks("v2", ["Poor Aesthetic"])
     block = pg._assessability_block(chunk)
     assert "assessab" in block.lower()
     line = pg._digest_line("Poor Aesthetic", block)

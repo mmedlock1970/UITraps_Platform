@@ -2,7 +2,7 @@
 Task 1 (new-KB integration) verification — no API calls.
 
 Covers the four Task-1 behaviors for the sole surviving Prompting+KB config
-(v2.1). The legacy Prompting+KB pathway (v1 / v2) is deprecated and now raises,
+(v2). The legacy Prompting+KB pathway (v1 / v2) is deprecated and now raises,
 so its regression tests are removed; v1 survives only as a KB-only (self-serve)
 version, exercised via the schema/formatter predicates below (is_new_kb=False):
 
@@ -34,7 +34,7 @@ from src.schema import (
 from src.formatters import format_report_as_html
 
 
-NEW_KBS = ["v2.1"]
+NEW_KBS = ["v2"]
 LEGACY_KBS = ["v1"]  # v1 survives only as a KB-only version; v1.1/v2 retired from the test matrix
 
 # Strings that must NOT appear in a new-KB system prompt (Task 1 removals).
@@ -54,17 +54,17 @@ FORBIDDEN_IN_NEW_PROMPT = [
 
 def test_each_version_loads_its_own_master():
     v1 = load_analysis_reference("v1")
-    v21 = load_analysis_reference("v2.1")
-    # Distinct content per surviving config — v1 (KB-only) vs v2.1 (Prompting+KB).
+    v21 = load_analysis_reference("v2")
+    # Distinct content per surviving config — v1 (KB-only) vs v2 (Prompting+KB).
     assert v1 != v21
-    assert "v2.1" in v21.splitlines()[0]
+    assert "v2" in v21.splitlines()[0]
     # The new master carries the new global-rules structure.
     assert "GLOBAL RULES" in v21
 
 
 def test_unknown_version_falls_back_to_v21():
-    # v2.0 support was removed; the analysis-reference fallback is now v2.1.
-    assert load_analysis_reference("bogus") == load_analysis_reference("v2.1")
+    # v2.0 support was removed; the analysis-reference fallback is now v2.
+    assert load_analysis_reference("bogus") == load_analysis_reference("v2")
 
 
 # ── 2. Prompt (mechanics-only) ───────────────────────────────────────────────
@@ -101,8 +101,8 @@ def test_new_kb_prompt_loads_matching_master(version):
 
 
 def test_new_kb_trap_name_sets():
-    v21 = build_system_prompt(version="v2.1")[0]["text"]
-    # v2.1 uses the 27-trap set (POOR AESTHETIC + INCORRECT INFORMATION).
+    v21 = build_system_prompt(version="v2")[0]["text"]
+    # v2 uses the 27-trap set (POOR AESTHETIC + INCORRECT INFORMATION).
     assert "POOR AESTHETIC" in v21 and "INCORRECT INFORMATION" in v21
 
 
@@ -142,8 +142,8 @@ def test_new_kb_user_message_is_clean(version):
 
 
 def test_trap_count_per_version():
-    # v2.1 (Prompting+KB) is the only config whose user message runs this path.
-    assert "Check all 27 Traps" in _user_text("v2.1")
+    # v2 (Prompting+KB) is the only config whose user message runs this path.
+    assert "Check all 27 Traps" in _user_text("v2")
 
 
 # ── 3. Schema ────────────────────────────────────────────────────────────────
@@ -261,7 +261,7 @@ def test_new_kb_report_renders_new_sections(version):
 def test_new_kb_worth_a_closer_look_section():
     html = format_report_as_html(
         _new_kb_report(), {"users": "kids", "tasks": "find kids shows", "format": "PNG"},
-        analysis_settings={"kb_version": "v2.1"},
+        analysis_settings={"kb_version": "v2"},
     )
     # Its own section, rendering the richer fields — not folded into Issues.
     assert "<h2>Worth a closer look</h2>" in html
@@ -275,7 +275,7 @@ def test_new_kb_worth_a_closer_look_section():
 def test_new_kb_scorecard_and_severity_order():
     html = format_report_as_html(
         _new_kb_report(), {"users": "kids", "tasks": "find kids shows", "format": "PNG"},
-        analysis_settings={"kb_version": "v2.1"},
+        analysis_settings={"kb_version": "v2"},
     )
     # Ladder scorecard (High/Medium/Low), not the rejected Critical or Moderate/Minor vocab.
     assert "Issues by severity" in html

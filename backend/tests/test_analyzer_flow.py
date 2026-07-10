@@ -121,7 +121,7 @@ def test_flow_v1_default_profile_still_trips_guard(tmp_path):
 def test_flow_single_call_carries_all_screens(tmp_path):
     a, calls = _analyzer(_TRAP)
     a.analyze_flow_diagram(frames=_frames(tmp_path, 3), user_context=_UC,
-                           kb_version="v2.1", profile="default", report_style="trap", mode="single")
+                           kb_version="v2", profile="default", report_style="trap", mode="single")
     tcs = _tool_calls(calls)
     assert len(tcs) == 1                 # ONE cross-screen call — not 3 stitched per-frame calls
     assert _count_images(tcs[0]) == 3    # all three screens in that one call (_n_screens == 3)
@@ -132,7 +132,7 @@ def test_flow_single_call_carries_all_screens(tmp_path):
 def test_flow_single_pass_is_one_report_call(tmp_path):
     a, calls = _analyzer(_TRAP)
     a.analyze_flow_diagram(frames=_frames(tmp_path, 2), user_context=_UC,
-                           kb_version="v2.1", profile="default", report_style="trap", mode="single")
+                           kb_version="v2", profile="default", report_style="trap", mode="single")
     assert len(_tool_calls(calls)) == 1
     assert len(_detection_calls(calls)) == 0  # no detection pass in single-pass
 
@@ -140,7 +140,7 @@ def test_flow_single_pass_is_one_report_call(tmp_path):
 def test_flow_twopass_runs_detection_then_adjudication(tmp_path):
     a, calls = _analyzer(_TRAP)
     a.analyze_flow_diagram(frames=_frames(tmp_path, 2), user_context=_UC,
-                           kb_version="v2.1", profile="default", report_style="trap", mode="twopass")
+                           kb_version="v2", profile="default", report_style="trap", mode="twopass")
     assert len(_detection_calls(calls)) == 1  # detection pass (candidate list, no tools)
     assert len(_tool_calls(calls)) == 1       # adjudication pass (tool output)
     # both passes carry the full multi-screen artifact
@@ -157,7 +157,7 @@ def test_flow_twopass_runs_detection_then_adjudication(tmp_path):
 def test_flow_report_style_trap_drives_tool_and_render(tmp_path):
     a, calls = _analyzer(_TRAP)
     r = a.analyze_flow_diagram(frames=_frames(tmp_path, 2), user_context=_UC,
-                               kb_version="v2.1", profile="default", report_style="trap", mode="single")
+                               kb_version="v2", profile="default", report_style="trap", mode="single")
     assert "UI Traps — By Trap" in r["html"]
     names = [t["name"] for kw in _tool_calls(calls) for t in kw["tools"]]
     assert "ui_analysis_report" in names
@@ -169,7 +169,7 @@ def test_flow_no_exportable_frames_raises(tmp_path):
     a, _ = _analyzer(_TRAP)
     with pytest.raises(ValueError, match="No exportable frames"):
         a.analyze_flow_diagram(frames=[{"id": "x", "name": "x", "image_path": None}],
-                               user_context=_UC, kb_version="v2.1")
+                               user_context=_UC, kb_version="v2")
 
 
 # ── item 6: >6-frame file truncates-with-notice (NOT hard-reject / 400) ───────────────────────
@@ -179,7 +179,7 @@ def test_flow_over_cap_truncates_with_notice(tmp_path):
     # the report discloses BOTH counts so an un-analyzed-frame miss reads as truncation, not a KB gap.
     a, calls = _analyzer(_TRAP)
     r = a.analyze_flow_diagram(frames=_frames(tmp_path, MAX_FLOW_SCREENS), user_context=_UC,
-                               kb_version="v2.1", profile="default", report_style="trap",
+                               kb_version="v2", profile="default", report_style="trap",
                                mode="single", total_frames=23)
     assert r["status"] == "success"
     assert len(_tool_calls(calls)) == 1               # still ONE cross-screen call over the 6 frames
@@ -194,10 +194,10 @@ def test_flow_over_cap_truncates_with_notice(tmp_path):
 def test_flow_within_cap_has_no_notice(tmp_path):
     # total == analyzed (nothing skipped) → no partial-coverage banner. Same when total is unset.
     a, _ = _analyzer(_TRAP)
-    r = a.analyze_flow_diagram(frames=_frames(tmp_path, 3), user_context=_UC, kb_version="v2.1",
+    r = a.analyze_flow_diagram(frames=_frames(tmp_path, 3), user_context=_UC, kb_version="v2",
                                profile="default", report_style="trap", mode="single", total_frames=3)
     assert "Partial coverage" not in r["html"]
     a2, _ = _analyzer(_TRAP)
-    r2 = a2.analyze_flow_diagram(frames=_frames(tmp_path, 3), user_context=_UC, kb_version="v2.1",
+    r2 = a2.analyze_flow_diagram(frames=_frames(tmp_path, 3), user_context=_UC, kb_version="v2",
                                  profile="default", report_style="trap", mode="single")
     assert "Partial coverage" not in r2["html"]

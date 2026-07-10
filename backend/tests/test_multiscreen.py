@@ -38,8 +38,8 @@ def test_multi_screen_blocks_are_labeled_and_interleaved():
 
 
 def test_system_prompt_multi_screen_note_gated_and_cache_safe():
-    single = build_system_prompt(version="v2.1", image_count=1)
-    multi = build_system_prompt(version="v2.1", image_count=3)
+    single = build_system_prompt(version="v2", image_count=1)
+    multi = build_system_prompt(version="v2", image_count=3)
     _has = lambda bl: any("MULTI-SCREEN ANALYSIS" in b.get("text", "") for b in bl)
     assert not _has(single), "single-screen must not get the multi-screen note"
     assert _has(multi), "multi-screen must get the note"
@@ -51,7 +51,7 @@ def test_system_prompt_multi_screen_note_gated_and_cache_safe():
 # ── 2. Schema shape ──────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("get_schema,arr,self_serve", [
-    (lambda: get_ui_analysis_schema("v2.1"), "critical_issues", False),          # coached By-Trap
+    (lambda: get_ui_analysis_schema("v2"), "critical_issues", False),          # coached By-Trap
     (lambda: get_ui_analysis_schema("v1", self_serve=True), "critical_issues", True),   # self-serve trap
 ])
 def test_regions_field_shape(get_schema, arr, self_serve):
@@ -143,7 +143,7 @@ def test_bytrap_formatter_renders_a_crop_per_region():
             ],
         }],
     }
-    html = format_bytrap_report_as_html(report, {"design_name": "T"}, {"kb_version": "v2.1", "report_style": "trap"})
+    html = format_bytrap_report_as_html(report, {"design_name": "T"}, {"kb_version": "v2", "report_style": "trap"})
     assert html.count("<figure class='crop'>") == 2         # one crop per instance
     assert _B64 in html and _B64B in html
     assert "home header" in html and "results header" in html

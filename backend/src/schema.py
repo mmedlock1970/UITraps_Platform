@@ -8,16 +8,16 @@ import copy
 
 # KB generations that carry all evaluative logic in the KB file itself and use the
 # new output vocabulary (Severity & Confidence: High/Medium/Low; G4 coverage labels;
-# G8 report sections). The legacy v1/v2 path is unchanged.
-NEW_KB_VERSIONS = frozenset({"v1.1", "v2.1"})
+# G8 report sections). The legacy v1 path is unchanged.
+NEW_KB_VERSIONS = frozenset({"v1.1", "v2"})
 
 
 def is_new_kb(version: str | None) -> bool:
-    """True when the selected KB carries the new (v2.1-lineage) output vocabulary."""
+    """True when the selected KB carries the new (v2-lineage) output vocabulary."""
     return version in NEW_KB_VERSIONS
 
 
-# New-KB output vocabulary (see trap_kb_v2.1.md §SEVERITY & CONFIDENCE and G4/G8)
+# New-KB output vocabulary (see trap_kb_v2.md §SEVERITY & CONFIDENCE and G4/G8)
 NEW_KB_CONFIDENCE_LEVELS = ["High", "Medium", "Low"]
 NEW_KB_SEVERITY_LABELS = ["High", "Medium", "Low"]
 NEW_KB_COVERAGE_STATUSES = [
@@ -93,7 +93,7 @@ VALID_TRAP_NAMES_V1 = [
 
 
 def _valid_trap_names(version: str | None) -> list:
-    """The canonical trap-name set for a version's lineage (26 for v1/v1.1, 27 for v2/v2.1)."""
+    """The canonical trap-name set for a version's lineage (26 for v1/v1.1, 27 for v2)."""
     return VALID_TRAP_NAMES_V1 if version in ("v1", "v1.1") else VALID_TRAP_NAMES
 
 # The 9 valid UI Tenet names
@@ -513,9 +513,9 @@ def _regions_field(bare: bool = False) -> dict:
     }
 
 
-def _new_kb_analysis_schema(version: str = "v2.1"):
+def _new_kb_analysis_schema(version: str = "v2"):
     """
-    Derive the analysis schema for new-KB (v2.1-lineage) versions from the legacy
+    Derive the analysis schema for new-KB (v2-lineage) versions from the legacy
     schema. Only the vocabulary changes — field names and array structure are
     preserved so the whole downstream pipeline (enrichment, crops, formatter,
     front end) keeps working:
@@ -688,7 +688,7 @@ def _new_kb_analysis_schema(version: str = "v2.1"):
     return schema
 
 
-# Cache the derived new-KB schema PER LINEAGE — v1.1 (26 traps) and v2.1 (27 traps) differ.
+# Cache the derived new-KB schema PER LINEAGE — v1.1 (26 traps) and v2 (27 traps) differ.
 _NEW_KB_ANALYSIS_SCHEMA_CACHE: dict = {}
 
 
@@ -742,7 +742,7 @@ def get_ui_analysis_schema(version: str = "v2", self_serve: bool = False):
     Get the JSON schema for UI analysis structured output.
 
     Args:
-        version: KB version. New-KB versions (v1.1/v2.1) get the remapped
+        version: KB version. New-KB versions (v1.1/v2) get the remapped
             vocabulary with a version-aware trap-name enum; others get the legacy schema.
         self_serve: When True, return the BARE By-Trap schema (raw-KB profile) for ANY
             version — no enums, no guidance, fields omittable. The tool derives tenet and the
@@ -893,7 +893,7 @@ USER_ISSUES_SCHEMA = {
 
 
 def get_user_issues_schema():
-    """Get the JSON schema for Pass 3 user-issues synthesis output (legacy v1/v2)."""
+    """Get the JSON schema for Pass 3 user-issues synthesis output (legacy v1)."""
     return USER_ISSUES_SCHEMA
 
 

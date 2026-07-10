@@ -47,14 +47,14 @@ def test_selfserve_trap_schema_is_cached_and_lineage_aware():
     b = get_ui_analysis_schema("v1", self_serve=True)  # cached → same object
     assert a is b
     # A different lineage yields a distinct cached object.
-    assert get_ui_analysis_schema("v2.1", self_serve=True) is not a
+    assert get_ui_analysis_schema("v2", self_serve=True) is not a
 
 
 def test_default_trap_schema_unchanged():
     # self_serve defaults False; legacy v1 still returns the untouched legacy schema object.
     assert get_ui_analysis_schema("v1") is UI_ANALYSIS_SCHEMA
     # new-KB trap schema still carries its coaching (enum + coverage taxonomy)
-    v21 = json.dumps(get_ui_analysis_schema("v2.1"))
+    v21 = json.dumps(get_ui_analysis_schema("v2"))
     assert "coverage_status" in v21 and "INVISIBLE ELEMENT" in v21
 
 
@@ -140,7 +140,7 @@ def test_selfserve_trap_tenets_derived_upper_matching_v21():
               "moderate_issues": [], "minor_issues": []}
     a._fill_selfserve_trap_tenets(report)
     tenet = report["critical_issues"][0]["tenet"]
-    # non-empty AND UPPER (same case the coached v2.1 trap schema emits from its enum)
+    # non-empty AND UPPER (same case the coached v2 trap schema emits from its enum)
     assert tenet and tenet == tenet.upper()
 
 
@@ -184,7 +184,7 @@ def test_selfserve_trap_coverage_carries_both_vocabularies():
     assert "DISTRACTION" not in {c["trap_name"] for c in cov}  # reported trap excluded
 
 
-@pytest.mark.parametrize("kbv", ["v1", "v2.1"])
+@pytest.mark.parametrize("kbv", ["v1", "v2"])
 def test_selfserve_trap_render_survives_malformed_findings(kbv, tmp_path):
     """A permissive bare schema can yield a stray non-dict finding. Drive the REAL analyze_design
     path (not a hand-rolled copy of the filter) so this proves PRODUCTION strips them before the

@@ -33,6 +33,26 @@ _ANALYSIS_API_TIMEOUT_S = 600
 # output truncation or the model self-limiting. Revisit if longer flows are genuinely needed.
 MAX_FLOW_SCREENS = 6
 
+
+def resolve_artifact_class(input_type: Optional[str], n_files: int) -> str:
+    """Which rung of the observability scale the SUBMITTED artifact sits on — a mechanical fact about
+    the input medium (tool-owned, like screen count). The KB owns the per-Trap floors on this scale
+    (Ledger 26 ASSESSABILITY-DIGEST); the disposition gate compares this class against those floors.
+    Conservative by construction: a medium is mapped to a rung only when it genuinely exposes that
+    rung's evidence, and ties break DOWN — over-claiming a class would wrongly license "Not present"
+    verdicts the artifact can't support, the exact error the gate exists to stop. Scale order:
+    static-screenshot < disconnected-screens < flow < live < code. The video→live and
+    flow_diagram→flow mappings are tool-owned tuning, re-rulable if the medium's real coverage differs.
+    """
+    it = (input_type or "").strip().lower()
+    if it == "video":
+        return "live"                 # a recording exposes real-time feedback / timing / activation
+    if it == "flow_diagram":
+        return "flow"                 # a flow shows the screen-to-screen transitions in one artifact
+    if it in ("multi_image", "multi-image", "multi_screen") or n_files > 1:
+        return "disconnected-screens"  # separate stills, no wired transitions between them
+    return "static-screenshot"        # a single still — the most restrictive, default rung
+
 # Stream generations at/above this max_tokens ceiling. Streaming is the Anthropic-recommended path
 # for high-max_tokens calls: it keeps the HTTP connection active so a multi-minute generation can't
 # trip the idle timeout and force an SDK retry that re-runs the entire attempt. The final Message is
@@ -156,7 +176,7 @@ class UITrapsAnalyzer:
         user_id: Optional[str] = None,
         page_context: Optional[Dict[str, Any]] = None,
         chat_context: Optional[str] = None,
-        kb_version: str = "v2.1",
+        kb_version: str = "v2",
         verbosity: str = "standard",
         pass1_model: Optional[str] = None,
         thorough_mode: bool = False,
@@ -413,6 +433,10 @@ class UITrapsAnalyzer:
             'truncated': _truncated,
             'frame_notice': frame_notice,
             'usage': dict(_usage_total),
+            # Observability rung of the submitted artifact — the disposition gate (Ledger 26) compares
+            # this against each Trap's KB-owned floor to decide whether a "Not present" verdict is even
+            # eligible. Derived from the declared input medium + screen count (tool mechanics).
+            'artifact_class': resolve_artifact_class(user_context.get('input_type'), len(_design_files)),
         }
         metadata['usage'] = dict(_usage_total)
         metadata['estimated_cost'] = round(_usage_total['cost'], 4)
@@ -429,6 +453,15 @@ class UITrapsAnalyzer:
             logger.error("[UITraps] Analysis returned with truncated output (max_tokens) — report is incomplete.")
         if _twopass_meta is not None:
             metadata['twopass'] = _twopass_meta
+        # Apply the disposition gate ONCE to the source report (self-guards to v2-coached only) so the
+        # markdown export, the statistics, and the returned report object all agree with the HTML — the
+        # HTML formatter re-runs it on its escaped copy idempotently. Runs after the run-log counts are
+        # unaffected (it changes coverage_status labels, not counts).
+        try:
+            from .formatters import _apply_disposition_gate
+        except ImportError:
+            from formatters import _apply_disposition_gate
+        _apply_disposition_gate(report, _analysis_settings)
         markdown_report = format_report_as_markdown(report, user_context, kb_version=kb_version)
         # rev6 BY-TRAP report for new-KB / self-serve; the legacy formatter is the fallback for any
         # other lineage. The public entry escapes settings at the boundary.
@@ -574,7 +607,7 @@ class UITrapsAnalyzer:
         """Self-serve BY-TRAP: the bare KB-only schema does not require `tenet`, but the by-trap
         formatter needs it for each finding's pill. Derive a missing/blank tenet from the trap
         name (the coached formatters get it from the model), using the version's OWN taxonomy —
-        v1 findings get v1 Tenets (the frozen v1.0 card-deck map), not the v2.1 table. Fills only
+        v1 findings get v1 Tenets (the frozen v1.0 card-deck map), not the v2 table. Fills only
         when absent; leaves any tenet the model did provide untouched. Tolerates non-dict findings."""
         try:
             from .formatters import _tenet_for
@@ -648,7 +681,7 @@ class UITrapsAnalyzer:
         frames: List[Dict],
         user_context: Dict[str, str],
         timeout: int = 120,
-        kb_version: str = "v2.1",
+        kb_version: str = "v2",
         verbosity: str = "standard",
         pass1_model: Optional[str] = None,
         profile: str = "default",
@@ -740,7 +773,7 @@ class UITrapsAnalyzer:
         design_file: str,
         user_context: Dict[str, str],
         timeout: int = 120,
-        kb_version: str = "v2.1",
+        kb_version: str = "v2",
         verbosity: str = "standard",
         pass1_model: Optional[str] = None,
         chat_context: Optional[str] = None,
@@ -779,10 +812,13 @@ class UITrapsAnalyzer:
         if max_tokens_override:
             pass1_max_tokens = max_tokens_override
         elif is_new_kb(kb_version) or profile == "self-serve":
-            # New KBs and the self-serve profile emit the verbose by-issue report — a legacy
-            # 3–5K cap truncates it. Give them the full ceiling, scaled with screen count for
-            # multi-screen flows (more screens → more findings + more coverage rows).
-            pass1_max_tokens = min(8000 + max(0, _n_screens - 1) * 1500, 16000)
+            # COMPLETENESS OVER SPEED (author-ruled): a truncated report is an incomplete
+            # evaluation = a reliability failure, so give the KB report a HIGH ceiling a full report
+            # (all findings + coverage + Emergent Patterns + disposition index) never reaches.
+            # max_tokens is a CEILING, not a target — a short report stops early, so raising it costs
+            # nothing except letting a long report complete (accepted: slower/costlier when it does).
+            # Stays ≥ _STREAM_MIN_TOKENS so it streams; scales with screen count for multi-screen.
+            pass1_max_tokens = min(24000 + max(0, _n_screens - 1) * 4000, 32000)
         else:
             pass1_max_tokens = 3000 if verbosity == "brief" else 5000
 
@@ -957,7 +993,7 @@ class UITrapsAnalyzer:
         design_file: str,
         user_context: Dict[str, str],
         timeout: int = 120,
-        kb_version: str = "v2.1",
+        kb_version: str = "v2",
         verbosity: str = "standard",
         pass1_model: Optional[str] = None,
         chat_context: Optional[str] = None,
@@ -968,7 +1004,7 @@ class UITrapsAnalyzer:
         profile: str = "default",
     ) -> Dict[str, Any]:
         """
-        Two-pass analysis for the new (v2.1-lineage) KBs.
+        Two-pass analysis for the new (v2-lineage) KBs.
 
         preloaded_images (multi-screen flow): interleaved SCREEN-labeled image blocks sent to
         BOTH passes in one call each; takes precedence over preloaded_image / design_file.
@@ -988,7 +1024,7 @@ class UITrapsAnalyzer:
         """
         if not is_new_kb(kb_version):
             raise ValueError(
-                f"two-pass mode is only supported for new KBs (v1.1, v2.1); got {kb_version!r}"
+                f"two-pass mode is only supported for new KBs (v1.1, v2); got {kb_version!r}"
             )
 
         # Staleness guard: regenerate derived packs if the master changed. Automatic swap.
@@ -1042,7 +1078,7 @@ class UITrapsAnalyzer:
         # A truncated candidate list loses recall. Scale the ceiling with screen count — a
         # multi-screen flow surfaces candidates on every screen, so a fixed 4000 would clip the
         # tail (and the tail is exactly the cross-screen traps this rebuild exists to catch).
-        _detection_max_tokens = min(4000 + max(0, _n_screens - 1) * 1000, 8000)
+        _detection_max_tokens = min(8000 + max(0, _n_screens - 1) * 2000, 16000)
         _t_det = time.time()
         try:
             det_response = self._create_message(
@@ -1159,7 +1195,7 @@ class UITrapsAnalyzer:
             report["_truncated"] = True
         return report
 
-    def _enrich_report(self, pass1_report: Dict[str, Any], timeout: int = 120, kb_version: str = "v2.1", verbosity: str = "standard") -> Dict[str, Any]:
+    def _enrich_report(self, pass1_report: Dict[str, Any], timeout: int = 120, kb_version: str = "v2", verbosity: str = "standard") -> Dict[str, Any]:
         """
         Pass 2: Enrich Pass 1 findings using full book sections for found traps.
 
@@ -1175,7 +1211,7 @@ class UITrapsAnalyzer:
             Enriched report (same schema as Pass 1, with enhanced text fields).
             Falls back to pass1_report unchanged if no traps were found.
         """
-        # New-KB (v2.1-lineage) versions are self-instructing and use the new output
+        # New-KB (v2-lineage) versions are self-instructing and use the new output
         # vocabulary (Confirmed/Probable/Flagged, coverage_status). The legacy Pass-2
         # enrichment prompt speaks the old vocabulary (high/medium/low, testable) and
         # would conflict with the new schema, so skip enrichment — Pass 1 output stands.
@@ -1273,7 +1309,7 @@ class UITrapsAnalyzer:
             enriched["_usage_last"] = _u
         return enriched
 
-    def _normalize_report_completeness(self, report: Dict[str, Any], kb_version: str = "v2.1") -> None:
+    def _normalize_report_completeness(self, report: Dict[str, Any], kb_version: str = "v2") -> None:
         """
         Make v1 and v2 reports structurally symmetric. Mutates report in place.
 
@@ -1397,7 +1433,10 @@ class UITrapsAnalyzer:
                     img = img.convert('RGB')
                 img.save(buf, format='JPEG', quality=92, optimize=True)
             else:
-                img.save(buf, format='PNG', optimize=True)
+                # No optimize= on the PNG upload encode: it runs a slow extra compression pass for a
+                # marginally smaller payload that does NOT change Claude's vision token count (the image
+                # is re-processed server-side regardless). Saves encode CPU per screen per analysis.
+                img.save(buf, format='PNG')
             img.close()
             image_data = base64.standard_b64encode(buf.getvalue()).decode('utf-8')
         except Exception as e:

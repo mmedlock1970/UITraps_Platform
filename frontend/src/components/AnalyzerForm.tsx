@@ -113,7 +113,7 @@ function assembleContext(fields: {
     pass1_model: pass1Model,
     thorough_mode: thoroughMode || undefined,
     // Two-pass is only supported for new KBs; never send it for legacy v1/v2.
-    mode: (kbVersion === 'v1.1' || kbVersion === 'v2.1') ? mode : 'single',
+    mode: (kbVersion === 'v1.1' || kbVersion === 'v2') ? mode : 'single',
     profile,
     report_style: reportStyle,
     input_type: inputType,
@@ -189,16 +189,16 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
   const [extraContext, setExtraContext] = useState(iv?.extraContext ?? '');
 
   // Card 5 — Analysis Scope
-  // Only two configs are supported: v1 (KB only) and v2.1 (Prompting + KB). v2 / v1.1 are
+  // Only two configs are supported: v1 (KB only) and v2 (Prompting + KB). v2 / v1.1 are
   // deprecated. A restored config (saved session / shared link) referencing a retired
   // version can't run as requested — v2 in Prompting+KB hits the backend's legacy
-  // ValueError, and v1.1 is out of support — so we resolve it to the v2.1 default rather
+  // ValueError, and v1.1 is out of support — so we resolve it to the v2 default rather
   // than dead-ending the link. Unlike the backend raise (an execution guardrail), this is
   // a UI-restore fallback, and it is made EXPLICIT (console warning + visible notice below)
   // instead of substituting silently.
   const requestedKb = iv?.kbVersion;
   const initialKb: KbVersion =
-    (requestedKb === 'v1' || requestedKb === 'v2.1') ? requestedKb : 'v2.1';
+    (requestedKb === 'v1' || requestedKb === 'v2') ? requestedKb : 'v2';
   const [kbVersion, setKbVersion] = useState<KbVersion>(initialKb);
   // The retired version the restore asked for, if it was resolved away (null otherwise).
   // Cleared once the user makes any KB selection.
@@ -209,7 +209,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
     if (coercedFromKb) {
       console.warn(
         `[UITraps] Saved configuration requested knowledge base "${coercedFromKb}", which is ` +
-        `deprecated and no longer available; resolving to "v2.1". The analysis will run on v2.1, ` +
+        `deprecated and no longer available; resolving to "v2". The analysis will run on v2, ` +
         `not "${coercedFromKb}".`,
       );
     }
@@ -226,7 +226,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
   const reportStyle = 'trap' as const;  // report style is fixed to By Trap (By-Issue retired)
   // Analysis profile — 'self-serve' routes a raw KB through the minimal-harness condition.
   // Tool coaching is no longer independently combinable: it is locked to the KB version
-  // (v1 → KB only, v2.1 → Prompting + KB).
+  // (v1 → KB only, v2 → Prompting + KB).
   const [profile, setProfile] = useState<Profile>(initialKb === 'v1' ? 'self-serve' : 'default');
   // Selecting a KB version locks the coaching profile to that version's supported config,
   // and dismisses any restore-time coercion notice.
@@ -1009,7 +1009,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
               {/* Only the two supported configs are offered. V2 / V1.1 are deprecated and no
                   longer rendered; a saved link that referenced them is resolved to V2.1 with the
                   coercion notice below (that logic reads the restored value, not the buttons). */}
-              {(['v1', 'v2.1'] as KbVersion[]).map(v => (
+              {(['v1', 'v2'] as KbVersion[]).map(v => (
                 <button
                   key={v}
                   type="button"
@@ -1022,7 +1022,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
               ))}
             </div>
             <p className={styles.fieldHint}>
-              {kbVersion === 'v2.1' && 'New v2.1 knowledge base — all evaluation rules self-contained in the KB. Reports use a High/Medium/Low severity and confidence scale and a Coverage-notes section. Runs as Prompting + KB: the tool adds its detection procedures, severity rules, and output scaffolding on top of the KB.'}
+              {kbVersion === 'v2' && 'New v2 knowledge base — all evaluation rules self-contained in the KB. Reports use a High/Medium/Low severity and confidence scale and a Coverage-notes section. Runs as Prompting + KB: the tool adds its detection procedures, severity rules, and output scaffolding on top of the KB.'}
               {kbVersion === 'v1' && 'Original knowledge base, injected verbatim. Runs as KB only: the raw KB is used with just a minimal instruction — no detection or severity guidance added by the tool.'}
             </p>
             {coercedFromKb && (

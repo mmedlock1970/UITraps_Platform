@@ -1,6 +1,6 @@
 """
 rev6 BY-TRAP report wiring — the live dispatch renders `_format_new_kb_bytrap_html` for a
-trap-style analysis on a new KB (v2.1 Prompting+KB) or the self-serve profile (v1.0 KB-only),
+trap-style analysis on a new KB (v2 Prompting+KB) or the self-serve profile (v1.0 KB-only),
 through a public entry that escapes settings. Task grouping reads each finding's `task` (the
 field the live model actually fills, per the user-turn attribution) with `task_context` as a
 tolerated alias; the KB-only bare schema omits both and stays flat.
@@ -36,7 +36,7 @@ def test_bytrap_entry_renders_rev6_and_escapes_settings():
     html = format_bytrap_report_as_html(
         _trap_report(), {"design_name": "X"},
         # a hostile settings value must be escaped, not injected
-        analysis_settings={"kb_version": "v2.1", "report_style": "trap", "verbosity": "<script>x</script>"},
+        analysis_settings={"kb_version": "v2", "report_style": "trap", "verbosity": "<script>x</script>"},
     )
     assert "UI Traps — By Trap" in html and "trap-card-img" in html  # rev6 chrome
     assert "<script>x</script>" not in html  # escaped at the boundary
@@ -51,7 +51,7 @@ def _multi_task_uc():
 def test_bytrap_entry_groups_by_task_when_task_context_present():
     # Alias path: a finding carrying `task_context` still groups (back-compat).
     uc = _multi_task_uc()
-    html = format_bytrap_report_as_html(_trap_report(), uc, {"kb_version": "v2.1", "report_style": "trap"})
+    html = format_bytrap_report_as_html(_trap_report(), uc, {"kb_version": "v2", "report_style": "trap"})
     assert "task-group-label" in html
     assert "Find kids shows" in html          # the task heading
     assert "General" in html                   # the untagged DISTRACTION finding
@@ -63,7 +63,7 @@ def test_bytrap_groups_by_task_field_the_model_emits():
     rep = _trap_report()
     rep["critical_issues"][0].pop("task_context", None)
     rep["critical_issues"][0]["task"] = "Find kids shows"
-    html = format_bytrap_report_as_html(rep, _multi_task_uc(), {"kb_version": "v2.1", "report_style": "trap"})
+    html = format_bytrap_report_as_html(rep, _multi_task_uc(), {"kb_version": "v2", "report_style": "trap"})
     assert "task-group-label" in html
     assert "Find kids shows" in html          # the task heading
     assert "General" in html                   # the untagged DISTRACTION finding
@@ -72,7 +72,7 @@ def test_bytrap_groups_by_task_field_the_model_emits():
 # ── schema ──────────────────────────────────────────────────────────────────
 
 def test_v21_trap_schema_has_task_context_bare_does_not():
-    assert "task_context" in json.dumps(get_ui_analysis_schema("v2.1"))
+    assert "task_context" in json.dumps(get_ui_analysis_schema("v2"))
     assert "task_context" not in json.dumps(get_ui_analysis_schema("v1", self_serve=True))
 
 
@@ -103,7 +103,7 @@ def _run(kb, profile, mode, tmp_path):
     )
 
 
-@pytest.mark.parametrize("kb,profile,mode", [("v2.1", "default", "twopass"), ("v1", "self-serve", "single")])
+@pytest.mark.parametrize("kb,profile,mode", [("v2", "default", "twopass"), ("v1", "self-serve", "single")])
 def test_live_bytrap_renders_rev6_not_legacy(kb, profile, mode, tmp_path):
     html = _run(kb, profile, mode, tmp_path)["html"]
     assert "UI Traps — By Trap" in html and "trap-card-img" in html   # rev6

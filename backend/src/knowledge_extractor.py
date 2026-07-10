@@ -5,7 +5,7 @@ Copyright © 2009-present UI Traps LLC. All Rights Reserved.
 PROPRIETARY & CONFIDENTIAL - UI Tenets & Traps Framework
 
 Manages loading and extraction from two knowledge sources:
-- trap_kb_v2.1.md / trap_kb_v1.0.md  →  Pass 1 (detection, condensed, AI-optimized)
+- trap_kb_v2.md / trap_kb_v1.0.md  →  Pass 1 (detection, condensed, AI-optimized)
 - UI_Tenets_Traps.txt             →  Pass 2 (enrichment, full book content)
 
 Book images are extracted from the source PDF and stored in data/book_images/
@@ -20,16 +20,16 @@ from typing import Dict, List, Optional, Tuple
 
 # Paths relative to this file
 _DATA_DIR = Path(__file__).parent.parent / "data"
-ANALYSIS_REFERENCE_PATH = _DATA_DIR / "trap_kb_v2.1.md"
+ANALYSIS_REFERENCE_PATH = _DATA_DIR / "trap_kb_v2.md"
 ANALYSIS_REFERENCE_PATH_V1 = _DATA_DIR / "trap_kb_v1.0.md"
 
 # Detection-pass KB master per version. Single mode injects the whole file for the
-# selected version. v1.1 / v2.1 are the self-instructing masters; v1 is the legacy
-# KB-only master. Unknown versions fall back to trap_kb_v2.1.md.
+# selected version. v1.1 / v2 are the self-instructing masters; v1 is the legacy
+# KB-only master. Unknown versions fall back to trap_kb_v2.md.
 _ANALYSIS_REFERENCE_PATHS = {
     "v1":   ANALYSIS_REFERENCE_PATH_V1,
     "v1.1": _DATA_DIR / "trap_kb_v1.1.md",
-    "v2.1": _DATA_DIR / "trap_kb_v2.1.md",
+    "v2": _DATA_DIR / "trap_kb_v2.md",
 }
 FULL_BOOK_PATH = _DATA_DIR / "UI_Tenets_Traps.txt"
 BOOK_IMAGES_DIR = _DATA_DIR / "book_images"
@@ -105,7 +105,7 @@ def _strip_non_analysis_sections(text: str) -> str:
     return "\n".join(out)
 
 
-def load_analysis_reference(version: str = "v2.1") -> str:
+def load_analysis_reference(version: str = "v2") -> str:
     """
     Load the condensed AI analysis reference (Pass 1 knowledge base) for the
     given KB version. Cached per version after first load.
@@ -115,11 +115,11 @@ def load_analysis_reference(version: str = "v2.1") -> str:
     analysis pass — single mode injects this whole string into the model.
 
     Args:
-        version: one of "v1", "v1.1", "v2", "v2.1". Unknown versions fall back
-            to "v2" (the deployed legacy KB).
+        version: one of "v1", "v1.1", "v2". Unknown versions fall back
+            to "v2" (the current deployed KB).
     """
     if version not in _ANALYSIS_REFERENCE_PATHS:
-        version = "v2.1"
+        version = "v2"
 
     if _analysis_reference_caches.get(version) is None:
         path = _ANALYSIS_REFERENCE_PATHS[version]
@@ -152,7 +152,25 @@ _GLOSS_LINE_RX = re.compile(r'-\s*less\s+([A-Za-z]+)\s*:\s*"([^"]+)"')
 _tenet_gloss_cache: "dict[str, dict]" = {}
 
 
-def load_tenet_glosses(version: str = "v2.1") -> "dict[str, str]":
+def _fenced_block_lines(version: str, start_marker: str, end_marker: str, what: str, note: str) -> "list[str]":
+    """Return the lines strictly BETWEEN two STANDALONE marker lines in the loaded KB reference. The
+    real fence sits on its own line, while a backtick mention of the markers may appear in the prose
+    above the block — anchoring on standalone lines targets the true fence, not the prose reference.
+    Raises loudly if either marker is absent: a KB-owned fenced block the tool parses at runtime must
+    never silently yield nothing. Shared by the TENET-GLOSSES and ASSESSABILITY-DIGEST parsers."""
+    ref_lines = load_analysis_reference(version).splitlines()
+    si = next((i for i, l in enumerate(ref_lines) if l.strip() == start_marker), -1)
+    ei = next((i for i in range(si + 1, len(ref_lines)) if ref_lines[i].strip() == end_marker),
+              -1) if si != -1 else -1
+    if si == -1 or ei == -1:
+        raise ValueError(
+            f"KB parse FAILED for version {version!r}: {what} fenced block "
+            f"({start_marker} … {end_marker}) not found as standalone marker lines in the KB. {note}"
+        )
+    return ref_lines[si + 1:ei]
+
+
+def load_tenet_glosses(version: str = "v2") -> "dict[str, str]":
     """Emergent-Patterns tenet cash-out glosses, parsed VERBATIM from the KB's TENET-GLOSSES fenced
     block (Ledger 24: KB-owned, authoritative — the tool holds no copy). Parsed once from the loaded
     reference, memoized per version. Raises loudly if the block is missing or any of the eight
@@ -160,20 +178,9 @@ def load_tenet_glosses(version: str = "v2.1") -> "dict[str, str]":
     cached = _tenet_gloss_cache.get(version)
     if cached is not None:
         return cached
-    # Anchor on the marker lines as STANDALONE lines (the real fence sits on its own line, while a
-    # backtick mention of the markers appears inside the descriptive prose above the block) — this
-    # targets the true fence, not the prose reference to it.
-    ref_lines = load_analysis_reference(version).splitlines()
-    si = next((i for i, l in enumerate(ref_lines) if l.strip() == _GLOSS_BLOCK_START), -1)
-    ei = next((i for i in range(si + 1, len(ref_lines)) if ref_lines[i].strip() == _GLOSS_BLOCK_END),
-              -1) if si != -1 else -1
-    if si == -1 or ei == -1:
-        raise ValueError(
-            f"KB gloss parse FAILED for version {version!r}: TENET-GLOSSES fenced block "
-            f"({_GLOSS_BLOCK_START} … {_GLOSS_BLOCK_END}) not found as standalone marker lines in the "
-            f"KB. The eight glosses are read from this block (Ledger 24) — do not render without it."
-        )
-    block = "\n".join(ref_lines[si + 1:ei])   # parse ONLY within the fences
+    block = "\n".join(_fenced_block_lines(   # parse ONLY within the fences
+        version, _GLOSS_BLOCK_START, _GLOSS_BLOCK_END, "TENET-GLOSSES",
+        "The eight glosses are read from this block (Ledger 24) — do not render without it."))
     glosses = {m.group(1).upper(): m.group(2).strip() for m in _GLOSS_LINE_RX.finditer(block)}
     missing = [t for t in _CANON_TENETS if t not in glosses]
     if missing:
@@ -189,12 +196,12 @@ def load_tenet_glosses(version: str = "v2.1") -> "dict[str, str]":
 _kb_file_sha_cache: "dict[str, str]" = {}
 
 
-def kb_file_sha256(version: str = "v2.1") -> str:
+def kb_file_sha256(version: str = "v2") -> str:
     """First 8 hex of sha256 of the KB FILE actually loaded for this version — computed from the
     file bytes (matches `sha256sum <file>`), memoized per process. Never hardcoded, never derived
     from the version label; changes when the KB file changes."""
     if version not in _ANALYSIS_REFERENCE_PATHS:
-        version = "v2.1"
+        version = "v2"
     cached = _kb_file_sha_cache.get(version)
     if cached is None:
         cached = _kb_file_sha_cache[version] = hashlib.sha256(
@@ -233,6 +240,130 @@ def build_sha() -> "str | None":
             val = None
     _build_sha_cache.append(val)
     return val
+
+
+# ── Assessability digest (Ledger 26): per-Trap observability floor, KB-owned, read at runtime ──
+# Ascending artifact-class scale — the floor is the MINIMUM class at which a Trap is observable AT ALL.
+ARTIFACT_CLASS_RANK: "dict[str, int]" = {
+    "static-screenshot": 0,
+    "disconnected-screens": 1,
+    "flow": 2,
+    "live": 3,
+    "code": 4,
+}
+_DIGEST_BLOCK_START = "<!-- ASSESSABILITY-DIGEST:START -->"
+_DIGEST_BLOCK_END = "<!-- ASSESSABILITY-DIGEST:END -->"
+# `- <TRAP>: <floor> [partial]` — trap may hold `(S)`/spaces; floor is a lowercase-hyphen token.
+_DIGEST_LINE_RX = re.compile(r'-\s*(.+?)\s*:\s*([a-z][a-z-]*)\s*(partial)?\s*$')
+_assessability_digest_cache: "dict[str, dict]" = {}
+
+
+def load_assessability_digest(version: str = "v2") -> "dict[str, tuple]":
+    """Per-Trap observability floors, parsed VERBATIM from the KB's ASSESSABILITY-DIGEST fenced block
+    (Ledger 26: KB-owned, authoritative — the tool holds no copy). Returns
+    {UPPER_TRAP: (floor_rank, floor_name, is_partial)}. Parsed once from the loaded reference, memoized
+    per version. Raises loudly if the block is missing, empty, or names a floor outside the class scale
+    — a parse miss must be visible, never a silent blank (the disposition gate reads this)."""
+    cached = _assessability_digest_cache.get(version)
+    if cached is not None:
+        return cached
+    digest: "dict[str, tuple]" = {}
+    for raw in _fenced_block_lines(   # parse ONLY within the fences
+            version, _DIGEST_BLOCK_START, _DIGEST_BLOCK_END, "ASSESSABILITY-DIGEST",
+            "The disposition gate (Ledger 26) reads floors from this block — do not gate without it."):
+        stripped = raw.strip()
+        if not stripped:
+            continue                                       # blank spacer lines are allowed
+        m = _DIGEST_LINE_RX.match(stripped)
+        if not m:
+            # Between the fence markers every non-blank line must be a `- <TRAP>: <floor> [partial]`
+            # row. A line that fails the shape (asterisk bullet, trailing comment, typo'd floor) would
+            # otherwise be SILENTLY dropped — that Trap loses its floor and the gate quietly downgrades
+            # its verdicts. Fail loud instead: the contract promises "a parse miss must be visible."
+            raise ValueError(
+                f"KB assessability parse FAILED for version {version!r}: line {raw!r} inside the "
+                f"ASSESSABILITY-DIGEST block does not match the `- <TRAP>: <floor> [partial]` shape "
+                f"(Ledger 26). Fix the line or move it outside the fence."
+            )
+        trap = re.sub(r"\s+", " ", m.group(1).strip()).upper()
+        floor_name = m.group(2).strip()
+        if floor_name not in ARTIFACT_CLASS_RANK:
+            raise ValueError(
+                f"KB assessability parse FAILED for version {version!r}: Trap {trap!r} names floor "
+                f"{floor_name!r}, which is not on the artifact-class scale "
+                f"{list(ARTIFACT_CLASS_RANK)}. Fix the digest line or the scale."
+            )
+        digest[trap] = (ARTIFACT_CLASS_RANK[floor_name], floor_name, bool(m.group(3)))
+    if not digest:
+        raise ValueError(
+            f"KB assessability parse FAILED for version {version!r}: ASSESSABILITY-DIGEST block found "
+            f"but no `- <TRAP>: <floor> [partial]` lines parsed from it (Ledger 26)."
+        )
+    _assessability_digest_cache[version] = digest
+    return digest
+
+
+# ── Scoped-coverage strings (Ledger 27): per-partial-Trap sub-scope line, KB-owned, read at runtime ──
+_SCOPED_BLOCK_START = "<!-- SCOPED-COVERAGE:START -->"
+_SCOPED_BLOCK_END = "<!-- SCOPED-COVERAGE:END -->"
+# `- <TRAP>: "<string>"` — the string is double-quoted (no embedded double-quotes in the KB strings).
+_SCOPED_LINE_RX = re.compile(r'-\s*(.+?)\s*:\s*"(.+)"\s*$')
+_scoped_coverage_cache: "dict[str, dict]" = {}
+
+
+def load_scoped_coverage(version: str = "v2") -> "dict[str, str]":
+    """Per-Trap scoped-coverage strings for partial-floored Traps, parsed VERBATIM from the KB's
+    SCOPED-COVERAGE fenced block (Ledger 27: KB-owned, authoritative — the tool holds no copy and
+    NEVER synthesizes scope language). Returns {UPPER_TRAP: scoped-coverage string}. Parsed once from
+    the loaded reference, memoized per version. The disposition gate renders this string when a partial
+    Trap is cleared only within its floor-supported sub-scope (Option-3 scoped clearance). Fail-loud: a
+    malformed line, an empty/unauthored string, or a `partial` Trap (per ASSESSABILITY-DIGEST) missing
+    its string all raise — a parse miss must be visible, never a silent blank that drops the scoped line."""
+    cached = _scoped_coverage_cache.get(version)
+    if cached is not None:
+        return cached
+    scoped: "dict[str, str]" = {}
+    for raw in _fenced_block_lines(   # parse ONLY within the fences
+            version, _SCOPED_BLOCK_START, _SCOPED_BLOCK_END, "SCOPED-COVERAGE",
+            "The disposition gate (Ledger 27) reads partial-Trap scoped strings from this block."):
+        stripped = raw.strip()
+        if not stripped:
+            continue                                       # blank spacer lines are allowed
+        m = _SCOPED_LINE_RX.match(stripped)
+        if not m:
+            # Every non-blank in-fence line must be `- <TRAP>: "<string>"`. A line failing the shape
+            # (unquoted TODO-author sentinel, stray bullet) would otherwise be silently dropped — the
+            # gate would then find no scoped string for that Trap. Fail loud, per the parse-miss contract.
+            raise ValueError(
+                f"KB scoped-coverage parse FAILED for version {version!r}: line {raw!r} inside the "
+                f"SCOPED-COVERAGE block does not match the `- <TRAP>: \"<string>\"` shape (Ledger 27). "
+                f"Fix the line or move it outside the fence."
+            )
+        trap = re.sub(r"\s+", " ", m.group(1).strip()).upper()
+        text = m.group(2).strip()
+        if not text or text == "TODO-author":
+            raise ValueError(
+                f"KB scoped-coverage parse FAILED for version {version!r}: Trap {trap!r} has an empty or "
+                f"unauthored (TODO-author) scoped-coverage string (Ledger 27)."
+            )
+        scoped[trap] = text
+    if not scoped:
+        raise ValueError(
+            f"KB scoped-coverage parse FAILED for version {version!r}: SCOPED-COVERAGE block found but "
+            f"no `- <TRAP>: \"<string>\"` lines parsed from it (Ledger 27)."
+        )
+    # Integrity cross-check: every `partial`-floored Trap in the ASSESSABILITY-DIGEST MUST carry a
+    # scoped string — the gate looks these up by partial Trap and cannot render a scoped clearance
+    # without one. A partial Trap missing here is a KB drift between the two blocks; fail loud.
+    _partials = {t for t, (_, _, is_partial) in load_assessability_digest(version).items() if is_partial}
+    _missing = sorted(_partials - set(scoped))
+    if _missing:
+        raise ValueError(
+            f"KB scoped-coverage parse FAILED for version {version!r}: partial-floored Traps {_missing} "
+            f"have no scoped-coverage string — every `partial` Trap in the digest needs one (Ledger 27)."
+        )
+    _scoped_coverage_cache[version] = scoped
+    return scoped
 
 
 _V1_TAXONOMY_HEADER = "## TENETS AND THEIR TRAPS"
@@ -684,7 +815,7 @@ def _extract_single_section(trap_name: str, book_text: str) -> str:
     return section_text
 
 
-def get_trap_definitions(version: str = "v2.1") -> dict[str, str]:
+def get_trap_definitions(version: str = "v2") -> dict[str, str]:
     """
     Parse the KB file and return a dict mapping trap name (uppercase) to
     its verbatim one-sentence definition.

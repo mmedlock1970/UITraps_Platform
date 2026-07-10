@@ -1,7 +1,7 @@
 """
 Two-pass pack generator.
 
-Splits a KB master (trap_kb_v2.1.md / trap_kb_v1.1.md / any future master) into the
+Splits a KB master (trap_kb_v2.md / trap_kb_v1.1.md / any future master) into the
 derived two-pass artifacts the analyzer's twopass mode consumes:
 
     <master>_twopass/
@@ -52,7 +52,7 @@ _DATA_DIR = Path(__file__).parent.parent / "data"
 # Master file per version (mirrors knowledge_extractor._ANALYSIS_REFERENCE_PATHS).
 _MASTERS = {
     "v1.1": _DATA_DIR / "trap_kb_v1.1.md",
-    "v2.1": _DATA_DIR / "trap_kb_v2.1.md",
+    "v2": _DATA_DIR / "trap_kb_v2.md",
 }
 
 # G-rules that belong in the pass-1 detection pack (per §5b). G6 carries a pass-2
@@ -163,7 +163,7 @@ def _taxonomy(taxonomy_body: str) -> "dict[str, tuple[str, str]]":
 
 
 # Heading = '### TRAP: <NAME>' plus an optional trailing '*(...)*' annotation. The annotation
-# varies by master ('*(draft-grade)*' in v2.1, '*(card 1 — mechanically templated...)*' in
+# varies by master ('*(draft-grade)*' in v2, '*(card 1 — mechanically templated...)*' in
 # v1.1), so capture the name without it and pull the grade out separately.
 _CHUNK_HEADING = re.compile(r"^### TRAP:\s+(.+?)\s*(\*\(.*\)\*)?\s*$")
 _GRADE_RE = re.compile(r"(\w+)-grade")
@@ -504,6 +504,7 @@ def _load_manifest_or_none(version: str) -> "dict | None":
 # parse per request (manifest + both packs are deterministic given the master).
 _MANIFEST_CACHE: "dict[tuple, dict]" = {}
 _PACK_TEXT_CACHE: "dict[tuple, str]" = {}
+_CHUNK_TEXT_CACHE: "dict[tuple, str]" = {}   # (version, master_sha, chunk_file) -> chunk text
 
 
 def ensure_current(version: str, regenerate: bool = True) -> dict:
@@ -569,10 +570,18 @@ def load_chunks(version: str, trap_names: list[str], manifest: dict | None = Non
     wanted = {n.upper() for n in trap_names}
     parts = []
     dest = _twopass_dir(version)
+    # Memoize each chunk's text by (version, master sha, chunk_file) — same staleness key as the packs,
+    # so a KB edit changes the sha → cache miss → fresh read. Without this the matched chunk files are
+    # re-read from disk on every two-pass request even though they are deterministic given the master.
+    _sha = master_hash(version)
     for t in manifest.get("traps", []):               # manifest order, not caller order
         name, chunk_file = t.get("trap"), t.get("chunk_file")
         if name and chunk_file and name.upper() in wanted:
-            parts.append((dest / chunk_file).read_text(encoding="utf-8"))
+            _ck = (version, _sha, chunk_file)
+            _txt = _CHUNK_TEXT_CACHE.get(_ck)
+            if _txt is None:
+                _txt = _CHUNK_TEXT_CACHE[_ck] = (dest / chunk_file).read_text(encoding="utf-8")
+            parts.append(_txt)
     return "\n\n".join(parts)
 
 

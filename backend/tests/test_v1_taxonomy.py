@@ -1,12 +1,12 @@
 """
 v1 taxonomy isolation (Check-3 resolution). A v1 / v1.1 render must reflect the FROZEN v1.0 card
-deck's taxonomy (KB trap_kb_v1.0.md), NOT the tool's v2.1 TENETS_AND_TRAPS table. The v1→v2.1
-taxonomy change (9→8 Tenets, regroupings) was deliberate, so applying the v2.1 table to a v1 report
+deck's taxonomy (KB trap_kb_v1.0.md), NOT the tool's v2 TENETS_AND_TRAPS table. The v1→v2
+taxonomy change (9→8 Tenets, regroupings) was deliberate, so applying the v2 table to a v1 report
 is leakage. These tests pin: (1) _tenet_for is version-aware on the divergent traps; (2) the render
 (disposition-index pill color) follows lineage; (3) the full 26-trap v1 map matches the card deck,
 so a future drift can't silently reintroduce a divergence.
 
-Card art is SHARED by ruling — _get_card_img stays v2.1 for both lineages and is NOT tested here.
+Card art is SHARED by ruling — _get_card_img stays v2 for both lineages and is NOT tested here.
 """
 from pathlib import Path
 
@@ -36,7 +36,7 @@ def _parse_card_deck_groupings() -> dict:
             mapping[_normalize_trap_name(s[2:].strip())] = cur
     return mapping
 
-# The three deliberate v1→v2.1 regroupings (trap, v1 Tenet, v2.1 Tenet).
+# The three deliberate v1→v2 regroupings (trap, v1 Tenet, v2 Tenet).
 DIVERGENT = [
     ("BAD PREDICTION", "EFFICIENT", "ACCURATE"),
     ("IRREVERSIBLE ACTION", "FORGIVING", "PROTECTIVE"),
@@ -48,8 +48,8 @@ DIVERGENT = [
 def test_tenet_for_is_version_aware(trap, v1t, v21t):
     assert _tenet_for(trap, version="v1") == v1t
     assert _tenet_for(trap, version="v1.1") == v1t
-    assert _tenet_for(trap, version="v2.1") == v21t
-    assert _tenet_for(trap) == v21t          # default lineage is v2.1
+    assert _tenet_for(trap, version="v2") == v21t
+    assert _tenet_for(trap) == v21t          # default lineage is v2
 
 
 def _empty_report():
@@ -61,11 +61,11 @@ def _empty_report():
 @pytest.mark.parametrize("trap,v1t,v21t", DIVERGENT)
 def test_disposition_pill_color_follows_lineage(trap, v1t, v21t):
     # The disposition index renders every canonical trap as a Tenet-colored pill. A v1 report must
-    # color the divergent traps by their v1 Tenet; a v2.1 report by their v2.1 Tenet.
+    # color the divergent traps by their v1 Tenet; a v2 report by their v2 Tenet.
     v1_html = format_bytrap_report_as_html(_empty_report(), {"design_name": "T"},
                                            {"kb_version": "v1", "report_style": "trap"})
     v21_html = format_bytrap_report_as_html(_empty_report(), {"design_name": "T"},
-                                            {"kb_version": "v2.1", "report_style": "trap"})
+                                            {"kb_version": "v2", "report_style": "trap"})
     assert f"background:{_TENET_PILL[v1t]}'>{trap}</span>" in v1_html
     assert f"background:{_TENET_PILL[v21t]}'>{trap}</span>" in v21_html
     # and NOT the other lineage's color on that trap

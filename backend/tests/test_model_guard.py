@@ -43,13 +43,13 @@ def _analyzer():
 def test_non_sonnet_is_hard_rejected_before_any_call(tmp_path, bad):
     a = _analyzer()
     with pytest.raises(ValueError, match="model not available"):
-        a.analyze_design(design_file=_img(tmp_path), user_context=_CTX, kb_version="v2.1", pass1_model=bad)
+        a.analyze_design(design_file=_img(tmp_path), user_context=_CTX, kb_version="v2", pass1_model=bad)
     a.client.messages.create.assert_not_called()  # rejected before token spend; never falls back
 
 
 @pytest.mark.parametrize("ok", ["sonnet", "Sonnet", " sonnet ", None, ""])
 def test_sonnet_or_default_proceeds(tmp_path, ok):
     a = _analyzer()
-    res = a.analyze_design(design_file=_img(tmp_path), user_context=_CTX, kb_version="v2.1",
+    res = a.analyze_design(design_file=_img(tmp_path), user_context=_CTX, kb_version="v2",
                            pass1_model=ok, mode="single", profile="default")
     assert res["status"] == "success"

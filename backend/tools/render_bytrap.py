@@ -22,8 +22,9 @@ OUT = os.path.join(_HERE, "sample_bytrap.html")
 
 def _inject_definitions(report, kb_version):
     """Attach each finding's verbatim definition from the (same-lineage) manifest, as the
-    analyzer will for By-Trap. v1/v2 fall back to v1.1/v2.1 (identical trap set)."""
-    _v = {"v1": "v1.1", "v2": "v2.1"}.get(kb_version, kb_version)
+    analyzer will for By-Trap. v1 falls back to the v1.1 manifest (identical trap set); v2 has
+    its own manifest (trap_kb_v2_twopass)."""
+    _v = {"v1": "v1.1"}.get(kb_version, kb_version)
     try:
         m = pack_generator.load_manifest(_v)
         by_upper = {k.upper(): v for k, v in (m.get("verbatim_definitions") or {}).items()}
@@ -41,7 +42,7 @@ def main():
     report = json.load(open(FIXTURE, "r", encoding="utf-8"))
     settings = dict(rs.DEFAULT_SETTINGS)
     settings["report_style"] = "trap"
-    _inject_definitions(report, settings.get("kb_version", "v2.1"))
+    _inject_definitions(report, settings.get("kb_version", "v2"))
     # Placeholder crops on several findings — including BOTH instances of the multi-instance
     # trap — to exercise the crop layout across single- and multi-instance cards and task groups.
     _crop = rs._placeholder_crop_b64()

@@ -107,7 +107,7 @@ export function contentTypeToPlatform(contentType: ContentType): PlatformType {
   return mapping[contentType] || 'other';
 }
 
-export type KbVersion = 'v1' | 'v1.1' | 'v2' | 'v2.1';
+export type KbVersion = 'v1' | 'v1.1' | 'v2';
 
 // Analysis profile. 'default' = normal pipeline (lineage-gated). 'self-serve' = raw-KB
 // condition: single-pass, minimal harness prompt + relaxed schema, rev6 template, any KB.

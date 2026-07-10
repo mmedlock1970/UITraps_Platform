@@ -56,7 +56,7 @@ TENET_COLORS = {
     "PROTECTIVE":     "#642FA1",
     "HABITUATING":    "#1F7DA8",
     "BEAUTIFUL":      "#E37209",
-    # v1-only Tenets (the v1 deck splits what v2.1 folded into PROTECTIVE). Colors are tool
+    # v1-only Tenets (the v1 deck splits what v2 folded into PROTECTIVE). Colors are tool
     # DISPLAY (the card deck defines no hex); kept in the PROTECTIVE purple family, distinct.
     "FORGIVING":      "#7A3FB0",
     "DISCREET":       "#4A3A8C",
@@ -124,7 +124,7 @@ def _normalize_trap_name(name: str) -> str:
     return re.sub(r'\s+', ' ', name).strip()
 
 
-# Reverse lookup: normalized trap name → Tenet (upper), v2.1 lineage. v1 / v1.1 do NOT use this —
+# Reverse lookup: normalized trap name → Tenet (upper), v2 lineage. v1 / v1.1 do NOT use this —
 # they read the FROZEN v1.0 map from the KB at runtime (see _tenet_for → load_v1_trap_tenet_map),
 # so there is no hand-maintained v1 copy to drift.
 _TRAP_TO_TENET: Dict[str, str] = {
@@ -139,7 +139,7 @@ def _tenet_for(trap_name: str, fallback_tenet: str = '', version: str | None = N
 
     version selects the lineage: v1 / v1.1 read the FROZEN v1.0 card-deck map FROM THE KB
     (knowledge_extractor.load_v1_trap_tenet_map — ONE source of truth, parsed once + cached, no
-    tool copy); everything else reads the v2.1 table. Passing the wrong version to a v1 render is
+    tool copy); everything else reads the v2 table. Passing the wrong version to a v1 render is
     the taxonomy leak this guards against."""
     if fallback_tenet:
         return fallback_tenet.upper()
@@ -1524,7 +1524,7 @@ def format_report_as_html(
     if analysis_settings is not None:
         analysis_settings = _escape_html_deep(analysis_settings)
 
-    # New-KB (v2.1-lineage) reports use the new vocabulary: Confidence is High/Medium/Low
+    # New-KB (v2-lineage) reports use the new vocabulary: Confidence is High/Medium/Low
     # (High = "higher confidence" for grouping), and coverage is expressed with G4 labels
     # instead of the testable boolean. Legacy 'confirmed' still counts as higher confidence.
     _kb_version = (analysis_settings or {}).get('kb_version', 'v2')
@@ -2183,7 +2183,7 @@ def format_report_as_html(
         _ts_lines.append(f"Analysis model: {'Haiku 4.5' if _m == 'haiku' else 'Sonnet 4.6'}")
         _kb = analysis_settings.get('kb_version')
         if _kb:
-            _kb_display = {'v1': 'v1', 'v1.1': 'v1.1', 'v2': 'v2', 'v2.1': 'v2.1'}.get(_kb, _kb)
+            _kb_display = {'v1': 'v1', 'v1.1': 'v1.1', 'v2': 'v2'}.get(_kb, _kb)
             _ts_lines.append(f"Knowledge base: {_kb_display}")
         _style = analysis_settings.get('report_style')
         if _style:
@@ -2964,7 +2964,7 @@ _TENET_PILL = {
     "UNDERSTANDABLE": "#35597F", "COMFORTABLE": "#C1442B", "RESPONSIVE": "#8F6510",
     "EFFICIENT": "#A11B5E", "ACCURATE": "#34793B", "PROTECTIVE": "#5C2E93",
     "HABITUATING": "#1C6F96", "BEAUTIFUL": "#A85408",
-    # v1-only Tenets (v1 deck's split of what v2.1 folded into PROTECTIVE). Tool DISPLAY colors —
+    # v1-only Tenets (v1 deck's split of what v2 folded into PROTECTIVE). Tool DISPLAY colors —
     # the card deck defines no hex — kept in the PROTECTIVE-purple family, distinct from each other.
     "FORGIVING": "#6E39A6", "DISCREET": "#453A82",
 }
@@ -3065,8 +3065,11 @@ _NEW_KB_ISSUES_CSS = """
 .eval-tasks li::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;border-radius:50%;background:var(--brand)}
 .eval-tasks li b{font-weight:640}
 @media(max-width:680px){.eval-grid{grid-template-columns:1fr;gap:22px}}
-.headline-lg{font-size:18px;font-weight:640;margin:0 0 6px;letter-spacing:-.01em}
+.headline-lg{font-size:18px;font-weight:640;margin:0 0 10px;letter-spacing:-.01em}
 .narrative{color:var(--ink-soft);margin:0;max-width:68ch}
+/* Separate stacked summary paragraphs (narrative + Emergent-Patterns lines) so the bold verdict
+   and the tenet-concentration prose never run together; no trailing gap before the scorecard. */
+.narrative + .narrative{margin-top:10px}
 .scorecard-wrap{overflow-x:auto}
 table.scorecard{border-collapse:separate;border-spacing:0;width:100%;min-width:480px;table-layout:fixed;font-variant-numeric:tabular-nums}
 .scorecard caption{text-align:left;font-family:var(--font-sans);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);padding-bottom:10px}
@@ -3087,6 +3090,11 @@ table.scorecard{border-collapse:separate;border-spacing:0;width:100%;min-width:4
 .scorecard tbody tr td:nth-child(2){background:var(--sev-critical-tint)}
 .scorecard tbody tr td:nth-child(3){background:var(--sev-medium-tint)}
 .scorecard tbody tr td:nth-child(4){background:var(--sev-low-tint)}
+/* Summary scorecard — the matrix leads the section in a subtly recessed panel (its own scan zone),
+   set clearly apart from the verdict prose that follows. */
+.summary-scorecard{background:var(--surface-sunk);border:1px solid var(--hairline);border-radius:var(--radius);padding:17px 20px 15px;margin:22px 0 26px}
+.summary-scorecard .sub-label{margin:0 0 13px}
+.summary-scorecard + .headline-lg{margin-top:0}
 .card{border:1px solid var(--hairline);border-radius:var(--radius);background:var(--surface);margin-top:16px;padding:22px 24px;display:grid;grid-template-columns:var(--rail) 1fr;column-gap:28px;row-gap:18px;align-items:start}
 .card+.card{margin-top:14px}
 .card-rail{display:flex;flex-direction:column;gap:16px;min-width:0}
@@ -3171,7 +3179,7 @@ def _ep_join(items: list) -> str:
     return ", ".join(items[:-1]) + ", and " + items[-1]
 
 
-def _emergent_patterns_html(report: dict, findings: list, version: str = "v2.1") -> list:
+def _emergent_patterns_html(report: dict, findings: list, version: str = "v2") -> list:
     """Render-time DERIVATION (NO model call) of the opening Emergent Patterns synthesis
     (KB G8 / Ledger 22). Failure-side, observation register, descriptive-only — never an
     imperative, never a severity change. Reads the retained issue-level substrate (issue_groups)
@@ -3282,7 +3290,10 @@ def _emergent_patterns_html(report: dict, findings: list, version: str = "v2.1")
             named = [h for h in named if h]
             tail = _ep_join(named[:3]) + (", among others" if len(named) > 3 else "")
             adj = top_ten.capitalize()
-            cash = _glosses[top_ten]
+            # Glosses come from the KB FILE (via load_tenet_glosses), not the model output, so they
+            # bypass the boundary escape that covers report/user_context/settings — escape here at the
+            # point of use so a stray &/</quote in a KB gloss can't break or inject into the HTML.
+            cash = html.escape(_glosses[top_ten], quote=True)
             lines.append(
                 f"Most of what's wrong here makes the interface less {adj} — {cash}"
                 + (f" — because {tail}." if tail else "."))
@@ -3305,6 +3316,79 @@ def _emergent_patterns_html(report: dict, findings: list, version: str = "v2.1")
     return [f"<p class='narrative ep-line'>{ln}</p>" for ln in lines]
 
 
+# Class-gap remedies (the settling artifact), computed from the floor — the relay's "generic remedy
+# from the class gap" where the KB scoped-coverage string isn't surfaced here.
+_CLASS_GAP_REMEDY = {"disconnected-screens": "needs a second screen to observe this trap",
+                     "flow": "needs the screen-to-screen flow to observe this trap",
+                     "live": "needs the live product to observe this trap",
+                     "code": "needs the source to observe this trap"}
+
+
+def _apply_disposition_gate(report: dict, settings: dict) -> None:
+    """Disposition gate — G4 three-state rule (Ledger 26/27), applied IN PLACE to traps_checked_not_found.
+    Each `not_present` verdict is re-routed by observability class and the Trap's KB-owned floor:
+
+      • below floor (unobservable, incl. unknown Trap) → "Couldn't evaluate" (not_assessable_artifact)
+        with a class-gap remedy.
+      • PARTIAL Trap AT its floor → scoped clearance (Ledger 27, Option 3): re-routed to
+        `partially_assessed` rendering the KB's pulled scoped-coverage string — the Trap cleared only
+        its floor-supported sub-scope, NEVER a bare "Not present." The string is KB-owned; the tool
+        never synthesizes scope language.
+      • otherwise observable (non-partial at/above floor, or a partial ABOVE its floor):
+          – with named G6 disconfirming evidence (the coverage `detail`) → stays "Not present" (hard clear).
+          – without it → "Couldn't evaluate" (the clear was unjustified).
+
+    v2 COACHED ONLY: self-serve is the raw-KB condition that tests whether the model applies G4 unaided,
+    so the tool must not enforce it there; v1 / v1.1 carry no digest.
+
+    Idempotent (only `not_present` entries are ever touched), so it is safe to run once on the source
+    report — so the markdown export and the returned object agree with the HTML — AND again on the
+    escaped render copy inside the formatter, without double-counting.
+    """
+    _ver = str(settings.get("kb_version", "v2")).strip().lower()
+    if _ver != "v2" or str(settings.get("profile", "")).strip().lower() == "self-serve":
+        return
+    try:
+        from .knowledge_extractor import load_assessability_digest, load_scoped_coverage, ARTIFACT_CLASS_RANK
+    except ImportError:
+        from knowledge_extractor import load_assessability_digest, load_scoped_coverage, ARTIFACT_CLASS_RANK
+    # Re-key the KB digest + scoped strings through the formatter's normalizer so `STEP(S)` etc. match
+    # the finding side (the loaders keep the raw KB spelling; both sides must fold identically). Fresh
+    # dicts each call — the cached KB values are never mutated.
+    _digest = {_normalize_trap_name(k): v for k, v in load_assessability_digest("v2").items()}
+    _scoped = {_normalize_trap_name(k): v for k, v in load_scoped_coverage("v2").items()}
+    _ac = str(settings.get("artifact_class", "static-screenshot")).strip().lower()
+    _ac_rank = ARTIFACT_CLASS_RANK.get(_ac, 0)     # unknown/absent class → most restrictive rung
+    for _c in report.get("traps_checked_not_found") or []:
+        if not isinstance(_c, dict) or _c.get("coverage_status") != "not_present":
+            continue
+        _nm = _normalize_trap_name(_c.get("trap_name", ""))
+        _floor = _digest.get(_nm)
+        # (1) Below floor / unknown Trap → not observable at all → Couldn't evaluate.
+        if _floor is None or _ac_rank < _floor[0]:
+            _c["coverage_status"] = "not_assessable_artifact"
+            if _floor is not None:
+                _c["_assess_remedy"] = _CLASS_GAP_REMEDY.get(_floor[1], "needs a richer artifact to observe this trap")
+            continue
+        # (2) PARTIAL Trap AT its floor → scoped clearance: partially_assessed with the KB scoped string,
+        # never a bare "Not present." (Above its floor the fuller scope is observable, so a partial falls
+        # through to the hard-clear rule below like a non-partial.)
+        if _floor[2] and _ac_rank == _floor[0]:
+            _c["coverage_status"] = "partially_assessed"
+            _s = _scoped.get(_nm)
+            if _s:
+                # Drop the leading "Trap Name — " (the coverage pill already shows the name) — a
+                # mechanical de-dup of the KB string, not a rewrite of its scope language.
+                _lead, _sep, _rest = _s.partition(" — ")
+                _c["detail"] = _rest if (_sep and _normalize_trap_name(_lead) == _nm) else _s
+            continue
+        # (3) Observable (non-partial, or partial above floor): honest "Not present" needs cited G6.
+        if bool(str(_c.get("detail") or "").strip()):
+            continue                                # a legitimate "Not present" — leave it standing
+        _c["coverage_status"] = "not_assessable_artifact"
+        _c["_assess_remedy"] = "no disconfirming evidence was cited to rule it out"
+
+
 def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict) -> str:
     """Render the new-KB BY-TRAP report in the rev6 style — one entry per Trap, each listing
     the instances found (or, for traps with none, grouped compactly under Coverage notes).
@@ -3312,9 +3396,9 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
     body differs (trap-centric vs issue-centric). Input is pre-escaped."""
     uc = user_context or {}
     # Lineage for taxonomy resolution: v1 / v1.1 renders read the FROZEN v1.0 tenet map; everything
-    # else reads the v2.1 table. Threaded into every _tenet_for call below so no v1 render is
-    # colored/labelled/grouped by the v2.1 taxonomy.
-    _ver = str(settings.get("kb_version", "v2.1")).strip().lower()
+    # else reads the v2 table. Threaded into every _tenet_for call below so no v1 render is
+    # colored/labelled/grouped by the v2 taxonomy.
+    _ver = str(settings.get("kb_version", "v2")).strip().lower()
 
     def sevc(label):
         return _SEV_CLASS.get((label or "").strip().lower(), "medium")
@@ -3332,9 +3416,16 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
                 # rather than a blanket "Medium" (self-serve by-trap leaves severity_label optional).
                 _findings.append({**f, "_src_sev": _SRC_SEV[_arr]})
 
+    # Disposition gate FIRST (G4 three-state rule) — it re-routes unsupportable "not present" verdicts
+    # to "Couldn't evaluate". Emergent Patterns' assessability leash counts un-inspectable Traps, so it
+    # MUST read post-gate statuses; running the gate here (before EP) keeps the exec-summary tenet
+    # concentration from asserting what the gate below then withdraws. Idempotent if already run at the
+    # source (analyzer): only `not_present` entries are ever touched.
+    _apply_disposition_gate(report, settings)
+
     # Emergent Patterns computed ONCE here and reused in the Summary body below, so the attestation
     # line can state the ACTUAL render outcome (emitted or not), never an assumption. v1 / v1.1
-    # suppress it entirely (Ledger 22 is v2.1 material).
+    # suppress it entirely (Ledger 22 is v2 material).
     _ep_lines = _emergent_patterns_html(report, _findings, version=_ver) if _ver not in ("v1", "v1.1") else []
 
     # ── Runtime provenance (RELAY B) — facts the tool verifies for THIS run, never hardcoded. KB
@@ -3344,7 +3435,7 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
         from .knowledge_extractor import kb_file_sha256, build_sha
     except ImportError:
         from knowledge_extractor import kb_file_sha256, build_sha
-    _kb_sha = kb_file_sha256(settings.get("kb_version", "v2.1"))
+    _kb_sha = kb_file_sha256(settings.get("kb_version", "v2"))
     _build = build_sha()
     _is_v1 = _ver in ("v1", "v1.1")
     _profile = str(settings.get("profile", "")).strip().lower()
@@ -3354,7 +3445,7 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
 
     # ── header meta (identical to By-Issue) ──
     _meta = []
-    _meta.append(("KB", settings.get("kb_version", "v2.1")))
+    _meta.append(("KB", settings.get("kb_version", "v2")))
     _meta.append(("Architecture", "Two-pass" if settings.get("mode") == "twopass" else "Single-pass"))
     _meta.append(("Coverage", "Thorough" if settings.get("thorough_mode") else "Standard"))
     _meta.append(("Report style", "By Trap"))
@@ -3391,17 +3482,17 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
     for k, v in _meta:
         h.append(f"<span><span class='k'>{k}</span> {v}</span>")
     h.append("</div>")
-    # Provenance stamp — the true shas as facts (no staleness verdict; a-simple). Copyable.
-    h.append(f"<div class='r-stamp'>KB {_kb_sha} · build {_build or 'unavailable'}</div>")
+    # Provenance stamp — the true version + shas as facts (no staleness verdict; a-simple). Copyable.
+    h.append(f"<div class='r-stamp'>KB {settings.get('kb_version', 'v2')} · {_kb_sha} · build {_build or 'unavailable'}</div>")
     # Isolation / full-stack attestation — each item a runtime fact about what was loaded/applied
-    # THIS run. v1: confirmed-clean INPUTS/paths (NOT a leak-free-output guarantee). v2.1: components
+    # THIS run. v1: confirmed-clean INPUTS/paths (NOT a leak-free-output guarantee). v2: components
     # PRESENT/APPLIED (NOT a performance/optimality claim). A contradicting fact is stamped as-is.
     if _is_v1:
         _att = [
             f"KB {_kb_sha}",
             "v1 taxonomy",
             ("no Emergent Patterns" if not _ep_rendered else "Emergent Patterns RENDERED (unexpected)"),
-            ("self-serve (no v2.1 scaffolding)" if _selfserve
+            ("self-serve (no v2 scaffolding)" if _selfserve
              else f"profile {_profile or 'unknown'} — NOT self-serve"),
         ]
         h.append("<div class='r-attest'>v1.0 isolated — " + " · ".join(_att) + "</div>")
@@ -3411,10 +3502,12 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
             f"KB {_kb_sha}",
             ("system-prompt know-how ✓" if _coached else "system-prompt know-how — (self-serve, KB-only)"),
             ("two-pass ✓" if _twopass else "two-pass — (not applied)"),
-            ("Emergent Patterns ✓" if _ep_rendered else "Emergent Patterns — (no findings)"),
+            ("Emergent Patterns ✓" if _ep_rendered
+             else ("Emergent Patterns — (no findings)" if not _findings
+                   else "Emergent Patterns — (no reportable pattern)")),
             ("exec-voice ✓" if _coached else "exec-voice — (self-serve, KB-only)"),
         ]
-        h.append("<div class='r-attest'>v2.1 full stack — " + " · ".join(_att) + "</div>")
+        h.append("<div class='r-attest'>v2 full stack — " + " · ".join(_att) + "</div>")
     h.append("</div>")
 
     if settings.get("truncated"):
@@ -3429,23 +3522,32 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
     # evaluation details (identical to By-Issue)
     _emit_eval_details(h, uc)
 
-    # summary + "Number of issues found" matrix (counts the flattened instances)
+    # summary section — the "Number of Traps found" matrix leads, then the verdict prose (headline,
+    # narrative, Emergent Patterns). Matrix-first per layout request: the scorecard is the at-a-glance
+    # scan, so it sits at the top of the section above the exec-voice paragraph.
     h.append("<div class='section'><div class='section-eyebrow'>Summary of findings</div>")
-    if report.get("summary_headline"):
-        h.append(f"<p class='headline-lg'>{report['summary_headline']}</p>")
-    if report.get("summary_narrative"):
-        h.append(f"<p class='narrative'>{report['summary_narrative']}</p>")
-    # Emergent Patterns — folded into the Summary ABOVE the scorecard, no subtitle. Computed once
-    # above (_ep_lines) and gated there: v2.1 material only, suppressed for v1 / v1.1 (Ledger 22).
-    h.extend(_ep_lines)
     _rows, _cols = _SCORE_ROWS, _SCORE_COLS
     _counts = {(r, c[0]): 0 for r in _rows for c in _cols}
     _sev_norm, _conf_norm = _SEV_NORM, _CONF_NORM
+    # Count DISTINCT traps (one per trap card below), NOT flattened instances: a trap that fires N
+    # times is one Trap, so it lands in exactly one cell — that of its WORST instance (highest
+    # severity, then highest confidence). This keeps the "Number of Traps found" total in agreement
+    # with the one-card-per-trap enumeration instead of inflating when a trap has multiple instances.
+    # Grouping key matches _emit_trap_cards (str.strip().upper()) so the counts track the cards.
+    _rank = {"High": 3, "Medium": 2, "Low": 1}
+    _worst_cell: dict = {}   # trap name -> ((sev_rank, conf_rank), conf, sev)
     for i in _findings:
+        _tn = str(i.get("trap_name") or "").strip().upper()
+        if not _tn:
+            continue
         sev = _sev_norm.get((i.get("severity_label") or "").strip().lower()) or i.get("_src_sev") or "Medium"
         conf = _conf_norm.get((i.get("confidence") or "").strip().lower(), "Low")
+        _rk = (_rank.get(sev, 2), _rank.get(conf, 1))
+        if _tn not in _worst_cell or _rk > _worst_cell[_tn][0]:
+            _worst_cell[_tn] = (_rk, conf, sev)
+    for _rk, conf, sev in _worst_cell.values():
         _counts[(conf, sev)] += 1
-    h.append("<div class='sub-block'><div class='sub-label'>Number of Traps found</div><div class='scorecard-wrap'>")
+    h.append("<div class='sub-block summary-scorecard'><div class='sub-label'>Number of Traps found</div><div class='scorecard-wrap'>")
     h.append("<table class='scorecard'><thead>")
     h.append("<tr><td class='corner-blank'></td><th class='axis-top' colspan='3'>Severity</th></tr>")
     h.append("<tr><th class='axis-side'>Confidence</th>")
@@ -3458,7 +3560,15 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
             n = _counts[(rlabel, label)]
             h.append(f"<td class='count {cls}'>{n}</td>" if n else "<td class='count zero'>—</td>")
         h.append("</tr>")
-    h.append("</tbody></table></div></div></div>")
+    h.append("</tbody></table></div></div>")   # close table, scorecard-wrap, sub-block (NOT the section)
+    # verdict prose beneath the matrix: headline, narrative, then Emergent Patterns (no subtitle;
+    # computed once above as _ep_lines, gated there — v2 material only, suppressed for v1 / v1.1).
+    if report.get("summary_headline"):
+        h.append(f"<p class='headline-lg'>{report['summary_headline']}</p>")
+    if report.get("summary_narrative"):
+        h.append(f"<p class='narrative'>{report['summary_narrative']}</p>")
+    h.extend(_ep_lines)
+    h.append("</div>")   # close the summary section
 
     # ── Traps identified — one card per trap. For a multi-task analysis, cards are grouped
     # under "General" then "Task N: <name>"; a finding's task_context assigns it (best-match).
@@ -3647,12 +3757,31 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
 
     # ── Coverage notes — traps with NO instances (identical buckets to By-Issue) ──
     cov = [c for c in report.get("traps_checked_not_found") or [] if isinstance(c, dict)]
-    # Mutual exclusivity: a trap with at least one instance among the findings must not also appear
-    # as "did not find" / "couldn't evaluate" (partially_assessed may co-exist per J27).
+    # Mutual exclusivity: a trap accounted for elsewhere must not ALSO surface as a coverage bucket
+    # (partially_assessed may co-exist per J27). "Elsewhere" = a per-trap finding (`_raised`) OR a
+    # secondary binding inside an issue_groups issue (`_secondary_names`) — the disposition index gives
+    # both precedence over coverage, so a coverage "Not found" for such a trap would contradict the
+    # index (e.g. a trap shown "Within an issue (consequence)" there and "Not found" here).
     _raised = {_normalize_trap_name(f.get("trap_name", "")) for f in _findings}
     _raised.discard("")
+    _secondary_names = {_normalize_trap_name(_t.get("trap_name", ""))
+                        for _g in (report.get("issue_groups") or []) if isinstance(_g, dict)
+                        for _t in (_g.get("traps") or []) if isinstance(_t, dict)}
+    _accounted = (_raised | _secondary_names)
+    _accounted.discard("")
     cov = [c for c in cov if c.get("coverage_status") == "partially_assessed"
-           or _normalize_trap_name(c.get("trap_name", "")) not in _raised]
+           or _normalize_trap_name(c.get("trap_name", "")) not in _accounted]
+    # De-dup by normalized trap name (a model can emit the same trap twice in traps_checked_not_found):
+    # the disposition index already dedups, so without this the coverage buckets would show twin pills.
+    _seen_cov: set = set()
+    _deduped_cov = []
+    for c in cov:
+        _cnm = _normalize_trap_name(c.get("trap_name", ""))
+        if _cnm and _cnm in _seen_cov:
+            continue
+        _seen_cov.add(_cnm)
+        _deduped_cov.append(c)
+    cov = _deduped_cov
     _did_not_find = [c for c in cov if c.get("coverage_status") == "not_present"]
     _partial = [c for c in cov if c.get("coverage_status") == "partially_assessed"]
     # "Couldn't evaluate" also absorbs any off-enum / missing coverage_status (e.g. from a
@@ -3691,7 +3820,9 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
             for c in _couldnt:
                 name = c.get('trap_name', '')
                 color = _TENET_PILL.get(_tenet_for(name, version=_ver).upper(), "#35597F")
-                reason = "needs details about your users" if c.get("coverage_status") == "not_assessable_context" else "needs the live product or more screens"
+                reason = (c.get("_assess_remedy")
+                          or ("needs details about your users" if c.get("coverage_status") == "not_assessable_context"
+                              else "needs the live product or more screens"))
                 h.append("<div class='cov-item assess'>")
                 h.append(f"<span class='tpill' style='background:{color}'>{name}</span>")
                 h.append(f"<span class='cs'>{reason}</span>")
@@ -3721,7 +3852,7 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
         from .schema import _valid_trap_names as _vtn
     except ImportError:
         from schema import _valid_trap_names as _vtn
-    _taxonomy = _vtn(settings.get("kb_version", "v2.1")) or []
+    _taxonomy = _vtn(settings.get("kb_version", "v2")) or []
     if _taxonomy:
         _found = {_normalize_trap_name(f.get("trap_name", "")) for f in _findings}
         _found.discard("")

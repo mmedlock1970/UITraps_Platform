@@ -250,7 +250,7 @@ A minimalist design with lots of whitespace is NOT a bug.
 
 
 @lru_cache(maxsize=4)
-def load_training_content(version: str = "v2.1") -> str:
+def load_training_content(version: str = "v2") -> str:
     """
     Load the condensed AI analysis reference for Pass 1 (detection).
     Result is cached per version to avoid repeated file I/O across requests.
@@ -291,11 +291,12 @@ _TRAP_NAMES_V2 = (
 )
 
 
+@lru_cache(maxsize=4)
 def _build_new_kb_system_prompt(trap_names_line: str) -> str:
     """
-    Mechanics-only system prompt for the new (v2.1-lineage) self-instructing KBs.
+    Mechanics-only system prompt for the new (v2-lineage) self-instructing KBs.
 
-    Design contract (see claude_code_instructions_trap_kb_v2.1 Task 1): the KB carries
+    Design contract (see claude_code_instructions_trap_kb_v2 Task 1): the KB carries
     ALL evaluative logic — detection procedures, disconfirmation, severity, confidence,
     trap disambiguation, coverage. This prompt carries ONLY: output-envelope mechanics,
     the G8→field mapping, and IP/safety. Tone/hedging, anti-hallucination grounding,
@@ -352,7 +353,7 @@ TECHNICAL BUGS  →  bugs_detected
 summary_headline / summary_narrative — THE EXECUTIVE BOTTOM LINE:
    Write these two fields for a smart, busy decision-maker who asked one question — "what did the analysis reveal?" — and wants the answer, not the workings. Plain, everyday English only: NO framework jargon (no trap names, no tenet names, none of "severity / confidence / adjudication / coverage"), NO counts, NO description of how the analysis was performed. Frame everything in terms of the specific users and the specific tasks named in the context.
    `summary_headline`: one sentence (16–24 words), verdict first — how well this interface lets those users get those tasks done. No wind-up.
-   `summary_narrative`: one tight paragraph — as long as needed to deliver the verdict and its essential caveats and NO longer (hard ceiling 7 sentences; typically 3–5; NEVER padded to a floor — a clear 3-sentence verdict beats a padded 6). This length rule is the single source of truth and holds identically in BOTH Brief and Standard modes. Cover, in this order:
+   `summary_narrative`: one SHORT paragraph — as long as needed to deliver the verdict and its essential caveats and NO longer (hard ceiling 5 sentences; typically 2–3; NEVER padded to a floor — a clear 2-sentence verdict beats a padded 4). Combine the points below into the same sentence wherever you can; this is a bottom line, not a write-up. The length rule is the single source of truth and holds identically in BOTH Brief and Standard modes. Cover, compactly, in this order:
      1) The bottom line, plainly — does the design support the stated users and tasks, and how well (what it gets right, where it breaks down).
      2) What most gets in the users' way — described as a person would experience it, grouped, not an exhaustive list.
      3) What is worth considering to improve the outcome — advisory and results-oriented ("the biggest lever is…", "consider…"), never a rigid instruction.
@@ -375,6 +376,7 @@ Submit your analysis using the ui_analysis_report tool, populating the fields as
     return prompt.replace("{trap_names_line}", trap_names_line)
 
 
+@lru_cache(maxsize=4)
 def _build_twopass_detection_system(trap_names_line: str) -> str:
     """
     Mechanics-only system prompt for the two-pass DETECTION pass (new KBs).
@@ -449,7 +451,7 @@ def _build_self_serve_trap_instruction() -> str:
 
 def build_system_prompt(
     use_caching: bool = True,
-    version: str = "v2.1",
+    version: str = "v2",
     image_count: int = 1,
     training_override: Optional[str] = None,
     extra_training: Optional[str] = None,
@@ -462,8 +464,8 @@ def build_system_prompt(
 
     Args:
         use_caching: Whether to use prompt caching (recommended for production)
-        version: Knowledge base version (default "v2.1"). Must be a new-KB version (v1.1/v2.1);
-            legacy Prompting+KB versions (v1/v2) raise ValueError — their only supported route
+        version: Knowledge base version (default "v2"). Must be a new-KB version (v1.1/v2);
+            the legacy Prompting+KB version (v1) raises ValueError — its only supported route
             is KB-only (self-serve) mode, which does not call this.
         training_override: If provided, use this text as the training content instead of
             loading the full master. Two-pass mode passes sliced packs here (detection pack
@@ -492,17 +494,17 @@ def build_system_prompt(
             ]
         return [{"type": "text", "text": f"{_kb_block}\n\n{_instruction}"}]
 
-    # v1.1 shares v1's 26-trap set; v2.1 shares v2's 27-trap set.
+    # v1 / v1.1 use the 26-trap set (_TRAP_NAMES_V1); v2 uses the 27-trap set (_TRAP_NAMES_V2).
     trap_names_line = _TRAP_NAMES_V1 if version in ("v1", "v1.1") else _TRAP_NAMES_V2
 
     # Legacy Prompting+KB (the old system_prompt_intro for v1/v2) is deprecated. The only
-    # supported Prompting+KB path is the new-KB (v1.1/v2.1) mechanics-only scaffolds below;
+    # supported Prompting+KB path is the new-KB (v1.1/v2) mechanics-only scaffolds below;
     # KB-only (self-serve) is handled by the early return above. All evaluative logic lives
     # in the KB.
     if not is_new_kb(version):
         raise ValueError(
             f"Legacy Prompting+KB pathway is deprecated for version {version!r}. Supported: "
-            f"new-KB (v1.1/v2.1) in Prompting+KB, or any version in KB-only (self-serve) mode."
+            f"new-KB (v1.1/v2) in Prompting+KB, or any version in KB-only (self-serve) mode."
         )
     if mode == "detect":
         full_system_prompt = _build_twopass_detection_system(trap_names_line=trap_names_line)
@@ -596,7 +598,7 @@ def build_user_message(
     frame_index: int = None,
     total_frames: int = None,
     verbosity: str = "standard",
-    version: str = "v2.1",
+    version: str = "v2",
     mode: str = "report",
     profile: str = "default",
 ) -> list:
@@ -617,7 +619,7 @@ def build_user_message(
         List of message content blocks
     """
     trap_count = "26" if version in ("v1", "v1.1") else "27"
-    # New-KB (v2.1-lineage) versions carry evaluative rules in the KB; the user-turn
+    # New-KB (v2-lineage) versions carry evaluative rules in the KB; the user-turn
     # reminders below must not re-inject legacy detection philosophy (Tier vocabulary,
     # gated procedures, the Critical/Moderate/Minor scale, page-role verdicts).
     new_kb_version = is_new_kb(version)

@@ -23,7 +23,7 @@ def _bytrap_report(**crit_over):
             "moderate_issues": [], "minor_issues": [], "traps_checked_not_found": [], "positive_observations": []}
 
 
-_TRAP_SET = {"kb_version": "v2.1", "report_style": "trap"}
+_TRAP_SET = {"kb_version": "v2", "report_style": "trap"}
 
 
 # ── confidence: card must agree with the scorecard bucket (blank → Low) ───────────────────────
@@ -31,6 +31,42 @@ _TRAP_SET = {"kb_version": "v2.1", "report_style": "trap"}
 def test_bytrap_blank_confidence_renders_low_matching_scorecard():
     html = format_bytrap_report_as_html(_bytrap_report(confidence=""), {"design_name": "X"}, _TRAP_SET)
     assert "c-low'>Low" in html
+
+
+# ── scorecard counts DISTINCT traps, not instances (agrees with one-card-per-trap) ────────────
+
+def test_scorecard_counts_distinct_traps_not_instances():
+    import re
+
+    def _inst(sev="High"):
+        return {"trap_name": "INCONSISTENT APPEARANCE", "tenet": "HABITUATING", "headline": "h",
+                "problem": "p", "recommendation": "r", "severity_label": sev, "confidence": "High"}
+    # ONE trap firing three times (all High/High): the card enumeration shows a single card with
+    # "3 instances found"; the scorecard must count the Trap ONCE, not three times.
+    report = {"summary_headline": "h", "summary_narrative": "n",
+              "critical_issues": [_inst(), _inst(), _inst()],
+              "moderate_issues": [], "minor_issues": [], "issue_groups": [],
+              "traps_checked_not_found": [], "positive_observations": []}
+    html = format_bytrap_report_as_html(report, {"design_name": "T"}, _TRAP_SET)
+    assert "3 instances found" in html                       # the card still reports all instances
+    score = html.split("class='scorecard'", 1)[1].split("</table>", 1)[0]
+    cells = re.findall(r"<td class='count[^']*'>(\d+)</td>", score)
+    assert cells == ["1"], f"scorecard should show a single distinct-trap count of 1, got {cells}"
+
+
+def test_scorecard_places_trap_in_its_worst_cell():
+    # A trap with instances at High and Low severity is counted ONCE, in its worst (High) cell.
+    def _inst(sev):
+        return {"trap_name": "BAD PREDICTION", "tenet": "ACCURATE", "headline": "h", "problem": "p",
+                "recommendation": "r", "severity_label": sev, "confidence": "High"}
+    report = {"summary_headline": "h", "summary_narrative": "n",
+              "critical_issues": [_inst("High")], "moderate_issues": [], "minor_issues": [_inst("Low")],
+              "issue_groups": [], "traps_checked_not_found": [], "positive_observations": []}
+    import re
+    html = format_bytrap_report_as_html(report, {"design_name": "T"}, _TRAP_SET)
+    score = html.split("class='scorecard'", 1)[1].split("</table>", 1)[0]
+    cells = re.findall(r"<td class='count[^']*'>(\d+)</td>", score)
+    assert cells == ["1"], f"one distinct trap in one (worst) cell, got {cells}"
 
 
 # ── By-Trap severity backfill from source array ───────────────────────────────────────────────
@@ -115,7 +151,7 @@ def test_bytrap_truncated_partial_dict_does_not_raise(tmp_path):
         design_file=str(img),
         user_context={"users": "first-time visitors", "tasks": "buy a sofa",
                        "format": "app", "content_type": "website"},
-        kb_version="v2.1", report_style="trap", mode="single", profile="default",
+        kb_version="v2", report_style="trap", mode="single", profile="default",
     )
     assert result["status"] == "success"
     assert result.get("html")
@@ -154,7 +190,7 @@ def test_issue_groups_json_string_is_recovered(tmp_path):
     res = a.analyze_design(
         design_file=str(img),
         user_context={"users": "first-time visitors", "tasks": "buy a sofa", "format": "app", "content_type": "website"},
-        kb_version="v2.1", report_style="trap", mode="single", profile="default",
+        kb_version="v2", report_style="trap", mode="single", profile="default",
     )
     assert isinstance(res["report"]["issue_groups"], list) and res["report"]["issue_groups"]
     assert "concentrate on the two nav bars" in res["html"]  # regional axis fired from recovered substrate

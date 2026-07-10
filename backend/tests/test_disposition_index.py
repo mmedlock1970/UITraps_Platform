@@ -15,7 +15,7 @@ from src.formatters import format_bytrap_report_as_html
 from src.schema import _valid_trap_names
 
 
-def _render(report, kb_version="v2.1"):
+def _render(report, kb_version="v2"):
     return format_bytrap_report_as_html(
         report, {"design_name": "Test"}, {"kb_version": kb_version, "report_style": "trap"}
     )
@@ -61,7 +61,7 @@ def _row(section, trap):
     return section.split(f">{trap}</span>", 1)[1].split("</tr>", 1)[0]
 
 
-@pytest.mark.parametrize("version", ["v2.1"])
+@pytest.mark.parametrize("version", ["v2"])
 def test_index_lists_every_taxonomy_trap_once(version):
     section = _disp_section(_render(_base_report(), kb_version=version))
     # One pill per taxonomy trap, in canonical scan order.
@@ -126,12 +126,40 @@ def test_fully_accounted_report_has_no_diagnostic_flag():
     report = _base_report()
     accounted = {"DISTRACTION", "UNCOMPREHENDED ELEMENT", "POOR GROUPING"}
     accounted |= {c["trap_name"] for c in report["traps_checked_not_found"]}
-    for trap in _valid_trap_names("v2.1"):
+    for trap in _valid_trap_names("v2"):
         if trap not in accounted:
             report["traps_checked_not_found"].append(
                 {"trap_name": trap, "coverage_status": "not_present", "detail": "x"})
     section = _disp_section(_render(report))
     assert "Not accounted for" not in section
+
+
+def test_secondary_bound_trap_not_duplicated_in_coverage_notes():
+    """A trap bound ONLY as a secondary in issue_groups but ALSO emitted as not_present coverage must
+    not render in both places — the disposition index gives the issue binding precedence, so the
+    coverage 'Not found' pill would contradict it. It is suppressed from coverage."""
+    report = _base_report()
+    # POOR GROUPING is a co-occurring secondary (no finding of its own); also (contradictorily) listed
+    # as not_present coverage. It must show 'Within an issue' in the index and NOT under coverage.
+    report["traps_checked_not_found"].append(
+        {"trap_name": "POOR GROUPING", "coverage_status": "not_present", "detail": "x"})
+    html = _render(report)
+    coverage = html.split("Coverage notes", 1)[1].split("Trap disposition index", 1)[0]
+    assert ">POOR GROUPING</span>" not in coverage      # suppressed from coverage buckets
+    assert "Within an issue" in _row(_disp_section(html), "POOR GROUPING")
+
+
+def test_duplicate_coverage_entries_deduped():
+    """The same trap emitted twice in traps_checked_not_found renders a single coverage pill, matching
+    the disposition index (which already dedupes)."""
+    report = _base_report()
+    report["traps_checked_not_found"] = [
+        {"trap_name": "INFORMATION OVERLOAD", "coverage_status": "not_present", "detail": "x"},
+        {"trap_name": "INFORMATION OVERLOAD", "coverage_status": "not_present", "detail": "x"},
+    ]
+    html = _render(report)
+    coverage = html.split("Coverage notes", 1)[1].split("Trap disposition index", 1)[0]
+    assert coverage.count(">INFORMATION OVERLOAD</span>") == 1
 
 
 @pytest.mark.parametrize("report", [

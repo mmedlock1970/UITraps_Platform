@@ -1914,7 +1914,7 @@ async def unified_ask(
     attentional_state: Optional[str] = Form(None),
     tenet_filter: Optional[str] = Form(None),
     design_name: Optional[str] = Form(None),
-    kb_version: str = Form("v2.1"),
+    kb_version: str = Form("v2"),
     report_style: str = Form("trap"),
     verbosity: str = Form("standard"),
     pass1_model: Optional[str] = Form(None),
@@ -2062,9 +2062,10 @@ async def unified_ask(
                     }
                     # Delegate to the shared engine: same cross-screen single call, dispatch
                     # (one-pass vs two-pass), coaching lock (profile), report_style, chat context,
-                    # and rev6 rendering as the image path — no flow-specific pipeline.
-                    _flow_analyzer = UITrapsAnalyzer()
-                    return _flow_analyzer.analyze_flow_diagram(
+                    # and rev6 rendering as the image path — no flow-specific pipeline. Reuse the
+                    # process singleton (warm Anthropic client + connection pool) rather than building
+                    # a fresh analyzer per request, matching every other entry point.
+                    return get_analyzer().analyze_flow_diagram(
                         frames=_frames,
                         user_context=_fctx,
                         kb_version=kb_version,
