@@ -3389,6 +3389,21 @@ def _apply_disposition_gate(report: dict, settings: dict) -> None:
         _c["_assess_remedy"] = "no disconfirming evidence was cited to rule it out"
 
 
+# In-report click interceptor for the priority statement's "(Trap NN)" links. The report renders in
+# an `<iframe srcDoc>`, whose document (about:srcdoc) resolves a bare `#trap-NN` fragment against the
+# PARENT app URL — so an unhandled click navigates the iframe to the app (the form) instead of
+# scrolling. This catches clicks on the trap-anchor links only and scrolls within THIS document, which
+# owns both the links and the id="trap-NN" targets. Scoped to a[href^="#trap-"]; all other links and
+# the numbering/ids/sentence are untouched.
+_TRAP_ANCHOR_JS = (
+    "<script>document.addEventListener('click',function(e){"
+    "var t=e.target,a=t&&t.closest?t.closest('a[href^=\"#trap-\"]'):null;"
+    "if(!a)return;e.preventDefault();"
+    "var el=document.getElementById(a.getAttribute('href').slice(1));"
+    "if(el)el.scrollIntoView({behavior:'smooth',block:'start'});});</script>"
+)
+
+
 def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict) -> str:
     """Render the new-KB BY-TRAP report in the rev6 style — one entry per Trap, each listing
     the instances found (or, for traps with none, grouped compactly under Coverage notes).
@@ -3917,7 +3932,9 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
 
     h.append("</div>")  # report-inner
     h.append("<div class='r-footer'>© UI Traps LLC · Proprietary &amp; Confidential — UI Tenets &amp; Traps Framework</div>")
-    h.append("</div></div></body></html>")
+    h.append("</div></div>")
+    h.append(_TRAP_ANCHOR_JS)   # scroll trap-anchor links within the iframe (srcDoc fragment fix)
+    h.append("</body></html>")
     return "\n".join(h)
 
 

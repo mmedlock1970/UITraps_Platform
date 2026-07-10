@@ -155,3 +155,16 @@ def test_renders_with_linked_trap_number_matching_the_card():
     assert 'The priority here is noisy hero (<a href="#trap-01">Trap 01</a>).' in seg
     # ... and the card it points to carries that exact id — anchor target exists and the numbers match.
     assert "id='trap-01'" in html
+
+
+def test_report_ships_trap_anchor_scroll_handler():
+    # The report renders in an `<iframe srcDoc>` where a bare "#trap-NN" fragment resolves against the
+    # parent app URL (loading the form) instead of scrolling. So the document ships a click handler
+    # that scrolls within itself — assert it's present and scoped to the trap-anchor links only.
+    report = {"summary_headline": "h", "summary_narrative": "n",
+              "critical_issues": [_f("DISTRACTION", "High", "noisy hero")],
+              "moderate_issues": [], "minor_issues": [], "issue_groups": [],
+              "traps_checked_not_found": [], "positive_observations": []}
+    html = format_bytrap_report_as_html(report, {"design_name": "T"}, _SET)
+    assert 'a[href^="#trap-"]' in html      # scoped to the trap-anchor links only
+    assert "scrollIntoView" in html         # scrolls within the report document, not fragment nav
