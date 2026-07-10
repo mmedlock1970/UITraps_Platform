@@ -159,8 +159,8 @@ def test_bytrap_truncated_partial_dict_does_not_raise(tmp_path):
 
 def test_issue_groups_json_string_is_recovered(tmp_path):
     # The model occasionally JSON-ENCODES issue_groups as a string (same failure the per-finding
-    # arrays already recover from). It must be recovered, not dropped — else the Emergent Patterns
-    # regional axis and the disposition "within an issue" attribution silently go blank.
+    # arrays already recover from). It must be recovered, not dropped — else the priority statement's
+    # cascade clause and the disposition "within an issue" attribution silently go blank.
     import json
     rep = {"summary_headline": "h", "summary_narrative": "n",
            "critical_issues": [{"trap_name": "POOR GROUPING", "tenet": "HABITUATING", "headline": "nav split",
@@ -193,7 +193,9 @@ def test_issue_groups_json_string_is_recovered(tmp_path):
         kb_version="v2", report_style="trap", mode="single", profile="default",
     )
     assert isinstance(res["report"]["issue_groups"], list) and res["report"]["issue_groups"]
-    assert "concentrate on the two nav bars" in res["html"]  # regional axis fired from recovered substrate
+    # The cascade clause fires ONLY when the recovered group's root_cause + consequence relationships
+    # survived — proof the JSON-string substrate was parsed, not dropped.
+    assert "also clears smaller issues" in res["html"]
 
 
 # ── streaming helper: streams when a real context-manager stream exists, else create() ─────────

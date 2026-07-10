@@ -2,7 +2,7 @@
  "kb_version": "v2",
  "structure": "two-pass",
  "source": "trap_kb_v2.md",
- "master_sha256": "4ae0a0bed37a31069a362191575810bdfc930ff21d8b7b62dfda8c914075b977",
+ "master_sha256": "d2bb63cb99c88772e6978d01a8121fb996e0ddcf3f269afe09de4265dac4763b",
  "note": "regenerate all derived files on any master edit",
  "pass1": "pass1_detection_pack.md",
  "pass2_core": "pass2_core_pack.md",

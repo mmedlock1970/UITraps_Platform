@@ -3179,6 +3179,15 @@ def _ep_join(items: list) -> str:
     return ", ".join(items[:-1]) + ", and " + items[-1]
 
 
+def _priority_handle(f: dict) -> str:
+    """Short 3-5 word handle for the priority statement. Prefers the model-authored `handle` field
+    (schema); falls back to a trimmed headline as a crash-guard only (LOSSY)."""
+    h = str(f.get("handle") or "").strip()
+    if h:
+        return h
+    return " ".join(str(f.get("headline") or "").strip().split()[:5])
+
+
 def _emergent_patterns_html(report: dict, findings: list, version: str = "v2") -> list:
     """Render-time DERIVATION (NO model call) of the opening Emergent Patterns synthesis
     (KB G8 / Ledger 22). Failure-side, observation register, descriptive-only — never an
@@ -3193,124 +3202,59 @@ def _emergent_patterns_html(report: dict, findings: list, version: str = "v2") -
     if not findings:
         return []
 
-    lines = []  # axis sentences, order: (a) regional, then (b) tenet
+    lines = []  # at most one line: the priority statement
 
-    # ── Axis (a): regional concentration ── issue_groups binding ≥2 DISTINCT Traps to one
-    # location WITH an established relationship (≥1 bound trap's relationship ≠ none).
-    regions = []
-    for g in (report.get("issue_groups") or []):
-        if not isinstance(g, dict):
-            continue
-        loc = str(g.get("location") or "").strip()
-        if not loc:
-            continue
-        names, rels, seen = [], [], set()
-        for t in (g.get("traps") or []):
-            if not isinstance(t, dict):
-                continue
-            nm = _normalize_trap_name(t.get("trap_name", ""))
-            if not nm or nm in seen:
-                continue
-            seen.add(nm)
-            names.append(nm)
-            rels.append(normalize_relationship(t.get("relationship")))
-        if len(names) < 2 or not any(r not in ("none", "") for r in rels):
-            continue
-        if "root_cause" in rels:
-            share = "one is the root cause of the others"
-        elif all(r == "co_occurring" for r in rels):
-            share = "a common underlying cause"
-        else:
-            share = "a shared remedy"
-        regions.append((len(names), loc, share))
-    regions.sort(key=lambda r: -r[0])
-    for n, loc, share in regions:
-        nword = _EP_NUM.get(n, str(n))
-        lines.append(
-            f"{nword} Traps concentrate on {loc}; the adjudication finds {share}, so that region "
-            f"is a single locus of risk despite surfacing as several Traps below.")
-
-    # ── Axis (b): tenet concentration ── ranks ONLY Tenets whose Traps FIRED. Fires when the top
-    # Tenet has ≥2 fired Traps AND leads by a clear margin: top ≥ runner-up + 2, OR top ≥ 50% of
-    # all fired Traps. A one-Trap margin does NOT fire; a tie for top does NOT fire.
+    # ── Priority statement (d2bb63cb) — replaces the former axis-(a) region lines and axis-(b)
+    # tenet-characterization line (both removed, along with the now-pointless per-render TENET-GLOSSES
+    # read; the block stays in the KB, just no longer read). Names the <=3 highest-priority Traps,
+    # severity-led (High > Medium > Low), then root-cause Traps before standalone among ties.
+    # Descriptor from the model `handle` field (headline-trim crash-fallback only); no render-time Trap
+    # numbers. Its own short paragraph, ALWAYS emitted when any Trap fired.
     #
-    # The whole tenet-concentration ranking is in DISTINCT-TRAP units, not instances — a trap firing
-    # N times is ONE trap. This keeps the ≥2 fire gate ("two distinct trap types", not one trap
-    # firing twice) and the assessability leash both in the same trap unit as KB guard iii.
-    #
-    # Assessability leash (KB guard iii), coverage-driven, NEVER a static tenet list. A Tenet enters
-    # the ranking iff ≥1 of its Traps fired this run. THEN the STRICTER exclusion: drop a fired Tenet
-    # when MORE of its Traps landed in "couldn't evaluate" (not_assessable_artifact / _context) than
-    # fired — that Tenet was mostly un-inspectable, so its concentration reading is unreliable and it
-    # must not be named, counted in the denominator, or used as the runner-up. Both sides count
-    # DISTINCT traps. not_present (assessed AND absent) is successful inspection and does NOT count
-    # against a Tenet. No Tenet is pre-judged unassessable — a Responsive/Protective Trap that DOES
-    # fire from a screenshot counts fully.
-    _fired_traps: "dict[str, set]" = {}
-    by_tenet = OrderedDict()
+    # Two root-cause sets, deliberately different (KB line 34 forbids a cascade claim for independent
+    # co-failures): `_root_cause` (LOOSE - root_cause in ANY group) drives ordering/tiebreak only,
+    # which makes no output claim; `_cascade` (STRICT - root_cause in a group that ALSO holds >=1
+    # `consequence` trap, i.e. a root cause with real dependents) is the ONLY gate on the "also clears
+    # smaller issues" clause. A root-cause-labelled trap with no co-occurring consequence therefore
+    # gets impact-only phrasing, never the cascade clause. Forbidden in output: adjudication / root
+    # cause / region / locus / concentrate, and Tenet names.
+    _SEVR = {"High": 3, "Medium": 2, "Low": 1}
+    _root_cause: "set" = set()   # loose: ordering/tiebreak only (no cascade claim)
+    _cascade: "set" = set()      # strict: root_cause in a group that also holds a consequence trap
+    for _g in (report.get("issue_groups") or []):
+        if not isinstance(_g, dict):
+            continue
+        _gt = [_t for _t in (_g.get("traps") or []) if isinstance(_t, dict)]
+        _rels = [normalize_relationship(_t.get("relationship")) for _t in _gt]
+        _has_consequence = "consequence" in _rels
+        for _t, _rel in zip(_gt, _rels):
+            if _rel == "root_cause":
+                _rcnm = _normalize_trap_name(_t.get("trap_name", ""))
+                if _rcnm:
+                    _root_cause.add(_rcnm)
+                    if _has_consequence:
+                        _cascade.add(_rcnm)
+    # One entry per DISTINCT fired Trap: (sev_rank, handle, is_root_cause_loose, cascade_ok). Worst
+    # severity kept when a Trap fires more than once.
+    _by_trap = OrderedDict()
     for f in findings:
-        ten = str(f.get("tenet") or _tenet_for(f.get("trap_name", ""))).strip().upper()
         nm = _normalize_trap_name(f.get("trap_name", ""))
-        if not ten:
+        if not nm:
             continue
-        by_tenet.setdefault(ten, []).append(f)
-        if nm:
-            _fired_traps.setdefault(ten, set()).add(nm)
-    counts = Counter({t: len(s) for t, s in _fired_traps.items()})   # DISTINCT fired traps / Tenet
-    _UNASSESSABLE = {"not_assessable_artifact", "not_assessable_context"}
-    _couldnt_traps: "dict[str, set]" = {}
-    for c in (report.get("traps_checked_not_found") or []):
-        if isinstance(c, dict) and c.get("coverage_status") in _UNASSESSABLE:
-            ct = str(c.get("tenet") or _tenet_for(c.get("trap_name", ""))).strip().upper()
-            cnm = _normalize_trap_name(c.get("trap_name", ""))
-            if ct and cnm:
-                _couldnt_traps.setdefault(ct, set()).add(cnm)
-    couldnt = {t: len(s) for t, s in _couldnt_traps.items()}          # DISTINCT un-inspectable / Tenet
-    for t in [t for t in counts if couldnt.get(t, 0) > counts[t]]:
-        del counts[t]
-        by_tenet.pop(t, None)
-    if counts:
-        # Glosses read VERBATIM from the KB (parsed once, cached) — no tool copy (Ledger 23). A
-        # parse miss raises loudly inside the loader; never a silent blank.
-        try:
-            from .knowledge_extractor import load_tenet_glosses
-        except ImportError:
-            from knowledge_extractor import load_tenet_glosses
-        _glosses = load_tenet_glosses(version)
-        ranked = counts.most_common()
-        top_ten, top_n = ranked[0]
-        runner = ranked[1][1] if len(ranked) > 1 else 0
-        total = sum(counts.values())
-        tie = sum(1 for _, c in ranked if c == top_n) > 1
-        if (not tie) and top_ten in _glosses and top_n >= 2 and (top_n >= runner + 2 or top_n * 2 >= total):
-            # Headlines woven into the "because …" clause verbatim — NOT lowercased: a lowercased
-            # proper noun ("google login…") reads as clearly wrong, whereas an occasional
-            # mid-sentence capital ("The login…") reads as barely-off, and this is the exec summary.
-            named = [str(f.get("headline") or "").strip() for f in by_tenet[top_ten]]
-            named = [h for h in named if h]
-            tail = _ep_join(named[:3]) + (", among others" if len(named) > 3 else "")
-            adj = top_ten.capitalize()
-            # Glosses come from the KB FILE (via load_tenet_glosses), not the model output, so they
-            # bypass the boundary escape that covers report/user_context/settings — escape here at the
-            # point of use so a stray &/</quote in a KB gloss can't break or inject into the HTML.
-            cash = html.escape(_glosses[top_ten], quote=True)
-            lines.append(
-                f"Most of what's wrong here makes the interface less {adj} — {cash}"
-                + (f" — because {tail}." if tail else "."))
-
-    # ── Neither axis fired → the single most consequential issue, one line, then stop. ──
-    if not lines:
-        _rank = {"High": 3, "Medium": 2, "Low": 1}
-
-        def _sev_key(f):
-            s = _SEV_NORM.get((f.get("severity_label") or "").strip().lower()) or f.get("_src_sev") or "Medium"
-            return _rank.get(s, 2)
-
-        top = max(findings, key=_sev_key)
-        hl = str(top.get("headline") or top.get("problem") or "").strip()
-        if not hl:
-            return []
-        lines.append(f"The single most consequential issue: {hl}")
+        sev = _SEV_NORM.get((f.get("severity_label") or "").strip().lower()) or f.get("_src_sev") or "Medium"
+        rank = _SEVR.get(sev, 2)
+        prev = _by_trap.get(nm)
+        if prev is None or rank > prev[0]:
+            _by_trap[nm] = (rank, _priority_handle(f), nm in _root_cause, nm in _cascade)
+    _ranked = sorted(_by_trap.values(), key=lambda e: (-e[0], not e[2]))[:3]   # sev desc, root-cause first
+    _descs = [h for _r, h, _rc, _c in _ranked if h]
+    if _descs:
+        _lead = "The priority here is " if len(_descs) == 1 else "The priorities here, worst first, are "
+        _stmt = _lead + _ep_join(_descs) + "."
+        _cascade_h = [h for _r, h, _rc, _c in _ranked if _c and h]   # STRICT gate on the cascade clause
+        if _cascade_h:
+            _stmt += f" Fixing {_ep_join(_cascade_h)} also clears smaller issues."
+        lines.append(_stmt)
 
     # Bare paragraphs — folded into the Summary section above the scorecard, no subtitle.
     return [f"<p class='narrative ep-line'>{ln}</p>" for ln in lines]

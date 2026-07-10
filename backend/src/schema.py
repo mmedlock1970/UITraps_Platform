@@ -142,6 +142,10 @@ UI_ANALYSIS_SCHEMA = {
                         "type": "string",
                         "description": "One sentence describing how this trap appears to manifest in this specific design and how it may affect the user. Write from the user's perspective, tied to the context and tasks provided. Use measured language: 'appears to', 'may cause', 'could prevent'. Example: 'Dense promotional content between the size selector and checkout button may require users to scroll past irrelevant material to complete their purchase.'"
                     },
+                    "handle": {
+                        "type": "string",
+                        "description": "A 3-5 word plain-language handle for THIS specific issue - a short noun phrase a person would recognize (e.g. 'unclear cost signals', 'buried kids content', 'duplicated navigation'). NOT the trap name, NOT the full headline, no framework terminology. Used to name this issue in the priority statement."
+                    },
                     "location": {
                         "type": "string",
                         "description": "Specific location in the design where trap occurs"
@@ -196,6 +200,10 @@ UI_ANALYSIS_SCHEMA = {
                         "type": "string",
                         "description": "One sentence describing how this trap appears to manifest in this specific design and how it may affect the user. Use measured language: 'appears to', 'may cause', 'could prevent'."
                     },
+                    "handle": {
+                        "type": "string",
+                        "description": "A 3-5 word plain-language handle for THIS specific issue - a short noun phrase a person would recognize (e.g. 'unclear cost signals', 'buried kids content', 'duplicated navigation'). NOT the trap name, NOT the full headline, no framework terminology. Used to name this issue in the priority statement."
+                    },
                     "location": {"type": "string"},
                     "problem": {"type": "string", "description": "2-3 sentences elaborating on the headline and the reasoning used to conclude this trap appears present. Use measured language. Do NOT include internal reasoning steps or framework terminology."},
                     "recommendation": {"type": "string", "description": "2-3 sentences suggesting how this trap might be addressed. Use advisory language: 'one approach would be', 'consider', 'it may help to'."},
@@ -239,6 +247,10 @@ UI_ANALYSIS_SCHEMA = {
                     "headline": {
                         "type": "string",
                         "description": "One sentence describing how this trap appears to manifest in this specific design and how it may affect the user. Use measured language: 'appears to', 'may cause', 'could prevent'."
+                    },
+                    "handle": {
+                        "type": "string",
+                        "description": "A 3-5 word plain-language handle for THIS specific issue - a short noun phrase a person would recognize (e.g. 'unclear cost signals', 'buried kids content', 'duplicated navigation'). NOT the trap name, NOT the full headline, no framework terminology. Used to name this issue in the priority statement."
                     },
                     "location": {"type": "string"},
                     "problem": {"type": "string", "description": "2-3 sentences elaborating on the headline and the reasoning used to conclude this trap appears present. Use measured language. Do NOT include internal reasoning steps or framework terminology."},
