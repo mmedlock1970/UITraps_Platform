@@ -127,7 +127,7 @@ function isImageFile(file: File) {
 
 // Multi-screen (flow) analysis sends all screens in one call; the backend hard-caps this too.
 // Keep in sync with MAX_FLOW_SCREENS in backend/src/analyzer.py.
-const MAX_FLOW_SCREENS = 6;
+const MAX_FLOW_SCREENS = 12;
 
 function isVideoFile(file: File) {
   return file.type.startsWith('video/');

@@ -175,16 +175,17 @@ def test_flow_no_exportable_frames_raises(tmp_path):
 # ── item 6: >6-frame file truncates-with-notice (NOT hard-reject / 400) ───────────────────────
 
 def test_flow_over_cap_truncates_with_notice(tmp_path):
-    # Simulates app.py exporting the first 6 of a 23-frame file. The run SUCCEEDS (no 400) and
-    # the report discloses BOTH counts so an un-analyzed-frame miss reads as truncation, not a KB gap.
+    # Simulates app.py exporting the first MAX_FLOW_SCREENS of a 23-frame file. The run SUCCEEDS (no
+    # 400) and the report discloses BOTH counts so an un-analyzed-frame miss reads as truncation, not
+    # a KB gap.
     a, calls = _analyzer(_TRAP)
     r = a.analyze_flow_diagram(frames=_frames(tmp_path, MAX_FLOW_SCREENS), user_context=_UC,
                                kb_version="v2", profile="default", report_style="trap",
                                mode="single", total_frames=23)
     assert r["status"] == "success"
-    assert len(_tool_calls(calls)) == 1               # still ONE cross-screen call over the 6 frames
-    assert "Analyzed 6 of 23 frames" in r["html"]
-    assert "17 frames were not analyzed" in r["html"]
+    assert len(_tool_calls(calls)) == 1               # still ONE cross-screen call over the frames
+    assert f"Analyzed {MAX_FLOW_SCREENS} of 23 frames" in r["html"]
+    assert f"{23 - MAX_FLOW_SCREENS} frames were not analyzed" in r["html"]
 
 
 # (The by-issue truncation-notice test was retired with the By-Issue report style; the notice is

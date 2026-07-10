@@ -112,7 +112,7 @@ def test_screen_count_is_capped(tmp_path):
     with pytest.raises(ValueError, match=f"at most {MAX_FLOW_SCREENS} screens"):
         analyzer.analyze_design(s0, ctx, additional_design_files=[s0] * MAX_FLOW_SCREENS)
     # Exactly at the cap does NOT raise for the count reason (fails later, on the mocked API).
-    assert MAX_FLOW_SCREENS == 6
+    assert MAX_FLOW_SCREENS == 12
 
 
 def test_crop_out_of_range_screen_index_is_skipped(tmp_path):

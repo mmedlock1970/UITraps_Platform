@@ -31,7 +31,7 @@ _ANALYSIS_API_TIMEOUT_S = 600
 # Multi-screen (flow) analysis sends all screens in ONE call; the output ceiling and cross-screen
 # reasoning are tuned for short flows. Hard-cap the screen count — a clear stop beats silent
 # output truncation or the model self-limiting. Revisit if longer flows are genuinely needed.
-MAX_FLOW_SCREENS = 6
+MAX_FLOW_SCREENS = 12
 
 
 def resolve_artifact_class(input_type: Optional[str], n_files: int) -> str:
