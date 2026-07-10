@@ -3070,6 +3070,7 @@ _NEW_KB_ISSUES_CSS = """
 /* Separate stacked summary paragraphs (narrative + Emergent-Patterns lines) so the bold verdict
    and the tenet-concentration prose never run together; no trailing gap before the scorecard. */
 .narrative + .narrative{margin-top:10px}
+.ep-line a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
 .scorecard-wrap{overflow-x:auto}
 table.scorecard{border-collapse:separate;border-spacing:0;width:100%;min-width:480px;table-layout:fixed;font-variant-numeric:tabular-nums}
 .scorecard caption{text-align:left;font-family:var(--font-sans);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);padding-bottom:10px}
@@ -3095,7 +3096,7 @@ table.scorecard{border-collapse:separate;border-spacing:0;width:100%;min-width:4
 .summary-scorecard{background:var(--surface-sunk);border:1px solid var(--hairline);border-radius:var(--radius);padding:17px 20px 15px;margin:22px 0 26px}
 .summary-scorecard .sub-label{margin:0 0 13px}
 .summary-scorecard + .headline-lg{margin-top:0}
-.card{border:1px solid var(--hairline);border-radius:var(--radius);background:var(--surface);margin-top:16px;padding:22px 24px;display:grid;grid-template-columns:var(--rail) 1fr;column-gap:28px;row-gap:18px;align-items:start}
+.card{border:1px solid var(--hairline);border-radius:var(--radius);background:var(--surface);margin-top:16px;padding:22px 24px;display:grid;grid-template-columns:var(--rail) 1fr;column-gap:28px;row-gap:18px;align-items:start;scroll-margin-top:16px}
 .card+.card{margin-top:14px}
 .card-rail{display:flex;flex-direction:column;gap:16px;min-width:0}
 .card-main{min-width:0}
@@ -3188,7 +3189,54 @@ def _priority_handle(f: dict) -> str:
     return " ".join(str(f.get("headline") or "").strip().split()[:5])
 
 
-def _emergent_patterns_html(report: dict, findings: list, version: str = "v2") -> list:
+def _compute_card_numbers(findings, task_names, uc):
+    """SINGLE SOURCE for trap-card numbering — {id(finding): card number}. Replicates
+    _emit_trap_cards' grouping EXACTLY (flat, or General then Task 1..N; first-seen distinct trap PER
+    BUCKET keyed by str(trap_name).strip().upper() — the emitter's own key, UNCHANGED, so no
+    STEP(S)/STEPS merge; idx continuous across buckets) without emitting HTML, and maps every finding
+    to its card's number. Both the priority statement (worst-instance finding) and _emit_trap_cards
+    (a card's instances) read this map, so their numbers cannot drift. Keyed by id() — VALID ONLY
+    because both consumers receive the same `_findings` objects (the sole copy is the one `{**f, ...}`
+    flatten in _format_new_kb_bytrap_html; nothing downstream re-copies or rebuilds them)."""
+    findings = [f for f in (findings or []) if isinstance(f, dict) and f.get("trap_name")]
+
+    def _key(f):
+        return str(f.get("trap_name") or "").strip().upper()
+
+    buckets = [findings]                                    # flat default (no task grouping)
+    if len(task_names) > 1:
+        def _match(tc):                                     # identical to _emit_trap_cards' _match_task
+            tcl = (tc or "").strip().lower()
+            if not tcl:
+                return None
+            for nm in task_names:
+                if tcl == nm.lower():
+                    return nm
+            best = None
+            for nm in task_names:
+                nl = nm.lower()
+                if (tcl in nl or nl in tcl) and (best is None or len(nm) > len(best)):
+                    best = nm
+            return best
+        general, tb = [], OrderedDict((nm, []) for nm in task_names)
+        for f in findings:
+            m = _match(f.get("task") or f.get("task_context"))
+            (tb[m] if m in tb else general).append(f)
+        if any(tb.values()):
+            buckets = ([general] if general else []) + [tb[nm] for nm in task_names if tb[nm]]
+    numbers, idx = {}, 0
+    for bucket in buckets:
+        seen = {}
+        for f in bucket:
+            k = _key(f)
+            if k not in seen:
+                idx += 1
+                seen[k] = idx
+            numbers[id(f)] = seen[k]                         # every instance -> its card's number
+    return numbers
+
+
+def _emergent_patterns_html(report: dict, findings: list, version: str = "v2", card_numbers: dict = None) -> list:
     """Render-time DERIVATION (NO model call) of the opening Emergent Patterns synthesis
     (KB G8 / Ledger 22). Failure-side, observation register, descriptive-only — never an
     imperative, never a severity change. Reads the retained issue-level substrate (issue_groups)
@@ -3245,13 +3293,21 @@ def _emergent_patterns_html(report: dict, findings: list, version: str = "v2") -
         rank = _SEVR.get(sev, 2)
         prev = _by_trap.get(nm)
         if prev is None or rank > prev[0]:
-            _by_trap[nm] = (rank, _priority_handle(f), nm in _root_cause, nm in _cascade)
+            _by_trap[nm] = (rank, _priority_handle(f), nm in _root_cause, nm in _cascade, f)  # +worst instance
     _ranked = sorted(_by_trap.values(), key=lambda e: (-e[0], not e[2]))[:3]   # sev desc, root-cause first
-    _descs = [h for _r, h, _rc, _c in _ranked if h]
+
+    def _lab(handle, wf):
+        # Visible "(Trap NN)" that also links to the card (id="trap-NN"). Number from the shared
+        # card-numbers map, keyed by the worst-instance finding's id() — exactly the card that
+        # instance renders under (same object identity as _emit_trap_cards; guaranteed to match).
+        n = card_numbers.get(id(wf)) if card_numbers else None
+        return f'{handle} (<a href="#trap-{n:02d}">Trap {n:02d}</a>)' if n else handle
+
+    _descs = [_lab(h, wf) for (_r, h, _rc, _c, wf) in _ranked if h]
     if _descs:
         _lead = "The priority here is " if len(_descs) == 1 else "The priorities here, worst first, are "
         _stmt = _lead + _ep_join(_descs) + "."
-        _cascade_h = [h for _r, h, _rc, _c in _ranked if _c and h]   # STRICT gate on the cascade clause
+        _cascade_h = [_lab(h, wf) for (_r, h, _rc, _c, wf) in _ranked if _c and h]   # STRICT gate; numbered too
         if _cascade_h:
             _stmt += f" Fixing {_ep_join(_cascade_h)} also clears smaller issues."
         lines.append(_stmt)
@@ -3360,6 +3416,21 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
                 # rather than a blanket "Medium" (self-serve by-trap leaves severity_label optional).
                 _findings.append({**f, "_src_sev": _SRC_SEV[_arr]})
 
+    # Card numbering — SINGLE SOURCE for both the priority statement and the trap cards, keyed by
+    # id() of each finding. Task names are hoisted here (they were computed in the cards section
+    # below) so the map is ready before the priority statement (EP) renders. id()-keying is valid
+    # ONLY because these same `_findings` objects flow into BOTH _emergent_patterns_html and
+    # _emit_trap_cards with no copy/rebuild in between (the sole copy is the `{**f, ...}` flatten
+    # above; the task bucketing below appends references).
+    _tl = uc.get("task_list") or []
+    _task_names = [(_t.get("name") or _t.get("description") or "").strip()
+                   for _t in _tl if isinstance(_t, dict) and (_t.get("name") or _t.get("description"))]
+    if len(_task_names) <= 1 and uc.get("tasks"):
+        _pt = [t for t in parse_tasks(uc.get("tasks", "")) if t]
+        if len(_pt) > 1:
+            _task_names = _pt
+    _card_numbers = _compute_card_numbers(_findings, _task_names, uc)
+
     # Disposition gate FIRST (G4 three-state rule) — it re-routes unsupportable "not present" verdicts
     # to "Couldn't evaluate". Emergent Patterns' assessability leash counts un-inspectable Traps, so it
     # MUST read post-gate statuses; running the gate here (before EP) keeps the exec-summary tenet
@@ -3370,7 +3441,8 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
     # Emergent Patterns computed ONCE here and reused in the Summary body below, so the attestation
     # line can state the ACTUAL render outcome (emitted or not), never an assumption. v1 / v1.1
     # suppress it entirely (Ledger 22 is v2 material).
-    _ep_lines = _emergent_patterns_html(report, _findings, version=_ver) if _ver not in ("v1", "v1.1") else []
+    _ep_lines = _emergent_patterns_html(report, _findings, version=_ver,
+                                        card_numbers=_card_numbers) if _ver not in ("v1", "v1.1") else []
 
     # ── Runtime provenance (RELAY B) — facts the tool verifies for THIS run, never hardcoded. KB
     # sha is sha256 of the loaded KB file; build sha is env/git; the isolation / full-stack items
@@ -3516,21 +3588,22 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
 
     # ── Traps identified — one card per trap. For a multi-task analysis, cards are grouped
     # under "General" then "Task N: <name>"; a finding's task_context assigns it (best-match).
-    def _emit_trap_cards(findings, idx0):
-        """Group `findings` by trap name (first-seen order) and emit one card per trap.
-        Returns the running Trap index so numbering stays continuous across task groups."""
+    def _emit_trap_cards(findings):
+        """Group `findings` by trap name (first-seen order) and emit one card per trap. The card
+        NUMBER is read from the shared `_card_numbers` map (keyed by id() of the instance) — the SAME
+        map the priority statement read — so the card's "Trap N" and the sentence's "(Trap N)" match
+        by construction. The card also carries id="trap-NN" so the sentence's anchor can jump to it."""
         by_trap = OrderedDict()
         for f in findings:
             if isinstance(f, dict) and f.get("trap_name"):
                 by_trap.setdefault(str(f["trap_name"]).strip().upper(), []).append(f)
-        idx = idx0
         for tname, instances in by_trap.items():
-            idx += 1
             first = instances[0]
+            number = _card_numbers.get(id(first), 0)   # same map, same objects as the priority statement
             tenet = (first.get("tenet") or "").upper() or (_tenet_for(tname, version=_ver) or "").upper()
             color = _TENET_PILL.get(tenet, "#35597F")
             definition = first.get("definition") or ""
-            h.append("<div class='card card-trapart'>")
+            h.append(f"<div class='card card-trapart' id='trap-{number:02d}'>")
             # rail — the Trap's card artwork (one Trap per card, so it fits). The card carries
             # the tenet, name, and definition; only when there is no card art do we fall back
             # to the rev6 tenet eyebrow + pill + text definition.
@@ -3547,7 +3620,7 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
             h.append("</div></div>")
             # main — the instances found of this trap
             h.append("<div class='card-main'>")
-            h.append(f"<span class='card-num'>Trap {idx:02d}</span>")
+            h.append(f"<span class='card-num'>Trap {number:02d}</span>")
             _n = len(instances)
             # Count line only when there is more than one instance (a single instance is self-evident).
             if _n > 1:
@@ -3592,20 +3665,13 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
                 h.append("</div>")  # .instance
             h.append("</div>")  # .card-main
             h.append("</div>")  # .card
-        return idx
 
     h.append("<div class='section'><div class='section-eyebrow'>Traps identified</div>")
     if not _findings:
         h.append("<p class='narrative'>No traps were found for the stated users and tasks.</p>")
     else:
-        # Task names for grouping (structured task_list preferred; else the tasks string).
-        _tl = uc.get("task_list") or []
-        _task_names = [(_t.get("name") or _t.get("description") or "").strip()
-                       for _t in _tl if isinstance(_t, dict) and (_t.get("name") or _t.get("description"))]
-        if len(_task_names) <= 1 and uc.get("tasks"):
-            _pt = [t for t in parse_tasks(uc.get("tasks", "")) if t]
-            if len(_pt) > 1:
-                _task_names = _pt
+        # _task_names was computed above (hoisted before the priority statement, which shares the
+        # _card_numbers map _emit_trap_cards reads).
         if len(_task_names) > 1:
             def _match_task(tc):
                 tcl = (tc or "").strip().lower()
@@ -3632,21 +3698,21 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
             if not any(_task_buckets.values()):
                 # No finding was attributed to a task (e.g. the KB-only bare schema emits no
                 # task_context) — a lone "General" heading would be noise, so render flat.
-                _emit_trap_cards(_findings, 0)
+                _emit_trap_cards(_findings)
             else:
-                _idx = 0
-                # General first, then each task in order — empty groups are skipped.
+                # General first, then each task in order — empty groups are skipped. Numbers come
+                # from the shared _card_numbers map, so no running index needs threading here.
                 if _general:
                     h.append("<div class='task-group'><div class='task-group-label'>General</div>")
-                    _idx = _emit_trap_cards(_general, _idx)
+                    _emit_trap_cards(_general)
                     h.append("</div>")
                 for _i, nm in enumerate(_task_names, 1):
                     if _task_buckets[nm]:
                         h.append(f"<div class='task-group'><div class='task-group-label'>Task {_i}: {nm}</div>")
-                        _idx = _emit_trap_cards(_task_buckets[nm], _idx)
+                        _emit_trap_cards(_task_buckets[nm])
                         h.append("</div>")
         else:
-            _emit_trap_cards(_findings, 0)
+            _emit_trap_cards(_findings)
     h.append("</div>")  # traps section
 
     # ── Worth a closer look (G8 §2) — pivotal, assessability-blocked unknowns. PARITY with the

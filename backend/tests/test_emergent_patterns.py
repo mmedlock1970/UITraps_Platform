@@ -142,13 +142,16 @@ def test_old_region_and_tenet_lines_are_gone():
     assert "Most of what's wrong here" not in out
 
 
-# ── integration: renders as its own ep-line paragraph beneath the summary ────────────────────
+# ── integration: own ep-line paragraph + the linked "(Trap NN)" matches the card's id ────────
 
-def test_renders_as_ep_line_paragraph():
+def test_renders_with_linked_trap_number_matching_the_card():
     report = {"summary_headline": "h", "summary_narrative": "n",
               "critical_issues": [_f("DISTRACTION", "High", "noisy hero")],
               "moderate_issues": [], "minor_issues": [], "issue_groups": [],
               "traps_checked_not_found": [], "positive_observations": []}
     html = format_bytrap_report_as_html(report, {"design_name": "T"}, _SET)
     seg = " ".join(re.findall(r"<p class='narrative ep-line'>(.*?)</p>", html))
-    assert "The priority here is noisy hero." in seg
+    # The priority statement names the handle with a linked "(Trap 01)" anchor ...
+    assert 'The priority here is noisy hero (<a href="#trap-01">Trap 01</a>).' in seg
+    # ... and the card it points to carries that exact id — anchor target exists and the numbers match.
+    assert "id='trap-01'" in html

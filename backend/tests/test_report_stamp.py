@@ -65,7 +65,10 @@ def test_v1_isolation_line_and_no_v2_or_ep_claims():
     assert "v1 taxonomy" in att and "no Emergent Patterns" in att
     assert "self-serve (no v2 scaffolding)" in att
     assert "8ca6a44f" in att and "0603182a" not in att              # v1.0 sha, not the v2 sha
-    assert "Emergent Patterns ✓" not in html and "ep-line" not in html
+    # No EP claim and no EP paragraph for v1. Match the paragraph marker, NOT a bare "ep-line"
+    # substring — the `.ep-line a` CSS selector (priority-statement link styling) is present in every
+    # report's stylesheet and is not EP content.
+    assert "Emergent Patterns ✓" not in html and "narrative ep-line'>" not in html
     assert "v2 full stack" not in html
 
 
