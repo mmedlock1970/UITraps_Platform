@@ -10,7 +10,7 @@ from typing import Optional
 from pathlib import Path
 
 from sqlmodel import Field, SQLModel, Session, create_engine
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import UniqueConstraint, text
 
 
 # --- Models ---
@@ -122,6 +122,11 @@ class ChatMessageRecord(SQLModel, table=True):
 
 # --- Database Connection ---
 
+# Whether DATABASE_URL was explicitly provided. When it wasn't, we fall back to a
+# local SQLite file — fine for local dev, but on a deployed host that file is
+# throwaway and it silently masks a missing DATABASE_URL (see check at startup).
+DATABASE_URL_FROM_ENV = "DATABASE_URL" in os.environ
+
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
     f"sqlite:///{Path(__file__).parent.parent / 'usage.db'}"
@@ -138,6 +143,26 @@ engine = create_engine(
     echo=os.environ.get("DEBUG_SQL", "").lower() == "true",
     **( {"connect_args": {"check_same_thread": False}} if _is_sqlite else {} )
 )
+
+
+def is_using_fallback_sqlite() -> bool:
+    """True when we fell back to the local SQLite file because DATABASE_URL was unset."""
+    return _is_sqlite and not DATABASE_URL_FROM_ENV
+
+
+def check_db_connection() -> tuple[bool, Optional[str]]:
+    """Confirm the database is actually reachable with a trivial query.
+
+    Returns (ok, error_message); error_message is None when ok is True.
+    Use this instead of assuming the engine is usable — creating the engine
+    never opens a connection, so a bad DATABASE_URL looks fine until first use.
+    """
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return True, None
+    except Exception as e:
+        return False, str(e)
 
 
 def init_db():

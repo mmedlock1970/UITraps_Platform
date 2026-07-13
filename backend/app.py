@@ -49,7 +49,8 @@ from src.pdf_analyzer import PdfAnalyzer, is_pymupdf_available
 
 # Database persistence for usage tracking
 from sqlmodel import Session, select
-from src.database import init_db, engine
+from sqlalchemy.exc import OperationalError
+from src.database import init_db, engine, check_db_connection, is_using_fallback_sqlite
 from src.usage_service import (
     get_usage,
     increment_usage,
@@ -156,14 +157,64 @@ def _friendly_api_error(e: Exception) -> HTTPException:
 
 
 # --- Initialize Database ---
-try:
-    init_db()  # Create tables if they don't exist
-except Exception as _db_init_err:
-    import logging as _logging
-    _logging.getLogger(__name__).warning(
-        f"Database unavailable at startup — analysis will still work, "
-        f"but report persistence and usage tracking are disabled. Error: {_db_init_err}"
-    )
+# Deployed environments (e.g. Railway) set these; used only to decide how loud to be.
+_IS_DEPLOYED = bool(
+    os.environ.get("RAILWAY_ENVIRONMENT")
+    or os.environ.get("RAILWAY_PROJECT_ID")
+    or os.environ.get("RAILWAY_SERVICE_ID")
+)
+
+# Module-level DB health, surfaced by /health so a broken connection is visible
+# to monitoring instead of only showing up when a webhook fails.
+DB_HEALTHY: bool = False
+DB_ERROR: Optional[str] = None
+
+
+def _startup_db_check() -> None:
+    """Initialize the DB and verify it is actually reachable, loudly.
+
+    We intentionally do NOT crash the process on failure — image/flow analysis
+    works without a database, so the app stays up in degraded mode. But unlike
+    before, a bad connection is logged at ERROR with an actionable message and
+    reported by /health, rather than being swallowed as a warning.
+    """
+    global DB_HEALTHY, DB_ERROR
+
+    # A missing DATABASE_URL on a deployed host means we silently fell back to a
+    # throwaway SQLite file — the exact class of misconfiguration that hid a
+    # broken Postgres connection for a month. Call it out unmistakably.
+    if is_using_fallback_sqlite() and _IS_DEPLOYED:
+        logger.error(
+            "DATABASE_URL is not set on a deployed host — falling back to a local "
+            "SQLite file that will NOT persist across restarts. Subscriptions, usage, "
+            "and saved reports will be lost. Set DATABASE_URL to your Postgres URL."
+        )
+
+    try:
+        init_db()  # Create tables if they don't exist
+    except Exception as _db_init_err:
+        DB_HEALTHY, DB_ERROR = False, str(_db_init_err)
+        logger.error(
+            "Database is UNREACHABLE at startup — report persistence, usage tracking, "
+            "and subscription webhooks are disabled until this is fixed. "
+            "Check that DATABASE_URL points at your database. Error: %s",
+            _db_init_err,
+        )
+        return
+
+    ok, err = check_db_connection()
+    DB_HEALTHY, DB_ERROR = ok, err
+    if ok:
+        logger.info("Database connection verified — persistence enabled.")
+    else:
+        logger.error(
+            "Database created its engine but is UNREACHABLE (SELECT 1 failed). "
+            "Persistence and webhooks are disabled until this is fixed. Error: %s",
+            err,
+        )
+
+
+_startup_db_check()
 
 
 def _save_report_db(user_id: str, result: dict, analysis_type: str,
@@ -307,6 +358,8 @@ class UsageResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     timestamp: str
+    database: Optional[str] = None       # connected | unavailable | not_configured
+    database_error: Optional[str] = None
 
 
 class EstimateResponse(BaseModel):
@@ -461,10 +514,25 @@ async def root():
 
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
-    """Health check for monitoring."""
+    """Health check for monitoring.
+
+    Reports database reachability so a broken connection is visible here instead
+    of only surfacing when a webhook or persistence call fails. Always returns
+    HTTP 200 (the process is up and analysis works even in degraded mode); read
+    the `database` field to distinguish healthy from degraded.
+    """
+    ok, err = check_db_connection()
+    if ok:
+        database = "connected"
+    elif is_using_fallback_sqlite():
+        database = "not_configured"
+    else:
+        database = "unavailable"
     return {
-        "status": "healthy",
-        "timestamp": datetime.now().isoformat()
+        "status": "healthy" if ok else "degraded",
+        "timestamp": datetime.now().isoformat(),
+        "database": database,
+        "database_error": err,
     }
 
 class AccessCodeRequest(BaseModel):
@@ -1800,9 +1868,15 @@ async def webhook_subscription(payload: SubscriptionWebhookRequest, request: Req
                 raise HTTPException(status_code=400, detail=f"Unknown event: {payload.event}")
     except HTTPException:
         raise
+    except OperationalError as e:
+        # Genuine database connectivity failure — this message is now only used
+        # when the DB really is unreachable, not for every error.
+        logger.error(f"[webhook/subscription] DB connection error for user={payload.user_id} event={event}: {e}")
+        raise HTTPException(status_code=503, detail="Database temporarily unavailable — please retry shortly.")
     except Exception as e:
-        logger.error(f"[webhook/subscription] DB error for user={payload.user_id} event={event}: {e}")
-        raise HTTPException(status_code=503, detail="Database unavailable — subscription webhook could not be processed. Retry when DB is restored.")
+        # Anything else (bad data, bug, unexpected state) — do NOT blame the DB.
+        logger.error(f"[webhook/subscription] Unexpected error for user={payload.user_id} event={event}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Subscription webhook failed due to an internal error.")
 
     logger.info(f"[webhook/subscription] user={payload.user_id} event={event} status={result.subscription_status}")
     return {"success": True, "user_id": payload.user_id, "status": result.subscription_status}
@@ -1822,8 +1896,15 @@ async def webhook_tokens(payload: TokensWebhookRequest, request: Request):
     if payload.tokens <= 0:
         raise HTTPException(status_code=400, detail="Tokens must be a positive number.")
 
-    with Session(engine) as session:
-        result = add_bonus_tokens(session, payload.user_id, payload.tokens)
+    try:
+        with Session(engine) as session:
+            result = add_bonus_tokens(session, payload.user_id, payload.tokens)
+    except OperationalError as e:
+        logger.error(f"[webhook/tokens] DB connection error for user={payload.user_id}: {e}")
+        raise HTTPException(status_code=503, detail="Database temporarily unavailable — please retry shortly.")
+    except Exception as e:
+        logger.error(f"[webhook/tokens] Unexpected error for user={payload.user_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Token webhook failed due to an internal error.")
 
     logger.info(f"[webhook/tokens] user={payload.user_id} added={payload.tokens} total_bonus={result.bonus_tokens}")
     return {"success": True, "user_id": payload.user_id, "bonus_tokens": result.bonus_tokens}
