@@ -184,7 +184,7 @@ Habituating-tenet Traps scale with repetition; one-time tasks make comprehension
 **Detection procedure (pass one — flag, do not filter).** *Unit: per-interaction; live artifacts strongly preferred.*
 1. For live/instrumented artifacts: measure response times per significant interaction; flag every threshold violation by interaction type.
 2. For all artifacts: audit wait-state design — flag any operation >1 s without continuous progress feedback; any >10 s with no occupied-time treatment (skeleton screens, background continuation); progress indicators that jump discretely or stall.
-3. For static artifacts: response times are not assessable — declare; wait-state *design* (presence/quality of progress feedback in mocked states) remains flaggable. Scoped coverage (always emitted on statics, J27): "Slow or No Response — wait-state design; not from this artifact: actual response times — live session or screen recording would settle."
+3. For static artifacts: response times are not assessable — declare; wait-state *design* (presence/quality of progress feedback in mocked states) remains flaggable. Scoped coverage (always emitted on statics, J27): "Wait-state design; not from this artifact: actual response times — live session or screen recording would settle."
 
 ---
 

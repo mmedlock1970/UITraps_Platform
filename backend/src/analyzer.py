@@ -62,6 +62,8 @@ _STREAM_MIN_TOKENS = 8000
 # Public list price per 1M tokens (USD): (input, output, cache_write, cache_read).
 # Used only for the estimated-cost line in the report header — not billing.
 _MODEL_PRICING = {
+    "claude-opus-4-8":            (5.0, 25.0, 6.25, 0.50),
+    "claude-sonnet-5":            (3.0, 15.0, 3.75, 0.30),  # standard list price ($2/$10 intro through 2026-08-31)
     "claude-sonnet-4-6":          (3.0, 15.0, 3.75, 0.30),
     "claude-haiku-4-5-20251001":  (1.0,  5.0, 1.25, 0.10),
     "claude-haiku-4-5":           (1.0,  5.0, 1.25, 0.10),
@@ -77,7 +79,7 @@ def _usage_from_response(response, model: str):
     out = getattr(u, "output_tokens", 0) or 0
     cr = getattr(u, "cache_read_input_tokens", 0) or 0
     cw = getattr(u, "cache_creation_input_tokens", 0) or 0
-    pin, pout, pcw, pcr = _MODEL_PRICING.get(model, _MODEL_PRICING["claude-sonnet-4-6"])
+    pin, pout, pcw, pcr = _MODEL_PRICING.get(model, _MODEL_PRICING["claude-sonnet-5"])
     cost = (inp * pin + out * pout + cw * pcw + cr * pcr) / 1_000_000
     return {"input": inp, "output": out, "cache_read": cr, "cache_creation": cw, "cost": cost}
 
@@ -164,7 +166,8 @@ class UITrapsAnalyzer:
 
         self.client = Anthropic(api_key=self.api_key, max_retries=3)
         self.use_caching = use_caching
-        self.model = "claude-sonnet-4-6"                    # Pass 1: full visual analysis
+        self.model = "claude-sonnet-5"                      # Pass 1 default: full visual analysis
+        self.opus_model = "claude-opus-4-8"                 # Pass 1 (Opus option): highest capability
         self.enrich_model = "claude-haiku-4-5-20251001"    # Pass 2: text enrichment only
 
     def analyze_design(
@@ -229,13 +232,13 @@ class UITrapsAnalyzer:
         if not is_valid_file:
             raise ValueError(f"Invalid file: {file_msg}")
 
-        # Sonnet-only (Haiku dropped). Hard-reject any non-Sonnet model instead of silently
-        # falling back — a report's config line must never claim a model the run did not use, so a
-        # silent fallback would make that line lie. None defaults to Sonnet; "sonnet" is explicit;
-        # anything else (stale client, saved config, hand-edited payload) is rejected here, the
-        # single chokepoint every call path (image, flow, multi-screen) passes through.
-        if pass1_model is not None and str(pass1_model).strip().lower() not in ("", "sonnet"):
-            raise ValueError(f"model not available: {pass1_model!r} — only Sonnet is available.")
+        # Sonnet 5 and Opus 4.8 are the offered models (Haiku dropped). Hard-reject any other model
+        # instead of silently falling back — a report's config line must never claim a model the run
+        # did not use, so a silent fallback would make that line lie. None defaults to Sonnet; "sonnet"
+        # and "opus" are explicit; anything else (stale client, saved config, hand-edited payload) is
+        # rejected here, the single chokepoint every call path (image, flow, multi-screen) passes through.
+        if pass1_model is not None and str(pass1_model).strip().lower() not in ("", "sonnet", "opus"):
+            raise ValueError(f"model not available: {pass1_model!r} — choose Sonnet 5 or Opus 4.8.")
 
         # The By-Issue report style is retired — every run renders By Trap. Pinning here forces the
         # by-trap schema/prompt/formatter for ALL profiles (including self-serve, 1D) and makes the
@@ -798,7 +801,7 @@ class UITrapsAnalyzer:
         parse+normalize machinery for its adjudication pass: the system prompt carries
         the sliced packs (core + flagged chunks) and the extra blocks carry the Pass-1
         candidate list."""
-        _model_map = {"sonnet": self.model, "haiku": self.enrich_model}
+        _model_map = {"opus": getattr(self, "opus_model", self.model), "sonnet": self.model, "haiku": self.enrich_model}
         effective_model = _model_map.get(pass1_model or "", self.model)
         # Multi-screen (flow) analysis sends N screens in ONE call; count them for the output
         # ceiling and for build_system_prompt's multi-screen note (screen_index reinforcement).
@@ -818,9 +821,10 @@ class UITrapsAnalyzer:
             # max_tokens is a CEILING, not a target — a short report stops early, so raising it costs
             # nothing except letting a long report complete (accepted: slower/costlier when it does).
             # Stays ≥ _STREAM_MIN_TOKENS so it streams; scales with screen count for multi-screen.
-            pass1_max_tokens = min(24000 + max(0, _n_screens - 1) * 4000, 32000)
+            # Ceilings carry ~30% headroom for the Opus-4.7/Sonnet-5 tokenizer (more output tokens per report).
+            pass1_max_tokens = min(31000 + max(0, _n_screens - 1) * 5200, 42000)
         else:
-            pass1_max_tokens = 3000 if verbosity == "brief" else 5000
+            pass1_max_tokens = 4000 if verbosity == "brief" else 6500
 
         _self_serve = (profile == "self-serve")
 
@@ -885,7 +889,7 @@ class UITrapsAnalyzer:
             response = self._create_message(
                 model=effective_model,
                 max_tokens=pass1_max_tokens,
-                temperature=0,
+                thinking={"type": "disabled"},   # Sonnet 5/Opus 4.8 reject sampling params; keep thinking off for deterministic structured output
                 system=system_prompt,
                 messages=[{"role": "user", "content": user_message}],
                 tools=[{
@@ -1046,7 +1050,7 @@ class UITrapsAnalyzer:
         else:
             image_data = self._load_image(design_file)
 
-        _model_map = {"sonnet": self.model, "haiku": self.enrich_model}
+        _model_map = {"opus": getattr(self, "opus_model", self.model), "sonnet": self.model, "haiku": self.enrich_model}
         effective_model = _model_map.get(pass1_model or "", self.model)
 
         # ── Pass 1: detection (candidate list, no tool) ─────────────────────────
@@ -1078,13 +1082,13 @@ class UITrapsAnalyzer:
         # A truncated candidate list loses recall. Scale the ceiling with screen count — a
         # multi-screen flow surfaces candidates on every screen, so a fixed 4000 would clip the
         # tail (and the tail is exactly the cross-screen traps this rebuild exists to catch).
-        _detection_max_tokens = min(8000 + max(0, _n_screens - 1) * 2000, 16000)
+        _detection_max_tokens = min(10500 + max(0, _n_screens - 1) * 2600, 21000)  # ~30% headroom for the new tokenizer
         _t_det = time.time()
         try:
             det_response = self._create_message(
                 model=effective_model,
                 max_tokens=_detection_max_tokens,
-                temperature=0,
+                thinking={"type": "disabled"},   # Sonnet 5/Opus 4.8 reject sampling params
                 system=detection_system,
                 messages=[{"role": "user", "content": detection_user}],
                 timeout=max(timeout or 0, _ANALYSIS_API_TIMEOUT_S),
@@ -1576,8 +1580,8 @@ class UITrapsAnalyzer:
         try:
             response = self.client.messages.create(
                 model=self.model,
-                max_tokens=4096,
-                temperature=0,
+                max_tokens=5400,   # ~30% headroom for the new tokenizer
+                thinking={"type": "disabled"},   # Sonnet 5/Opus 4.8 reject sampling params
                 system=system_prompt,
                 messages=[
                     {

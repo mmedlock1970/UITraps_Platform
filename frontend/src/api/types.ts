@@ -130,7 +130,7 @@ export interface UserContext {
   kb_version?: KbVersion;
   tenet_filter?: string[];
   verbosity?: 'brief' | 'standard';
-  pass1_model?: 'sonnet' | 'haiku';
+  pass1_model?: 'opus' | 'sonnet';
   thorough_mode?: boolean;
   mode?: 'single' | 'twopass';
   profile?: Profile;

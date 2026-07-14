@@ -233,13 +233,13 @@ class MultiAnalyzer:
 
             # Make fast classification request (use haiku for speed/cost)
             response = client.messages.create(
-                model="claude-sonnet-4-20250514",  # Fast model for classification
+                model="claude-haiku-4-5",  # Fast, current model for classification (was deprecated Sonnet 4)
                 max_tokens=2000,
                 messages=[{"role": "user", "content": content}]
             )
 
-            # Parse response
-            response_text = response.content[0].text
+            # Parse response (robust to a leading thinking block on thinking-on models)
+            response_text = next((b.text for b in response.content if getattr(b, "type", None) == "text"), "")
 
             # Try to extract JSON from response
             import re

@@ -72,7 +72,7 @@ def _get_chat_service():
     from .chat.chat_service import ChatService
     ai = ChatAIService(
         anthropic_api_key=os.environ["ANTHROPIC_API_KEY"],
-        model=os.environ.get("CHAT_AI_MODEL", "claude-sonnet-4-5-20250929"),
+        model=os.environ.get("CHAT_AI_MODEL", "claude-opus-4-8"),
         max_tokens=int(os.environ.get("CHAT_MAX_TOKENS", "1024")),
         temperature=float(os.environ.get("CHAT_TEMPERATURE", "0.7")),
     )

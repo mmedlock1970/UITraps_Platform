@@ -1,9 +1,9 @@
 """
-Haiku dropped — the backend enforces Sonnet-only. A non-Sonnet model request is HARD-REJECTED at
-the analyze_design chokepoint (which every path — image, flow, multi-screen — passes through):
-no silent fallback to Sonnet, no API call, no token spend. Rationale: a report's config line must
-never claim a model the run didn't use, so a silent fallback would make that line lie. Sonnet, an
-explicit "sonnet", None, and "" all proceed normally (None/"" default to Sonnet downstream).
+Sonnet 5 and Opus 4.8 are the offered models (Haiku dropped). A model request outside that set is
+HARD-REJECTED at the analyze_design chokepoint (which every path — image, flow, multi-screen —
+passes through): no silent fallback, no API call, no token spend. Rationale: a report's config line
+must never claim a model the run didn't use, so a silent fallback would make that line lie. "sonnet",
+"opus", None, and "" all proceed normally (None/"" default to Sonnet 5 downstream).
 """
 from unittest.mock import Mock
 
@@ -34,20 +34,21 @@ def _analyzer():
     a.client = Mock()
     a.client.messages.create.side_effect = cap
     a.model = "m"
+    a.opus_model = "o"
     a.enrich_model = "e"
     a.use_caching = True
     return a
 
 
-@pytest.mark.parametrize("bad", ["haiku", "Haiku", " haiku ", "opus", "gpt-4o", "claude-haiku-4-5"])
-def test_non_sonnet_is_hard_rejected_before_any_call(tmp_path, bad):
+@pytest.mark.parametrize("bad", ["haiku", "Haiku", " haiku ", "gpt-4o", "claude-haiku-4-5"])
+def test_unavailable_model_is_hard_rejected_before_any_call(tmp_path, bad):
     a = _analyzer()
     with pytest.raises(ValueError, match="model not available"):
         a.analyze_design(design_file=_img(tmp_path), user_context=_CTX, kb_version="v2", pass1_model=bad)
     a.client.messages.create.assert_not_called()  # rejected before token spend; never falls back
 
 
-@pytest.mark.parametrize("ok", ["sonnet", "Sonnet", " sonnet ", None, ""])
+@pytest.mark.parametrize("ok", ["sonnet", "Sonnet", " sonnet ", "opus", "Opus", " opus ", None, ""])
 def test_sonnet_or_default_proceeds(tmp_path, ok):
     a = _analyzer()
     res = a.analyze_design(design_file=_img(tmp_path), user_context=_CTX, kb_version="v2",

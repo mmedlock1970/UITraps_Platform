@@ -58,7 +58,7 @@ function assembleContext(fields: {
   priorProducts: string; userDesc: string; extraContext: string; productContext: string;
   physicalEnv: string; lighting: string; gripPosition: string; attentionalState: string;
   kbVersion: KbVersion; selectedTenets: string[];
-  verbosity: 'brief' | 'standard'; pass1Model: 'sonnet' | 'haiku';
+  verbosity: 'brief' | 'standard'; pass1Model: 'opus' | 'sonnet';
   figmaLink: string; thoroughMode: boolean; mode: 'single' | 'twopass'; reportStyle: 'trap';
   profile: Profile;
   inputType: 'screenshot' | 'video' | 'flow_diagram';
@@ -218,7 +218,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
   }, []);
   const [selectedTenets, setSelectedTenets] = useState<string[]>(iv?.selectedTenets ?? [...ALL_TENETS]);
   const [verbosity, setVerbosity] = useState<'brief' | 'standard'>(iv?.verbosity ?? 'brief');
-  const [pass1Model, setPass1Model] = useState<'sonnet' | 'haiku'>(iv?.pass1Model ?? 'sonnet');
+  const [pass1Model, setPass1Model] = useState<'opus' | 'sonnet'>(iv?.pass1Model ?? 'sonnet');
   // Thorough coverage is deprecated (inert for both surviving configs) and its toggle was
   // removed — every run is Standard. Kept as a pinned value for the payload/snapshot shape.
   const [thoroughMode] = useState(false);
@@ -952,51 +952,25 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
 
           <hr className={styles.fieldDivider} />
 
-          {/* Report verbosity */}
-          <div className={styles.field}>
-            <label className={styles.fieldLabel}>Report detail</label>
-            <div className={styles.kbVersionGroup}>
-              {(['brief', 'standard'] as const).map(v => (
-                <button
-                  key={v}
-                  type="button"
-                  className={`${styles.kbVersionBtn} ${verbosity === v ? styles.kbVersionBtnActive : ''}`}
-                  onClick={() => setVerbosity(v)}
-                  disabled={disabled}
-                >
-                  {v === 'standard' ? 'Standard' : 'Brief'}
-                </button>
-              ))}
-            </div>
-            <p className={styles.fieldHint}>
-              {verbosity === 'standard' && 'Full narratives for summary, findings, and recommendations.'}
-              {verbosity === 'brief' && 'Shorter text throughout. Reduces output tokens and speeds up analysis.'}
-            </p>
-          </div>
-
-          <hr className={styles.fieldDivider} />
-
           {/* Analysis model */}
           <div className={styles.field}>
             <label className={styles.fieldLabel}>Analysis model</label>
             <div className={styles.kbVersionGroup}>
-              {(['sonnet', 'haiku'] as const).map(v => (
+              {(['opus', 'sonnet'] as const).map(v => (
                 <button
                   key={v}
                   type="button"
                   className={`${styles.kbVersionBtn} ${pass1Model === v ? styles.kbVersionBtnActive : ''}`}
-                  // Haiku is dropped for now — the slot stays visible (for future models) but
-                  // non-selectable. Sonnet is the only reachable model; the backend also rejects
-                  // any non-Sonnet request, so this is UI convenience, not the enforcement point.
-                  onClick={() => v === 'sonnet' && setPass1Model(v)}
-                  disabled={disabled || v === 'haiku'}
+                  onClick={() => setPass1Model(v)}
+                  disabled={disabled}
                 >
-                  {v === 'sonnet' ? 'Sonnet' : 'Haiku'}
+                  {v === 'opus' ? 'Opus 4.8' : 'Sonnet 5'}
                 </button>
               ))}
             </div>
             <p className={styles.fieldHint}>
-              Sonnet only for now — additional models may be added in future releases.
+              {pass1Model === 'opus' && 'Highest capability. Best recall on dense, detailed screens and the closest adherence to the knowledge base’s rules. Slower and more expensive per run.'}
+              {pass1Model === 'sonnet' && 'Near-Opus quality with high-resolution vision. Meaningfully faster and lower cost. May miss more on dense or cluttered screens.'}
             </p>
           </div>
 
@@ -1073,6 +1047,30 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
                 : mode === 'single'
                   ? 'One call with the whole knowledge base. Fast.'
                   : 'Detection pass surfaces candidate traps, then an adjudication pass confirms each one against only the relevant trap definitions. Higher recall and cleaner attribution; slower and more tokens.'}
+            </p>
+          </div>
+
+          <hr className={styles.fieldDivider} />
+
+          {/* Report detail */}
+          <div className={styles.field}>
+            <label className={styles.fieldLabel}>Report detail</label>
+            <div className={styles.kbVersionGroup}>
+              {(['brief', 'standard'] as const).map(v => (
+                <button
+                  key={v}
+                  type="button"
+                  className={`${styles.kbVersionBtn} ${verbosity === v ? styles.kbVersionBtnActive : ''}`}
+                  onClick={() => setVerbosity(v)}
+                  disabled={disabled}
+                >
+                  {v === 'standard' ? 'Standard' : 'Brief'}
+                </button>
+              ))}
+            </div>
+            <p className={styles.fieldHint}>
+              {verbosity === 'standard' && 'Full narratives for summary, findings, and recommendations.'}
+              {verbosity === 'brief' && 'Shorter text throughout. Reduces output tokens and speeds up analysis.'}
             </p>
           </div>
 

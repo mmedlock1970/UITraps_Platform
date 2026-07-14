@@ -12,13 +12,19 @@ from anthropic import Anthropic
 logger = logging.getLogger(__name__)
 
 
+def _rejects_sampling_params(model: str) -> bool:
+    """Opus 4.7/4.8, Sonnet 5, and Fable 5 reject temperature/top_p/top_k with a 400."""
+    m = (model or "").lower()
+    return any(tag in m for tag in ("opus-4-8", "opus-4-7", "sonnet-5", "fable-5"))
+
+
 class ChatAIService:
     """Generates AI responses using Claude with RAG context."""
 
     def __init__(
         self,
         anthropic_api_key: str,
-        model: str = "claude-haiku-4-5-20251001",
+        model: str = "claude-opus-4-8",
         max_tokens: int = 1024,
         temperature: float = 0.7,
     ):
@@ -57,15 +63,22 @@ class ChatAIService:
             )
         messages.append({"role": "user", "content": user_message})
 
-        response = self._client.messages.create(
-            model=self._model,
-            max_tokens=self._max_tokens,
-            temperature=self._temperature,
-            system=system_prompt,
-            messages=messages,
-        )
+        # Opus 4.7/4.8, Sonnet 5, and Fable 5 reject sampling params (temperature → 400); only send
+        # temperature to models that accept it (e.g. Haiku), so this service stays correct whichever
+        # model CHAT_AI_MODEL selects.
+        create_kwargs = {
+            "model": self._model,
+            "max_tokens": self._max_tokens,
+            "system": system_prompt,
+            "messages": messages,
+        }
+        if self._temperature is not None and not _rejects_sampling_params(self._model):
+            create_kwargs["temperature"] = self._temperature
 
-        text = response.content[0].text
+        response = self._client.messages.create(**create_kwargs)
+
+        # Robust to a leading thinking block (a thinking-on model would put it at content[0]).
+        text = next((b.text for b in response.content if getattr(b, "type", None) == "text"), "")
         return {
             "text": text,
             "sources": self._extract_sources(text),

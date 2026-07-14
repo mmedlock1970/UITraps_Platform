@@ -465,7 +465,7 @@ def get_chat_service() -> ChatService:
 
         ai_svc = ChatAIService(
             anthropic_api_key=anthropic_key,
-            model=os.environ.get("CHAT_AI_MODEL", "claude-sonnet-4-5-20250929"),
+            model=os.environ.get("CHAT_AI_MODEL", "claude-opus-4-8"),
             max_tokens=int(os.environ.get("CHAT_MAX_TOKENS", "1024")),
             temperature=float(os.environ.get("CHAT_TEMPERATURE", "0.7")),
         )
@@ -2682,7 +2682,7 @@ async def report_chat(request: ReportChatRequest):
                 messages.append({"role": role, "content": content})
         messages.append({"role": "user", "content": request.message})
 
-        model = os.environ.get("CHAT_AI_MODEL", "claude-haiku-4-5-20251001")
+        model = os.environ.get("CHAT_AI_MODEL", "claude-opus-4-8")
         response = client.messages.create(
             model=model,
             max_tokens=1024,
@@ -2690,7 +2690,9 @@ async def report_chat(request: ReportChatRequest):
             messages=messages,
         )
 
-        return {"success": True, "response": response.content[0].text}
+        # Robust to a leading thinking block (a thinking-on model would put it at content[0]).
+        _text = next((b.text for b in response.content if getattr(b, "type", None) == "text"), "")
+        return {"success": True, "response": _text}
 
     except Exception as e:
         logger.error(f"Report chat error: {e}")

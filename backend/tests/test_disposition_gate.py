@@ -207,7 +207,7 @@ def test_scoped_coverage_fails_loud_on_corrupt_line(monkeypatch):
     orig = ke.load_analysis_reference
     def _fake(v="v2"):
         # strip the opening quote from one scoped line → it no longer matches `- <TRAP>: "<string>"`
-        return orig(v).replace('- BAD PREDICTION: "Bad Prediction', '- BAD PREDICTION: Bad Prediction')
+        return orig(v).replace('- BAD PREDICTION: "Act-vs-suggest', '- BAD PREDICTION: Act-vs-suggest')
     monkeypatch.setattr(ke, "load_analysis_reference", _fake)
     try:
         with pytest.raises(ValueError):

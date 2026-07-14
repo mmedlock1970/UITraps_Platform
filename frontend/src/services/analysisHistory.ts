@@ -26,7 +26,7 @@ export interface FormSnapshot {
   kbVersion: KbVersion;
   selectedTenets: string[];
   verbosity: 'brief' | 'standard';
-  pass1Model: 'sonnet' | 'haiku';
+  pass1Model: 'opus' | 'sonnet';
   thoroughMode: boolean;
   mode?: 'single' | 'twopass';
   reportStyle?: 'trap';
