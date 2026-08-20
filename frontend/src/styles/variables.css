@@ -15,9 +15,9 @@
   --uitraps-bg: #ffffff;
   --uitraps-bg-secondary: #f8f9fa;
   --uitraps-bg-hover: #e9ecef;
-  --uitraps-text: #212529;
-  --uitraps-text-secondary: #6c757d;
-  --uitraps-text-muted: #adb5bd;
+  --uitraps-text: #1a1a1a;
+  --uitraps-text-secondary: #333333;
+  --uitraps-text-muted: #6e6e6e;
   --uitraps-border: #dee2e6;
   --uitraps-border-focus: #3498db;
 
@@ -28,8 +28,9 @@
   --uitraps-spacing-lg: 24px;
   --uitraps-spacing-xl: 32px;
 
-  /* Typography */
-  --uitraps-font-family: 'Montserrat', sans-serif;
+  /* Typography — Open Sans for body copy (matches the WordPress site), Montserrat for headings */
+  --uitraps-font-family: 'Open Sans', 'Montserrat', sans-serif;
+  --uitraps-font-heading: 'Montserrat', 'Open Sans', sans-serif;
   --uitraps-font-size-xs: 12px;
   --uitraps-font-size-sm: 14px;
   --uitraps-font-size-base: 16px;
@@ -63,6 +64,12 @@
   box-sizing: border-box;
 }
 
+/* Headings use Montserrat; body copy uses Open Sans (via --uitraps-font-family) */
+.uitraps-analyzer h1, .uitraps-analyzer h2, .uitraps-analyzer h3,
+.uitraps-platform h1, .uitraps-platform h2, .uitraps-platform h3 {
+  font-family: var(--uitraps-font-heading);
+}
+
 /* Dark Theme */
 .uitraps-analyzer[data-theme="dark"],
 .uitraps-platform[data-theme="dark"],
@@ -75,13 +82,13 @@
   --uitraps-error: #e74c3c;
   --uitraps-critical: #ff6b6b;
 
-  --uitraps-bg: #000000;
-  --uitraps-bg-secondary: #111111;
-  --uitraps-bg-hover: #1e1e1e;
-  --uitraps-text: #eee;
+  --uitraps-bg: #1e1e1e;
+  --uitraps-bg-secondary: #262626;
+  --uitraps-bg-hover: #333333;
+  --uitraps-text: #ededed;
   --uitraps-text-secondary: #adb5bd;
   --uitraps-text-muted: #6c757d;
-  --uitraps-border: #333;
+  --uitraps-border: #3f3f3f;
   --uitraps-border-focus: #5dade2;
 
   --uitraps-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);

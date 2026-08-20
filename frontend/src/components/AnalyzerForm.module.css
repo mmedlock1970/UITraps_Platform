@@ -1,14 +1,15 @@
 .form {
-  max-width: 900px;
-  margin: 0 auto;
+  max-width: 100%;
+  margin: 0;
   padding: 0 24px 100px;
 }
 
 .intro {
-  margin-bottom: 40px;
+  margin-bottom: 24px;
 }
 
 .introTitle {
+  font-family: var(--uitraps-font-heading);
   font-size: 36px;
   font-weight: 800;
   letter-spacing: -0.8px;
@@ -84,7 +85,7 @@
 
 .cardHeaderText p {
   font-size: 13px;
-  color: var(--uitraps-text-muted);
+  color: var(--uitraps-text-secondary);
   margin: 1px 0 0;
 }
 
@@ -187,7 +188,7 @@
 
 .fieldHint {
   font-size: 12px;
-  color: var(--uitraps-text-muted);
+  color: var(--uitraps-text-secondary);
   line-height: 1.5;
   margin: 0;
 }
@@ -216,7 +217,7 @@
   background: var(--uitraps-bg-secondary);
   border: 1.5px solid var(--uitraps-border);
   color: var(--uitraps-text);
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: var(--uitraps-font-family);
   font-size: 14px;
   padding: 10px 14px;
   border-radius: 6px;
@@ -423,6 +424,71 @@
   letter-spacing: 0.04em;
 }
 
+/* Info icon — on-demand "Why this matters" tooltip beside a section heading */
+.info {
+  position: relative;
+  display: inline-flex;
+  vertical-align: middle;
+  margin-left: 8px;
+}
+.infoBtn {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid var(--uitraps-text-muted);
+  background: transparent;
+  color: var(--uitraps-text-muted);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+.infoBtn:hover,
+.infoBtn:focus-visible {
+  border-color: #e05c1a;
+  color: #e05c1a;
+  outline: none;
+}
+.infoPop {
+  position: absolute;
+  top: 26px;
+  left: -6px;
+  width: 300px;
+  max-width: 78vw;
+  background: var(--uitraps-bg);
+  border: 1px solid var(--uitraps-border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-family: var(--uitraps-font-family);
+  font-size: 12.5px;
+  font-weight: 400;
+  line-height: 1.55;
+  color: var(--uitraps-text);
+  box-shadow: var(--uitraps-shadow);
+  z-index: 40;
+  display: none;
+  letter-spacing: normal;
+  text-transform: none;
+}
+.infoPop strong {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #e05c1a;
+}
+.info:hover .infoPop,
+.info:focus-within .infoPop {
+  display: block;
+}
+
 .fieldDivider {
   border: none;
   border-top: 1px solid var(--uitraps-border);
@@ -472,7 +538,7 @@
   background: #ffffff;
   color: #111111;
   border: none;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: var(--uitraps-font-family);
   font-size: 14px;
   font-weight: 700;
   padding: 13px 28px;
@@ -526,7 +592,7 @@
   color: var(--uitraps-text-secondary);
   border: none;
   border-right: 1.5px solid var(--uitraps-border);
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: var(--uitraps-font-family);
   font-size: 13px;
   font-weight: 500;
   padding: 8px 18px;
@@ -602,6 +668,26 @@
 }
 .tenetClearBtn:hover { color: var(--uitraps-text); }
 .tenetClearBtn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* Compact Analysis-scope option row — segmented controls side by side */
+.scopeOpts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px 30px;
+}
+.scopeOpt {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.scopeOptLabel {
+  margin: 0;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--uitraps-text-secondary);
+}
 
 /* Field history chips */
 .fieldHistory {

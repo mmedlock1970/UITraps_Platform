@@ -3022,19 +3022,20 @@ def _emit_eval_details(h: list, uc: dict) -> None:
 
 
 _NEW_KB_ISSUES_CSS = """
-:root{--ground:#e9ebef;--surface:#fff;--surface-sunk:#f4f5f7;--ink:#1b1e24;--ink-soft:#565d68;--ink-faint:#8b929c;
---hairline:#e2e5ea;--hairline-strong:#d2d7de;--brand:#0f766e;--brand-soft:#ddf0ed;
+:root{--ground:#ffffff;--surface:#fff;--surface-sunk:#f4f5f7;--ink:#1b1e24;--ink-soft:#565d68;--ink-faint:#8b929c;
+--hairline:#e2e5ea;--hairline-strong:#d2d7de;--brand:#3498db;--brand-soft:#e9f4fb;
 --sev-critical:#b4232a;--sev-high:#cf5f26;--sev-medium:#b3860c;--sev-low:#3a7ca5;
 --sev-critical-tint:#f7e5e6;--sev-high-tint:#f8e9df;--sev-medium-tint:#f6eed9;--sev-low-tint:#e2edf4;
 --radius:11px;--rail:216px;--shadow:0 1px 2px rgba(20,25,35,.05),0 8px 24px rgba(20,25,35,.06);
---font-sans:'Montserrat',system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+--font-sans:'Open Sans',system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;--font-head:'Montserrat','Open Sans',system-ui,-apple-system,"Segoe UI",sans-serif;
 --font-mono:ui-monospace,"SF Mono","Cascadia Code","Roboto Mono",Menlo,Consolas,monospace;}
 /* Report defaults to LIGHT (matches the rest of the app). Dark is opt-in only, via an
    explicit data-theme="dark" on the root — never auto-switched from the OS preference,
    which would leave the report dark while the app is light. */
-:root[data-theme="light"]{--ground:#e9ebef;--surface:#fff;--surface-sunk:#f4f5f7;--ink:#1b1e24;--ink-soft:#565d68;--ink-faint:#8b929c;--hairline:#e2e5ea;--hairline-strong:#d2d7de;--brand:#0f766e;--brand-soft:#ddf0ed;--sev-critical:#b4232a;--sev-high:#cf5f26;--sev-medium:#b3860c;--sev-low:#3a7ca5;--sev-critical-tint:#f7e5e6;--sev-high-tint:#f8e9df;--sev-medium-tint:#f6eed9;--sev-low-tint:#e2edf4;}
-:root[data-theme="dark"]{--ground:#14171c;--surface:#1d2127;--surface-sunk:#23282f;--ink:#eef1f5;--ink-soft:#aab2bd;--ink-faint:#7b838f;--hairline:#2c323a;--hairline-strong:#363d47;--brand:#3fbcae;--brand-soft:#10312e;--sev-critical:#e06a6f;--sev-high:#e79256;--sev-medium:#d9b038;--sev-low:#6fb0d4;--sev-critical-tint:#3a2528;--sev-high-tint:#3a2c21;--sev-medium-tint:#35301d;--sev-low-tint:#22323c;}
+:root[data-theme="light"]{--ground:#ffffff;--surface:#fff;--surface-sunk:#f4f5f7;--ink:#1b1e24;--ink-soft:#565d68;--ink-faint:#8b929c;--hairline:#e2e5ea;--hairline-strong:#d2d7de;--brand:#3498db;--brand-soft:#e9f4fb;--sev-critical:#b4232a;--sev-high:#cf5f26;--sev-medium:#b3860c;--sev-low:#3a7ca5;--sev-critical-tint:#f7e5e6;--sev-high-tint:#f8e9df;--sev-medium-tint:#f6eed9;--sev-low-tint:#e2edf4;}
+:root[data-theme="dark"]{--ground:#1e1e1e;--surface:#262626;--surface-sunk:#2e2e2e;--ink:#eef1f5;--ink-soft:#aab2bd;--ink-faint:#7b838f;--hairline:#2c323a;--hairline-strong:#363d47;--brand:#5dade2;--brand-soft:#152834;--sev-critical:#e06a6f;--sev-high:#e79256;--sev-medium:#d9b038;--sev-low:#6fb0d4;--sev-critical-tint:#3a2528;--sev-high-tint:#3a2c21;--sev-medium-tint:#35301d;--sev-low-tint:#22323c;}
 *{box-sizing:border-box}body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--font-sans);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.r-title,.headline-lg,.card-headline,.section-eyebrow,.tenet{font-family:var(--font-head)}
 /* Preserve pill fills, scorecard tints, and every other background when exporting to PDF /
    printing — browsers drop backgrounds by default unless a page opts in with print-color-adjust. */
 .report,.report *{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}
@@ -3501,7 +3502,7 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
          "<title>UI Traps — By Trap</title>",
          "<link rel='preconnect' href='https://fonts.googleapis.com'>",
          "<link rel='preconnect' href='https://fonts.gstatic.com' crossorigin>",
-         "<link href='https://fonts.googleapis.com/css2?family=Montserrat:wght@400..700&display=swap' rel='stylesheet'>",
+         "<link href='https://fonts.googleapis.com/css2?family=Montserrat:wght@400..700&family=Open+Sans:wght@400;600;700&display=swap' rel='stylesheet'>",
          f"<style>{_NEW_KB_ISSUES_CSS}</style>",
          "</head><body data-selftheme='1'>", "<div class='wrap'>", "<div class='report'>"]
 

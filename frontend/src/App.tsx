@@ -22,7 +22,6 @@ import { saveAnalysis, getAnalysisHistory, StoredAnalysis, FormSnapshot } from '
 import { ReportStatistics, UsageInfo, UnifiedAskResponse, TimeEstimate, UserContext, isFigmaEstimate, isUrlEstimate, isFileEstimate, UnifiedEstimate } from './api/types';
 import { unifiedAsk } from './api/client';
 import { ChatPanel } from './components/ChatPanel';
-import { RecentStrip } from './components/RecentStrip';
 import './styles/variables.css';
 import styles from './App.module.css';
 
@@ -141,7 +140,6 @@ export const App: React.FC = () => {
     // postMessage({type:'uitraps-theme'}) still overrides (e.g. the WordPress host forcing dark).
     return 'light';
   });
-  const [externalTheme, setExternalTheme] = useState(() => _params.has('theme'));
   const [externalMode] = useState(() => _params.has('mode'));
   const [apiEndpoint] = useState(DEFAULT_API_ENDPOINT);
   const [view, setView] = useState<AppView>(() => {
@@ -220,7 +218,7 @@ export const App: React.FC = () => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'uitraps-theme') {
         const val = event.data.theme;
-        if (val === 'dark' || val === 'light') { setTheme(val); setExternalTheme(true); }
+        if (val === 'dark' || val === 'light') { setTheme(val); }
       } else if (event.data?.type === 'uitraps-token') {
         const token = event.data.token;
         const isDevParam = new URLSearchParams(window.location.search).get('dev') === 'true';
@@ -446,10 +444,6 @@ export const App: React.FC = () => {
     onStartTaskCapture: handleStartTaskCapture,
   });
 
-  const toggleTheme = useCallback(() => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light');
-  }, []);
-
   const handleViewHistoryReport = useCallback((analysis: StoredAnalysis) => {
     setActiveReport({
       html: analysis.html,
@@ -620,13 +614,6 @@ export const App: React.FC = () => {
                 Past Analyses
               </button>
             )}
-            {!externalTheme && (
-              <button className={`${styles.headerButton} ${styles.themeToggle}`} onClick={toggleTheme} title={theme === 'light' ? 'Dark mode' : 'Light mode'}>
-                {theme === 'light'
-                ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-                : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>}
-              </button>
-            )}
           </div>
           <div className={styles.reportWithChat} style={isEmbedded ? { overflow: 'visible', height: 'auto' } : undefined}>
             <div className={styles.reportArea} style={isEmbedded ? { overflowY: 'visible' } : undefined}>
@@ -656,32 +643,6 @@ export const App: React.FC = () => {
   }
 
   // ── History view ──
-  if (view === 'history') {
-    return (
-      <div className={`uitraps-viewport-wrapper ${styles.viewportWrapper}`} data-theme={theme}>
-        <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
-          <div className={styles.topBorderLine} />
-          {!externalTheme && (
-            <div className={styles.subTabActions}>
-              <button className={`${styles.headerButton} ${styles.themeToggle}`} onClick={toggleTheme} title={theme === 'light' ? 'Dark mode' : 'Light mode'}>
-                {theme === 'light'
-                ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-                : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>}
-              </button>
-            </div>
-          )}
-          <PastAnalyses
-            onViewReport={handleViewHistoryReport}
-            onReuseSettings={handleReuseSettings}
-            onClose={() => setView('form')}
-            token={effectiveToken || undefined}
-            apiEndpoint={apiEndpoint}
-          />
-        </div>
-      </div>
-    );
-  }
-
   // ── Estimate preview overlay ──
   if (view === 'chat' && unified.analysisPhase === 'previewing' && unified.estimate) {
     return (
@@ -737,24 +698,16 @@ export const App: React.FC = () => {
             {!externalMode && (
               <div className={styles.tabRow}>
                 <button type="button" className={`${styles.tab} ${view === 'form' ? styles.tabActive : ''}`} onClick={() => setView('form')}>Analyze a design</button>
+                <button type="button" className={`${styles.tab} ${view === 'history' ? styles.tabActive : ''}`} onClick={() => setView('history')}>See past analyses</button>
                 <button type="button" className={`${styles.tab} ${view === 'chat' ? styles.tabActive : ''}`} onClick={() => setView('chat')}>Ask a question</button>
               </div>
             )}
             {/* Separator line when tab row is hidden */}
             {externalMode && <div className={styles.topBorderLine} />}
             {/* Sub-actions: New Session (chat), theme toggle */}
-            {(view === 'chat' || !externalTheme) && (
+            {view === 'chat' && !isEmpty && (
               <div className={styles.subTabActions}>
-                {view === 'chat' && (
-                  <button className={styles.headerButton} onClick={() => unified.clearHistory()}>New Session</button>
-                )}
-                {!externalTheme && (
-                  <button className={`${styles.headerButton} ${styles.themeToggle}`} onClick={toggleTheme} title={theme === 'light' ? 'Dark mode' : 'Light mode'}>
-                    {theme === 'light'
-                      ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-                      : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>}
-                  </button>
-                )}
+                <button className={styles.headerButton} onClick={() => unified.clearHistory()}>New Session</button>
               </div>
             )}
           </>
@@ -774,7 +727,6 @@ export const App: React.FC = () => {
               </div>
             )}
             <div style={{ display: isFormAnalyzing ? 'none' : 'flex', flexDirection: 'column', ...(isEmbedded ? { overflow: 'visible' } : { overflowY: 'auto', flex: 1 }), paddingTop: '24px' }}>
-              <RecentStrip onViewAll={() => setView('history')} />
               {formError && (
                 <div style={{ maxWidth: 900, margin: '0 auto 0', padding: '0 24px', width: '100%', boxSizing: 'border-box' }}>
                   <div style={{ background: '#fdecea', border: '1px solid #f5c6c6', color: '#c0392b', borderRadius: 8, padding: '12px 16px', fontSize: 13, marginBottom: 16 }}>
@@ -846,6 +798,17 @@ export const App: React.FC = () => {
               />
             </>
           )
+        )}
+        {view === 'history' && (
+          <div style={{ display: 'flex', flexDirection: 'column', ...(isEmbedded ? { overflow: 'visible' } : { overflowY: 'auto', flex: 1 }) }}>
+            <PastAnalyses
+              onViewReport={handleViewHistoryReport}
+              onReuseSettings={handleReuseSettings}
+              onClose={() => setView('form')}
+              token={effectiveToken || undefined}
+              apiEndpoint={apiEndpoint}
+            />
+          </div>
         )}
       </div>
     </div>

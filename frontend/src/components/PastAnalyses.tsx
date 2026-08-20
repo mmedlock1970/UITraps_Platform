@@ -52,7 +52,7 @@ function serverReportDisplayName(r: ServerReport): string {
 }
 
 export const PastAnalyses: React.FC<PastAnalysesProps> = ({
-  onViewReport, onReuseSettings, onClose, token, apiEndpoint,
+  onViewReport, onReuseSettings, token, apiEndpoint,
 }) => {
   const useServer = !!(token && apiEndpoint);
 
@@ -134,8 +134,7 @@ export const PastAnalyses: React.FC<PastAnalysesProps> = ({
   if (useServer) {
     return (
       <div className={styles.container}>
-        <button className={styles.backNav} onClick={onClose}>← Back</button>
-        <div className={styles.header}>
+                <div className={styles.header}>
           <h2 className={styles.title}>Past Analyses</h2>
         </div>
 
@@ -230,8 +229,7 @@ export const PastAnalyses: React.FC<PastAnalysesProps> = ({
   if (localAnalyses.length === 0) {
     return (
       <div className={styles.container}>
-        <button className={styles.backNav} onClick={onClose}>← Back</button>
-        <div className={styles.empty}>
+                <div className={styles.empty}>
           <div className={styles.emptyTitle}>No Past Analyses</div>
           <p className={styles.emptyText}>
             Your completed analyses will appear here. Run an analysis to get started.
@@ -243,8 +241,7 @@ export const PastAnalyses: React.FC<PastAnalysesProps> = ({
 
   return (
     <div className={styles.container}>
-      <button className={styles.backNav} onClick={onClose}>← Back</button>
-      <div className={styles.header}>
+            <div className={styles.header}>
         <h2 className={styles.title}>Past Analyses</h2>
         <span className={styles.count}>{localAnalyses.length} of {HISTORY_LIMIT}</span>
       </div>

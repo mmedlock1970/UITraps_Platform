@@ -98,6 +98,7 @@
 }
 
 .authTitle {
+  font-family: var(--uitraps-font-heading);
   font-size: var(--uitraps-font-size-xl);
   font-weight: 700;
   color: var(--uitraps-text);
@@ -154,7 +155,7 @@
   align-items: stretch;
   justify-content: flex-start;
   flex: 1;
-  padding: 24px 24px 100px;
+  padding: 24px 16px 100px;
   gap: var(--uitraps-spacing-sm);
   overflow-y: auto;
 }
@@ -167,6 +168,7 @@
 }
 
 .welcomeTitle {
+  font-family: var(--uitraps-font-heading);
   font-size: 32px;
   font-weight: 700;
   color: var(--uitraps-text);
@@ -263,10 +265,10 @@
 
 /* ── Chat page empty state ── */
 .chatPageContent {
-  max-width: 900px;
+  max-width: 100%;
   width: 100%;
-  margin: 0 auto;
-  padding: 0 24px;
+  margin: 0;
+  padding: 0;
 }
 
 .chatPageIntro {
@@ -275,12 +277,11 @@
 }
 
 .chatPageTitle {
-  font-size: 36px;
-  font-weight: 800;
-  letter-spacing: -0.8px;
-  line-height: 1.15;
+  font-family: var(--uitraps-font-heading);
+  font-size: var(--uitraps-font-size-xl);
+  font-weight: 700;
   color: var(--uitraps-text);
-  margin: 0 0 18px 0;
+  margin: 0 0 8px 0;
 }
 
 .chatPageSubtitle {

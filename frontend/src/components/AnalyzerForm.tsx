@@ -182,7 +182,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
   // Card 3 — Use Environment
   const [physicalEnv, setPhysicalEnv] = useState(iv?.physicalEnv ?? '');
   const lighting = iv?.lighting ?? '';
-  const [gripPosition, setGripPosition] = useState(iv?.gripPosition ?? '');
+  const [gripPosition] = useState(iv?.gripPosition ?? '');  // control removed; value retained for snapshot/context compatibility
   const [attentionalState, setAttentionalState] = useState(iv?.attentionalState ?? '');
 
   // Card 4 — Additional Context
@@ -385,8 +385,6 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
     <form className={styles.form} onSubmit={handleSubmit} noValidate>
 
       <div className={styles.intro}>
-        <h1 className={styles.introTitle}>Analyze your interface<br />for high-severity Traps.</h1>
-        <p className={styles.introSubtitle}>Tell us about your interface and its users. The more context you provide, the more accurate the analysis.</p>
         <div className={styles.requiredNote}>
           <span className={styles.requiredDot} />
           Required fields
@@ -618,17 +616,19 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
         <div className={styles.cardHeader}>
           <div className={styles.cardNum}>2</div>
           <div className={styles.cardHeaderText}>
-            <h2>The User and their goals</h2>
+            <h2>The User and their goals
+              <span className={styles.info}>
+                <button type="button" className={styles.infoBtn} aria-label="Why this matters">i</button>
+                <span className={styles.infoPop} role="tooltip">
+                  <strong>Why this matters</strong>
+                  Many Traps are only visible when we know what users already understand and what they are trying to do. The more precisely you describe the user, the more accurate the analysis.
+                </span>
+              </span>
+            </h2>
             <p>Who will use this interface, and what do they already know?</p>
           </div>
         </div>
         <div className={styles.cardBody}>
-
-          <div className={styles.callout}>
-            <strong>Why this matters</strong>
-            Many Traps are only visible when we know what users already understand and what they are trying to do.
-            The more precisely you describe the user, the more accurate the analysis.
-          </div>
 
           <div className={`${styles.fieldGrid} ${styles.twoCol}`}>
 
@@ -801,16 +801,19 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
         <div className={styles.cardHeader}>
           <div className={styles.cardNum}>3</div>
           <div className={styles.cardHeaderText}>
-            <h2>Use Environment</h2>
+            <h2>Use Environment
+              <span className={styles.info}>
+                <button type="button" className={styles.infoBtn} aria-label="Why this matters">i</button>
+                <span className={styles.infoPop} role="tooltip">
+                  <strong>Why this matters</strong>
+                  The context of use — where users are, what else they're doing, and how much attention they can give the interface — shapes which risks are real and how severe they are. The more detail you provide, the sharper the analysis.
+                </span>
+              </span>
+            </h2>
             <p>Where and how will this interface be used?</p>
           </div>
         </div>
         <div className={styles.cardBody}>
-          <div className={styles.callout}>
-            <strong>Why this matters</strong>
-            The context of use — where users are, what else they're doing, and how much attention they can give the interface —
-            shapes which risks are real and how severe they are. The more detail you provide, the sharper the analysis.
-          </div>
           <div className={`${styles.fieldGrid} ${styles.twoCol}`}>
             <div className={styles.field}>
               <label className={styles.fieldLabel} htmlFor="physicalEnv">
@@ -829,25 +832,6 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
                 <option value="stationary">Stationary, away from a desk (couch, café, waiting area)</option>
                 <option value="moving">On the go — walking, commuting, outdoors, or in a vehicle</option>
                 <option value="hands_free">Mounted display, kiosk, or hands-free setting</option>
-              </select>
-            </div>
-            <div className={styles.field}>
-              <label className={styles.fieldLabel} htmlFor="gripPosition">
-                Typical grip / body position
-                <span className={styles.opt}>optional</span>
-              </label>
-              <select
-                id="gripPosition"
-                className={styles.select}
-                value={gripPosition}
-                onChange={e => setGripPosition(e.target.value)}
-                disabled={disabled}
-              >
-                <option value="">— Select one —</option>
-                <option value="keyboard">Both hands on a keyboard (desktop or laptop)</option>
-                <option value="handheld">Handheld device — one or two hands, thumbs for input</option>
-                <option value="flat">Device resting flat on a surface</option>
-                <option value="hands_free">Hands-free — voice, mounted display, or kiosk</option>
               </select>
             </div>
             <div className={styles.field}>
@@ -952,129 +936,92 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
 
           <hr className={styles.fieldDivider} />
 
-          {/* Analysis model */}
-          <div className={styles.field}>
-            <label className={styles.fieldLabel}>Analysis model</label>
-            <div className={styles.kbVersionGroup}>
-              {(['opus', 'sonnet'] as const).map(v => (
-                <button
-                  key={v}
-                  type="button"
-                  className={`${styles.kbVersionBtn} ${pass1Model === v ? styles.kbVersionBtnActive : ''}`}
-                  onClick={() => setPass1Model(v)}
-                  disabled={disabled}
-                >
-                  {v === 'opus' ? 'Opus 4.8' : 'Sonnet 5'}
-                </button>
-              ))}
-            </div>
-            <p className={styles.fieldHint}>
-              {pass1Model === 'opus' && 'Highest capability. Best recall on dense, detailed screens and the closest adherence to the knowledge base’s rules. Slower and more expensive per run.'}
-              {pass1Model === 'sonnet' && 'Near-Opus quality with high-resolution vision. Meaningfully faster and lower cost. May miss more on dense or cluttered screens.'}
-            </p>
-          </div>
-
-          <hr className={styles.fieldDivider} />
-
-          {/* Knowledge base version selector */}
-          <div className={styles.field}>
-            <label className={styles.fieldLabel}>Knowledge base version</label>
-            <div className={styles.kbVersionGroup}>
-              {/* Only the two supported configs are offered. V2 / V1.1 are deprecated and no
-                  longer rendered; a saved link that referenced them is resolved to V2.1 with the
-                  coercion notice below (that logic reads the restored value, not the buttons). */}
-              {(['v1', 'v2'] as KbVersion[]).map(v => (
-                <button
-                  key={v}
-                  type="button"
-                  className={`${styles.kbVersionBtn} ${kbVersion === v ? styles.kbVersionBtnActive : ''}`}
-                  onClick={() => selectKbVersion(v)}
-                  disabled={disabled}
-                >
-                  {v.toUpperCase()}
-                </button>
-              ))}
-            </div>
-            <p className={styles.fieldHint}>
-              {kbVersion === 'v2' && 'New v2 knowledge base — all evaluation rules self-contained in the KB. Reports use a High/Medium/Low severity and confidence scale and a Coverage-notes section. Runs as Prompting + KB: the tool adds its detection procedures, severity rules, and output scaffolding on top of the KB.'}
-              {kbVersion === 'v1' && 'Original knowledge base, injected verbatim. Runs as KB only: the raw KB is used with just a minimal instruction — no detection or severity guidance added by the tool.'}
-            </p>
-            {coercedFromKb && (
-              <p className={styles.fieldHint} role="status" style={{ color: 'var(--color-warning, #b45309)' }}>
-                This saved configuration requested <strong>{coercedFromKb.toUpperCase()}</strong>, which is
-                deprecated and no longer available. It has been switched to <strong>V2.1</strong> — the
-                analysis will run on V2.1, not {coercedFromKb.toUpperCase()}.
-              </p>
-            )}
-          </div>
-
-          {/* Tool coaching control removed — it added no value as a field: the profile is fully
-              determined by the KB version (V1 → KB only, V2.1 → Prompting + KB), and that
-              detail now lives in the Knowledge base version hint above. `profile` state is still
-              derived from the KB selection and sent to the backend. */}
-
-          {/* Analysis coverage toggle removed — Thorough is deprecated and its pipeline is gone;
-              every run is Standard (single-pass), so there is no choice to surface. thoroughMode
-              is pinned false in state. */}
-
-          {/* Analysis architecture — always visible. Meaningful for V2.1 (Prompting + KB);
-              inert for V1 (KB only forces single-pass), where it is shown disabled with an
-              explanation so the override is visible rather than the toggle silently vanishing. */}
-          <hr className={styles.fieldDivider} />
-          <div className={styles.field}>
-            <label className={styles.fieldLabel}>Analysis architecture</label>
-            <div className={styles.kbVersionGroup}>
-              {(['twopass', 'single'] as const).map(v => {
-                // KB only (V1) always runs single-pass regardless of the toggle value.
-                const archActive = kbVersion === 'v1' ? 'single' : mode;
-                return (
+          {/* Compact option row — segmented controls side by side (labels only, no per-option prose) */}
+          <div className={styles.scopeOpts}>
+            {/* Analysis model */}
+            <div className={styles.scopeOpt}>
+              <p className={styles.scopeOptLabel}>Analysis model</p>
+              <div className={styles.kbVersionGroup}>
+                {(['opus', 'sonnet'] as const).map(v => (
                   <button
                     key={v}
                     type="button"
-                    className={`${styles.kbVersionBtn} ${archActive === v ? styles.kbVersionBtnActive : ''}`}
-                    onClick={() => setMode(v)}
-                    disabled={disabled || kbVersion === 'v1'}
-                    title={kbVersion === 'v1' ? 'KB only (V1) always runs single-pass' : undefined}
+                    className={`${styles.kbVersionBtn} ${pass1Model === v ? styles.kbVersionBtnActive : ''}`}
+                    onClick={() => setPass1Model(v)}
+                    disabled={disabled}
                   >
-                    {v === 'single' ? 'Single-pass' : 'Two-pass'}
+                    {v === 'opus' ? 'Opus 4.8' : 'Sonnet 5'}
                   </button>
-                );
-              })}
+                ))}
+              </div>
             </div>
-            <p className={styles.fieldHint}>
-              {kbVersion === 'v1'
-                ? 'Locked to single-pass: KB only (V1) runs one call with the raw knowledge base and does not support the two-pass detection → adjudication pipeline.'
-                : mode === 'single'
-                  ? 'One call with the whole knowledge base. Fast.'
-                  : 'Detection pass surfaces candidate traps, then an adjudication pass confirms each one against only the relevant trap definitions. Higher recall and cleaner attribution; slower and more tokens.'}
-            </p>
+
+            {/* Knowledge base version */}
+            <div className={styles.scopeOpt}>
+              <p className={styles.scopeOptLabel}>Knowledge base version</p>
+              <div className={styles.kbVersionGroup}>
+                {(['v1', 'v2'] as KbVersion[]).map(v => (
+                  <button
+                    key={v}
+                    type="button"
+                    className={`${styles.kbVersionBtn} ${kbVersion === v ? styles.kbVersionBtnActive : ''}`}
+                    onClick={() => selectKbVersion(v)}
+                    disabled={disabled}
+                  >
+                    {v.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Analysis architecture — KB only (V1) forces single-pass */}
+            <div className={styles.scopeOpt}>
+              <p className={styles.scopeOptLabel}>Analysis architecture</p>
+              <div className={styles.kbVersionGroup}>
+                {(['twopass', 'single'] as const).map(v => {
+                  const archActive = kbVersion === 'v1' ? 'single' : mode;
+                  return (
+                    <button
+                      key={v}
+                      type="button"
+                      className={`${styles.kbVersionBtn} ${archActive === v ? styles.kbVersionBtnActive : ''}`}
+                      onClick={() => setMode(v)}
+                      disabled={disabled || kbVersion === 'v1'}
+                      title={kbVersion === 'v1' ? 'KB only (V1) always runs single-pass' : undefined}
+                    >
+                      {v === 'single' ? 'Single-pass' : 'Two-pass'}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Report detail */}
+            <div className={styles.scopeOpt}>
+              <p className={styles.scopeOptLabel}>Report detail</p>
+              <div className={styles.kbVersionGroup}>
+                {(['brief', 'standard'] as const).map(v => (
+                  <button
+                    key={v}
+                    type="button"
+                    className={`${styles.kbVersionBtn} ${verbosity === v ? styles.kbVersionBtnActive : ''}`}
+                    onClick={() => setVerbosity(v)}
+                    disabled={disabled}
+                  >
+                    {v === 'standard' ? 'Standard' : 'Brief'}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
-          <hr className={styles.fieldDivider} />
-
-          {/* Report detail */}
-          <div className={styles.field}>
-            <label className={styles.fieldLabel}>Report detail</label>
-            <div className={styles.kbVersionGroup}>
-              {(['brief', 'standard'] as const).map(v => (
-                <button
-                  key={v}
-                  type="button"
-                  className={`${styles.kbVersionBtn} ${verbosity === v ? styles.kbVersionBtnActive : ''}`}
-                  onClick={() => setVerbosity(v)}
-                  disabled={disabled}
-                >
-                  {v === 'standard' ? 'Standard' : 'Brief'}
-                </button>
-              ))}
-            </div>
-            <p className={styles.fieldHint}>
-              {verbosity === 'standard' && 'Full narratives for summary, findings, and recommendations.'}
-              {verbosity === 'brief' && 'Shorter text throughout. Reduces output tokens and speeds up analysis.'}
+          {coercedFromKb && (
+            <p className={styles.fieldHint} role="status" style={{ color: 'var(--color-warning, #b45309)', marginTop: 8 }}>
+              This saved configuration requested <strong>{coercedFromKb.toUpperCase()}</strong>, which is
+              deprecated and no longer available. It has been switched to <strong>V2.1</strong> — the
+              analysis will run on V2.1, not {coercedFromKb.toUpperCase()}.
             </p>
-          </div>
-
-          {/* Report style toggle removed — the By-Issue report style is retired; every run is By Trap. */}
+          )}
 
 
         </div>
