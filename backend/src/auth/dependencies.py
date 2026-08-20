@@ -79,8 +79,13 @@ async def get_current_user(
             headers={"X-Error-Code": "INVALID_TOKEN"},
         )
 
-    # Check subscription claim (matching Node.js auth.js line 29)
-    if not payload.get("hasActiveSubscription"):
+    # The JWT's hasActiveSubscription is a point-in-time snapshot minted by WordPress; it goes stale
+    # when the subscription changes AFTER the token was issued (e.g. expire → re-activate). Before
+    # rejecting, fall back to the live, webhook-synced DB status — the subscription webhook is our
+    # source of truth — so a stale "inactive" claim can't lock out an actually-active user. The DB is
+    # only ever written by the authenticated webhook, so trusting a DB "active" over the claim is safe.
+    active = bool(payload.get("hasActiveSubscription")) or _live_subscription_active(payload.get("userId"))
+    if not active:
         raise HTTPException(
             status_code=403,
             detail="Active subscription required",
@@ -90,3 +95,20 @@ async def get_current_user(
         "id": payload.get("userId"),
         "hasActiveSubscription": True,
     }
+
+
+def _live_subscription_active(user_id) -> bool:
+    """True if the webhook-synced DB shows an active (or cancelled-but-in-period) subscription.
+
+    Read-only. On any DB error returns False so auth degrades to the JWT claim rather than crashing.
+    """
+    if not user_id:
+        return False
+    try:
+        from sqlmodel import Session
+        from ..database import engine
+        from ..subscription_service import get_subscription_status
+        with Session(engine) as session:
+            return get_subscription_status(session, str(user_id)) in ("active", "cancelled")
+    except Exception:
+        return False

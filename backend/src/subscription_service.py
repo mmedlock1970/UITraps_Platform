@@ -156,6 +156,18 @@ def check_and_consume_token(session: Session, user_id: str) -> tuple[bool, str]:
     )
 
 
+def get_subscription_status(session: Session, user_id: str) -> Optional[str]:
+    """Return the stored subscription_status for a user, or None if no record exists.
+
+    Read-only (never creates a row). Used by the auth gate to authorize against the
+    live, webhook-synced DB rather than a point-in-time JWT claim.
+    """
+    sub = session.exec(
+        select(UserSubscription).where(UserSubscription.user_id == user_id)
+    ).first()
+    return sub.subscription_status if sub else None
+
+
 def get_usage_summary(session: Session, user_id: str) -> dict:
     """Return a usage summary for the user."""
     sub = session.exec(
