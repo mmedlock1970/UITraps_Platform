@@ -1,11 +1,11 @@
 {
-  "_comment": "UITraps MCP Server — client configuration examples.",
+  "_comment": "UITraps MCP Server — client configuration examples. Transport: Streamable HTTP at /mcp.",
 
   "_setup_instructions": [
     "1. Get your API key from your UITraps subscription dashboard.",
     "2. Copy the block for your AI client below into its config file.",
     "3. Replace YOUR_API_KEY_HERE with your actual key.",
-    "4. Replace the URL with your Railway deployment URL (or http://localhost:8080 for local dev).",
+    "4. Replace the URL host with your Railway deployment (e.g. https://YOUR-APP.railway.app/mcp), or use http://localhost:8000/mcp for local dev.",
     "5. Restart your AI client."
   ],
 
@@ -14,7 +14,8 @@
     "_file_win": "%APPDATA%\\Claude\\claude_desktop_config.json  (Windows)",
     "mcpServers": {
       "uitraps": {
-        "url": "https://YOUR-APP.railway.app/mcp/sse",
+        "type": "http",
+        "url": "https://YOUR-APP.railway.app/mcp",
         "headers": {
           "Authorization": "Bearer YOUR_API_KEY_HERE"
         }
@@ -24,22 +25,23 @@
 
   "claude_code": {
     "_command": "Run this in your terminal, then restart Claude Code:",
-    "_run": "claude mcp add uitraps --transport sse https://YOUR-APP.railway.app/mcp/sse --header 'Authorization: Bearer YOUR_API_KEY_HERE'"
+    "_run": "claude mcp add uitraps --transport http https://YOUR-APP.railway.app/mcp --header 'Authorization: Bearer YOUR_API_KEY_HERE'"
   },
 
   "cursor": {
     "_file": "Cursor → Settings → MCP → Add Server",
     "name": "UITraps Analyzer",
-    "transport": "sse",
-    "url": "https://YOUR-APP.railway.app/mcp/sse",
+    "transport": "http",
+    "url": "https://YOUR-APP.railway.app/mcp",
     "headers": {
       "Authorization": "Bearer YOUR_API_KEY_HERE"
     }
   },
 
   "local_dev": {
-    "_note": "For local development (backend running on port 8080):",
-    "url": "http://localhost:8080/mcp/sse",
+    "_note": "For local development (backend running on port 8000):",
+    "type": "http",
+    "url": "http://localhost:8000/mcp",
     "headers": {
       "Authorization": "Bearer YOUR_API_KEY_HERE"
     }
