@@ -265,10 +265,18 @@ def verify_api_key(api_key: str, session: Session = None) -> bool:
 
 # --- FastAPI App ---
 
+# Build the MCP ASGI app first so we can chain its lifespan into FastAPI.
+# mcp.http_app() carries a lifespan that starts the Streamable-HTTP session
+# manager (an anyio task group). If that lifespan never runs, every MCP call
+# raises "Task group is not initialized" and returns 500. Mounting alone does
+# NOT run it — the parent app must own the lifespan.
+_mcp_asgi = mcp.http_app(path="/")
+
 app = FastAPI(
     title="UI Traps Analyzer API",
     description="Analyze UI designs for usability issues using the UI Tenets & Traps framework",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=_mcp_asgi.lifespan,
 )
 
 # CORS middleware - allows uitraps.com, all subdomains, and localhost for dev
@@ -277,7 +285,7 @@ app.add_middleware(
     allow_origins=ALLOWED_ORIGINS,
     allow_origin_regex=ALLOWED_ORIGIN_REGEX,
     allow_credentials=True,
-    allow_methods=["POST", "GET"],
+    allow_methods=["POST", "GET", "DELETE"],
     allow_headers=["*"],
 )
 
@@ -322,9 +330,10 @@ async def mcp_auth_middleware(request: Request, call_next):
         mcp_api_key.reset(token)
 
 # --- Mount MCP server ---
-# Streamable HTTP endpoint: /mcp  (configure this URL in your MCP client)
+# Streamable HTTP endpoint: /mcp  (configure this URL in your MCP client).
+# _mcp_asgi is built above (before the FastAPI app) so its lifespan can be
+# chained into FastAPI(lifespan=...); mounting here only wires the routes.
 try:
-    _mcp_asgi = mcp.http_app(path="/")
     app.mount("/mcp", _mcp_asgi)
     logger.info("MCP server mounted at /mcp")
 except Exception as e:
