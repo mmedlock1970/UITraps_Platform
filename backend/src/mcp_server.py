@@ -18,9 +18,11 @@ Copyright © 2009-present UI Traps LLC. All Rights Reserved.
 """
 
 import os
+import re
 import base64
 import tempfile
 import logging
+from pathlib import Path
 from typing import Optional
 
 from fastmcp import FastMCP
@@ -39,6 +41,7 @@ logger = logging.getLogger(__name__)
 #   analyze_pdf            →  /analyze-pdf
 #   analyze_video          →  /analyze-video
 #   ask_about_traps        →  /api/chat          (free, no credits)
+#   get_trap_detection_rules →  (none — parses trap_kb_v2.md directly; no Claude, no credits)
 #
 # What stays in sync automatically (no action needed):
 #   - Bug fixes and prompt changes in the analyzer service classes
@@ -470,3 +473,151 @@ def ask_about_traps(
     except Exception as e:
         logger.error("ask_about_traps error: %s", e)
         return {"error": f"Chat failed: {e}"}
+
+
+# ── Trap detection rules (KB-derived; no Claude, no credits) ───────────────────
+# get_trap_detection_rules reads each Trap's "Detection procedure" (what to look
+# for) and "Remediation" (the fix) straight from the v2 knowledge base. It parses
+# the markdown and returns structured data — it never calls Claude and never
+# charges credits.
+
+_TRAP_RULES_CACHE = None
+_KB_SOURCE_LABEL = "UI Tenets & Traps Knowledge Base v2.1 (trap_kb_v2.md)"
+
+_KB_TENET_RE = re.compile(r'^##\s+TRAP CHUNKS\s+[—–-]\s+(.+?)\s*$')
+_KB_TRAP_RE = re.compile(r'^###\s+TRAP:\s+(.+?)\s*$')
+_KB_FIELD_RE = re.compile(r'^\*\*([A-Z][^*]+?)\.\*\*\s*(.*)$')
+
+
+def _kb_v2_path() -> Path:
+    """Canonical path to the v2 knowledge base (reuses knowledge_base._KB_PATHS)."""
+    try:
+        from .knowledge_base import _KB_PATHS
+        p = _KB_PATHS.get("v2")
+        if p:
+            return p
+    except Exception:
+        pass
+    return Path(__file__).parent.parent / "data" / "trap_kb_v2.md"
+
+
+def _kb_clean_trap_name(raw: str) -> str:
+    # Strip a trailing "*(ratified …)*"-style annotation from the header.
+    return re.sub(r'\s*\*\(.*?\)\*\s*$', '', raw).strip()
+
+
+def _kb_clean_field(text_lines: list) -> str:
+    out = []
+    for ln in text_lines:
+        if ln.strip() == "---":  # end-of-chunk separator
+            break
+        out.append(ln)
+    return "\n".join(out).strip()
+
+
+def _kb_extract_fields(body_lines: list) -> list:
+    """Split a Trap chunk's body into (label, lines) fields keyed by their **Label.** header."""
+    fields = []
+    label = None
+    buf = []
+    for line in body_lines:
+        m = _KB_FIELD_RE.match(line)
+        if m:
+            if label is not None:
+                fields.append((label, buf))
+            label = m.group(1).strip()
+            buf = [m.group(2)] if m.group(2) else []
+        elif label is not None:
+            buf.append(line)
+    if label is not None:
+        fields.append((label, buf))
+    return fields
+
+
+def _kb_pick(fields: list, prefix: str) -> str:
+    for label, buf in fields:
+        if label.startswith(prefix):
+            return _kb_clean_field(buf)
+    return ""
+
+
+def _parse_trap_rules() -> list:
+    text = _kb_v2_path().read_text(encoding="utf-8")
+    tenet = None
+    traps = []
+    cur = None
+
+    def _close():
+        nonlocal cur
+        if cur is not None:
+            traps.append(cur)
+            cur = None
+
+    for line in text.split("\n"):
+        if line.startswith("## "):
+            _close()
+            m = _KB_TENET_RE.match(line)
+            tenet = m.group(1).strip().title() if m else None
+            continue
+        tm = _KB_TRAP_RE.match(line)
+        if tm:
+            _close()
+            cur = {"name": _kb_clean_trap_name(tm.group(1)), "tenet": tenet, "body": []}
+            continue
+        if cur is not None:
+            cur["body"].append(line)
+    _close()
+
+    rules = []
+    for t in traps:
+        fields = _kb_extract_fields(t["body"])
+        rules.append({
+            "trap": t["name"],
+            "tenet": t["tenet"],
+            "detection_rules": _kb_pick(fields, "Detection"),
+            "fix": _kb_pick(fields, "Remediation"),
+        })
+    return rules
+
+
+def _load_trap_detection_rules() -> list:
+    global _TRAP_RULES_CACHE
+    if _TRAP_RULES_CACHE is None:
+        _TRAP_RULES_CACHE = _parse_trap_rules()
+    return _TRAP_RULES_CACHE
+
+
+def _kb_normalize(s: str) -> str:
+    return re.sub(r'[^a-z0-9]', '', (s or "").lower())
+
+
+@mcp.tool()
+def get_trap_detection_rules(trap_name: Optional[str] = None) -> dict:
+    """Returns what to look for when checking a screenshot or design for UI Traps. Use this, then examine the image yourself and report the Traps found, the element involved, the fix, and the source."""
+    try:
+        rules = _load_trap_detection_rules()
+    except Exception as e:
+        logger.error("get_trap_detection_rules load error: %s", e)
+        return {"error": f"Could not load trap knowledge base: {e}"}
+
+    if trap_name and trap_name.strip():
+        target = _kb_normalize(trap_name)
+        exact = [r for r in rules if _kb_normalize(r["trap"]) == target]
+        if exact:
+            return {"trap": exact[0], "source": _KB_SOURCE_LABEL}
+        partial = [r for r in rules if target and target in _kb_normalize(r["trap"])]
+        if len(partial) == 1:
+            return {"trap": partial[0], "source": _KB_SOURCE_LABEL}
+        if len(partial) > 1:
+            return {
+                "error": f"'{trap_name}' matches multiple Traps; specify one.",
+                "candidates": [r["trap"] for r in partial],
+                "source": _KB_SOURCE_LABEL,
+            }
+        return {
+            "error": f"No Trap named '{trap_name}'.",
+            "available_traps": [r["trap"] for r in rules],
+            "source": _KB_SOURCE_LABEL,
+        }
+
+    return {"traps": rules, "count": len(rules), "source": _KB_SOURCE_LABEL}
