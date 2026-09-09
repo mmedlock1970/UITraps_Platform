@@ -476,13 +476,23 @@ def ask_about_traps(
 
 
 # ── Trap detection rules (KB-derived; no Claude, no credits) ───────────────────
-# get_trap_detection_rules reads each Trap's "Detection procedure" (what to look
-# for) and "Remediation" (the fix) straight from the v2 knowledge base. It parses
-# the markdown and returns structured data — it never calls Claude and never
-# charges credits.
+# get_trap_detection_rules serves the v2 knowledge base as structured data: per-
+# Trap definition (one sentence), detection rules, disambiguation, severity,
+# confidence, and fix — all drawn straight from the KB, nothing invented — plus a
+# general section (severity scale, confidence, the two-pass detect→enrich
+# procedure, and the required per-finding output format). It never calls Claude
+# and never charges credits.
+#
+# The no-argument response is PAGINATED (offset / next_offset). Every Trap is
+# returned at full verbatim fidelity across pages, each page kept well under any
+# single-call size limit — so as the KB grows, all of it stays reachable and
+# nothing is ever summarized away or truncated. Pass a trap_name for one Trap.
 
-_TRAP_RULES_CACHE = None
+_KB_CACHE = None
 _KB_SOURCE_LABEL = "UI Tenets & Traps Knowledge Base v2.1 (trap_kb_v2.md)"
+# Cap on the per-page traps payload (chars). Keeps each call comfortably small
+# regardless of how large the KB grows; the caller pages via next_offset.
+_PAGE_CHAR_BUDGET = 38000
 
 _KB_TENET_RE = re.compile(r'^##\s+TRAP CHUNKS\s+[—–-]\s+(.+?)\s*$')
 _KB_TRAP_RE = re.compile(r'^###\s+TRAP:\s+(.+?)\s*$')
@@ -541,7 +551,53 @@ def _kb_pick(fields: list, prefix: str) -> str:
     return ""
 
 
-def _parse_trap_rules() -> list:
+def _kb_normalize(s: str) -> str:
+    return re.sub(r'[^a-z0-9]', '', (s or "").lower())
+
+
+def _kb_first_sentence(text: str) -> str:
+    """First sentence of a field — used to summarize the (long) Definition to one line."""
+    text = (text or "").strip()
+    if not text:
+        return ""
+    m = re.search(r'(.+?[.!?])(?:\s+[A-Z(]|\s*$)', text, re.S)
+    return (m.group(1) if m else text).strip()
+
+
+def _kb_tidy(s: str) -> str:
+    # Drop a trailing markdown rule ("---") left in a section capture.
+    return re.sub(r'\s*-{3,}\s*$', '', (s or "")).strip()
+
+
+def _parse_general_section(text: str) -> dict:
+    """Extract the KB's cross-cutting rules verbatim, anchored on stable markers
+    (not line numbers) so growth in the KB does not break the extraction."""
+    def _grab(pattern):
+        m = re.search(pattern, text, re.S | re.M)
+        return m.group(1).strip() if m else ""
+
+    # Severity scale + how to assign it, and how to express confidence —
+    # the whole "## SEVERITY & CONFIDENCE" section, split at the confidence half.
+    sc = _grab(r'^##\s+SEVERITY & CONFIDENCE[^\n]*\n(.*?)(?=^##\s)')
+    severity_scale, confidence = sc, ""
+    idx = sc.find("**Confidence scale**")
+    if idx != -1:
+        severity_scale, confidence = sc[:idx].strip(), sc[idx:].strip()
+
+    return {
+        "severity_scale": _kb_tidy(severity_scale),
+        "confidence": _kb_tidy(confidence),
+        # Analysis procedure the web analyzer follows: two-pass detect → enrich (G2).
+        "analysis_procedure": _grab(r'(\*\*G2\..*?)(?=\n\*\*G3\.)'),
+        # Required output format per finding — the "Issues" block of the four-section body.
+        "output_format_per_finding": _grab(
+            r'(1\.\s+\*\*Issues\.\*\*.*?)(?=\n2\.\s+\*\*Worth a closer look)'
+        ),
+        "source": _KB_SOURCE_LABEL,
+    }
+
+
+def _parse_kb() -> dict:
     text = _kb_v2_path().read_text(encoding="utf-8")
     tenet = None
     traps = []
@@ -570,36 +626,51 @@ def _parse_trap_rules() -> list:
 
     rules = []
     for t in traps:
-        fields = _kb_extract_fields(t["body"])
+        f = _kb_extract_fields(t["body"])
         rules.append({
             "trap": t["name"],
             "tenet": t["tenet"],
-            "detection_rules": _kb_pick(fields, "Detection"),
-            "fix": _kb_pick(fields, "Remediation"),
+            "definition": _kb_first_sentence(_kb_pick(f, "Definition")),
+            "detection_rules": _kb_pick(f, "Detection"),
+            "disambiguation": {
+                "boundary": _kb_pick(f, "Boundary"),
+                "attribution": _kb_pick(f, "Attribution"),
+            },
+            "severity": _kb_pick(f, "Severity"),
+            "confidence": _kb_pick(f, "Assessability"),
+            "fix": _kb_pick(f, "Remediation"),
         })
-    return rules
+    return {"general": _parse_general_section(text), "traps": rules}
 
 
-def _load_trap_detection_rules() -> list:
-    global _TRAP_RULES_CACHE
-    if _TRAP_RULES_CACHE is None:
-        _TRAP_RULES_CACHE = _parse_trap_rules()
-    return _TRAP_RULES_CACHE
+def _load_kb() -> dict:
+    global _KB_CACHE
+    if _KB_CACHE is None:
+        _KB_CACHE = _parse_kb()
+    return _KB_CACHE
 
 
-def _kb_normalize(s: str) -> str:
-    return re.sub(r'[^a-z0-9]', '', (s or "").lower())
+def _kb_trap_size(t: dict) -> int:
+    d = t.get("disambiguation", {})
+    return sum(len(x) for x in (
+        t["trap"], t["tenet"] or "", t["definition"], t["detection_rules"],
+        d.get("boundary", ""), d.get("attribution", ""),
+        t["severity"], t["confidence"], t["fix"],
+    )) + 160  # approx JSON key/structure overhead per Trap
 
 
 @mcp.tool()
-def get_trap_detection_rules(trap_name: Optional[str] = None) -> dict:
-    """Returns what to look for when checking a screenshot or design for UI Traps. Use this, then examine the image yourself and report the Traps found, the element involved, the fix, and the source."""
+def get_trap_detection_rules(trap_name: Optional[str] = None, offset: int = 0) -> dict:
+    """Returns what to look for when checking a screenshot or design for UI Traps. Use this, then examine the image yourself and report the Traps found, the element involved, the fix, and the source. Results are paginated: when the response includes a non-null 'next_offset', call again with offset=next_offset until it is null to retrieve every Trap; pass a trap_name to get one Trap's full detail instead."""
     try:
-        rules = _load_trap_detection_rules()
+        kb = _load_kb()
     except Exception as e:
         logger.error("get_trap_detection_rules load error: %s", e)
         return {"error": f"Could not load trap knowledge base: {e}"}
 
+    rules = kb["traps"]
+
+    # Single-Trap lookup — full verbatim detail for one Trap.
     if trap_name and trap_name.strip():
         target = _kb_normalize(trap_name)
         exact = [r for r in rules if _kb_normalize(r["trap"]) == target]
@@ -620,4 +691,40 @@ def get_trap_detection_rules(trap_name: Optional[str] = None) -> dict:
             "source": _KB_SOURCE_LABEL,
         }
 
-    return {"traps": rules, "count": len(rules), "source": _KB_SOURCE_LABEL}
+    # Full dump — paginated so the entire KB is reachable at full fidelity.
+    total = len(rules)
+    try:
+        start = max(0, int(offset))
+    except (TypeError, ValueError):
+        start = 0
+
+    page = []
+    used = 0
+    i = start
+    while i < total:
+        sz = _kb_trap_size(rules[i])
+        if page and used + sz > _PAGE_CHAR_BUDGET:
+            break
+        page.append(rules[i])
+        used += sz
+        i += 1
+    next_offset = i if i < total else None
+
+    resp = {
+        "traps": page,
+        "total_traps": total,
+        "offset": start,
+        "returned": len(page),
+        "next_offset": next_offset,
+        "source": _KB_SOURCE_LABEL,
+    }
+    if next_offset is not None:
+        resp["note"] = (
+            f"More Traps remain. Call get_trap_detection_rules(offset={next_offset}) and keep "
+            "following next_offset until it is null so every Trap is examined."
+        )
+    # The general section and the full taxonomy ride on the first page only.
+    if start == 0:
+        resp["general"] = kb["general"]
+        resp["taxonomy"] = [{"trap": r["trap"], "tenet": r["tenet"]} for r in rules]
+    return resp
