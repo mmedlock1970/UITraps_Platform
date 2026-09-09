@@ -23,9 +23,10 @@ import base64
 import tempfile
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Annotated, Optional
 
 from fastmcp import FastMCP
+from pydantic import Field
 
 from .mcp_context import mcp_api_key
 
@@ -569,6 +570,16 @@ def _kb_tidy(s: str) -> str:
     return re.sub(r'\s*-{3,}\s*$', '', (s or "")).strip()
 
 
+def _parse_tenet_glosses(text: str) -> dict:
+    """Parse the KB's TENET-GLOSSES block: one line per Tenet, `- less <Tenet>: "<gloss>"`."""
+    glosses = {}
+    block = re.search(r'<!-- TENET-GLOSSES:START -->(.*?)<!-- TENET-GLOSSES:END -->', text, re.S)
+    if block:
+        for mm in re.finditer(r'-\s*less\s+(\w+):\s*"([^"]*)"', block.group(1)):
+            glosses[mm.group(1).strip().lower()] = mm.group(2).strip()
+    return glosses
+
+
 def _parse_general_section(text: str) -> dict:
     """Extract the KB's cross-cutting rules verbatim, anchored on stable markers
     (not line numbers) so growth in the KB does not break the extraction."""
@@ -640,7 +651,11 @@ def _parse_kb() -> dict:
             "confidence": _kb_pick(f, "Assessability"),
             "fix": _kb_pick(f, "Remediation"),
         })
-    return {"general": _parse_general_section(text), "traps": rules}
+    return {
+        "general": _parse_general_section(text),
+        "traps": rules,
+        "tenet_glosses": _parse_tenet_glosses(text),
+    }
 
 
 def _load_kb() -> dict:
@@ -728,3 +743,57 @@ def get_trap_detection_rules(trap_name: Optional[str] = None, offset: int = 0) -
         resp["general"] = kb["general"]
         resp["taxonomy"] = [{"trap": r["trap"], "tenet": r["tenet"]} for r in rules]
     return resp
+
+
+# ── Prompt: guided trap analysis ──────────────────────────────────────────────
+
+@mcp.prompt()
+def run_trap_analysis(
+    users: Annotated[str, Field(description="Who uses the product")],
+    goal: Annotated[str, Field(description="What they are trying to do")],
+) -> str:
+    """Analyze an attached screenshot or design for UI Traps against the UI Tenets & Traps framework."""
+    return (
+        "You are analyzing a user interface for UI Traps (usability problems) using the "
+        "UI Tenets & Traps framework.\n\n"
+        f"Users (who uses the product): {users}\n"
+        f"Goal (what they are trying to do): {goal}\n\n"
+        "Do the following, in order:\n"
+        "1. Call the get_trap_detection_rules tool to load what to look for (the detection "
+        "rules, severity guidance, and fixes for every Trap).\n"
+        "2. Examine the attached screenshot or design carefully against those rules, given the "
+        "users and goal above.\n"
+        "3. Report every Trap you find. For each Trap, give — in this exact order — the element "
+        "involved, the matched detection rule, the severity, the fix, and the source label.\n\n"
+        'Begin your answer with exactly: "Based on UI Tenets & Traps:"'
+    )
+
+
+# ── Resource: the 8 Tenets ────────────────────────────────────────────────────
+
+@mcp.resource(
+    "uitraps://tenets",
+    name="The 8 Tenets",
+    description="The eight UI Tenets with their one-line glosses from the knowledge base.",
+    mime_type="text/markdown",
+)
+def tenets_resource() -> str:
+    """List the 8 UI Tenets with the KB's one-line gloss for each."""
+    kb = _load_kb()
+    glosses = kb["tenet_glosses"]
+    ordered = []
+    for r in kb["traps"]:
+        if r["tenet"] and r["tenet"] not in ordered:
+            ordered.append(r["tenet"])
+    lines = [
+        "# The 8 UI Tenets",
+        "",
+        "One-line glosses from the UI Tenets & Traps knowledge base — each says what the "
+        "interface is like when that Tenet is not met:",
+        "",
+    ]
+    for tenet in ordered:
+        g = glosses.get(tenet.lower(), "")
+        lines.append(f'- **{tenet}** — when it is missing: "{g}"' if g else f"- **{tenet}**")
+    lines += ["", f"Source: {_KB_SOURCE_LABEL}"]
+    return "\n".join(lines)
