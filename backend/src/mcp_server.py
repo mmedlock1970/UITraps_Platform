@@ -20,6 +20,7 @@ Copyright © 2009-present UI Traps LLC. All Rights Reserved.
 import os
 import re
 import base64
+import secrets
 import tempfile
 import logging
 from pathlib import Path
@@ -495,6 +496,10 @@ _KB_SOURCE_LABEL = "UI Tenets & Traps Knowledge Base v2.1 (trap_kb_v2.md)"
 # yet, so _kb_trap_link points at the framework site; when per-Trap pages exist,
 # switch it to f"{_TRAP_SITE}/traps/{_kb_trap_slug(name)}" (one-line change).
 _TRAP_SITE = "https://uitraps.com"
+# Source-check receipt: KB version + a short random run ID, e.g. "UITT-2.1-7f3a9c".
+# Generated fresh per tool call, so a report that quotes it verbatim proves the tool
+# was actually invoked (the random ID cannot be produced without calling the tool).
+_KB_VERSION = "2.1"
 # Cap on the per-page traps payload (chars). Keeps each call comfortably small
 # regardless of how large the KB grows; the caller pages via next_offset.
 _PAGE_CHAR_BUDGET = 38000
@@ -573,6 +578,11 @@ def _kb_trap_link(name: str) -> str:
 def _kb_trap_source(name: str, tenet: str) -> str:
     """Per-Trap source label: 'UI Tenets & Traps: <Trap> (<Tenet>) — <link>'."""
     return f"UI Tenets & Traps: {name} ({tenet or ''}) — {_kb_trap_link(name)}"
+
+
+def _receipt() -> str:
+    """Fresh source-check receipt for a tool call, e.g. 'UITT-2.1-7f3a9c'."""
+    return f"UITT-{_KB_VERSION}-{secrets.token_hex(3)}"
 
 
 def _kb_first_sentence(text: str) -> str:
@@ -696,19 +706,24 @@ def _kb_trap_size(t: dict) -> int:
 
 @mcp.tool()
 def get_trap_detection_rules(trap_name: Optional[str] = None, offset: int = 0) -> dict:
-    """Returns what to look for when checking a screenshot or design for UI Traps, plus the per-Trap source label to cite. Use this, then examine the image yourself and report your findings as a LIST OF TRAPS. For EVERY finding, use exactly this format, in this order, heading first before anything else:
-[Trap name] · [Tenet]
+    """Returns what to look for when checking a screenshot or design for UI Traps, the per-Trap source label to cite, and a 'receipt' value that proves this tool was called. Use this, then examine the image yourself.
+OPEN the report with a 'Source check' line, before anything else:
+- If you called this tool: "Source check: the UI Tenets & Traps connector was used. Receipt: <the receipt value this tool returned, quoted verbatim>. ◆ = finding based on a detection rule returned by the connector; ○ = my own observation, not part of the framework."
+- If you did NOT call this tool, open instead with exactly: "Source check: the UI Tenets & Traps connector was not used; this analysis is Claude's general knowledge only."
+Then report findings as a LIST OF TRAPS. For EVERY ◆ finding use exactly this format, in this order, heading first:
+◆ [Trap name] · [Tenet]
 Element: …
 Rule matched: [quote the detection rule]
 Severity: …   Confidence: …
 Fix: …
 Source: [the per-Trap 'source' label this tool returns for that Trap, including its link]
-If a finding involves more than one Trap, lead with the primary Trap in the heading and list the secondary Trap(s) on the Element line. Begin your answer with "Based on UI Tenets & Traps:". Results are paginated: when the response includes a non-null 'next_offset', call again with offset=next_offset until it is null to retrieve every Trap; pass a trap_name to get one Trap's full detail instead."""
+If a finding involves more than one Trap, lead with the primary Trap in the heading and list the secondary Trap(s) on the Element line. Mark every finding ◆ (backed by a detection rule this tool returned) or ○ (your own observation, not in the framework); group all ○ items at the END under a heading "Other observations". Results are paginated: when the response includes a non-null 'next_offset', call again with offset=next_offset until it is null to retrieve every Trap; pass a trap_name to get one Trap's full detail instead."""
+    receipt = _receipt()
     try:
         kb = _load_kb()
     except Exception as e:
         logger.error("get_trap_detection_rules load error: %s", e)
-        return {"error": f"Could not load trap knowledge base: {e}"}
+        return {"error": f"Could not load trap knowledge base: {e}", "receipt": receipt}
 
     rules = kb["traps"]
 
@@ -717,20 +732,22 @@ If a finding involves more than one Trap, lead with the primary Trap in the head
         target = _kb_normalize(trap_name)
         exact = [r for r in rules if _kb_normalize(r["trap"]) == target]
         if exact:
-            return {"trap": exact[0], "knowledge_base": _KB_SOURCE_LABEL}
+            return {"trap": exact[0], "knowledge_base": _KB_SOURCE_LABEL, "receipt": receipt}
         partial = [r for r in rules if target and target in _kb_normalize(r["trap"])]
         if len(partial) == 1:
-            return {"trap": partial[0], "knowledge_base": _KB_SOURCE_LABEL}
+            return {"trap": partial[0], "knowledge_base": _KB_SOURCE_LABEL, "receipt": receipt}
         if len(partial) > 1:
             return {
                 "error": f"'{trap_name}' matches multiple Traps; specify one.",
                 "candidates": [r["trap"] for r in partial],
                 "knowledge_base": _KB_SOURCE_LABEL,
+                "receipt": receipt,
             }
         return {
             "error": f"No Trap named '{trap_name}'.",
             "available_traps": [r["trap"] for r in rules],
             "knowledge_base": _KB_SOURCE_LABEL,
+            "receipt": receipt,
         }
 
     # Full dump — paginated so the entire KB is reachable at full fidelity.
@@ -759,6 +776,7 @@ If a finding involves more than one Trap, lead with the primary Trap in the head
         "returned": len(page),
         "next_offset": next_offset,
         "knowledge_base": _KB_SOURCE_LABEL,
+        "receipt": receipt,
     }
     if next_offset is not None:
         resp["note"] = (
@@ -786,21 +804,31 @@ def run_trap_analysis(
         f"Users (who uses the product): {users}\n"
         f"Goal (what they are trying to do): {goal}\n\n"
         "Do the following, in order:\n"
-        "1. Call the get_trap_detection_rules tool to load what to look for (the detection "
-        "rules, severity guidance, fixes, and per-Trap source label for every Trap).\n"
+        "1. Call the get_trap_detection_rules tool. It returns the detection rules, severity "
+        "guidance, fixes, per-Trap source labels, and a 'receipt' value — note the receipt.\n"
         "2. Examine the attached screenshot or design carefully against those rules, given the "
         "users and goal above.\n"
-        "3. Report your findings as a LIST OF TRAPS. For EVERY finding, use exactly this "
-        "format, in this order, with the heading first before anything else:\n\n"
-        "[Trap name] · [Tenet]\n"
+        "3. OPEN the report with a 'Source check' line, before anything else:\n"
+        "   - If you called the tool: \"Source check: the UI Tenets & Traps connector was "
+        "used. Receipt: <the tool's receipt value, quoted verbatim>. ◆ = finding based on a "
+        "detection rule returned by the connector; ○ = my own observation, not part of the "
+        "framework.\"\n"
+        "   - If you did NOT call the tool, open instead with exactly: \"Source check: the UI "
+        "Tenets & Traps connector was not used; this analysis is Claude's general knowledge "
+        "only.\"\n"
+        "4. Then report your findings as a LIST OF TRAPS. For EVERY ◆ finding, use exactly "
+        "this format, in this order, with the heading first:\n\n"
+        "◆ [Trap name] · [Tenet]\n"
         "Element: <the specific element(s) involved>\n"
         "Rule matched: <quote the detection rule you matched>\n"
         "Severity: <High/Medium/Low>   Confidence: <High/Medium/Low>\n"
         "Fix: <how to fix it>\n"
         "Source: <the per-Trap 'source' label the tool returned for this Trap, including its link>\n\n"
         "If a finding involves more than one Trap, lead with the primary Trap in the heading "
-        "and list the secondary Trap(s) on the Element line.\n\n"
-        'Begin your answer with exactly: "Based on UI Tenets & Traps:"'
+        "and list the secondary Trap(s) on the Element line.\n"
+        "5. Mark every finding ◆ (backed by a detection rule the tool returned) or ○ (your "
+        "own observation, not in the framework). Put ALL ○ items at the END under a heading "
+        "\"Other observations\", never mixed in with the ◆ findings."
     )
 
 
