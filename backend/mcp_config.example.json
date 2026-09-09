@@ -12,13 +12,25 @@
   "claude_desktop": {
     "_file": "~/Library/Application Support/Claude/claude_desktop_config.json  (Mac)",
     "_file_win": "%APPDATA%\\Claude\\claude_desktop_config.json  (Windows)",
-    "mcpServers": {
+    "_setup": "Claude Desktop reaches the server through the mcp-remote bridge helper (requires Node.js/npx). MERGE the mcpServers block below into your existing config — do not overwrite the file. Keep the trailing slash on /mcp/, and note there is NO space after the colon in the Authorization header (mcp-remote is sensitive to it on Windows). Fully quit Claude Desktop from the system tray and reopen after adding or changing the server.",
+    "_windows_mcpServers": {
       "uitraps": {
-        "type": "http",
-        "url": "https://YOUR-APP.railway.app/mcp",
-        "headers": {
-          "Authorization": "Bearer YOUR_API_KEY_HERE"
-        }
+        "command": "cmd",
+        "args": [
+          "/c", "npx", "-y", "mcp-remote",
+          "https://YOUR-APP.railway.app/mcp/",
+          "--header", "Authorization:Bearer YOUR_API_KEY_HERE"
+        ]
+      }
+    },
+    "_mac_mcpServers": {
+      "uitraps": {
+        "command": "npx",
+        "args": [
+          "-y", "mcp-remote",
+          "https://YOUR-APP.railway.app/mcp/",
+          "--header", "Authorization:Bearer YOUR_API_KEY_HERE"
+        ]
       }
     }
   },
@@ -52,6 +64,7 @@
     "analyze_figma": "Analyze a Figma file by URL. 1 credit per frame.",
     "analyze_pdf": "Analyze a PDF document. 1 credit per page.",
     "analyze_video": "Analyze a screen recording. 1 credit per extracted frame.",
-    "ask_about_traps": "Ask questions about the UI Traps framework. Free."
+    "ask_about_traps": "Ask questions about the UI Traps framework. Free.",
+    "get_trap_detection_rules": "Get the detection rules, severity, and fixes for the Traps from the knowledge base. Free."
   }
 }
