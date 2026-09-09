@@ -491,6 +491,10 @@ def ask_about_traps(
 
 _KB_CACHE = None
 _KB_SOURCE_LABEL = "UI Tenets & Traps Knowledge Base v2.1 (trap_kb_v2.md)"
+# Public framework site for per-Trap citations. uitraps.com has no per-Trap pages
+# yet, so _kb_trap_link points at the framework site; when per-Trap pages exist,
+# switch it to f"{_TRAP_SITE}/traps/{_kb_trap_slug(name)}" (one-line change).
+_TRAP_SITE = "https://uitraps.com"
 # Cap on the per-page traps payload (chars). Keeps each call comfortably small
 # regardless of how large the KB grows; the caller pages via next_offset.
 _PAGE_CHAR_BUDGET = 38000
@@ -556,6 +560,21 @@ def _kb_normalize(s: str) -> str:
     return re.sub(r'[^a-z0-9]', '', (s or "").lower())
 
 
+def _kb_trap_slug(name: str) -> str:
+    return re.sub(r'[^a-z0-9]+', '-', (name or "").lower()).strip('-')
+
+
+def _kb_trap_link(name: str) -> str:
+    # Per-Trap page link. uitraps.com has no per-Trap pages yet, so cite the framework
+    # site; switch to f"{_TRAP_SITE}/traps/{_kb_trap_slug(name)}" once those pages exist.
+    return _TRAP_SITE
+
+
+def _kb_trap_source(name: str, tenet: str) -> str:
+    """Per-Trap source label: 'UI Tenets & Traps: <Trap> (<Tenet>) — <link>'."""
+    return f"UI Tenets & Traps: {name} ({tenet or ''}) — {_kb_trap_link(name)}"
+
+
 def _kb_first_sentence(text: str) -> str:
     """First sentence of a field — used to summarize the (long) Definition to one line."""
     text = (text or "").strip()
@@ -604,7 +623,7 @@ def _parse_general_section(text: str) -> dict:
         "output_format_per_finding": _grab(
             r'(1\.\s+\*\*Issues\.\*\*.*?)(?=\n2\.\s+\*\*Worth a closer look)'
         ),
-        "source": _KB_SOURCE_LABEL,
+        "knowledge_base": _KB_SOURCE_LABEL,
     }
 
 
@@ -641,6 +660,7 @@ def _parse_kb() -> dict:
         rules.append({
             "trap": t["name"],
             "tenet": t["tenet"],
+            "source": _kb_trap_source(t["name"], t["tenet"]),
             "definition": _kb_first_sentence(_kb_pick(f, "Definition")),
             "detection_rules": _kb_pick(f, "Detection"),
             "disambiguation": {
@@ -668,7 +688,7 @@ def _load_kb() -> dict:
 def _kb_trap_size(t: dict) -> int:
     d = t.get("disambiguation", {})
     return sum(len(x) for x in (
-        t["trap"], t["tenet"] or "", t["definition"], t["detection_rules"],
+        t["trap"], t["tenet"] or "", t.get("source", ""), t["definition"], t["detection_rules"],
         d.get("boundary", ""), d.get("attribution", ""),
         t["severity"], t["confidence"], t["fix"],
     )) + 160  # approx JSON key/structure overhead per Trap
@@ -676,7 +696,14 @@ def _kb_trap_size(t: dict) -> int:
 
 @mcp.tool()
 def get_trap_detection_rules(trap_name: Optional[str] = None, offset: int = 0) -> dict:
-    """Returns what to look for when checking a screenshot or design for UI Traps. Use this, then examine the image yourself and report the Traps found, the element involved, the fix, and the source. Results are paginated: when the response includes a non-null 'next_offset', call again with offset=next_offset until it is null to retrieve every Trap; pass a trap_name to get one Trap's full detail instead."""
+    """Returns what to look for when checking a screenshot or design for UI Traps, plus the per-Trap source label to cite. Use this, then examine the image yourself and report your findings as a LIST OF TRAPS. For EVERY finding, use exactly this format, in this order, heading first before anything else:
+[Trap name] · [Tenet]
+Element: …
+Rule matched: [quote the detection rule]
+Severity: …   Confidence: …
+Fix: …
+Source: [the per-Trap 'source' label this tool returns for that Trap, including its link]
+If a finding involves more than one Trap, lead with the primary Trap in the heading and list the secondary Trap(s) on the Element line. Begin your answer with "Based on UI Tenets & Traps:". Results are paginated: when the response includes a non-null 'next_offset', call again with offset=next_offset until it is null to retrieve every Trap; pass a trap_name to get one Trap's full detail instead."""
     try:
         kb = _load_kb()
     except Exception as e:
@@ -690,20 +717,20 @@ def get_trap_detection_rules(trap_name: Optional[str] = None, offset: int = 0) -
         target = _kb_normalize(trap_name)
         exact = [r for r in rules if _kb_normalize(r["trap"]) == target]
         if exact:
-            return {"trap": exact[0], "source": _KB_SOURCE_LABEL}
+            return {"trap": exact[0], "knowledge_base": _KB_SOURCE_LABEL}
         partial = [r for r in rules if target and target in _kb_normalize(r["trap"])]
         if len(partial) == 1:
-            return {"trap": partial[0], "source": _KB_SOURCE_LABEL}
+            return {"trap": partial[0], "knowledge_base": _KB_SOURCE_LABEL}
         if len(partial) > 1:
             return {
                 "error": f"'{trap_name}' matches multiple Traps; specify one.",
                 "candidates": [r["trap"] for r in partial],
-                "source": _KB_SOURCE_LABEL,
+                "knowledge_base": _KB_SOURCE_LABEL,
             }
         return {
             "error": f"No Trap named '{trap_name}'.",
             "available_traps": [r["trap"] for r in rules],
-            "source": _KB_SOURCE_LABEL,
+            "knowledge_base": _KB_SOURCE_LABEL,
         }
 
     # Full dump — paginated so the entire KB is reachable at full fidelity.
@@ -731,7 +758,7 @@ def get_trap_detection_rules(trap_name: Optional[str] = None, offset: int = 0) -
         "offset": start,
         "returned": len(page),
         "next_offset": next_offset,
-        "source": _KB_SOURCE_LABEL,
+        "knowledge_base": _KB_SOURCE_LABEL,
     }
     if next_offset is not None:
         resp["note"] = (
@@ -760,11 +787,19 @@ def run_trap_analysis(
         f"Goal (what they are trying to do): {goal}\n\n"
         "Do the following, in order:\n"
         "1. Call the get_trap_detection_rules tool to load what to look for (the detection "
-        "rules, severity guidance, and fixes for every Trap).\n"
+        "rules, severity guidance, fixes, and per-Trap source label for every Trap).\n"
         "2. Examine the attached screenshot or design carefully against those rules, given the "
         "users and goal above.\n"
-        "3. Report every Trap you find. For each Trap, give — in this exact order — the element "
-        "involved, the matched detection rule, the severity, the fix, and the source label.\n\n"
+        "3. Report your findings as a LIST OF TRAPS. For EVERY finding, use exactly this "
+        "format, in this order, with the heading first before anything else:\n\n"
+        "[Trap name] · [Tenet]\n"
+        "Element: <the specific element(s) involved>\n"
+        "Rule matched: <quote the detection rule you matched>\n"
+        "Severity: <High/Medium/Low>   Confidence: <High/Medium/Low>\n"
+        "Fix: <how to fix it>\n"
+        "Source: <the per-Trap 'source' label the tool returned for this Trap, including its link>\n\n"
+        "If a finding involves more than one Trap, lead with the primary Trap in the heading "
+        "and list the secondary Trap(s) on the Element line.\n\n"
         'Begin your answer with exactly: "Based on UI Tenets & Traps:"'
     )
 
