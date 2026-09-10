@@ -25,7 +25,7 @@ load_dotenv()  # Load .env file before other imports
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from pydantic import BaseModel
 
 # Import the existing analyzer
@@ -338,6 +338,59 @@ try:
     logger.info("MCP server mounted at /mcp")
 except Exception as e:
     logger.warning("MCP server could not be mounted: %s", e)
+
+
+# --- Public report hosting (MCP render_trap_report) ---
+# Serves HTML reports the connector stored, at an unguessable path, for 7 days. No auth by
+# design — the token IS the credential. Isolated from the /analyze and /mcp paths.
+def _report_notice_html(title: str, body: str) -> str:
+    return (
+        "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'>"
+        "<meta name='viewport' content='width=device-width, initial-scale=1.0'>"
+        f"<title>{title}</title>"
+        "<style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;"
+        "font-family:'Open Sans',system-ui,-apple-system,'Segoe UI',sans-serif;background:#f5f7f9;color:#191d22}"
+        "@media(prefers-color-scheme:dark){body{background:#1e1e1e;color:#eceef0}}"
+        ".c{max-width:440px;text-align:center;padding:32px}"
+        "h1{font-family:'Montserrat',system-ui,sans-serif;font-size:20px;margin:0 0 10px}"
+        "p{color:#5a6672;line-height:1.6;margin:0}"
+        "@media(prefers-color-scheme:dark){p{color:#a2aab3}}</style></head>"
+        f"<body><div class='c'><h1>{title}</h1><p>{body}</p></div></body></html>"
+    )
+
+
+@app.get("/r/{token}")
+async def serve_connector_report(token: str):
+    """Serve a connector-generated HTML report by its unguessable token, for 7 days."""
+    from datetime import datetime as _dt, timedelta as _td
+    from sqlmodel import Session, select
+    from src.database import ConnectorReport
+    try:
+        with Session(engine) as session:
+            row = session.exec(
+                select(ConnectorReport).where(ConnectorReport.token == token)
+            ).first()
+    except Exception as e:
+        logger.error("serve_connector_report db error: %s", e)
+        return HTMLResponse(
+            _report_notice_html("Report unavailable",
+                                "This report could not be loaded right now. Please try again later."),
+            status_code=503,
+        )
+    if not row:
+        return HTMLResponse(
+            _report_notice_html("Report not found",
+                                "This report link is not valid. Check that you copied the full link."),
+            status_code=404,
+        )
+    if _dt.utcnow() - row.created_at > _td(days=7):
+        return HTMLResponse(
+            _report_notice_html("Report expired",
+                                "Reports are kept for 7 days. Re-run the analysis to generate a fresh report."),
+            status_code=410,
+        )
+    return HTMLResponse(row.html)
+
 
 # Initialize analyzer (reuse instance for efficiency)
 analyzer = None

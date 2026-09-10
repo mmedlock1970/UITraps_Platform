@@ -403,6 +403,20 @@ def parse_claude_response(response_text: str) -> Dict[str, Any]:
     return report
 
 
+def _grounding_mark(val) -> str:
+    """Optional per-finding source-check mark. ◆ = grounded in a returned framework detection
+    rule; ○ = the assistant's own observation. Empty when unset (e.g. the web tool never sets
+    it, so its output is unchanged)."""
+    if val in ("◆", "○"):
+        return val
+    v = str(val or "").strip().lower()
+    if v in ("rule", "diamond", "framework", "grounded", "trap"):
+        return "◆"
+    if v in ("own", "circle", "observation", "claude", "self"):
+        return "○"
+    return ""
+
+
 def format_report_as_markdown(report: Dict[str, Any], user_context: Dict[str, str] = None,
                               kb_version: str = None) -> str:
     """
@@ -420,6 +434,11 @@ def format_report_as_markdown(report: Dict[str, Any], user_context: Dict[str, st
     # Header
     md.append("# UI Tenets & Traps Analysis Report")
     md.append("")
+
+    # Source check (optional; set by the connector's render_trap_report). Opens the report.
+    if report.get('source_check'):
+        md.append(f"> **Source check:** {report['source_check']}")
+        md.append("")
 
     # Design name/title (from context or default)
     if user_context and user_context.get('design_name'):
@@ -516,9 +535,10 @@ def format_report_as_markdown(report: Dict[str, Any], user_context: Dict[str, st
             elif 'frame' in issue:
                 md.append(f"*{issue['frame']}*")
                 md.append("")
-            # Headline
+            # Headline (optional ◆/○ grounding mark set by the connector)
             if issue.get('headline'):
-                md.append(f"### {_cap_terms(issue['headline'])}")
+                _mk = _grounding_mark(issue.get('grounding'))
+                md.append(f"### {(_mk + ' ') if _mk else ''}{_cap_terms(issue['headline'])}")
                 md.append("")
             # Meta — prefer the new-KB ladder level when present
             conf = issue.get('confidence', '')
@@ -552,6 +572,22 @@ def format_report_as_markdown(report: Dict[str, Any], user_context: Dict[str, st
     if report.get('positive_observations'):
         for obs in report['positive_observations']:
             md.append(f"- {obs}")
+        md.append("")
+
+    # Other observations (optional; ○ items the connector reports outside the framework)
+    _other_md = [o for o in (report.get('other_observations') or []) if o]
+    if _other_md:
+        md.append("## Other observations")
+        md.append("")
+        md.append("*Claude's own observations, not part of the UI Tenets & Traps framework (○).*")
+        md.append("")
+        for o in _other_md:
+            if isinstance(o, dict):
+                _t = o.get('observation') or o.get('headline') or o.get('title') or ''
+                _s = o.get('suggestion') or o.get('recommendation') or o.get('note') or ''
+                md.append(f"- ○ {_t}" + (f" — {_s}" if _s else ""))
+            else:
+                md.append(f"- ○ {o}")
         md.append("")
     else:
         md.append("*None noted*")
@@ -3551,6 +3587,16 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
 
     h.append("<div class='report-inner'>")
 
+    # Source check (optional; set by the connector's render_trap_report). Opens the body.
+    if report.get('source_check'):
+        h.append(
+            "<div style=\"margin:0 0 20px;padding:12px 16px;border:1px solid var(--hairline);"
+            "border-left:3px solid var(--brand);border-radius:8px;background:var(--surface-sunk);"
+            "font-size:12.5px;line-height:1.5;color:var(--ink-soft)\">"
+            "<strong style=\"color:var(--ink)\">Source check:</strong> "
+            f"{report['source_check']}</div>"
+        )
+
     # evaluation details (identical to By-Issue)
     _emit_eval_details(h, uc)
 
@@ -3636,7 +3682,8 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
             h.append("</div></div>")
             # main — the instances found of this trap
             h.append("<div class='card-main'>")
-            h.append(f"<span class='card-num'>Trap {number:02d}</span>")
+            _gm = "◆ " if report.get("source_check") else ""
+            h.append(f"<span class='card-num'>{_gm}Trap {number:02d}</span>")
             _n = len(instances)
             # Count line only when there is more than one instance (a single instance is self-evident).
             if _n > 1:
@@ -3930,6 +3977,23 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
                 h.append("<td class='dt-disp'><span class='disp-none'>Not accounted for</span></td>")
             h.append("</tr>")
         h.append("</tbody></table></div></div>")
+
+    # Other observations (optional; ○ items the connector reports outside the framework)
+    _other = [o for o in (report.get("other_observations") or []) if o]
+    if _other:
+        h.append("<div class='section'><div class='section-eyebrow'>Other observations</div>")
+        h.append("<p class='narrative' style='margin-bottom:12px'>Claude&#39;s own observations, "
+                 "not part of the UI Tenets &amp; Traps framework (○).</p>")
+        h.append("<ul class='eval-tasks'>")
+        for o in _other:
+            if isinstance(o, dict):
+                _t = o.get("observation") or o.get("headline") or o.get("title") or ""
+                _s = o.get("suggestion") or o.get("recommendation") or o.get("note") or ""
+                _line = f"<b>{_t}</b>" + (f" — {_s}" if _s else "")
+            else:
+                _line = str(o)
+            h.append(f"<li>○ {_line}</li>")
+        h.append("</ul></div>")
 
     h.append("</div>")  # report-inner
     h.append("<div class='r-footer'>© UI Traps LLC · Proprietary &amp; Confidential — UI Tenets &amp; Traps Framework</div>")

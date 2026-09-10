@@ -93,6 +93,19 @@ class AnalysisReport(SQLModel, table=True):
     statistics: Optional[str] = None  # JSON string
 
 
+# --- Connector report hosting (MCP render_trap_report) ---
+
+class ConnectorReport(SQLModel, table=True):
+    """HTML reports produced by the MCP connector's render_trap_report tool. Served publicly
+    at /r/{token} for 7 days — the unguessable token IS the credential (no auth on that route)."""
+    __tablename__ = "connector_reports"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    token: str = Field(unique=True, index=True)
+    html: str = Field(sa_column_kwargs={"nullable": False})
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
 # --- Chat Models (for unified platform) ---
 
 class ConversationSession(SQLModel, table=True):

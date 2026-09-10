@@ -44,6 +44,7 @@ logger = logging.getLogger(__name__)
 #   analyze_video          →  /analyze-video
 #   ask_about_traps        →  /api/chat          (free, no credits)
 #   get_trap_detection_rules →  (none — parses trap_kb_v2.md directly; no Claude, no credits)
+#   render_trap_report       →  (none — reuses formatters.py renderers; stores HTML at /r/{token}; no credits)
 #
 # What stays in sync automatically (no action needed):
 #   - Bug fixes and prompt changes in the analyzer service classes
@@ -585,6 +586,19 @@ def _receipt() -> str:
     return f"UITT-{_KB_VERSION}-{secrets.token_hex(3)}"
 
 
+def _public_base() -> str:
+    """Public base URL for hosted report links (used by render_trap_report)."""
+    b = os.environ.get("PUBLIC_BASE_URL")
+    if b:
+        return b.rstrip("/")
+    dom = os.environ.get("RAILWAY_PUBLIC_DOMAIN")
+    if dom:
+        return f"https://{dom}"
+    if os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY_PROJECT_ID") or os.environ.get("RAILWAY_SERVICE_ID"):
+        return "https://uitrapsplatform-production.up.railway.app"
+    return "http://localhost:8000"
+
+
 def _kb_first_sentence(text: str) -> str:
     """First sentence of a field — used to summarize the (long) Definition to one line."""
     text = (text or "").strip()
@@ -717,7 +731,7 @@ Rule matched: [quote the detection rule]
 Severity: …   Confidence: …
 Fix: …
 Source: [the per-Trap 'source' label this tool returns for that Trap, including its link]
-If a finding involves more than one Trap, lead with the primary Trap in the heading and list the secondary Trap(s) on the Element line. Mark every finding ◆ (backed by a detection rule this tool returned) or ○ (your own observation, not in the framework); group all ○ items at the END under a heading "Other observations". Results are paginated: when the response includes a non-null 'next_offset', call again with offset=next_offset until it is null to retrieve every Trap; pass a trap_name to get one Trap's full detail instead."""
+If a finding involves more than one Trap, lead with the primary Trap in the heading and list the secondary Trap(s) on the Element line. Mark every finding ◆ (backed by a detection rule this tool returned) or ○ (your own observation, not in the framework); group all ○ items at the END under a heading "Other observations". To produce the OFFICIAL formatted report (matching the web tool) plus a shareable link, build your findings as structured JSON and pass them to the render_trap_report tool rather than hand-formatting the report. Results are paginated: when the response includes a non-null 'next_offset', call again with offset=next_offset until it is null to retrieve every Trap; pass a trap_name to get one Trap's full detail instead."""
     receipt = _receipt()
     try:
         kb = _load_kb()
@@ -790,6 +804,75 @@ If a finding involves more than one Trap, lead with the primary Trap in the head
     return resp
 
 
+# ── Tool: render the official report from structured findings ─────────────────
+# render_trap_report reuses the web tool's EXACT renderers (format_report_as_markdown +
+# format_bytrap_report_as_html) — no second template — so a connector report looks identical
+# to the web Trap Analyzer's. It stores the HTML for public serving at /r/{token} (7 days) and
+# returns the markdown for the chat. No Claude call, no credits.
+
+@mcp.tool()
+def render_trap_report(
+    findings: dict,
+    users: str = "",
+    goal: str = "",
+    artifact_description: str = "",
+    receipt: str = "",
+) -> dict:
+    """Render structured Trap findings into the official UI Traps report (the same renderer the web
+    tool uses — do not hand-format the report yourself). Pass the findings JSON you produced (the
+    analysis schema: summary_headline, summary_narrative, critical_issues/moderate_issues/minor_issues
+    — each finding with trap_name, tenet, headline, location, problem, recommendation, severity_label,
+    confidence, grounding "rule" (◆), and source; positive_observations; traps_checked_not_found;
+    other_observations for ○ items), plus users, goal, artifact_description, and the receipt returned
+    by get_trap_detection_rules. Returns report_markdown (show it in the chat VERBATIM) and report_url
+    (a link to the full HTML report, valid 7 days). No Claude call, no credits."""
+    try:
+        from .formatters import format_report_as_markdown, format_bytrap_report_as_html
+    except Exception:
+        from formatters import format_report_as_markdown, format_bytrap_report_as_html
+
+    report = dict(findings or {})
+    if receipt:
+        report["source_check"] = (
+            f"the UI Tenets & Traps connector was used. Receipt: {receipt}. "
+            "◆ = finding based on a returned detection rule; ○ = Claude's own observation, "
+            "not part of the framework."
+        )
+    uc = {
+        "design_name": artifact_description or "UI analysis",
+        "users": users or "",
+        "tasks": goal or "",
+    }
+    settings = {"kb_version": "v2", "profile": "self-serve"}
+    try:
+        md = format_report_as_markdown(report, uc, kb_version="v2")
+        html = format_bytrap_report_as_html(report, uc, analysis_settings=settings)
+    except Exception as e:
+        logger.error("render_trap_report render error: %s", e)
+        return {"error": f"Could not render report: {e}"}
+
+    token = secrets.token_urlsafe(16)
+    try:
+        from .database import engine, ConnectorReport
+        from sqlmodel import Session
+        with Session(engine) as s:
+            s.add(ConnectorReport(token=token, html=html))
+            s.commit()
+    except Exception as e:
+        logger.error("render_trap_report store error: %s", e)
+        return {
+            "report_markdown": md,
+            "report_url": None,
+            "note": f"Report rendered, but the hosted HTML link could not be created: {e}",
+        }
+
+    return {
+        "report_markdown": md,
+        "report_url": f"{_public_base()}/r/{token}",
+        "expires": "This link works for 7 days.",
+    }
+
+
 # ── Prompt: guided trap analysis ──────────────────────────────────────────────
 
 @mcp.prompt()
@@ -800,35 +883,45 @@ def run_trap_analysis(
     """Analyze an attached screenshot or design for UI Traps against the UI Tenets & Traps framework."""
     return (
         "You are analyzing a user interface for UI Traps (usability problems) using the "
-        "UI Tenets & Traps framework.\n\n"
+        "UI Tenets & Traps framework, and producing the OFFICIAL UI Traps report (the same "
+        "report the web tool generates). Do NOT hand-write or hand-format the report — you will "
+        "build structured findings and a tool will render them.\n\n"
         f"Users (who uses the product): {users}\n"
         f"Goal (what they are trying to do): {goal}\n\n"
-        "Do the following, in order:\n"
-        "1. Call the get_trap_detection_rules tool. It returns the detection rules, severity "
-        "guidance, fixes, per-Trap source labels, and a 'receipt' value — note the receipt.\n"
-        "2. Examine the attached screenshot or design carefully against those rules, given the "
-        "users and goal above.\n"
-        "3. OPEN the report with a 'Source check' line, before anything else:\n"
-        "   - If you called the tool: \"Source check: the UI Tenets & Traps connector was "
-        "used. Receipt: <the tool's receipt value, quoted verbatim>. ◆ = finding based on a "
-        "detection rule returned by the connector; ○ = my own observation, not part of the "
-        "framework.\"\n"
-        "   - If you did NOT call the tool, open instead with exactly: \"Source check: the UI "
-        "Tenets & Traps connector was not used; this analysis is Claude's general knowledge "
-        "only.\"\n"
-        "4. Then report your findings as a LIST OF TRAPS. For EVERY ◆ finding, use exactly "
-        "this format, in this order, with the heading first:\n\n"
-        "◆ [Trap name] · [Tenet]\n"
-        "Element: <the specific element(s) involved>\n"
-        "Rule matched: <quote the detection rule you matched>\n"
-        "Severity: <High/Medium/Low>   Confidence: <High/Medium/Low>\n"
-        "Fix: <how to fix it>\n"
-        "Source: <the per-Trap 'source' label the tool returned for this Trap, including its link>\n\n"
-        "If a finding involves more than one Trap, lead with the primary Trap in the heading "
-        "and list the secondary Trap(s) on the Element line.\n"
-        "5. Mark every finding ◆ (backed by a detection rule the tool returned) or ○ (your "
-        "own observation, not in the framework). Put ALL ○ items at the END under a heading "
-        "\"Other observations\", never mixed in with the ◆ findings."
+        "Follow these steps in order:\n"
+        "1. Call get_trap_detection_rules. It returns the detection rules, severity/confidence "
+        "guidance, per-Trap source labels, and a 'receipt' value — keep the receipt.\n"
+        "2. Examine the attached artifact — a screenshot, or a Figma frame you obtained via the "
+        "Figma connector — against those rules, given the users and goal above.\n"
+        "3. Build your findings as ONE JSON object in this schema (do NOT show this JSON to the "
+        "user):\n"
+        "   {\n"
+        "     \"summary_headline\": str, \"summary_narrative\": str,\n"
+        "     \"critical_issues\": [finding], \"moderate_issues\": [finding], \"minor_issues\": [finding],\n"
+        "     \"positive_observations\": [str],\n"
+        "     \"traps_checked_not_found\": [{\"trap_name\": str, \"coverage_status\": "
+        "\"not_present\"|\"not_assessable_artifact\"|\"not_assessable_context\", \"detail\": str}],\n"
+        "     \"other_observations\": [{\"observation\": str, \"suggestion\": str}]\n"
+        "   }\n"
+        "   where finding = {\"trap_name\": one of the 27 Trap names, \"tenet\": its Tenet, "
+        "\"headline\": a plain-language one-liner, \"location\": where it is, \"problem\": what's "
+        "happening and why it matters, \"recommendation\": a caveated fix (what to consider), "
+        "\"severity_label\": \"High\"|\"Medium\"|\"Low\" (give the reason in problem), \"confidence\": "
+        "\"High\"|\"Medium\"|\"Low\" (state the promotion path when not High), \"grounding\": \"rule\", "
+        "\"source\": the per-Trap source label the tool returned}.\n"
+        "   Put every framework Trap you find (grounded in a returned detection rule) in the "
+        "severity arrays with grounding \"rule\" (◆). Put any observation NOT tied to a returned "
+        "rule in other_observations (○). Traps you evaluated but did not find go in "
+        "traps_checked_not_found.\n"
+        "4. Call render_trap_report with {findings: <that JSON>, users, goal, "
+        "artifact_description: a short description of what you analyzed, receipt: the receipt "
+        "from step 1}.\n"
+        "5. Show the returned report_markdown to the user VERBATIM — do not reformat, summarize, "
+        "re-order, shorten, or add to it. Then on a new line below it add exactly: "
+        "\"Full report: <report_url>\".\n\n"
+        "If you did not call get_trap_detection_rules (or it returned nothing), do NOT call "
+        "render_trap_report; instead reply exactly: \"Source check: the UI Tenets & Traps "
+        "connector was not used; this analysis is Claude's general knowledge only.\""
     )
 
 
