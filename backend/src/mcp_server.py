@@ -64,6 +64,62 @@ mcp = FastMCP(
 )
 
 
+# ── Public "quick-look" mode ──────────────────────────────────────────────────
+# MCP_AUTH_DISABLED=true runs the /mcp server with NO API key required — for a
+# temporary, unauthenticated test (e.g. Figma's agent, which sends no key). In this
+# mode only the KB tools + run_trap_analysis + the tenets resource are exposed; the
+# credit-spending / analysis tools are NOT registered, so nothing that spends credits
+# or runs an analysis pass is reachable without a key. NEVER set this on production.
+MCP_AUTH_DISABLED = os.environ.get("MCP_AUTH_DISABLED", "").strip().lower() in ("1", "true", "yes", "on")
+
+if MCP_AUTH_DISABLED:
+    logger.warning("=" * 64)
+    logger.warning("MCP_AUTH_DISABLED=true — /mcp is PUBLIC (no API key required).")
+    logger.warning("Exposed: get_trap_detection_rules, render_trap_report, ask_about_traps,")
+    logger.warning("         run_trap_analysis (prompt), 'The 8 Tenets' resource.")
+    logger.warning("NOT exposed: analyze_screenshots/figma/pdf/video (credits + analysis).")
+    logger.warning("Anyone with the URL can use this. NEVER set this on production.")
+    logger.warning("=" * 64)
+
+
+def _keyed_tool(fn):
+    """Register a credit-spending / analysis tool ONLY when auth is enabled. In
+    MCP_AUTH_DISABLED (public quick-look) mode these are left unregistered, so they
+    never reach the credit/usage tables and never run an analysis pass without a key."""
+    if MCP_AUTH_DISABLED:
+        return fn
+    return mcp.tool()(fn)
+
+
+# ask_about_traps rate limit — public mode only (it does call Claude). Per source IP.
+_ASK_LIMIT = 30            # calls
+_ASK_WINDOW = 3600         # seconds
+_ask_hits: dict = {}       # ip -> list[timestamps]
+
+
+def _ask_source_ip() -> str:
+    try:
+        from fastmcp.server.dependencies import get_http_request
+        req = get_http_request()
+        xff = (req.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+        return xff or (req.client.host if req.client else "unknown")
+    except Exception:
+        return "global"
+
+
+def _ask_rate_ok(ip: str) -> bool:
+    import time
+    now = time.time()
+    bucket = _ask_hits.setdefault(ip, [])
+    cutoff = now - _ASK_WINDOW
+    while bucket and bucket[0] < cutoff:
+        bucket.pop(0)
+    if len(bucket) >= _ASK_LIMIT:
+        return False
+    bucket.append(now)
+    return True
+
+
 # ── Lazy service factories ────────────────────────────────────────────────────
 
 def _get_multi_analyzer():
@@ -137,7 +193,7 @@ def _image_suffix(b64: str) -> tuple[str, str]:
 
 # ── Tools ─────────────────────────────────────────────────────────────────────
 
-@mcp.tool()
+@_keyed_tool
 def analyze_screenshots(
     images_base64: list[str],
     users: str,
@@ -206,7 +262,7 @@ def analyze_screenshots(
                 pass
 
 
-@mcp.tool()
+@_keyed_tool
 def analyze_figma(
     figma_url: str,
     users: str,
@@ -294,7 +350,7 @@ def analyze_figma(
         return {"error": f"Figma analysis failed: {e}"}
 
 
-@mcp.tool()
+@_keyed_tool
 def analyze_pdf(
     pdf_base64: str,
     users: str,
@@ -370,7 +426,7 @@ def analyze_pdf(
                 pass
 
 
-@mcp.tool()
+@_keyed_tool
 def analyze_video(
     video_base64: str,
     users: str,
@@ -469,6 +525,9 @@ def ask_about_traps(
     Returns:
         response — a detailed answer grounded in the UI Tenets & Traps knowledge base
     """
+    # Public quick-look mode: this tool calls Claude, so cap it per source IP.
+    if MCP_AUTH_DISABLED and not _ask_rate_ok(_ask_source_ip()):
+        return {"error": "Rate limit reached: 30 questions per hour. Please try again later."}
     try:
         result = _get_chat_service().handle_chat(question, conversation_history or [])
         return {"response": result["response"]}

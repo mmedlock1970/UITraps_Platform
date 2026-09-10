@@ -86,7 +86,7 @@ from src.chat.chat_service import ChatService
 from src.router import detect_intent, IntentMode
 
 # MCP server — exposes analysis tools for Claude Desktop, Claude Code, Cursor, etc.
-from src.mcp_server import mcp
+from src.mcp_server import mcp, MCP_AUTH_DISABLED
 from src.mcp_context import mcp_api_key
 
 logger = logging.getLogger(__name__)
@@ -300,6 +300,12 @@ async def mcp_auth_middleware(request: Request, call_next):
 
     # Let OPTIONS pass through so CORS preflight works without auth
     if request.method == "OPTIONS":
+        return await call_next(request)
+
+    # Public quick-look mode (MCP_AUTH_DISABLED=true): skip the API-key check entirely.
+    # No key is read, no key/credits table is touched — the request goes straight to the
+    # MCP app (which, in this mode, only exposes the key-free tools/prompt/resource).
+    if MCP_AUTH_DISABLED:
         return await call_next(request)
 
     # Accept key from Authorization: Bearer header or ?api_key= query param
