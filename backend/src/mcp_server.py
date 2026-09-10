@@ -24,10 +24,9 @@ import secrets
 import tempfile
 import logging
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Optional
 
 from fastmcp import FastMCP
-from pydantic import Field
 
 from .mcp_context import mcp_api_key
 
@@ -814,7 +813,7 @@ If a finding involves more than one Trap, lead with the primary Trap in the head
 def render_trap_report(
     findings: dict,
     users: str = "",
-    goal: str = "",
+    tasks: str = "",
     artifact_description: str = "",
     receipt: str = "",
 ) -> dict:
@@ -823,7 +822,7 @@ def render_trap_report(
     analysis schema: summary_headline, summary_narrative, critical_issues/moderate_issues/minor_issues
     — each finding with trap_name, tenet, headline, location, problem, recommendation, severity_label,
     confidence, grounding "rule" (◆), and source; positive_observations; traps_checked_not_found;
-    other_observations for ○ items), plus users, goal, artifact_description, and the receipt returned
+    other_observations for ○ items), plus users, tasks, artifact_description, and the receipt returned
     by get_trap_detection_rules. Returns report_markdown (show it in the chat VERBATIM) and report_url
     (a link to the full HTML report, valid 7 days). No Claude call, no credits."""
     try:
@@ -841,7 +840,7 @@ def render_trap_report(
     uc = {
         "design_name": artifact_description or "UI analysis",
         "users": users or "",
-        "tasks": goal or "",
+        "tasks": tasks or "",
     }
     try:
         md = format_report_as_markdown(report, uc, kb_version="v2")
@@ -880,24 +879,34 @@ def render_trap_report(
 
 # ── Prompt: guided trap analysis ──────────────────────────────────────────────
 
-@mcp.prompt()
-def run_trap_analysis(
-    users: Annotated[str, Field(description="Who uses the product")],
-    goal: Annotated[str, Field(description="What they are trying to do")],
-) -> str:
-    """Analyze an attached screenshot or design for UI Traps against the UI Tenets & Traps framework."""
+@mcp.prompt(title="Run a Trap analysis")
+def run_trap_analysis(users: str, tasks: str, url: str = "") -> str:
+    """Analyze an attached screenshot or Figma frame for UI Traps and produce the full UI Tenets & Traps report.
+
+    Args:
+        users: Who uses this interface — e.g. "first-time mobile shoppers"
+        tasks: What they are trying to do — separate multiple tasks with semicolons
+        url: Optional. A Figma file or frame link (must include node-id). For a live website, attach a screenshot instead.
+    """
     return (
         "You are analyzing a user interface for UI Traps (usability problems) using the "
         "UI Tenets & Traps framework, and producing the OFFICIAL UI Traps report (the same "
         "report the web tool generates). Do NOT hand-write or hand-format the report — you will "
         "build structured findings and a tool will render them.\n\n"
         f"Users (who uses the product): {users}\n"
-        f"Goal (what they are trying to do): {goal}\n\n"
+        f"Tasks (what they are trying to do): {tasks}\n"
+        + (f"URL provided: {url}\n" if url.strip() else "")
+        + "\n"
         "Follow these steps in order:\n"
         "1. Call get_trap_detection_rules. It returns the detection rules, severity/confidence "
         "guidance, per-Trap source labels, and a 'receipt' value — keep the receipt.\n"
-        "2. Examine the attached artifact — a screenshot, or a Figma frame you obtained via the "
-        "Figma connector — against those rules, given the users and goal above.\n"
+        "2. Get the artifact to analyze, then assess it against those rules for the users and "
+        "tasks above (treat each semicolon-separated task separately):\n"
+        "   - If a URL is provided above and it is a Figma file or frame link, obtain that frame "
+        "via the Figma connector (or the analyze_figma tool) and analyze it.\n"
+        "   - Otherwise analyze the screenshot or HTML file attached to this conversation. If a "
+        "website URL was provided but you cannot actually view the page, ask the user to attach a "
+        "screenshot.\n"
         "3. Build your findings as ONE JSON object in this schema (do NOT show this JSON to the "
         "user):\n"
         "   {\n"
@@ -918,7 +927,7 @@ def run_trap_analysis(
         "severity arrays with grounding \"rule\" (◆). Put any observation NOT tied to a returned "
         "rule in other_observations (○). Traps you evaluated but did not find go in "
         "traps_checked_not_found.\n"
-        "4. Call render_trap_report with {findings: <that JSON>, users, goal, "
+        "4. Call render_trap_report with {findings: <that JSON>, users, tasks, "
         "artifact_description: a short description of what you analyzed, receipt: the receipt "
         "from step 1}.\n"
         "5. Show the returned report_markdown to the user VERBATIM — do not reformat, summarize, "
