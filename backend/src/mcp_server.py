@@ -843,9 +843,14 @@ def render_trap_report(
         "users": users or "",
         "tasks": goal or "",
     }
-    settings = {"kb_version": "v2", "profile": "self-serve"}
     try:
         md = format_report_as_markdown(report, uc, kb_version="v2")
+        # Embed the markdown (base64) so the report's in-page "Export as Markdown" button works.
+        settings = {
+            "kb_version": "v2",
+            "profile": "self-serve",
+            "export_markdown_b64": base64.b64encode(md.encode("utf-8")).decode("ascii"),
+        }
         html = format_bytrap_report_as_html(report, uc, analysis_settings=settings)
     except Exception as e:
         logger.error("render_trap_report render error: %s", e)

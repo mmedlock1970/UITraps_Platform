@@ -3542,6 +3542,42 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
          f"<style>{_NEW_KB_ISSUES_CSS}</style>",
          "</head><body data-selftheme='1'>", "<div class='wrap'>", "<div class='report'>"]
 
+    # Optional in-report export toolbar — rendered only when a caller supplies the report's
+    # markdown (base64) via settings['export_markdown_b64'] (the connector's render_trap_report
+    # does; the web tool does not, so its iframe report is unchanged and keeps its own controls).
+    # PDF = the browser's print-to-PDF (the report already has @media print styles); Markdown =
+    # a client-side download of the embedded markdown. Self-contained; hidden when printing.
+    _exp_b64 = settings.get("export_markdown_b64")
+    if _exp_b64:
+        h.append(
+            "<style>"
+            ".rpt-actions{display:flex;justify-content:flex-end;gap:8px;padding:12px 32px 0}"
+            ".rpt-btn{font:600 12px/1 var(--font-sans);color:var(--ink-soft);background:var(--surface-sunk);"
+            "border:1px solid var(--hairline-strong);border-radius:7px;padding:9px 13px;cursor:pointer;"
+            "display:inline-flex;align-items:center;gap:6px;transition:color .12s,border-color .12s}"
+            ".rpt-btn:hover{color:var(--ink);border-color:var(--ink-faint)}"
+            ".rpt-btn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;"
+            "stroke-linecap:round;stroke-linejoin:round}"
+            "@media print{.rpt-actions{display:none}}"
+            "</style>"
+            "<div class=\"rpt-actions\">"
+            "<button class=\"rpt-btn\" type=\"button\" onclick=\"window.print()\">"
+            "<svg viewBox=\"0 0 24 24\"><path d=\"M6 9V2h12v7\"/>"
+            "<path d=\"M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2\"/>"
+            "<path d=\"M6 14h12v8H6z\"/></svg>Export as PDF</button>"
+            "<button class=\"rpt-btn\" type=\"button\" id=\"rpt-md\">"
+            "<svg viewBox=\"0 0 24 24\"><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/>"
+            "<path d=\"M7 10l5 5 5-5\"/><path d=\"M12 15V3\"/></svg>Export as Markdown</button>"
+            "</div>"
+            "<script>(function(){var b64=\"" + _exp_b64 + "\";var el=document.getElementById(\"rpt-md\");"
+            "if(!el)return;el.addEventListener(\"click\",function(){try{var bin=atob(b64);"
+            "var a2=new Uint8Array(bin.length);for(var i=0;i<bin.length;i++){a2[i]=bin.charCodeAt(i);}"
+            "var bl=new Blob([a2],{type:\"text/markdown;charset=utf-8\"});var u=URL.createObjectURL(bl);"
+            "var a=document.createElement(\"a\");a.href=u;a.download=\"ui-traps-report.md\";"
+            "document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u);}"
+            "catch(e){console.error(e);}});})();</script>"
+        )
+
     # header
     h.append("<div class='r-header'>")
     h.append("<div class='r-eyebrow'>UI Tenets &amp; Traps · Analysis Report</div>")
