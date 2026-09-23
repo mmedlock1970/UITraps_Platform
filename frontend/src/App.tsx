@@ -176,6 +176,9 @@ export const App: React.FC = () => {
     return 'form';
   });
   const [activeReport, setActiveReport] = useState<ActiveReport | null>(null);
+  // Whether the shown report was opened from See past analyses (vs. a fresh analysis) — drives
+  // which tab stays active and the back button (Back to all vs Back to analyzer).
+  const [reportFromHistory, setReportFromHistory] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [isRerunning, setIsRerunning] = useState(false);
   const rerunElapsed = useElapsedTime();
@@ -340,6 +343,7 @@ export const App: React.FC = () => {
         originalContext: context,
       };
       setActiveReport(report);
+      setReportFromHistory(false);
       setView('report');
       setChatOpen(false);
 
@@ -498,6 +502,8 @@ export const App: React.FC = () => {
       markdown: analysis.markdown,
       statistics: analysis.statistics,
     });
+    setReportFromHistory(true);
+    setChatOpen(false);
     setView('report');
   }, []);
 
@@ -693,7 +699,7 @@ export const App: React.FC = () => {
 
   // A viewed report belongs to the "Analyze a design" tab, so it stays highlighted while the
   // report shows. Clicking that tab returns to the current report (or the form if none).
-  const activeTab: AppView = view === 'report' ? 'form' : view;
+  const activeTab: AppView = view === 'report' ? (reportFromHistory ? 'history' : 'form') : view;
 
   return (
     <div className={`uitraps-viewport-wrapper ${styles.viewportWrapper}`} data-theme={theme}>
@@ -709,7 +715,7 @@ export const App: React.FC = () => {
                     key={t}
                     type="button"
                     className={`${styles.tab} ${activeTab === t ? styles.tabActive : ''}`}
-                    onClick={() => setView(t === 'form' && activeReport ? 'report' : t)}
+                    onClick={() => { if (view === 'report' && t === activeTab) return; setView(t); }}
                   >
                     {TAB_LABELS[t]}
                   </button>
@@ -726,12 +732,21 @@ export const App: React.FC = () => {
             )}
             {view === 'report' && (
               <div className={styles.reportActions}>
-                <button className={styles.reportBtn} onClick={() => { setActiveReport(null); setView('form'); }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 19V5M5 12l7-7 7 7" />
-                  </svg>
-                  Back to analyzer
-                </button>
+                {reportFromHistory ? (
+                  <button className={styles.reportBtn} onClick={() => setView('history')}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 19V5M5 12l7-7 7 7" />
+                    </svg>
+                    Back to all
+                  </button>
+                ) : (
+                  <button className={styles.reportBtn} onClick={() => { setActiveReport(null); setView('form'); }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 19V5M5 12l7-7 7 7" />
+                    </svg>
+                    Back to analyzer
+                  </button>
+                )}
                 <button
                   className={chatOpen ? styles.reportBtnActive : styles.reportBtn}
                   onClick={() => setChatOpen(o => !o)}
