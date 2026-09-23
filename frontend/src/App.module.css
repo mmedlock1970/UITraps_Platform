@@ -273,9 +273,6 @@
   /* Side padding 4px + the report's own 20px inner padding = 24px, so the report card's
      edges line up with the action buttons and the tabs (all at 24px). */
   padding: 0 4px 8px;
-  /* Pull the report up under the action buttons (the report's .wrap has 12px top padding,
-     so this leaves a tight ~6px gap between the buttons and the report card). */
-  margin-top: -6px;
   align-items: stretch;
 }
 
@@ -283,6 +280,11 @@
   flex: 1;
   overflow-y: auto;
   min-width: 0;
+  /* Reserve the scrollbar gutter on both sides so the centered report card stays on the
+     page's true center axis whether or not a scrollbar is showing. Without this, the
+     scrollbar shifts the card left while the (unscrolled) button row stays centered, so
+     the "Chat about results" button overhangs the card's right edge. */
+  scrollbar-gutter: stable both-edges;
 }
 
 /* ── Page tab navigation (shared by form + chat views) ── */
