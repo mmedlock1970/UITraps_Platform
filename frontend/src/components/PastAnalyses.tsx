@@ -134,11 +134,7 @@ export const PastAnalyses: React.FC<PastAnalysesProps> = ({
   if (useServer) {
     return (
       <div className={styles.container}>
-                <div className={styles.header}>
-          <h2 className={styles.title}>Past Analyses</h2>
-        </div>
-
-        {serverLoading && <p style={{ padding: '16px', color: 'var(--uitraps-text-secondary)' }}>Loading…</p>}
+        {serverLoading &&<p style={{ padding: '16px', color: 'var(--uitraps-text-secondary)' }}>Loading…</p>}
         {serverError && <p style={{ padding: '16px', color: 'var(--uitraps-error)' }}>{serverError}</p>}
         {dbUnavailable && (
           <p style={{ padding: '12px 16px', margin: '0 0 8px', background: 'var(--uitraps-bg-secondary)', borderRadius: '8px', fontSize: '0.88em', color: 'var(--uitraps-text-secondary)' }}>
@@ -242,7 +238,6 @@ export const PastAnalyses: React.FC<PastAnalysesProps> = ({
   return (
     <div className={styles.container}>
             <div className={styles.header}>
-        <h2 className={styles.title}>Past Analyses</h2>
         <span className={styles.count}>{localAnalyses.length} of {HISTORY_LIMIT}</span>
       </div>
 

@@ -1,7 +1,7 @@
 .container {
   flex: 1;
   overflow-y: auto;
-  padding: var(--uitraps-spacing-lg) var(--uitraps-spacing-md);
+  padding: var(--uitraps-spacing-lg);
 }
 
 .backNav {

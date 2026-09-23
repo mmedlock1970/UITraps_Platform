@@ -37,7 +37,6 @@ export const PastChats: React.FC<PastChatsProps> = ({ token, apiEndpoint, onStar
 
   return (
     <div className={styles.container}>
-      <h2 className={styles.title}>Past chats</h2>
       {loading ? (
         <p className={styles.emptyText}>Loading…</p>
       ) : chats.length === 0 ? (

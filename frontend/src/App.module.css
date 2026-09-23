@@ -201,7 +201,7 @@
   align-items: stretch;
   justify-content: flex-start;
   flex: 1;
-  padding: 24px 16px 100px;
+  padding: 24px 24px 100px;
   gap: var(--uitraps-spacing-sm);
   overflow-y: auto;
 }

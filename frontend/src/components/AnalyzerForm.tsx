@@ -385,6 +385,9 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
     <form className={styles.form} onSubmit={handleSubmit} noValidate>
 
       <div className={styles.intro}>
+        <p className={styles.introSubtitle}>
+          Paste a screenshot or Figma frame URL and get a structured heuristic assessment.
+        </p>
         <div className={styles.requiredNote}>
           <span className={styles.requiredDot} />
           Required fields

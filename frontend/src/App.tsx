@@ -789,7 +789,6 @@ export const App: React.FC = () => {
             <div className={styles.centeredLayout}>
               <div className={styles.chatPageContent}>
                 <div className={styles.chatPageIntro}>
-                  <h1 className={styles.chatPageTitle}>Ask me anything...</h1>
                   <p className={styles.chatPageSubtitle}>Ask anything about UI Tenets &amp; Traps, or describe an interface issue and I'll identify the relevant Traps.</p>
                 </div>
                 <UnifiedInput
