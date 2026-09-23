@@ -865,7 +865,6 @@ export const App: React.FC = () => {
             <PastChats
               token={effectiveToken || undefined}
               apiEndpoint={apiEndpoint}
-              onStartChat={() => setView('chat')}
               onOpenChat={handleOpenChat}
             />
           </div>

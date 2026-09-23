@@ -5,7 +5,6 @@ import { listChats, SavedChatSummary } from '../api/chatApi';
 interface PastChatsProps {
   token?: string;
   apiEndpoint?: string;
-  onStartChat?: () => void;
   onOpenChat?: (sessionId: string) => void;
 }
 
@@ -13,7 +12,7 @@ interface PastChatsProps {
  * "See past chats" — a Claude-style list of the signed-in user's saved Q&A conversations.
  * Each item shows a brief summary title; clicking one re-opens that conversation to continue it.
  */
-export const PastChats: React.FC<PastChatsProps> = ({ token, apiEndpoint, onStartChat, onOpenChat }) => {
+export const PastChats: React.FC<PastChatsProps> = ({ token, apiEndpoint, onOpenChat }) => {
   const [chats, setChats] = useState<SavedChatSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -44,11 +43,6 @@ export const PastChats: React.FC<PastChatsProps> = ({ token, apiEndpoint, onStar
           <p className={styles.emptyText}>
             Your past chats will appear here once you've asked a question.
           </p>
-          {onStartChat && (
-            <button type="button" className={styles.startBtn} onClick={onStartChat}>
-              Ask a question
-            </button>
-          )}
         </div>
       ) : (
         <ul className={styles.list}>
