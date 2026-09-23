@@ -46,11 +46,19 @@
   gap: var(--uitraps-spacing-sm);
 }
 
-/* Report action row — sits under the tabs. Back to analyzer left, Chat about results right. */
+/* Report action row — sits under the tabs. Back to analyzer left, Chat about results right.
+   The report card (.report) lives inside a 920px centered .wrap with 20px side padding, so the
+   card's visible border sits at an 880px centered box. We mirror that here — max-width 928px
+   (880 content + 2×24px padding, border-box) centered — so the buttons' outer edges track the
+   card's left/right borders at every window width, wide (card centered) or narrow (card fills). */
 .reportActions {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  width: 100%;
+  max-width: 928px;
+  margin: 0 auto;
+  box-sizing: border-box;
   padding: 18px 24px 0;
   flex-shrink: 0;
 }
