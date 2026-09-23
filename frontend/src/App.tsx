@@ -278,6 +278,7 @@ export const App: React.FC = () => {
   // measures the full content height rather than just the current iframe height.
   const isEmbedded = window.self !== window.top;
   const lastSentHeightRef = useRef(0);
+  const formScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isEmbedded) document.documentElement.setAttribute('data-embed', 'true');
@@ -745,7 +746,7 @@ export const App: React.FC = () => {
                     Back to all
                   </button>
                 ) : (
-                  <button className={styles.reportBtn} onClick={() => { setActiveReport(null); setView('form'); }}>
+                  <button className={styles.reportBtn} onClick={() => { setActiveReport(null); setView('form'); requestAnimationFrame(() => formScrollRef.current?.scrollTo(0, 0)); }}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M12 19V5M5 12l7-7 7 7" />
                     </svg>
@@ -776,7 +777,7 @@ export const App: React.FC = () => {
                 />
               </div>
             )}
-            <div style={{ display: isFormAnalyzing ? 'none' : 'flex', flexDirection: 'column', ...(isEmbedded ? { overflow: 'visible' } : { overflowY: 'auto', flex: 1 }), paddingTop: '24px' }}>
+            <div ref={formScrollRef} style={{ display: isFormAnalyzing ? 'none' : 'flex', flexDirection: 'column', ...(isEmbedded ? { overflow: 'visible' } : { overflowY: 'auto', flex: 1 }), paddingTop: '24px' }}>
               {formError && (
                 <div style={{ maxWidth: 900, margin: '0 auto 0', padding: '0 24px', width: '100%', boxSizing: 'border-box' }}>
                   <div style={{ background: '#fdecea', border: '1px solid #f5c6c6', color: '#c0392b', borderRadius: 8, padding: '12px 16px', fontSize: 13, marginBottom: 16 }}>
