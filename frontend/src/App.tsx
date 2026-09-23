@@ -17,6 +17,7 @@ import { EstimatePreview } from './components/EstimatePreview';
 import { AnalysisProgress } from './components/AnalysisProgress';
 import { ReportViewer } from './components/ReportViewer';
 import { PastAnalyses } from './components/PastAnalyses';
+import { PastChats } from './components/PastChats';
 import { TaskCaptureScreen, CapturedStep } from './components/TaskCaptureScreen';
 import { saveAnalysis, getAnalysisHistory, StoredAnalysis, FormSnapshot } from './services/analysisHistory';
 import { ReportStatistics, UsageInfo, UnifiedAskResponse, TimeEstimate, UserContext, isFigmaEstimate, isUrlEstimate, isFileEstimate, UnifiedEstimate } from './api/types';
@@ -115,7 +116,23 @@ function extractContextCorrections(
   return corrected;
 }
 
-type AppView = 'form' | 'chat' | 'report' | 'history' | 'task-capture';
+type AppView = 'form' | 'chat' | 'report' | 'history' | 'task-capture' | 'pastchats';
+
+// Which tabs a given ?mode= shows. Multi-tab modes (>1 tab) render a restricted tab row;
+// any other ?mode= value (chat / history / analyze / …) locks to one view with no tabs.
+// No ?mode= at all → the full three-tab default.
+//   analyzer → "Trap Analyzer"    : Analyze a design + See past analyses
+//   ask      → "Ask me anything"  : Ask a question   + See past chats
+const TAB_MODES: Record<string, AppView[]> = {
+  analyzer: ['form', 'history'],
+  ask: ['chat', 'pastchats'],
+};
+const TAB_LABELS: Record<string, string> = {
+  form: 'Analyze a design',
+  history: 'See past analyses',
+  chat: 'Ask a question',
+  pastchats: 'See past chats',
+};
 
 interface ActiveReport {
   html: string;
@@ -140,12 +157,21 @@ export const App: React.FC = () => {
     // postMessage({type:'uitraps-theme'}) still overrides (e.g. the WordPress host forcing dark).
     return 'light';
   });
-  const [externalMode] = useState(() => _params.has('mode'));
+  const _mode = _params.get('mode');
+  // The tabs to show for this mode: a multi-tab mode from TAB_MODES; the full three tabs when
+  // no mode is given; or none (single locked view) for any other explicit mode value.
+  const [tabs] = useState<AppView[]>(() => {
+    if (_mode && TAB_MODES[_mode]) return TAB_MODES[_mode];
+    if (!_mode) return ['form', 'history', 'chat'];
+    return [];
+  });
+  const showTabs = tabs.length > 1;
   const [apiEndpoint] = useState(DEFAULT_API_ENDPOINT);
   const [view, setView] = useState<AppView>(() => {
-    const mode = _params.get('mode');
-    if (mode === 'chat') return 'chat';
-    if (mode === 'history') return 'history';
+    if (_mode && TAB_MODES[_mode]) return TAB_MODES[_mode][0];
+    if (_mode === 'chat') return 'chat';
+    if (_mode === 'history') return 'history';
+    if (_mode === 'pastchats') return 'pastchats';
     return 'form';
   });
   const [activeReport, setActiveReport] = useState<ActiveReport | null>(null);
@@ -694,16 +720,24 @@ export const App: React.FC = () => {
       <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
         {!isFormAnalyzing && (
           <>
-            {/* Tab row — hidden when parent site drives the mode */}
-            {!externalMode && (
+            {/* Tab row — the tabs for the active mode (all three by default). A single-view
+                mode (or none) renders no tabs, just a separator line. */}
+            {showTabs && (
               <div className={styles.tabRow}>
-                <button type="button" className={`${styles.tab} ${view === 'form' ? styles.tabActive : ''}`} onClick={() => setView('form')}>Analyze a design</button>
-                <button type="button" className={`${styles.tab} ${view === 'history' ? styles.tabActive : ''}`} onClick={() => setView('history')}>See past analyses</button>
-                <button type="button" className={`${styles.tab} ${view === 'chat' ? styles.tabActive : ''}`} onClick={() => setView('chat')}>Ask a question</button>
+                {tabs.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    className={`${styles.tab} ${view === t ? styles.tabActive : ''}`}
+                    onClick={() => setView(t)}
+                  >
+                    {TAB_LABELS[t]}
+                  </button>
+                ))}
               </div>
             )}
-            {/* Separator line when tab row is hidden */}
-            {externalMode && <div className={styles.topBorderLine} />}
+            {/* Separator line when there is no tab row */}
+            {!showTabs && <div className={styles.topBorderLine} />}
             {/* Sub-actions: New Session (chat), theme toggle */}
             {view === 'chat' && !isEmpty && (
               <div className={styles.subTabActions}>
@@ -807,6 +841,15 @@ export const App: React.FC = () => {
               onClose={() => setView('form')}
               token={effectiveToken || undefined}
               apiEndpoint={apiEndpoint}
+            />
+          </div>
+        )}
+        {view === 'pastchats' && (
+          <div style={{ display: 'flex', flexDirection: 'column', ...(isEmbedded ? { overflow: 'visible' } : { overflowY: 'auto', flex: 1 }) }}>
+            <PastChats
+              token={effectiveToken || undefined}
+              apiEndpoint={apiEndpoint}
+              onStartChat={() => setView('chat')}
             />
           </div>
         )}
