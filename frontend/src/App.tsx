@@ -704,27 +704,27 @@ export const App: React.FC = () => {
   return (
     <div className={`uitraps-viewport-wrapper ${styles.viewportWrapper}`} data-theme={theme}>
       <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
+        {/* Tab row — always visible (even while an analysis is running) so the mode's two tabs
+            stay present. A single-view mode (or none) renders no tabs, just a separator line. */}
+        {showTabs && (
+          <div className={styles.tabRow}>
+            {tabs.map((t) => (
+              <button
+                key={t}
+                type="button"
+                className={`${styles.tab} ${activeTab === t ? styles.tabActive : ''}`}
+                onClick={() => { if (view === 'report' && t === activeTab) return; setView(t); }}
+              >
+                {TAB_LABELS[t]}
+              </button>
+            ))}
+          </div>
+        )}
+        {/* Separator line when there is no tab row */}
+        {!showTabs && <div className={styles.topBorderLine} />}
+        {/* Sub-action rows — hidden while an analysis is running */}
         {!isFormAnalyzing && (
           <>
-            {/* Tab row — the tabs for the active mode (all three by default). A single-view
-                mode (or none) renders no tabs, just a separator line. */}
-            {showTabs && (
-              <div className={styles.tabRow}>
-                {tabs.map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    className={`${styles.tab} ${activeTab === t ? styles.tabActive : ''}`}
-                    onClick={() => { if (view === 'report' && t === activeTab) return; setView(t); }}
-                  >
-                    {TAB_LABELS[t]}
-                  </button>
-                ))}
-              </div>
-            )}
-            {/* Separator line when there is no tab row */}
-            {!showTabs && <div className={styles.topBorderLine} />}
-            {/* Sub-actions row: New Session (chat), or the report's New analysis / Chat buttons */}
             {view === 'chat' && !isEmpty && (
               <div className={styles.subTabActions}>
                 <button className={styles.headerButton} onClick={() => unified.clearHistory()}>New Session</button>
