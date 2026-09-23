@@ -262,7 +262,9 @@
   display: flex;
   gap: 16px;
   overflow: hidden;
-  padding: 0 8px 8px;
+  /* Side padding 4px + the report's own 20px inner padding = 24px, so the report card's
+     edges line up with the action buttons and the tabs (all at 24px). */
+  padding: 0 4px 8px;
   align-items: stretch;
 }
 
