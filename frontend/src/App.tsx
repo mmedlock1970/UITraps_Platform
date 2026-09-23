@@ -125,7 +125,12 @@ type AppView = 'form' | 'chat' | 'report' | 'history' | 'task-capture' | 'pastch
 //   analyzer → "Trap Analyzer"    : Analyze a design + See past analyses
 //   ask      → "Ask me anything"  : Ask a question   + See past chats
 const TAB_MODES: Record<string, AppView[]> = {
+  // "Trap Analyzer" page — accept the natural spellings so the WordPress iframe / shortcut
+  // URL just works whether it says analyzer, analyze, or analysis.
   analyzer: ['form', 'history'],
+  analyze: ['form', 'history'],
+  analysis: ['form', 'history'],
+  // "Ask me anything" page
   ask: ['chat', 'pastchats'],
 };
 const TAB_LABELS: Record<string, string> = {
