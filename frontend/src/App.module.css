@@ -52,7 +52,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 18px 24px 6px;
+  padding: 18px 24px 0;
   flex-shrink: 0;
 }
 
@@ -263,7 +263,7 @@
   display: flex;
   gap: 16px;
   overflow: hidden;
-  padding: 8px;
+  padding: 0 8px 8px;
   align-items: stretch;
 }
 

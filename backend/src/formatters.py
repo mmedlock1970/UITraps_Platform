@@ -3076,7 +3076,7 @@ _NEW_KB_ISSUES_CSS = """
    printing — browsers drop backgrounds by default unless a page opts in with print-color-adjust. */
 .report,.report *{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}
 @media print{.wrap{padding:0}body{background:#fff}.report{box-shadow:none;border:none}}
-.wrap{max-width:920px;margin:0 auto;padding:28px 20px 80px}
+.wrap{max-width:920px;margin:0 auto;padding:12px 20px 80px}
 .report{background:var(--surface);border:1px solid var(--hairline);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
 .r-header{padding:26px 32px 22px;border-bottom:1px solid var(--hairline)}
 .r-eyebrow{font-family:var(--font-sans);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);font-weight:600}
