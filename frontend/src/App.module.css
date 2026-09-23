@@ -47,14 +47,50 @@
   gap: var(--uitraps-spacing-sm);
 }
 
-/* Report action row — sits under the tabs. New analysis left, Chat about results right. */
+/* Report action row — sits under the tabs. Back to analyzer left, Chat about results right. */
 .reportActions {
-  height: 40px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 24px;
+  padding: 18px 24px 6px;
   flex-shrink: 0;
+}
+
+/* Outlined pill button matching the WordPress site's "Back to all" style. */
+.reportBtn,
+.reportBtnActive {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: var(--uitraps-border-radius);
+  font-family: var(--uitraps-font-family);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--uitraps-transition), border-color var(--uitraps-transition), color var(--uitraps-transition);
+}
+
+.reportBtn {
+  border: 1px solid var(--uitraps-border);
+  background: var(--uitraps-bg);
+  color: var(--uitraps-text);
+}
+
+.reportBtn:hover {
+  background: var(--uitraps-bg-hover);
+  border-color: var(--uitraps-border-focus);
+}
+
+.reportBtnActive {
+  border: 1px solid var(--uitraps-primary);
+  background: var(--uitraps-primary);
+  color: #fff;
+}
+
+.reportBtnActive:hover {
+  background: var(--uitraps-primary-hover);
+  border-color: var(--uitraps-primary-hover);
 }
 
 .headerButton {
