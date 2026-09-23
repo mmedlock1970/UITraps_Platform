@@ -732,7 +732,7 @@ export const App: React.FC = () => {
           <>
             {view === 'chat' && !isEmpty && (
               <div className={styles.subTabActions}>
-                <button className={styles.headerButton} onClick={() => unified.clearHistory()}>New Session</button>
+                <button className={styles.reportBtn} onClick={() => unified.clearHistory()}>New Session</button>
               </div>
             )}
             {view === 'report' && (

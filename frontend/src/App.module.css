@@ -32,11 +32,10 @@
 
 /* Sub-row below the tab/divider border — holds contextual action buttons */
 .subTabActions {
-  height: 40px;
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  padding: 0 24px;
+  padding: 18px 24px 0;
   gap: var(--uitraps-spacing-sm);
   flex-shrink: 0;
 }
