@@ -59,7 +59,7 @@
   max-width: 928px;
   margin: 0 auto;
   box-sizing: border-box;
-  padding: 18px 24px 0;
+  padding: 34px 24px 0;
   flex-shrink: 0;
 }
 
@@ -273,6 +273,9 @@
   /* Side padding 4px + the report's own 20px inner padding = 24px, so the report card's
      edges line up with the action buttons and the tabs (all at 24px). */
   padding: 0 4px 8px;
+  /* Pull the report up under the action buttons (the report's .wrap has 12px top padding,
+     so this leaves a tight ~6px gap between the buttons and the report card). */
+  margin-top: -6px;
   align-items: stretch;
 }
 
@@ -283,10 +286,12 @@
 }
 
 /* ── Page tab navigation (shared by form + chat views) ── */
+/* No left padding — the first tab sits flush with the frame's left edge so it left-aligns
+   with the WordPress page heading ("Trap Analyzer") that sits above the iframe. */
 .tabRow {
   display: flex;
   align-items: center;
-  padding: 0 24px;
+  padding: 0;
   border-bottom: 1px solid var(--uitraps-border);
   background: var(--uitraps-bg);
   flex-shrink: 0;
