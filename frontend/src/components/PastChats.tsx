@@ -1,33 +1,71 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import styles from './PastChats.module.css';
+import { listChats, SavedChatSummary } from '../api/chatApi';
 
 interface PastChatsProps {
-  // token + apiEndpoint are used in Step 2 to fetch the saved chat list; accepted now so
-  // the wiring from App is already in place.
   token?: string;
   apiEndpoint?: string;
   onStartChat?: () => void;
+  onOpenChat?: (sessionId: string) => void;
 }
 
 /**
- * "See past chats" — a Claude-style list of the user's saved Q&A conversations.
- * Step 1 renders the empty state; Step 2 fetches and lists saved chats (summary title,
- * click to reopen). Chats are saved per signed-in user, forward-only.
+ * "See past chats" — a Claude-style list of the signed-in user's saved Q&A conversations.
+ * Each item shows a brief summary title; clicking one re-opens that conversation to continue it.
  */
-export const PastChats: React.FC<PastChatsProps> = ({ onStartChat }) => {
+export const PastChats: React.FC<PastChatsProps> = ({ token, apiEndpoint, onStartChat, onOpenChat }) => {
+  const [chats, setChats] = useState<SavedChatSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!token || !apiEndpoint) {
+        setLoading(false);
+        return;
+      }
+      const list = await listChats({ apiEndpoint, token });
+      if (!cancelled) {
+        setChats(list);
+        setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [token, apiEndpoint]);
+
   return (
     <div className={styles.container}>
       <h2 className={styles.title}>Past chats</h2>
-      <div className={styles.empty}>
-        <p className={styles.emptyText}>
-          Your past chats will appear here once you've asked a question.
-        </p>
-        {onStartChat && (
-          <button type="button" className={styles.startBtn} onClick={onStartChat}>
-            Ask a question
-          </button>
-        )}
-      </div>
+      {loading ? (
+        <p className={styles.emptyText}>Loading…</p>
+      ) : chats.length === 0 ? (
+        <div className={styles.empty}>
+          <p className={styles.emptyText}>
+            Your past chats will appear here once you've asked a question.
+          </p>
+          {onStartChat && (
+            <button type="button" className={styles.startBtn} onClick={onStartChat}>
+              Ask a question
+            </button>
+          )}
+        </div>
+      ) : (
+        <ul className={styles.list}>
+          {chats.map((c) => (
+            <li key={c.session_id}>
+              <button
+                type="button"
+                className={styles.item}
+                onClick={() => onOpenChat?.(c.session_id)}
+              >
+                {c.title || 'Untitled chat'}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 };

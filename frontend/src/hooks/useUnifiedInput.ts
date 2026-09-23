@@ -188,10 +188,12 @@ interface UseUnifiedInputReturn {
   messages: ChatMessage[];
   isLoading: boolean;
   error: string | null;
+  sessionId: string;
 
   // Actions
   submit: () => Promise<void>;
   clearHistory: () => void;
+  loadConversation: (messages: ChatMessage[], sessionId: string) => void;
   handleWidgetChoice: (messageId: string, choiceId: string) => void;
   notifyTaskCaptureComplete: (screenshotCount: number) => void;
 }
@@ -1171,6 +1173,8 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
     messages: chat.messages,
     isLoading: chat.isLoading || isUnifiedLoading,
     error: chat.error,
+    sessionId: chat.sessionId,
+    loadConversation: chat.loadConversation,
     submit,
     clearHistory: () => {
       // Reset all context state so the new session starts completely fresh

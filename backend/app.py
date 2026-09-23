@@ -1192,6 +1192,121 @@ async def get_saved_report(
 
 
 # ===========================================================
+# Saved Chats (See past chats) — per signed-in user
+# ===========================================================
+
+class SaveChatRequest(BaseModel):
+    session_id: str
+    messages: list = []
+
+
+def _chat_title(first_message: str) -> str:
+    """A brief Claude-style title for a saved chat; falls back to the trimmed first question."""
+    base = (first_message or "New chat").strip().replace("\n", " ")
+    fallback = (base[:57].rstrip() + "…") if len(base) > 60 else base
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+        resp = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=20,
+            messages=[{
+                "role": "user",
+                "content": "Write a 3-6 word title (no quotes, no trailing period) summarising this "
+                           "question:\n\n" + (first_message or "")[:600],
+            }],
+        )
+        text = "".join(getattr(b, "text", "") for b in resp.content).strip().strip('"').rstrip(".")
+        return text or fallback
+    except Exception as e:
+        logger.warning("chat title generation failed: %s", e)
+        return fallback
+
+
+@app.post("/api/chats")
+async def save_chat(req: SaveChatRequest, user: dict = Depends(get_current_user)):
+    """Upsert a saved chat (per user, keyed by session_id). Title generated on first save."""
+    user_id = str(user.get("id") or user.get("userId", ""))
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    if not req.session_id or not req.messages:
+        return {"ok": False}
+    from src.database import SavedChat
+    first_user = next(
+        (m.get("content", "") for m in req.messages if isinstance(m, dict) and m.get("role") == "user"),
+        "",
+    )
+    try:
+        with Session(engine) as session:
+            row = session.exec(
+                select(SavedChat).where(
+                    SavedChat.user_id == user_id, SavedChat.session_id == req.session_id
+                )
+            ).first()
+            if row:
+                row.messages = json.dumps(req.messages)
+                row.updated_at = datetime.utcnow()
+                if not row.title:
+                    row.title = _chat_title(first_user)
+            else:
+                row = SavedChat(
+                    user_id=user_id,
+                    session_id=req.session_id,
+                    title=_chat_title(first_user),
+                    messages=json.dumps(req.messages),
+                )
+                session.add(row)
+            session.commit()
+            title = row.title
+        return {"ok": True, "session_id": req.session_id, "title": title}
+    except Exception as e:
+        logger.warning("save_chat failed: %s", e)
+        return {"ok": False}
+
+
+@app.get("/api/chats")
+async def list_chats(user: dict = Depends(get_current_user)):
+    """List the signed-in user's saved chats, newest first (title only)."""
+    user_id = str(user.get("id") or user.get("userId", ""))
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    from src.database import SavedChat
+    try:
+        with Session(engine) as session:
+            rows = session.exec(
+                select(SavedChat).where(SavedChat.user_id == user_id).order_by(SavedChat.updated_at.desc())
+            ).all()
+            return {"chats": [{"session_id": r.session_id, "title": r.title or "Untitled chat"} for r in rows]}
+    except Exception as e:
+        logger.warning("list_chats failed: %s", e)
+        return {"chats": []}
+
+
+@app.get("/api/chats/{session_id}")
+async def get_chat(session_id: str, user: dict = Depends(get_current_user)):
+    """Return one saved chat's messages, for re-opening the conversation."""
+    user_id = str(user.get("id") or user.get("userId", ""))
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    from src.database import SavedChat
+    try:
+        with Session(engine) as session:
+            row = session.exec(
+                select(SavedChat).where(
+                    SavedChat.user_id == user_id, SavedChat.session_id == session_id
+                )
+            ).first()
+            if not row:
+                raise HTTPException(status_code=404, detail="Chat not found")
+            return {"session_id": row.session_id, "title": row.title, "messages": json.loads(row.messages or "[]")}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning("get_chat failed: %s", e)
+        raise HTTPException(status_code=500, detail="Could not load chat")
+
+
+# ===========================================================
 # URL-Based Analysis Endpoints (Figma and Website Crawl)
 # ===========================================================
 

@@ -133,6 +133,25 @@ class ChatMessageRecord(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+# --- Saved chats (See past chats) ---
+
+class SavedChat(SQLModel, table=True):
+    """A saved 'Ask a question' conversation, per signed-in user, for the See-past-chats list.
+    The whole message list is stored as a JSON blob; one row per (user_id, session_id)."""
+    __tablename__ = "saved_chats"
+    __table_args__ = (
+        UniqueConstraint("user_id", "session_id", name="unique_user_session"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: str = Field(index=True)
+    session_id: str = Field(index=True)
+    title: str = Field(default="")
+    messages: str = Field(default="[]")  # JSON array of chat messages
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
 # --- Database Connection ---
 
 # Whether DATABASE_URL was explicitly provided. When it wasn't, we fall back to a

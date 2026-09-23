@@ -18,9 +18,10 @@ import { AnalysisProgress } from './components/AnalysisProgress';
 import { ReportViewer } from './components/ReportViewer';
 import { PastAnalyses } from './components/PastAnalyses';
 import { PastChats } from './components/PastChats';
+import { saveChat, getChat } from './api/chatApi';
 import { TaskCaptureScreen, CapturedStep } from './components/TaskCaptureScreen';
 import { saveAnalysis, getAnalysisHistory, StoredAnalysis, FormSnapshot } from './services/analysisHistory';
-import { ReportStatistics, UsageInfo, UnifiedAskResponse, TimeEstimate, UserContext, isFigmaEstimate, isUrlEstimate, isFileEstimate, UnifiedEstimate } from './api/types';
+import { ChatMessage, ReportStatistics, UsageInfo, UnifiedAskResponse, TimeEstimate, UserContext, isFigmaEstimate, isUrlEstimate, isFileEstimate, UnifiedEstimate } from './api/types';
 import { unifiedAsk } from './api/client';
 import { ChatPanel } from './components/ChatPanel';
 import './styles/variables.css';
@@ -470,6 +471,27 @@ export const App: React.FC = () => {
     onStartTaskCapture: handleStartTaskCapture,
   });
 
+  // Persist the current conversation after each completed exchange, so it shows under
+  // "See past chats". Fire-and-forget; skipped without a real signed-in token.
+  useEffect(() => {
+    const msgs = unified.messages;
+    if (!effectiveToken || effectiveToken === 'dev-mode') return;
+    if (unified.isLoading || msgs.length === 0) return;
+    if (msgs[msgs.length - 1].role !== 'assistant') return;
+    void saveChat({ apiEndpoint, token: effectiveToken, sessionId: unified.sessionId, messages: msgs });
+  }, [unified.messages, unified.isLoading, unified.sessionId, effectiveToken, apiEndpoint]);
+
+  // Re-open a saved chat and continue it (under its original session id).
+  const handleOpenChat = useCallback(async (sessionId: string) => {
+    if (!effectiveToken) return;
+    const data = await getChat({ apiEndpoint, token: effectiveToken, sessionId });
+    if (!data) return;
+    const raw = (data.messages || []) as unknown as ChatMessage[];
+    const msgs = raw.map((m) => ({ ...m, timestamp: new Date(m.timestamp as unknown as string) }));
+    unified.loadConversation(msgs, data.session_id);
+    setView('chat');
+  }, [apiEndpoint, effectiveToken, unified]);
+
   const handleViewHistoryReport = useCallback((analysis: StoredAnalysis) => {
     setActiveReport({
       html: analysis.html,
@@ -850,6 +872,7 @@ export const App: React.FC = () => {
               token={effectiveToken || undefined}
               apiEndpoint={apiEndpoint}
               onStartChat={() => setView('chat')}
+              onOpenChat={handleOpenChat}
             />
           </div>
         )}

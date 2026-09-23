@@ -20,6 +20,8 @@ interface UseChatReturn {
   messages: ChatMessage[];
   isLoading: boolean;
   error: string | null;
+  /** Stable id for the current conversation; changes on clearHistory, set by loadConversation. */
+  sessionId: string;
   sendMessage: (message: string) => Promise<void>;
   addUserMessage: (content: string, mode?: MessageMode) => void;
   addSystemPrompt: (content: string) => void;
@@ -27,11 +29,21 @@ interface UseChatReturn {
   markWidgetUsed: (messageId: string) => void;
   addAnalysisMessage: (reportHtml: string, statistics?: Record<string, unknown>) => void;
   clearHistory: () => void;
+  /** Replace the conversation (re-open a saved chat and continue it under its session id). */
+  loadConversation: (messages: ChatMessage[], sessionId: string) => void;
 }
 
 let messageIdCounter = 0;
 function generateId(): string {
   return `msg-${Date.now()}-${++messageIdCounter}`;
+}
+
+function newSessionId(): string {
+  try {
+    return crypto.randomUUID();
+  } catch {
+    return `sess-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }
 }
 
 export function useChat(options: UseChatOptions): UseChatReturn {
@@ -40,6 +52,7 @@ export function useChat(options: UseChatOptions): UseChatReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string>(() => newSessionId());
   const abortRef = useRef<AbortController | null>(null);
 
   const sendMessage = useCallback(async (message: string) => {
@@ -167,12 +180,21 @@ export function useChat(options: UseChatOptions): UseChatReturn {
   const clearHistory = useCallback(() => {
     setMessages([]);
     setError(null);
+    setSessionId(newSessionId());
+  }, []);
+
+  const loadConversation = useCallback((msgs: ChatMessage[], sid: string) => {
+    setMessages(msgs);
+    setSessionId(sid);
+    setError(null);
+    setIsLoading(false);
   }, []);
 
   return {
     messages,
     isLoading,
     error,
+    sessionId,
     sendMessage,
     addUserMessage,
     addSystemPrompt,
@@ -180,5 +202,6 @@ export function useChat(options: UseChatOptions): UseChatReturn {
     markWidgetUsed,
     addAnalysisMessage,
     clearHistory,
+    loadConversation,
   };
 }

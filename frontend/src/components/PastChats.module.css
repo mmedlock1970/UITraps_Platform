@@ -41,3 +41,34 @@
 .startBtn:hover {
   background: var(--uitraps-primary-hover);
 }
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 640px;
+}
+
+.item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 14px 16px;
+  background: var(--uitraps-bg-secondary);
+  border: 1px solid var(--uitraps-border);
+  border-radius: var(--uitraps-border-radius);
+  color: var(--uitraps-text);
+  font-family: var(--uitraps-font-family);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--uitraps-transition), border-color var(--uitraps-transition);
+}
+
+.item:hover {
+  background: var(--uitraps-bg-hover);
+  border-color: var(--uitraps-border-focus);
+}
