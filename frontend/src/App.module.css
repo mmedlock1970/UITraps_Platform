@@ -59,7 +59,7 @@
   max-width: 928px;
   margin: 0 auto;
   box-sizing: border-box;
-  padding: 34px 24px 0;
+  padding: 22px 24px 0;
   flex-shrink: 0;
 }
 
@@ -286,12 +286,14 @@
 }
 
 /* ── Page tab navigation (shared by form + chat views) ── */
-/* No left padding — the first tab sits flush with the frame's left edge so it left-aligns
-   with the WordPress page heading ("Trap Analyzer") that sits above the iframe. */
+/* Sits in a content column inset by a gutter on both sides (margin, not padding, so the
+   divider line is inset too). The first tab then left-aligns with the WordPress page heading
+   ("Trap Analyzer") above the iframe, and the divider spans the same width as the nav bar. */
 .tabRow {
   display: flex;
   align-items: center;
   padding: 0;
+  margin: 0 40px;
   border-bottom: 1px solid var(--uitraps-border);
   background: var(--uitraps-bg);
   flex-shrink: 0;

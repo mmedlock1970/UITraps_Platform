@@ -482,10 +482,11 @@ export const App: React.FC = () => {
   });
 
   // Persist the current conversation after each completed exchange, so it shows under
-  // "See past chats". Fire-and-forget; skipped without a real signed-in token.
+  // "See past chats". Fire-and-forget. Runs in dev mode too — the backend maps the
+  // 'dev-mode' token to the 'dev-user' account, so saved chats round-trip on localhost.
   useEffect(() => {
     const msgs = unified.messages;
-    if (!effectiveToken || effectiveToken === 'dev-mode') return;
+    if (!effectiveToken) return;
     if (unified.isLoading || msgs.length === 0) return;
     if (msgs[msgs.length - 1].role !== 'assistant') return;
     void saveChat({ apiEndpoint, token: effectiveToken, sessionId: unified.sessionId, messages: msgs });
@@ -733,7 +734,7 @@ export const App: React.FC = () => {
           <>
             {view === 'chat' && !isEmpty && (
               <div className={styles.subTabActions}>
-                <button className={styles.reportBtn} onClick={() => unified.clearHistory()}>New Session</button>
+                <button className={styles.reportBtn} onClick={() => unified.clearHistory()}>Start new chat</button>
               </div>
             )}
             {view === 'report' && (
