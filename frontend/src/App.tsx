@@ -20,7 +20,7 @@ import { PastAnalyses } from './components/PastAnalyses';
 import { PastChats } from './components/PastChats';
 import { saveChat, getChat } from './api/chatApi';
 import { TaskCaptureScreen, CapturedStep } from './components/TaskCaptureScreen';
-import { saveAnalysis, getAnalysisHistory, StoredAnalysis, FormSnapshot } from './services/analysisHistory';
+import { saveAnalysis, StoredAnalysis, FormSnapshot } from './services/analysisHistory';
 import { ChatMessage, ReportStatistics, UsageInfo, UnifiedAskResponse, TimeEstimate, UserContext, isFigmaEstimate, isUrlEstimate, isFileEstimate, UnifiedEstimate } from './api/types';
 import { unifiedAsk } from './api/client';
 import { ChatPanel } from './components/ChatPanel';
@@ -625,65 +625,19 @@ export const App: React.FC = () => {
   }
 
   // ── Report view ──
-  if (view === 'report' && activeReport) {
-    if (isRerunning) {
-      return (
-        <div className={`uitraps-viewport-wrapper ${styles.viewportWrapper}`} data-theme={theme}>
-          <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
-            <div className={styles.overlayContainer} style={isEmbedded ? { minHeight: '500px' } : undefined}>
-              <AnalysisProgress
-                elapsedTime={rerunElapsed.elapsedTime}
-                onCancel={() => { setIsRerunning(false); rerunElapsed.reset(); }}
-                inputType="multi_image"
-                fileCount={activeReport.originalFiles?.length ?? 1}
-              />
-            </div>
-          </div>
-        </div>
-      );
-    }
-
+  // Re-run in progress overlays the whole view. The finished report itself now renders
+  // inside the tabbed layout below (under the "Analyze a design" tab).
+  if (view === 'report' && activeReport && isRerunning) {
     return (
       <div className={`uitraps-viewport-wrapper ${styles.viewportWrapper}`} data-theme={theme}>
         <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
-          <div className={styles.topBorderLine} />
-          <div className={styles.subTabActions}>
-            <button
-              className={chatOpen ? styles.headerButtonActive : styles.headerButton}
-              onClick={() => setChatOpen(o => !o)}
-            >
-              Chat about Results
-            </button>
-            <button className={styles.headerButton} onClick={() => setView('form')}>
-              New Analysis
-            </button>
-            {getAnalysisHistory().length > 0 && (
-              <button className={styles.headerButton} onClick={() => setView('history')}>
-                Past Analyses
-              </button>
-            )}
-          </div>
-          <div className={styles.reportWithChat} style={isEmbedded ? { overflow: 'visible', height: 'auto' } : undefined}>
-            <div className={styles.reportArea} style={isEmbedded ? { overflowY: 'visible' } : undefined}>
-              <ReportViewer
-                html={activeReport.html}
-                markdown={activeReport.markdown}
-                statistics={activeReport.statistics}
-                showStatistics={true}
-                showUsageInfo={false}
-                isDark={theme === 'dark'}
-                onContentLoaded={handleReportContentLoaded}
-              />
-            </div>
-            <div style={{ display: chatOpen ? undefined : 'none' }}>
-              <ChatPanel
-                apiEndpoint={apiEndpoint}
-                apiKey={effectiveToken}
-                reportMarkdown={activeReport.markdown || null}
-                canRerun={!!activeReport.originalFiles?.length && !!activeReport.originalContext}
-                onRerunAnalysis={handleRerunAnalysis}
-              />
-            </div>
+          <div className={styles.overlayContainer} style={isEmbedded ? { minHeight: '500px' } : undefined}>
+            <AnalysisProgress
+              elapsedTime={rerunElapsed.elapsedTime}
+              onCancel={() => { setIsRerunning(false); rerunElapsed.reset(); }}
+              inputType="multi_image"
+              fileCount={activeReport.originalFiles?.length ?? 1}
+            />
           </div>
         </div>
       </div>
@@ -737,6 +691,10 @@ export const App: React.FC = () => {
   const isFormAnalyzing = view === 'form' && formAnalysisPhase === 'analyzing';
   const isEmpty = unified.messages.length === 0 && !unified.isLoading;
 
+  // A viewed report belongs to the "Analyze a design" tab, so it stays highlighted while the
+  // report shows. Clicking that tab returns to the current report (or the form if none).
+  const activeTab: AppView = view === 'report' ? 'form' : view;
+
   return (
     <div className={`uitraps-viewport-wrapper ${styles.viewportWrapper}`} data-theme={theme}>
       <div className={`uitraps-platform ${styles.platform}`} data-theme={theme}>
@@ -750,8 +708,8 @@ export const App: React.FC = () => {
                   <button
                     key={t}
                     type="button"
-                    className={`${styles.tab} ${view === t ? styles.tabActive : ''}`}
-                    onClick={() => setView(t)}
+                    className={`${styles.tab} ${activeTab === t ? styles.tabActive : ''}`}
+                    onClick={() => setView(t === 'form' && activeReport ? 'report' : t)}
                   >
                     {TAB_LABELS[t]}
                   </button>
@@ -760,10 +718,23 @@ export const App: React.FC = () => {
             )}
             {/* Separator line when there is no tab row */}
             {!showTabs && <div className={styles.topBorderLine} />}
-            {/* Sub-actions: New Session (chat), theme toggle */}
+            {/* Sub-actions row: New Session (chat), or the report's New analysis / Chat buttons */}
             {view === 'chat' && !isEmpty && (
               <div className={styles.subTabActions}>
                 <button className={styles.headerButton} onClick={() => unified.clearHistory()}>New Session</button>
+              </div>
+            )}
+            {view === 'report' && (
+              <div className={styles.reportActions}>
+                <button className={styles.headerButton} onClick={() => { setActiveReport(null); setView('form'); }}>
+                  New analysis
+                </button>
+                <button
+                  className={chatOpen ? styles.headerButtonActive : styles.headerButton}
+                  onClick={() => setChatOpen(o => !o)}
+                >
+                  Chat about results
+                </button>
               </div>
             )}
           </>
@@ -874,6 +845,30 @@ export const App: React.FC = () => {
               onStartChat={() => setView('chat')}
               onOpenChat={handleOpenChat}
             />
+          </div>
+        )}
+        {view === 'report' && activeReport && (
+          <div className={styles.reportWithChat} style={isEmbedded ? { overflow: 'visible', height: 'auto' } : undefined}>
+            <div className={styles.reportArea} style={isEmbedded ? { overflowY: 'visible' } : undefined}>
+              <ReportViewer
+                html={activeReport.html}
+                markdown={activeReport.markdown}
+                statistics={activeReport.statistics}
+                showStatistics={true}
+                showUsageInfo={false}
+                isDark={theme === 'dark'}
+                onContentLoaded={handleReportContentLoaded}
+              />
+            </div>
+            <div style={{ display: chatOpen ? undefined : 'none' }}>
+              <ChatPanel
+                apiEndpoint={apiEndpoint}
+                apiKey={effectiveToken}
+                reportMarkdown={activeReport.markdown || null}
+                canRerun={!!activeReport.originalFiles?.length && !!activeReport.originalContext}
+                onRerunAnalysis={handleRerunAnalysis}
+              />
+            </div>
           </div>
         )}
       </div>

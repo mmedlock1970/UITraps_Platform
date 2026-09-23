@@ -47,6 +47,16 @@
   gap: var(--uitraps-spacing-sm);
 }
 
+/* Report action row — sits under the tabs. New analysis left, Chat about results right. */
+.reportActions {
+  height: 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 24px;
+  flex-shrink: 0;
+}
+
 .headerButton {
   padding: var(--uitraps-spacing-xs) var(--uitraps-spacing-sm);
   border: 1px solid var(--uitraps-border);
