@@ -2216,7 +2216,8 @@ def format_report_as_html(
         _v = analysis_settings.get('verbosity')
         _ts_lines.append(f"Report detail: {'Brief' if _v == 'brief' else 'Standard'}")
         _m = analysis_settings.get('pass1_model')
-        _ts_lines.append(f"Analysis model: {'Haiku 4.5' if _m == 'haiku' else 'Sonnet 4.6'}")
+        _m_label = {'haiku': 'Haiku 4.5', 'opus': 'Opus 5.5', 'sonnet': 'Sonnet 5.5'}.get(_m, 'Sonnet 5.5')
+        _ts_lines.append(f"Analysis model: {_m_label}")
         _kb = analysis_settings.get('kb_version')
         if _kb:
             _kb_display = {'v1': 'v1', 'v1.1': 'v1.1', 'v2': 'v2'}.get(_kb, _kb)

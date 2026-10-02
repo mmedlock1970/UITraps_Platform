@@ -62,12 +62,50 @@ _STREAM_MIN_TOKENS = 8000
 # Public list price per 1M tokens (USD): (input, output, cache_write, cache_read).
 # Used only for the estimated-cost line in the report header — not billing.
 _MODEL_PRICING = {
+    "claude-opus-5-5":            (4.0, 20.0, 5.00, 0.20),  # current Opus (strong tier)
+    "claude-sonnet-5-5":          (2.0, 10.0, 2.50, 0.20),  # current Sonnet (efficient tier)
     "claude-opus-4-8":            (5.0, 25.0, 6.25, 0.50),
     "claude-sonnet-5":            (3.0, 15.0, 3.75, 0.30),  # standard list price ($2/$10 intro through 2026-08-31)
     "claude-sonnet-4-6":          (3.0, 15.0, 3.75, 0.30),
     "claude-haiku-4-5-20251001":  (1.0,  5.0, 1.25, 0.10),
     "claude-haiku-4-5":           (1.0,  5.0, 1.25, 0.10),
 }
+
+# Models that require the current Messages API shape: thinking can't be disabled (effort is the
+# only depth control) and tool_choice can't force a specific tool. For these we drop a `disabled`
+# thinking request (thinking runs adaptively) and convert a forced tool_choice to "auto", steering
+# the model to the structured-output tool via a system-prompt instruction instead. Every analyzer
+# call routes through _create_message, which applies this before streaming/creating.
+_CURRENT_GEN_MODELS = {"claude-opus-5-5", "claude-sonnet-5-5"}
+
+
+def _normalize_for_model(kwargs: dict) -> dict:
+    """Rewrite request kwargs that the current-generation models reject (disabled thinking,
+    forced tool_choice) into their supported equivalents. No-op for every other model."""
+    if kwargs.get("model", "") not in _CURRENT_GEN_MODELS:
+        return kwargs
+    out = dict(kwargs)
+    # 1. Thinking can't be disabled — drop the override so it runs adaptively.
+    think = out.get("thinking")
+    if isinstance(think, dict) and think.get("type") == "disabled":
+        out.pop("thinking", None)
+    # 2. Forced tool_choice is rejected — switch to "auto" and instruct the tool call in the prompt
+    #    (the response parsers already find the tool_use block past any leading thinking block).
+    tc = out.get("tool_choice")
+    if isinstance(tc, dict) and tc.get("type") == "tool":
+        forced = tc.get("name", "")
+        out["tool_choice"] = {"type": "auto"}
+        if forced:
+            nudge = (f"\n\nRespond ONLY by calling the {forced} tool with the complete structured "
+                     f"output. Do not reply with plain text.")
+            sys_val = out.get("system")
+            if isinstance(sys_val, str):
+                out["system"] = sys_val + nudge
+            elif isinstance(sys_val, list):
+                out["system"] = sys_val + [{"type": "text", "text": nudge.strip()}]
+            else:
+                out["system"] = nudge.strip()
+    return out
 
 
 def _usage_from_response(response, model: str):
@@ -166,8 +204,8 @@ class UITrapsAnalyzer:
 
         self.client = Anthropic(api_key=self.api_key, max_retries=3)
         self.use_caching = use_caching
-        self.model = "claude-sonnet-5"                      # Pass 1 default: full visual analysis
-        self.opus_model = "claude-opus-4-8"                 # Pass 1 (Opus option): highest capability
+        self.model = "claude-sonnet-5-5"                    # Pass 1 default: full visual analysis
+        self.opus_model = "claude-opus-5-5"                 # Pass 1 (Opus option): highest capability
         self.enrich_model = "claude-haiku-4-5-20251001"    # Pass 2: text enrichment only
 
     def analyze_design(
@@ -238,7 +276,7 @@ class UITrapsAnalyzer:
         # and "opus" are explicit; anything else (stale client, saved config, hand-edited payload) is
         # rejected here, the single chokepoint every call path (image, flow, multi-screen) passes through.
         if pass1_model is not None and str(pass1_model).strip().lower() not in ("", "sonnet", "opus"):
-            raise ValueError(f"model not available: {pass1_model!r} — choose Sonnet 5 or Opus 4.8.")
+            raise ValueError(f"model not available: {pass1_model!r} — choose Sonnet 5.5 or Opus 5.5.")
 
         # The By-Issue report style is retired — every run renders By Trap. Pinning here forces the
         # by-trap schema/prompt/formatter for ALL profiles (including self-serve, 1D) and makes the
@@ -752,6 +790,8 @@ class UITrapsAnalyzer:
         not a real context manager (e.g. a test Mock), or if streaming rejects a kwarg — so behaviour
         (and the create-mocking test suite) degrades safely to the previous path.
         """
+        # Rewrite disabled-thinking / forced-tool-choice for current-generation models (no-op otherwise).
+        kwargs = _normalize_for_model(kwargs)
         if kwargs.get("max_tokens", 0) >= _STREAM_MIN_TOKENS:
             _stream = getattr(self.client.messages, "stream", None)
             if callable(_stream):
@@ -919,7 +959,10 @@ class UITrapsAnalyzer:
                 (block for block in response.content if block.type == "tool_use"), None
             )
             if not tool_use_block:
-                report = parse_claude_response(response.content[0].text)
+                # No tool call (rare with the current-gen "auto" nudge) — parse the first text block,
+                # skipping any leading thinking block a thinking-on model may emit.
+                _text = next((b.text for b in response.content if getattr(b, "type", None) == "text"), "")
+                report = parse_claude_response(_text)
             else:
                 report = tool_use_block.input
                 # Truncation (stop_reason == max_tokens) can return a PARTIAL dict missing later
@@ -1578,10 +1621,11 @@ class UITrapsAnalyzer:
         ]
 
         try:
-            response = self.client.messages.create(
+            # Route through _create_message so the current-gen thinking/tool_choice normalization applies.
+            response = self._create_message(
                 model=self.model,
                 max_tokens=5400,   # ~30% headroom for the new tokenizer
-                thinking={"type": "disabled"},   # Sonnet 5/Opus 4.8 reject sampling params
+                thinking={"type": "disabled"},   # normalized away on current-gen models (thinking runs adaptively)
                 system=system_prompt,
                 messages=[
                     {

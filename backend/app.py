@@ -533,7 +533,7 @@ def get_chat_service() -> ChatService:
 
         ai_svc = ChatAIService(
             anthropic_api_key=anthropic_key,
-            model=os.environ.get("CHAT_AI_MODEL", "claude-opus-4-8"),
+            model=os.environ.get("CHAT_AI_MODEL", "claude-opus-5-5"),
             max_tokens=int(os.environ.get("CHAT_MAX_TOKENS", "1024")),
             temperature=float(os.environ.get("CHAT_TEMPERATURE", "0.7")),
         )
@@ -2865,7 +2865,7 @@ async def report_chat(request: ReportChatRequest):
                 messages.append({"role": role, "content": content})
         messages.append({"role": "user", "content": request.message})
 
-        model = os.environ.get("CHAT_AI_MODEL", "claude-opus-4-8")
+        model = os.environ.get("CHAT_AI_MODEL", "claude-opus-5-5")
         response = client.messages.create(
             model=model,
             max_tokens=1024,

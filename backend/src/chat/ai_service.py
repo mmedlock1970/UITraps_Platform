@@ -13,9 +13,10 @@ logger = logging.getLogger(__name__)
 
 
 def _rejects_sampling_params(model: str) -> bool:
-    """Opus 4.7/4.8, Sonnet 5, and Fable 5 reject temperature/top_p/top_k with a 400."""
+    """Current reasoning models reject temperature/top_p/top_k with a 400 — Opus 5/5.5,
+    Sonnet 5/5.5, Opus 4.7/4.8, and Fable 5. (Haiku still accepts sampling params.)"""
     m = (model or "").lower()
-    return any(tag in m for tag in ("opus-4-8", "opus-4-7", "sonnet-5", "fable-5"))
+    return any(tag in m for tag in ("opus-5", "opus-4-8", "opus-4-7", "sonnet-5", "fable-5"))
 
 
 class ChatAIService:
@@ -24,7 +25,7 @@ class ChatAIService:
     def __init__(
         self,
         anthropic_api_key: str,
-        model: str = "claude-opus-4-8",
+        model: str = "claude-opus-5-5",
         max_tokens: int = 1024,
         temperature: float = 0.7,
     ):

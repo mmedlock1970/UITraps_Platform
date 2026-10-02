@@ -858,7 +858,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
                     onClick={() => setPass1Model(v)}
                     disabled={disabled}
                   >
-                    {v === 'opus' ? 'Opus 4.8' : 'Sonnet 5'}
+                    {v === 'opus' ? 'Opus 5.5' : 'Sonnet 5.5'}
                   </button>
                 ))}
               </div>
