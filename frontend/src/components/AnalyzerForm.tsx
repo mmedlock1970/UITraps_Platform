@@ -701,9 +701,6 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
                   />
                 </div>
               ))}
-              <p className={styles.fieldHint}>
-                Tasks 2 and 3 are optional. Each additional task increases analysis time.
-              </p>
               {errors.userGoal && <p className={styles.fieldError}>{errors.userGoal}</p>}
             </div>
 
