@@ -197,33 +197,8 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
   const [extraContext, setExtraContext] = useState(iv?.extraContext ?? '');
 
   // Card 5 — Analysis Scope
-  // Only two configs are supported: v1 (KB only) and v2 (Prompting + KB). v2 / v1.1 are
-  // deprecated. A restored config (saved session / shared link) referencing a retired
-  // version can't run as requested — v2 in Prompting+KB hits the backend's legacy
-  // ValueError, and v1.1 is out of support — so we resolve it to the v2 default rather
-  // than dead-ending the link. Unlike the backend raise (an execution guardrail), this is
-  // a UI-restore fallback, and it is made EXPLICIT (console warning + visible notice below)
-  // instead of substituting silently.
-  const requestedKb = iv?.kbVersion;
-  const initialKb: KbVersion =
-    (requestedKb === 'v1' || requestedKb === 'v2') ? requestedKb : 'v2';
-  const [kbVersion, setKbVersion] = useState<KbVersion>(initialKb);
-  // The retired version the restore asked for, if it was resolved away (null otherwise).
-  // Cleared once the user makes any KB selection.
-  const [coercedFromKb, setCoercedFromKb] = useState<KbVersion | null>(
-    (requestedKb === 'v2' || requestedKb === 'v1.1') ? requestedKb : null,
-  );
-  useEffect(() => {
-    if (coercedFromKb) {
-      console.warn(
-        `[UITraps] Saved configuration requested knowledge base "${coercedFromKb}", which is ` +
-        `deprecated and no longer available; resolving to "v2". The analysis will run on v2, ` +
-        `not "${coercedFromKb}".`,
-      );
-    }
-    // Mount-only: report the restore-time substitution once.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Knowledge base is pinned to v2 (the current KB); the version toggle was removed.
+  const kbVersion: KbVersion = 'v2';
   const [selectedTenets, setSelectedTenets] = useState<string[]>(iv?.selectedTenets ?? [...ALL_TENETS]);
   const [verbosity, setVerbosity] = useState<'brief' | 'standard'>(iv?.verbosity ?? 'brief');
   const [pass1Model, setPass1Model] = useState<'opus' | 'sonnet'>(iv?.pass1Model ?? 'sonnet');
@@ -232,17 +207,8 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
   const [thoroughMode] = useState(false);
   const [mode, setMode] = useState<'single' | 'twopass'>(iv?.mode ?? 'twopass');
   const reportStyle = 'trap' as const;  // report style is fixed to By Trap (By-Issue retired)
-  // Analysis profile — 'self-serve' routes a raw KB through the minimal-harness condition.
-  // Tool coaching is no longer independently combinable: it is locked to the KB version
-  // (v1 → KB only, v2 → Prompting + KB).
-  const [profile, setProfile] = useState<Profile>(initialKb === 'v1' ? 'self-serve' : 'default');
-  // Selecting a KB version locks the coaching profile to that version's supported config,
-  // and dismisses any restore-time coercion notice.
-  const selectKbVersion = (v: KbVersion) => {
-    setKbVersion(v);
-    setProfile(v === 'v1' ? 'self-serve' : 'default');
-    setCoercedFromKb(null);
-  };
+  // Analysis profile is 'default' (Prompting + KB) — v2 always runs this config.
+  const profile: Profile = 'default';
   const [lockedInputType, setLockedInputType] = useState<'screenshot' | 'video' | 'flow_diagram' | null>(iv?.lockedInputType ?? null);
   const [autoDetectedType, setAutoDetectedType] = useState<'flow_diagram' | null>(null);
   const inputType = lockedInputType ?? autoDetectedType ?? inferFileType(files, figmaLink);
@@ -864,43 +830,21 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
               </div>
             </div>
 
-            {/* Knowledge base version */}
-            <div className={styles.scopeOpt}>
-              <p className={styles.scopeOptLabel}>Knowledge base version</p>
-              <div className={styles.kbVersionGroup}>
-                {(['v1', 'v2'] as KbVersion[]).map(v => (
-                  <button
-                    key={v}
-                    type="button"
-                    className={`${styles.kbVersionBtn} ${kbVersion === v ? styles.kbVersionBtnActive : ''}`}
-                    onClick={() => selectKbVersion(v)}
-                    disabled={disabled}
-                  >
-                    {v.toUpperCase()}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Analysis architecture — KB only (V1) forces single-pass */}
+            {/* Analysis architecture */}
             <div className={styles.scopeOpt}>
               <p className={styles.scopeOptLabel}>Analysis architecture</p>
               <div className={styles.kbVersionGroup}>
-                {(['twopass', 'single'] as const).map(v => {
-                  const archActive = kbVersion === 'v1' ? 'single' : mode;
-                  return (
-                    <button
-                      key={v}
-                      type="button"
-                      className={`${styles.kbVersionBtn} ${archActive === v ? styles.kbVersionBtnActive : ''}`}
-                      onClick={() => setMode(v)}
-                      disabled={disabled || kbVersion === 'v1'}
-                      title={kbVersion === 'v1' ? 'KB only (V1) always runs single-pass' : undefined}
-                    >
-                      {v === 'single' ? 'Single-pass' : 'Two-pass'}
-                    </button>
-                  );
-                })}
+                {(['twopass', 'single'] as const).map(v => (
+                  <button
+                    key={v}
+                    type="button"
+                    className={`${styles.kbVersionBtn} ${mode === v ? styles.kbVersionBtnActive : ''}`}
+                    onClick={() => setMode(v)}
+                    disabled={disabled}
+                  >
+                    {v === 'single' ? 'Single-pass' : 'Two-pass'}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -922,15 +866,6 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
               </div>
             </div>
           </div>
-
-          {coercedFromKb && (
-            <p className={styles.fieldHint} role="status" style={{ color: 'var(--color-warning, #b45309)', marginTop: 8 }}>
-              This saved configuration requested <strong>{coercedFromKb.toUpperCase()}</strong>, which is
-              deprecated and no longer available. It has been switched to <strong>V2.1</strong> — the
-              analysis will run on V2.1, not {coercedFromKb.toUpperCase()}.
-            </p>
-          )}
-
 
         </div>
       </div>
