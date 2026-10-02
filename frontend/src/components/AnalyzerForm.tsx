@@ -165,7 +165,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
   const [screenName, setScreenName] = useState(iv?.screenName ?? '');
   const [platform, setPlatform] = useState(iv?.platform ?? '');
   const [productDomain, setProductDomain] = useState(iv?.productDomain ?? '');
-  const [productContext, setProductContext] = useState(iv?.productContext ?? '');
+  const productContext = iv?.productContext ?? '';  // field removed; value retained for snapshot/context compatibility
   const [isDragover, setIsDragover] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -593,24 +593,6 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
 
           </div>
 
-          {/* Product context */}
-          <div className={styles.field}>
-            <label className={styles.fieldLabel} htmlFor="productContext">
-              Describe the general purpose of this product
-              <span className={styles.opt}>optional</span>
-            </label>
-            <input
-              id="productContext"
-              type="text"
-              className={styles.input}
-              placeholder="e.g., Hospital website, retail mobile app, banking dashboard, B2B SaaS tool"
-              value={productContext}
-              onChange={e => setProductContext(e.target.value)}
-              disabled={disabled}
-            />
-            <p className={styles.fieldHint}>Helps calibrate findings and recommendations to the product's broader purpose — not just the task being evaluated.</p>
-          </div>
-
         </div>
       </div>
 
@@ -879,7 +861,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
               id="extraContext"
               type="text"
               className={styles.input}
-              placeholder="Known technical constraints, recent design changes, specific hypotheses to test, competitive context — anything that would help calibrate the analysis."
+              placeholder="The product's broader purpose, known technical constraints, recent design changes, specific hypotheses to test, competitive context — anything that would help calibrate the analysis."
               value={extraContext}
               onChange={e => setExtraContext(e.target.value)}
               disabled={disabled}
@@ -904,7 +886,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
             <label className={styles.fieldLabel}>Tenets to analyze</label>
             <p className={styles.fieldHint} style={{ marginBottom: 10 }}>
               {selectedTenets.length === ALL_TENETS.length
-                ? 'All nine Tenets will be evaluated (default).'
+                ? 'All eight Tenets will be evaluated (default).'
                 : `Focusing on ${selectedTenets.length} Tenet${selectedTenets.length > 1 ? 's' : ''}: ${selectedTenets.join(', ')}.`}
             </p>
             <div className={styles.tenetGrid}>
