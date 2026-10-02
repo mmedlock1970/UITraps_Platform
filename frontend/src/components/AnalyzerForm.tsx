@@ -154,6 +154,12 @@ function inferFileType(files: File[], figmaLink: string): 'screenshot' | 'video'
   return 'screenshot';
 }
 
+// Parse the single comma-separated task field into up to three task entries (empties dropped).
+function parseTaskText(text: string): Array<{ name: string; description: string }> {
+  return text.split(',').map(s => s.trim()).filter(Boolean).slice(0, 3)
+             .map(description => ({ name: '', description }));
+}
+
 export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled = false, initialValues }) => {
   const iv = initialValues;
 
@@ -173,13 +179,11 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
   const [expLevel, setExpLevel] = useState(iv?.expLevel ?? '');
   const techSavvy = iv?.techSavvy ?? '';  // field removed; value retained for snapshot/context compatibility
   const [frequency, setFrequency] = useState(iv?.frequency ?? '');
-  // Exactly three task slots, always rendered. Pad a restored session (which may have 1–3)
-  // up to three; empty descriptions are filtered out at submit time.
-  const [tasks, setTasks] = useState<Array<{ name: string; description: string }>>(() => {
-    const padded = (iv?.tasks ?? []).slice(0, 3);
-    while (padded.length < 3) padded.push({ name: '', description: '' });
-    return padded;
-  });
+  // Up to three tasks in one comma-separated field. A restored session may hold a tasks array;
+  // join it back into text. Parsed into a task list (max 3) at submit time.
+  const [taskText, setTaskText] = useState<string>(
+    (iv?.tasks ?? []).map(t => t.description).filter(Boolean).join(', ')
+  );
   const [userDesc, setUserDesc] = useState(iv?.userDesc ?? '');
   const [priorProducts, setPriorProducts] = useState(iv?.priorProducts ?? '');
 
@@ -249,10 +253,6 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
     );
   }, []);
 
-  const updateTask = useCallback((index: number, field: 'name' | 'description', value: string) => {
-    setTasks(prev => prev.map((t, i) => i === index ? { ...t, [field]: value } : t));
-  }, []);
-
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState(false);
 
@@ -295,10 +295,10 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
     if (!productDomain) e.productDomain = 'Required';
     if (!expLevel) e.expLevel = 'Required';
     if (!userDesc.trim()) e.userDesc = 'Required';
-    if (!tasks[0]?.description.trim()) e.userGoal = 'Required';
+    if (parseTaskText(taskText).length === 0) e.userGoal = 'Required';
     setErrors(e);
     return e;
-  }, [files, figmaLink, lockedInputType, screenName, platform, productDomain, expLevel, userDesc, tasks]);
+  }, [files, figmaLink, lockedInputType, screenName, platform, productDomain, expLevel, userDesc, taskText]);
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
@@ -325,19 +325,20 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
       return;
     }
     setFormError(false);
+    const parsedTasks = parseTaskText(taskText);
     const formSnapshot: FormSnapshot = {
       figmaLink, screenName, platform, productDomain, productContext,
-      expLevel, techSavvy, frequency, tasks, userDesc, priorProducts,
+      expLevel, techSavvy, frequency, tasks: parsedTasks, userDesc, priorProducts,
       physicalEnv, lighting, gripPosition, attentionalState, extraContext,
       kbVersion, selectedTenets, verbosity, pass1Model, thoroughMode, mode, reportStyle, lockedInputType,
     };
     const context = assembleContext({ platform, productDomain, screenName,
-      expLevel, techSavvy, frequency, taskList: tasks, priorProducts, userDesc, extraContext, productContext,
+      expLevel, techSavvy, frequency, taskList: parsedTasks, priorProducts, userDesc, extraContext, productContext,
       physicalEnv, lighting, gripPosition, attentionalState, kbVersion, selectedTenets,
       verbosity, pass1Model, figmaLink, thoroughMode, mode, reportStyle, profile, inputType });
     onSubmit({ files, context, formSnapshot });
   }, [disabled, validate, files, figmaLink, screenName, platform, productDomain, productContext,
-      expLevel, techSavvy, frequency, tasks, userDesc, priorProducts, extraContext,
+      expLevel, techSavvy, frequency, taskText, userDesc, priorProducts, extraContext,
       physicalEnv, lighting, gripPosition, attentionalState, kbVersion, selectedTenets,
       verbosity, pass1Model, thoroughMode, mode, reportStyle, lockedInputType, onSubmit]);
 
@@ -682,25 +683,20 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
             </div>
 
             <div className={`${styles.field} ${styles.span3}`}>
-              <label className={styles.fieldLabel}>
+              <label className={styles.fieldLabel} htmlFor="userGoal">
                 <span className={styles.req} />
-                Enter up to three user task(s) to evaluate
+                Enter up to three user tasks to evaluate, separated by commas
               </label>
-              {tasks.map((task, i) => (
-                <div key={i} className={styles.taskRow}>
-                  <input
-                    id={i === 0 ? 'userGoal' : undefined}
-                    type="text"
-                    className={`${styles.input} ${i === 0 && errors.userGoal ? styles.inputError : ''}`}
-                    placeholder={i === 0
-                      ? 'e.g., Complete a purchase, Find and book a flight'
-                      : `Task ${i + 1} (optional)`}
-                    value={task.description}
-                    onChange={e => updateTask(i, 'description', e.target.value)}
-                    disabled={disabled}
-                  />
-                </div>
-              ))}
+              <input
+                id="userGoal"
+                type="text"
+                className={`${styles.input} ${errors.userGoal ? styles.inputError : ''}`}
+                placeholder="e.g., Complete a purchase, Find and book a flight"
+                value={taskText}
+                onChange={e => setTaskText(e.target.value)}
+                disabled={disabled}
+              />
+              <p className={styles.fieldHint}>Note: each additional task will increase analysis time.</p>
               {errors.userGoal && <p className={styles.fieldError}>{errors.userGoal}</p>}
             </div>
 
