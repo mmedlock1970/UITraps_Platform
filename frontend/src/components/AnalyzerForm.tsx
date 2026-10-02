@@ -791,7 +791,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
               id="extraContext"
               type="text"
               className={styles.input}
-              placeholder="The product's broader purpose, known technical constraints, recent design changes, specific hypotheses to test, competitive context — anything that would help calibrate the analysis."
+              placeholder="Product purpose, technical constraints, recent changes, hypotheses to test, or competitive context."
               value={extraContext}
               onChange={e => setExtraContext(e.target.value)}
               disabled={disabled}
