@@ -173,9 +173,13 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
   const [expLevel, setExpLevel] = useState(iv?.expLevel ?? '');
   const techSavvy = iv?.techSavvy ?? '';  // field removed; value retained for snapshot/context compatibility
   const [frequency, setFrequency] = useState(iv?.frequency ?? '');
-  const [tasks, setTasks] = useState<Array<{ name: string; description: string }>>(
-    iv?.tasks ?? [{ name: '', description: '' }]
-  );
+  // Exactly three task slots, always rendered. Pad a restored session (which may have 1–3)
+  // up to three; empty descriptions are filtered out at submit time.
+  const [tasks, setTasks] = useState<Array<{ name: string; description: string }>>(() => {
+    const padded = (iv?.tasks ?? []).slice(0, 3);
+    while (padded.length < 3) padded.push({ name: '', description: '' });
+    return padded;
+  });
   const [userDesc, setUserDesc] = useState(iv?.userDesc ?? '');
   const [priorProducts, setPriorProducts] = useState(iv?.priorProducts ?? '');
 
@@ -245,26 +249,8 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
     );
   }, []);
 
-  const addTask = useCallback(() => {
-    setTasks(prev => prev.length < 3 ? [...prev, { name: '', description: '' }] : prev);
-  }, []);
-
-  const removeTask = useCallback((index: number) => {
-    setTasks(prev => prev.length > 1 ? prev.filter((_, i) => i !== index) : prev);
-  }, []);
-
   const updateTask = useCallback((index: number, field: 'name' | 'description', value: string) => {
     setTasks(prev => prev.map((t, i) => i === index ? { ...t, [field]: value } : t));
-  }, []);
-
-  const moveTask = useCallback((index: number, direction: -1 | 1) => {
-    setTasks(prev => {
-      const next = [...prev];
-      const target = index + direction;
-      if (target < 0 || target >= next.length) return prev;
-      [next[index], next[target]] = [next[target], next[index]];
-      return next;
-    });
   }, []);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -698,62 +684,25 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
             <div className={`${styles.field} ${styles.span3}`}>
               <label className={styles.fieldLabel}>
                 <span className={styles.req} />
-                Describe the user task(s) to evaluate
+                Enter up to three user task(s) to evaluate
               </label>
               {tasks.map((task, i) => (
                 <div key={i} className={styles.taskRow}>
-                  <div className={styles.taskDescRow}>
-                    {tasks.length > 1 && (
-                      <div className={styles.taskReorderBtns}>
-                        <button
-                          type="button"
-                          className={styles.taskReorderBtn}
-                          onClick={() => moveTask(i, -1)}
-                          disabled={disabled || i === 0}
-                          title="Move up"
-                        >▲</button>
-                        <button
-                          type="button"
-                          className={styles.taskReorderBtn}
-                          onClick={() => moveTask(i, 1)}
-                          disabled={disabled || i === tasks.length - 1}
-                          title="Move down"
-                        >▼</button>
-                      </div>
-                    )}
-                    <input
-                      id={i === 0 ? 'userGoal' : undefined}
-                      type="text"
-                      className={`${styles.input} ${i === 0 && errors.userGoal ? styles.inputError : ''}`}
-                      placeholder={tasks.length === 1
-                        ? 'e.g., Complete a purchase, Find and book a flight'
-                        : `Task ${i + 1} description`}
-                      value={task.description}
-                      onChange={e => updateTask(i, 'description', e.target.value)}
-                      disabled={disabled}
-                    />
-                    {tasks.length > 1 && (
-                      <button
-                        type="button"
-                        className={styles.taskRemoveBtn}
-                        onClick={() => removeTask(i)}
-                        disabled={disabled}
-                        title="Remove task"
-                      >×</button>
-                    )}
-                  </div>
+                  <input
+                    id={i === 0 ? 'userGoal' : undefined}
+                    type="text"
+                    className={`${styles.input} ${i === 0 && errors.userGoal ? styles.inputError : ''}`}
+                    placeholder={i === 0
+                      ? 'e.g., Complete a purchase, Find and book a flight'
+                      : `Task ${i + 1} (optional)`}
+                    value={task.description}
+                    onChange={e => updateTask(i, 'description', e.target.value)}
+                    disabled={disabled}
+                  />
                 </div>
               ))}
-              {tasks.length < 3 && (
-                <button
-                  type="button"
-                  className={styles.taskAddBtn}
-                  onClick={addTask}
-                  disabled={disabled}
-                >+ Add task</button>
-              )}
               <p className={styles.fieldHint}>
-                You can add up to 3 tasks — each additional task increases analysis time.
+                Tasks 2 and 3 are optional. Each additional task increases analysis time.
               </p>
               {errors.userGoal && <p className={styles.fieldError}>{errors.userGoal}</p>}
             </div>
