@@ -201,11 +201,11 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
   const kbVersion: KbVersion = 'v2';
   const [selectedTenets, setSelectedTenets] = useState<string[]>(iv?.selectedTenets ?? [...ALL_TENETS]);
   const [verbosity, setVerbosity] = useState<'brief' | 'standard'>(iv?.verbosity ?? 'brief');
-  const [pass1Model, setPass1Model] = useState<'opus' | 'sonnet'>(iv?.pass1Model ?? 'sonnet');
+  const [pass1Model, setPass1Model] = useState<'opus' | 'sonnet'>(iv?.pass1Model ?? 'opus');
   // Thorough coverage is deprecated (inert for both surviving configs) and its toggle was
   // removed — every run is Standard. Kept as a pinned value for the payload/snapshot shape.
   const [thoroughMode] = useState(false);
-  const [mode, setMode] = useState<'single' | 'twopass'>(iv?.mode ?? 'twopass');
+  const [mode, setMode] = useState<'single' | 'twopass'>(iv?.mode ?? 'single');
   const reportStyle = 'trap' as const;  // report style is fixed to By Trap (By-Issue retired)
   // Analysis profile is 'default' (Prompting + KB) — v2 always runs this config.
   const profile: Profile = 'default';
@@ -662,7 +662,6 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
                 onChange={e => setTaskText(e.target.value)}
                 disabled={disabled}
               />
-              <p className={styles.fieldHint}>Note: each additional task will increase analysis time.</p>
               {errors.userGoal && <p className={styles.fieldError}>{errors.userGoal}</p>}
             </div>
 
@@ -816,7 +815,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
             <div className={styles.scopeOpt}>
               <p className={styles.scopeOptLabel}>Analysis model</p>
               <div className={styles.kbVersionGroup}>
-                {(['opus', 'sonnet'] as const).map(v => (
+                {(['sonnet', 'opus'] as const).map(v => (
                   <button
                     key={v}
                     type="button"
@@ -832,9 +831,9 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
 
             {/* Analysis architecture */}
             <div className={styles.scopeOpt}>
-              <p className={styles.scopeOptLabel}>Analysis architecture</p>
+              <p className={styles.scopeOptLabel}>Analysis depth</p>
               <div className={styles.kbVersionGroup}>
-                {(['twopass', 'single'] as const).map(v => (
+                {(['single', 'twopass'] as const).map(v => (
                   <button
                     key={v}
                     type="button"
@@ -879,7 +878,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
         )}
         <div className={styles.submitText}>
           <h3>Ready to analyze.</h3>
-          <p>High-severity findings only, ranked by likely user impact. Analysis typically takes 2–3 minutes.</p>
+          <p>Analysis times will vary from one to several minutes depending on number of tasks, analysis depth, etc.</p>
         </div>
         <button type="submit" className={styles.btnSubmit} disabled={disabled}>
           Run Analysis
