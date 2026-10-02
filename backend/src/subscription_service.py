@@ -5,12 +5,28 @@ Handles WooCommerce webhook events for subscription lifecycle and token top-ups.
 Users are identified by their WordPress user ID (from JWT payload).
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlmodel import Session, select
 
 from src.database import UserSubscription
+
+
+def _parse_iso_utc(value: Optional[str]) -> Optional[datetime]:
+    """Parse a WooCommerce ISO 8601 timestamp into a timezone-aware UTC datetime.
+
+    The user_subscriptions datetime columns are timestamptz, so stored values must be
+    tz-aware. Handles a trailing 'Z' (e.g. "2026-10-02T18:19:21Z") on every Python version,
+    and treats a naive string as UTC. Returns None for an empty value.
+    """
+    if not value:
+        return None
+    s = value.strip()
+    if s.endswith("Z"):
+        s = s[:-1] + "+00:00"
+    dt = datetime.fromisoformat(s)
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
 def get_or_create_subscription(session: Session, user_id: str) -> UserSubscription:
@@ -42,14 +58,14 @@ def activate_subscription(
     sub.subscription_status = "active"
     sub.monthly_limit = monthly_limit
     sub.monthly_used = 0
-    sub.updated_at = datetime.utcnow()
+    sub.updated_at = datetime.now(timezone.utc)
 
     if subscription_start:
-        sub.subscription_start = datetime.fromisoformat(subscription_start)
+        sub.subscription_start = _parse_iso_utc(subscription_start)
     if subscription_end:
-        sub.subscription_end = datetime.fromisoformat(subscription_end)
+        sub.subscription_end = _parse_iso_utc(subscription_end)
     if next_renewal:
-        sub.next_renewal = datetime.fromisoformat(next_renewal)
+        sub.next_renewal = _parse_iso_utc(next_renewal)
 
     session.add(sub)
     session.commit()
@@ -69,14 +85,14 @@ def renew_subscription(
 
     sub.subscription_status = "active"
     sub.monthly_used = 0
-    sub.updated_at = datetime.utcnow()
+    sub.updated_at = datetime.now(timezone.utc)
 
     if monthly_limit is not None:
         sub.monthly_limit = monthly_limit
     if next_renewal:
-        sub.next_renewal = datetime.fromisoformat(next_renewal)
+        sub.next_renewal = _parse_iso_utc(next_renewal)
     if subscription_end:
-        sub.subscription_end = datetime.fromisoformat(subscription_end)
+        sub.subscription_end = _parse_iso_utc(subscription_end)
 
     session.add(sub)
     session.commit()
@@ -88,7 +104,7 @@ def cancel_subscription(session: Session, user_id: str) -> UserSubscription:
     """Cancel subscription — user loses access at period end."""
     sub = get_or_create_subscription(session, user_id)
     sub.subscription_status = "cancelled"
-    sub.updated_at = datetime.utcnow()
+    sub.updated_at = datetime.now(timezone.utc)
     session.add(sub)
     session.commit()
     session.refresh(sub)
@@ -99,7 +115,7 @@ def expire_subscription(session: Session, user_id: str) -> UserSubscription:
     """Expire subscription — access fully revoked."""
     sub = get_or_create_subscription(session, user_id)
     sub.subscription_status = "expired"
-    sub.updated_at = datetime.utcnow()
+    sub.updated_at = datetime.now(timezone.utc)
     session.add(sub)
     session.commit()
     session.refresh(sub)
@@ -110,7 +126,7 @@ def add_bonus_tokens(session: Session, user_id: str, tokens: int) -> UserSubscri
     """Add purchased bonus tokens to user's balance."""
     sub = get_or_create_subscription(session, user_id)
     sub.bonus_tokens += tokens
-    sub.updated_at = datetime.utcnow()
+    sub.updated_at = datetime.now(timezone.utc)
     session.add(sub)
     session.commit()
     session.refresh(sub)
@@ -137,7 +153,7 @@ def check_and_consume_token(session: Session, user_id: str) -> tuple[bool, str]:
     # Monthly allowance available
     if sub.monthly_used < sub.monthly_limit:
         sub.monthly_used += 1
-        sub.updated_at = datetime.utcnow()
+        sub.updated_at = datetime.now(timezone.utc)
         session.add(sub)
         session.commit()
         return True, "ok"
@@ -145,7 +161,7 @@ def check_and_consume_token(session: Session, user_id: str) -> tuple[bool, str]:
     # Fall back to bonus tokens
     if sub.bonus_tokens > 0:
         sub.bonus_tokens -= 1
-        sub.updated_at = datetime.utcnow()
+        sub.updated_at = datetime.now(timezone.utc)
         session.add(sub)
         session.commit()
         return True, "ok"

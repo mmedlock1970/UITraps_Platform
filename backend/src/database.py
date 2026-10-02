@@ -5,7 +5,7 @@ Uses SQLModel (Pydantic + SQLAlchemy) for type-safe database operations.
 """
 
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from pathlib import Path
 
@@ -72,8 +72,10 @@ class UserSubscription(SQLModel, table=True):
     subscription_start: Optional[datetime] = Field(default=None)
     subscription_end: Optional[datetime] = Field(default=None)
     next_renewal: Optional[datetime] = Field(default=None)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    # Timezone-aware (UTC): the user_subscriptions columns are timestamptz, so naive
+    # datetime.utcnow() values are rejected ("Datetime values must have timezone information").
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # --- Analysis Report Storage ---
