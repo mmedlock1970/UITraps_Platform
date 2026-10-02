@@ -44,12 +44,14 @@
 }
 
 .card {
+  /* No overflow:hidden here — it would clip the "Why this matters" info popover, which needs
+     to overlay the fields below. The card's rounded corners don't depend on it (no child has a
+     full-bleed background reaching the corners). */
   background: var(--uitraps-bg);
   border-radius: 12px;
   box-shadow: var(--uitraps-shadow-sm);
   border: 1px solid var(--uitraps-border);
   margin-bottom: 16px;
-  overflow: hidden;
 }
 
 .cardHeader {
