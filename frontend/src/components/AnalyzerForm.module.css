@@ -156,9 +156,21 @@
   grid-column: span 2;
 }
 
+.threeCol {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.span3 {
+  grid-column: span 3;
+}
+
+/* Keep the three selects symmetric: 3-across on wider screens, fully stacked on narrow —
+   no intermediate 2+1 orphan. */
 @media (max-width: 580px) {
   .twoCol { grid-template-columns: 1fr; }
   .span2 { grid-column: span 1; }
+  .threeCol { grid-template-columns: 1fr; }
+  .span3 { grid-column: span 1; }
   .introTitle { font-size: 28px; }
 }
 

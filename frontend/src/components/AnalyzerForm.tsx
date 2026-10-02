@@ -171,7 +171,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
 
   // Card 2 — User
   const [expLevel, setExpLevel] = useState(iv?.expLevel ?? '');
-  const [techSavvy, setTechSavvy] = useState(iv?.techSavvy ?? '');
+  const techSavvy = iv?.techSavvy ?? '';  // field removed; value retained for snapshot/context compatibility
   const [frequency, setFrequency] = useState(iv?.frequency ?? '');
   const [tasks, setTasks] = useState<Array<{ name: string; description: string }>>(
     iv?.tasks ?? [{ name: '', description: '' }]
@@ -615,9 +615,9 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
         </div>
         <div className={styles.cardBody}>
 
-          <div className={`${styles.fieldGrid} ${styles.twoCol}`}>
+          <div className={`${styles.fieldGrid} ${styles.threeCol}`}>
 
-            <div className={`${styles.field} ${styles.span2}`}>
+            <div className={`${styles.field} ${styles.span3}`}>
               <label className={styles.fieldLabel} htmlFor="userDesc">
                 <span className={styles.req} />
                 Describe the intended users of this interface
@@ -676,25 +676,6 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
             </div>
 
             <div className={styles.field}>
-              <label className={styles.fieldLabel} htmlFor="techSavvy">
-                Tech savviness
-                <span className={styles.opt}>optional</span>
-              </label>
-              <select
-                id="techSavvy"
-                className={styles.select}
-                value={techSavvy}
-                onChange={e => setTechSavvy(e.target.value)}
-                disabled={disabled}
-              >
-                <option value="">— Select one —</option>
-                <option>Low — limited tech experience</option>
-                <option>Average — comfortable with everyday apps</option>
-                <option>High — power user or specialist</option>
-              </select>
-            </div>
-
-            <div className={styles.field}>
               <label className={styles.fieldLabel} htmlFor="frequency">
                 How often will users interact with this product?
                 <span className={styles.opt}>optional</span>
@@ -714,7 +695,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
               </select>
             </div>
 
-            <div className={`${styles.field} ${styles.span2}`}>
+            <div className={`${styles.field} ${styles.span3}`}>
               <label className={styles.fieldLabel}>
                 <span className={styles.req} />
                 Describe the user task(s) to evaluate
