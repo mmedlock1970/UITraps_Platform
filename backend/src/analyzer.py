@@ -380,7 +380,7 @@ class UITrapsAnalyzer:
         # Step 6: Calculate metadata
         duration = time.time() - start_time
         # Report the model actually used for pass 1 (pass1_model="haiku" routes to enrich_model).
-        _effective_model = {"sonnet": self.model, "haiku": self.enrich_model}.get(pass1_model or "", self.model)
+        _effective_model = {"opus": self.opus_model, "sonnet": self.model, "haiku": self.enrich_model}.get(pass1_model or "", self.model)
         metadata = {
             "model": _effective_model,
             "duration_seconds": round(duration, 2),
@@ -864,7 +864,10 @@ class UITrapsAnalyzer:
             # Ceilings carry ~30% headroom for the Opus-4.7/Sonnet-5 tokenizer (more output tokens per report).
             pass1_max_tokens = min(31000 + max(0, _n_screens - 1) * 5200, 42000)
         else:
-            pass1_max_tokens = 4000 if verbosity == "brief" else 6500
+            # Legacy By-Issue ceiling. Raised from 4000/6500: current-gen models always run thinking
+            # (it can't be disabled), and those tokens share this budget, so the old caps risked
+            # truncating the report. max_tokens is a ceiling — a short report still stops early.
+            pass1_max_tokens = 9000 if verbosity == "brief" else 12000
 
         _self_serve = (profile == "self-serve")
 
@@ -959,10 +962,14 @@ class UITrapsAnalyzer:
                 (block for block in response.content if block.type == "tool_use"), None
             )
             if not tool_use_block:
-                # No tool call (rare with the current-gen "auto" nudge) — parse the first text block,
-                # skipping any leading thinking block a thinking-on model may emit.
+                # No tool call (rare with the current-gen "auto" nudge) — recover from the first text
+                # block, skipping any leading thinking block. New-KB reports are JSON dicts; the legacy
+                # By-Issue text format is handled by parse_claude_response.
                 _text = next((b.text for b in response.content if getattr(b, "type", None) == "text"), "")
-                report = parse_claude_response(_text)
+                try:
+                    report = json.loads(_text)
+                except (ValueError, TypeError):
+                    report = parse_claude_response(_text)
             else:
                 report = tool_use_block.input
                 # Truncation (stop_reason == max_tokens) can return a PARTIAL dict missing later
@@ -1624,7 +1631,7 @@ class UITrapsAnalyzer:
             # Route through _create_message so the current-gen thinking/tool_choice normalization applies.
             response = self._create_message(
                 model=self.model,
-                max_tokens=5400,   # ~30% headroom for the new tokenizer
+                max_tokens=9000,   # headroom for the report + the always-on thinking on current-gen models
                 thinking={"type": "disabled"},   # normalized away on current-gen models (thinking runs adaptively)
                 system=system_prompt,
                 messages=[
@@ -1653,10 +1660,16 @@ class UITrapsAnalyzer:
                 None
             )
 
-            if not tool_use_block:
-                raise ValueError("No tool use found in response")
-
-            analysis = tool_use_block.input
+            if tool_use_block:
+                analysis = tool_use_block.input
+            else:
+                # Current-gen models run tool_choice "auto" (forced choice is rejected), so a rare
+                # plain-text reply is possible — recover the report from a JSON text block before failing.
+                _txt = next((b.text for b in response.content if getattr(b, "type", None) == "text"), "")
+                try:
+                    analysis = json.loads(_txt)
+                except (ValueError, TypeError):
+                    raise ValueError("No tool use or parseable JSON found in interaction response")
 
             # Validate required fields
             required_fields = [
