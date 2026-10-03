@@ -247,16 +247,31 @@ function hasFullContext(users: string, expertise: string, tasks: string, format:
 }
 
 /** Intent patterns that trigger the options widget instead of plain chat */
+// Intent to RUN an analysis on the user's own design. Deliberately requires a design object
+// ("analyze my/this design", "run an analysis") — bare "analyze"/"analysis" matched knowledge
+// questions like "instructions for conducting a trap analysis" and wrongly opened the intake widget.
 const ANALYSIS_INTENT_PATTERNS = [
-  /\banalyze\b/i,
-  /\banalysis\b/i,
+  /\banalyze\s+(my|this|the|a|an|our|it|these|those|that)\b/i,
+  /\b(run|start|do|perform|conduct)\s+(a\s+|an\s+)?(new\s+)?(trap\s+|ui\s+)?analysis\b/i,
   /\bcheck\s+(my|this|the)\b/i,
   /\breview\s+(my|this|the)\b/i,
-  /\bevaluate\b/i,
+  /\bevaluate\s+(my|this|the|a)\b/i,
   /\btest\s+(my|this|the)\b/i,
-  /\bstart\s+(a\s+)?new\s+analysis\b/i,
   /\bi\s+have\s+a\s+design\b/i,
   /\bi\s+want\s+to\s+(analyze|check|review|test)\b/i,
+];
+
+// How-to / instruction / knowledge questions. These are ANSWERED (RAG chat) even when they mention
+// "analysis", so asking how to do a trap analysis never opens the run-an-analysis intake widget.
+const KNOWLEDGE_HOWTO_PATTERNS = [
+  /\b(instructions?|guide|tutorial|walk\s*through|walkthrough)\b/i,
+  /\bhow\s+(do|can|would|should|might)\s+i\b/i,
+  /\bhow\s+to\b/i,
+  /\b(teach|show)\s+me\b/i,
+  /\bexplain\b/i,
+  /\bsteps?\s+(to|for)\b/i,
+  /\b(on\s+my\s+own|myself|manually|by\s+hand|paper\s+and\s+pencil)\b/i,
+  /\btell\s+me\s+about\b/i,
 ];
 
 const CAPABILITY_PATTERNS = [
@@ -942,6 +957,13 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
           "I can help you with UI analysis in a few ways:",
           OPTIONS_WIDGET_CHOICES
         );
+        return;
+      }
+
+      // How-to / instruction questions (even when they mention "analysis") → answer directly.
+      // The intake widget is only for actually running an analysis on a provided design.
+      if (KNOWLEDGE_HOWTO_PATTERNS.some(p => p.test(text))) {
+        await chat.sendMessage(text);
         return;
       }
 
