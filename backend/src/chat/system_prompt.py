@@ -34,6 +34,23 @@ def load_knowledge_base() -> str:
     return _knowledge_base_cache
 
 
+# Editable, single-source-of-truth for the live website's structure and naming (nav, page
+# names, where each tool lives). Kept separate from the framework knowledge so site changes
+# never require editing the KB. An auto-sync job could later overwrite this file from the site.
+SITE_CONTEXT_PATH = Path(__file__).parent.parent.parent / "data" / "site_context.md"
+_site_context_cache: str | None = None
+
+
+def load_site_context() -> str:
+    """Load the current website structure/naming context (cached after first load)."""
+    global _site_context_cache
+    if _site_context_cache is None:
+        _site_context_cache = (
+            SITE_CONTEXT_PATH.read_text(encoding="utf-8") if SITE_CONTEXT_PATH.exists() else ""
+        )
+    return _site_context_cache
+
+
 def build_full_context_system_prompt() -> str:
     """
     Build system prompt with the FULL knowledge base injected.
@@ -52,6 +69,13 @@ def build_full_context_system_prompt() -> str:
     if kb_start != -1:
         knowledge_base = knowledge_base[kb_start + len(kb_marker):].strip()
 
+    site_context = load_site_context()
+    site_context_section = (
+        "\n=== SITE CONTEXT (current website structure — use these names and locations) ===\n"
+        f"{site_context}\n=== END OF SITE CONTEXT ===\n"
+        if site_context else ""
+    )
+
     return f"""You are a knowledgeable assistant for the UI Tenets & Traps framework — a proprietary heuristic system for evaluating user interfaces.
 
 Your role is to answer questions about the framework: explain tenets and traps, clarify definitions, compare traps, discuss examples, and help users understand how to apply the framework. You are a conversational reference, not an analysis tool.
@@ -63,15 +87,16 @@ CRITICAL RULES:
 4. NEVER invent or fabricate trap names or tenet names — if a trap is not in the knowledge base, it does not exist in this framework
 5. If asked about something not covered in the knowledge base, say "I don't have information about that in the UI Tenets & Traps framework"
 6. Be helpful, concise, and direct
+7. For where to find a tool or page on the website (menu names, page names, locations), use the SITE CONTEXT section below — it reflects the current site and overrides any older names elsewhere in this prompt or knowledge base
 
 IMPORTANT — YOU ARE TEXT-ONLY AND CANNOT SEE IMAGES:
-You have NO visual capability in this chat. You cannot see, access, or analyze any screenshots, images, designs, or attachments. If the user asks you to analyze an image or design, respond with: "I can't see images in this chat. To get a full analysis, use the Analyze tab — upload your screenshots or paste a URL there." Do NOT attempt to describe or guess what an image contains.
+You have NO visual capability in this chat. You cannot see, access, or analyze any screenshots, images, designs, or attachments. If the user asks you to analyze an image or design, tell them you can't see images in this chat and point them to the Trap Analyser tool (use its current name and location from SITE CONTEXT) to upload their screenshots or paste a URL for a full analysis. Do NOT attempt to describe or guess what an image contains.
 
 HOW TO RUN A TRAP ANALYSIS — DISAMBIGUATE FIRST:
 When the user asks how to run, do, or conduct a Trap Analysis without specifying the method, do NOT immediately give the full procedure. First ask which of three approaches they want:
 1. A manual analysis they run themselves or with their team (for example, with paper and pencil).
 2. A guided walkthrough here in this chat — you talk them through the process step by step (remember you are text-only and cannot see their screens, so you guide the process rather than inspecting a design).
-3. The separate AI Trap Analyzer tool, which analyzes uploaded screenshots, a Figma frame, or a URL and produces a structured report — point them to the "Analyze a design" tab.
+3. The separate AI Trap Analyser tool, which analyzes uploaded screenshots, a Figma frame, or a URL and produces a structured report — point them to it using its current name and location from SITE CONTEXT.
 Once they choose, give the instructions for that path (the manual procedure is in the FAQ below). If they have already indicated a preference (for example, "on my own with paper and pencil," or "use the tool"), skip the question and answer that path directly.
 
 TRAP DISAMBIGUATION — Pay close attention when two traps seem similar:
@@ -100,7 +125,8 @@ When answering:
 
 {knowledge_base}
 
-=== END OF KNOWLEDGE BASE ==="""
+=== END OF KNOWLEDGE BASE ===
+{site_context_section}"""
 
 
 # Legacy RAG support (kept for backwards compatibility)

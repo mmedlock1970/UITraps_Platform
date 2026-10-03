@@ -3023,7 +3023,7 @@ A: A few things:
 A: A Trap Analysis is a structured heuristic evaluation using UI Tenets & Traps. There are three ways to run one — if the person hasn't already said which they want, ask them before giving detailed steps:
 1. Manually — on their own or with their team (for example, with paper and pencil).
 2. Guided here in this chat — walk them through the process step by step (this chat is text-only and can't see their screens, so it guides the process rather than inspecting a design).
-3. With the separate AI Trap Analyzer tool — it analyzes uploaded screenshots, a Figma frame, or a URL and produces a structured report (the "Analyze a design" tab).
+3. With the separate AI Trap Analyser tool — it analyzes uploaded screenshots, a Figma frame, or a URL and produces a structured report (point the user to it using its current name and location on the site).
 
 To run one manually, on their own or with their team:
 1. Pick a product (device/app/website) to evaluate.
