@@ -2971,4 +2971,109 @@ Failing to apply existing design knowledge. Even when teams prioritize the needs
 UI Tenets & Traps directly addresses the final cause above, and by making good design easier to achieve, it raises the cost of the first three.
 
 
+## FREQUENTLY ASKED QUESTIONS
+
+### About UI Tenets & Traps
+
+**Q: What is UI Tenets & Traps?**
+A: UI Tenets & Traps is a tool for learning and applying the principles behind what makes products work for people. It distills nearly 100 years of research on human perception, cognition, memory, and ergonomics into an accessible, actionable form. The system is comprised of 8 Tenets and 27 Traps: Tenets describe general attributes of good interface design, and Traps describe common, detectable design problems that degrade that goodness. The core idea: reduce Traps and the experience improves.
+
+**Q: Who is it built for?**
+A: It was built to be used by everyone involved in creating a product interface, including designers, researchers, PMs, and developers.
+
+**Q: Why was it created? What makes design knowledge hard to use?**
+A: Because design knowledge is hard to use. Working as design researchers at companies including Motorola, Microsoft, Meta, and Amazon, the creators watched teams struggle to apply existing research and saw the same avoidable problems appear in product after product. UI Tenets & Traps is the result, refined over more than fifteen years by thousands of designers, researchers, PMs, and developers at dozens of companies worldwide.
+
+The core problem is not a shortage of knowledge but the lack of an effective tool for making it easy to recall and act on. An audit of existing UI design resources — hundreds of studies, books, websites, and heuristic checklists — found no shortage of material capturing what makes good design, but no single resource that adequately addressed how teams can learn and apply it:
+- Hard to learn: short lists of high-level heuristics (e.g., Jakob Nielsen's 10 usability heuristics) give excellent orientation but are limited in breadth and depth; comprehensive books cataloging scores of principles are invaluable but too unwieldy to align a team around.
+- Hard to apply: existing tools teach good lessons but lack mechanisms to ensure those lessons get applied in the heat of the design process — the systematic structure and shared language to internalize and discuss key ideas, and the clear detection criteria needed to reliably spot and diagnose problems.
+
+Without these, teams fall victim to the curse of knowledge: proximity to their own designs makes it hard to imagine others won't understand them (like playing charades, certain your miming is obvious while others stare back blankly). Research shows that merely being aware of this does not make it go away. What does: a set of clear, objectively detectable criteria a team agrees to look for before design begins.
+
+**Q: How is it different from other heuristic tools?**
+A: Four things set it apart:
+- The right level of detail. It synthesizes hundreds of sources into a concise middle ground — more detail than frameworks built around a handful of high-level heuristics, but more focused than catalogs of a hundred-plus guidelines. Eight Tenets and twenty-seven Traps balance ease of learning and recall with comprehensiveness and depth, and provide a scaffold and gateway to deeper knowledge (with in-context pointers to resources and a bibliography organized by Tenet). It is not a substitute for deep expertise, but a scaffold toward it.
+- A memorable structure. The system is a pyramid: Tenets at the top, Traps below, with each Trap belonging to a Tenet. Tenets are adjectives; Traps are nouns. Both use familiar, memorable language, each precisely defined, and the system is color-coded throughout — with particular attention to Traps that are easy to miss and explicit guidance on how to detect them.
+- Precise language. As Daniel Kahneman put it, "There is a direct relationship between more precise language and better decisions … [a label] for a problem is a hook to which all that is known about it can be attached — its causes, its effects, and what can be done about it." Once a team shares a clearly defined Trap's name, they stop arguing about whether something is a problem (they named it ahead of time) and move straight to how severe it is and what to do about it.
+- A tangible form. As Jae Park observed, "Never underestimate the power of a tangible artifact." The companion color-coded card deck (one card per Trap) transformed the framework from a checklist into something people keep visible, bring to meetings, and hand to a colleague to name exactly the problem they're seeing — keeping the framework present in daily work in a way an app or document rarely manages.
+
+Together, the structure, language, and form make the framework uniquely actionable and help inoculate teams against the curse of knowledge.
+
+**Q: Where did the Tenets and Traps come from?**
+A: From a rigorous audit of the user interface literature and many existing heuristic taxonomies and guidelines. The Tenets were defined deliberately to create a global but still manageable set of categories for organizing the gathered information. A key insight from this audit: no single author developed guidelines or principles for every Tenet — authors tended to go deep in a subset (and produced amazing work there). The Tenets provide a human-centered framing within which any guideline or research finding can be considered, making a very large body of knowledge easier to get your head around. (The list of authors reviewed is not comprehensive — see the bibliography for a fuller account.)
+
+### Using the framework
+
+**Q: How does it help product teams?**
+A: It is built to work the way real teams work — flexibly, and alongside methods already in play. Teams use it for:
+- Alignment: agreeing on both the principles of good interface design and the language used to discuss them.
+- Evaluation: the shared vocabulary gives precision across expert reviews, design crits, and cognitive walkthroughs; in usability testing, RITE studies, and benchmarking it provides a ready explanation for what went wrong and why; formal heuristic evaluations (Trap Analyses) build on the same foundation.
+- Opportunity identification: systematically scanning a design for every chance to make it more Efficient, Understandable, or Habituating often surfaces issues testing alone would miss.
+
+The goal is to bring the framework in as early as possible and carry it through the entire product lifecycle.
+
+**Q: What should I keep in mind when using it?**
+A: A few things:
+- It's about "the how," not "the what." The framework helps you execute an excellent design once you know which user needs you're addressing (managing a calendar, shopping for groceries, paying taxes, etc.); it doesn't help you decide which needs to address. As Bill Buxton observed, we must both "get the right design and get the design right" — this tool focuses on the latter.
+- Context matters. Most Tenets and Traps apply broadly, but context shapes if and how. Some designs intentionally introduce what would be problems elsewhere: games may create appropriate challenge by testing memory and dexterity; shopping experiences may offer redundant paths to discovery that would frustrate users in task-focused contexts.
+- It's about starting conversations, not winning them. The framework is most valuable as shared language for difficult design discussions, not ammunition. Bringing it in at the start of a project — when teams are most open and can align on its use — pays dividends throughout.
+- All models are imperfect. It can't capture every nuance, but thousands of practitioners find it useful for detecting issues earlier, discussing them more precisely, and developing better solutions. As George Box put it: all models are wrong; some are useful.
+
+**Q: What is a Trap Analysis, and how do I do one? (including on my own, with paper and pencil)**
+A: A Trap Analysis is a structured heuristic evaluation using UI Tenets & Traps. It can be done manually (for example, with paper and pencil) or with the AI-driven Trap Analysis tool. To run one with your team:
+1. Pick a product (device/app/website) to evaluate.
+2. Capture attributes of the target users that might influence task success (familiarity with the product or domain, comfort with technology, etc.).
+3. Write down 2–3 tasks important to these users — describe the goal, not the implementation.
+4. Complete the tasks, "being the user": focus on the task and keep those user attributes in mind.
+5. Consider ALL the ways a user might try to complete the task — not just the obvious ones.
+6. Consider what happens if the user does something unexpected, tries to back up, or starts over.
+7. Write down any design issues you encounter in your own words, and note their severity (see below).
+8. Note which Trap(s) best explain each issue; several may apply — flag the most critical.
+9. If you're unsure which Traps apply, ask which Tenets are being degraded — this often clarifies things.
+10. For an issue with multiple Traps, ask whether one Trap is the root cause of the others; the root cause is often the key to the best solution.
+11. Don't sweat it if you're unsure which Trap applies — finding and fixing problems is what matters.
+12. If you have time, cross-validate by having other reviewers run the tasks.
+13. For each problem, describe the design change you believe might fix it, framed as a hypothesis.
+14. Share your findings with teammates and have a good discussion.
+
+Severity definitions:
+- High: Prevents the user from completing the task.
+- Medium: Does not prevent completion, but causes significant dissatisfaction.
+- Low: Does not prevent completion and causes little or no dissatisfaction.
+
+Writing good tasks: A good task is (1) known to be important to the end user and (2) describes an end, not a means — a real user goal with no reference to implementation. This is harder than it sounds, because we're all solution-oriented.
+- Good: "Using the school's website, find out which required classes are available to you next semester."
+- Bad: "Using the school's website, open the calendar view and use the available filters to determine which required classes are available next semester."
+
+Writing a good hypothesis: A good hypothesis describes a change you expect to see in some measure as a result of a change to your design, and explains why — for example, because it makes the design more Understandable, Comfortable, or Efficient.
+- Good: "Changing the label of [function X] from [old label] to [new label] will increase task completion and satisfaction for task X, because [new label] is more understandable to the target user."
+
+### When Tenets and Traps apply
+
+**Q: Are Traps always problematic? Do the Tenets always apply?**
+A: No — it depends on context. UI Tenets & Traps generalize to as many contexts as possible, but cannot escape context entirely. Three contexts illustrate how application changes:
+- Specific goal, no challenge (e.g., operating-system UIs): all Traps apply. Users know exactly what they want and expect no challenge; the framework is especially good at finding issues here.
+- Unclear goal, no challenge (e.g., shopping interfaces like Amazon): every Trap applies except Gratuitous Redundancy. Shoppers are as likely to be open to suggestion as to know exactly what they want, so promoting content redundantly — offering multiple paths to the same destination — can enhance rather than detract from the experience, even though it would be inadvisable when users have specific goals.
+- No "real-world" goal, challenge expected (games): game goals aren't grounded in the real world (the game supplies them), and challenge is desirable — without it, most games wouldn't be fun. Because the challenge differs from game to game, different Traps will or won't apply.
+
+**Q: Do UI Tenets & Traps apply to all user populations?**
+A: They apply broadly across user cohorts, but different populations can shift the threshold for what counts as a Trap rather than adding new Traps. For example, researchers studying software for young children initially suspected gaps in the system; after reviewing their reports, reviews, and publicly reported issues (theirs and competitors'), they found no new Traps — only that thresholds differed. Children are shorter with smaller hands, so hardware designed for adults triggered an existing Trap (Physical Challenge) at a different threshold. Similar stories hold for other populations with different capabilities and limitations: same Traps, different thresholds.
+
+### AI, dark patterns, and scope
+
+**Q: Why is using UI Tenets & Traps important when designing with AI?**
+A: Three reasons:
+- You can't supervise what you don't understand. Current AI is probabilistic and prone to error; it can't reliably assess or create interfaces without human oversight, and effective oversight requires deep domain knowledge. This framework is a gateway to that knowledge — whether you're deciding alone or with AI.
+- AI scales output, not quality. AI dramatically accelerates interface production, but speed doesn't raise standards. AI-generated interfaces reproduce common design failures as readily as common successes, because both are in the training data. Tenets and Traps provide the quality filter the generation process itself cannot.
+- The one thing that hasn't changed. Whatever form a product takes and however it's generated, there is still a human, a system, and an interface between them. Graphical or conversational, that interface must align with human capabilities and limitations that haven't appreciably changed since prehistoric times. As the field focuses on AI's rapidly evolving potential, staying grounded in the human user matters more than ever.
+
+**Q: How do Traps relate to dark patterns?**
+A: Dark (or "deceptive") patterns are design tricks that exploit human psychology to make people do things they otherwise wouldn't — for example, "Sneaking" unwanted items into a cart during checkout. AI has introduced new manipulation opportunities (e.g., deep fakes) and a new class of emergent dark patterns that weren't designed in intentionally but arise from how AIs are trained (e.g., "sycophancy," which harms by affirming users' incorrect beliefs).
+
+Both dark patterns and Traps describe detectable interface problems that can harm the user experience. The difference: dark patterns address efforts to manipulate users, while Traps address any problem that can degrade the experience, regardless of motive. Traps therefore cover a broader class of problems — solve for Traps and you'll likely eliminate most dark patterns. Dark patterns remain a useful, highly resolved lens for that particular type of problem and work well in combination with Traps.
+
+**Q: Are there any AI Traps?**
+A: No. AI is a solution, and Traps aren't based on solutions — they're based on durable human capabilities and limitations, describing interface problems that limit users' achievement of their goals. Just as there are no special steering-wheel Traps, touch-screen Traps, or drop-down-menu Traps, there are no AI Traps (these are all solutions). Note that there can be sets of Traps scoped to particular goals — for example, Game (or "Fun") Traps, Productivity Traps, Communication Traps, and so on.
+
+
 
