@@ -25,8 +25,8 @@ class ChatAIService:
     def __init__(
         self,
         anthropic_api_key: str,
-        model: str = "claude-opus-5-5",
-        max_tokens: int = 1024,
+        model: str = "claude-sonnet-5-5",
+        max_tokens: int = 2048,
         temperature: float = 0.7,
     ):
         # max_retries=5 enables automatic exponential backoff on 429 rate limit errors.
@@ -70,7 +70,10 @@ class ChatAIService:
         create_kwargs = {
             "model": self._model,
             "max_tokens": self._max_tokens,
-            "system": system_prompt,
+            # Cache the large, stable KB system prefix so it isn't re-processed (and re-billed) on
+            # every message. The prefix is identical across users, so the cache stays warm whenever
+            # anyone is chatting; the default 5-minute TTL is enough for an active conversation.
+            "system": [{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}],
             "messages": messages,
         }
         if self._temperature is not None and not _rejects_sampling_params(self._model):
