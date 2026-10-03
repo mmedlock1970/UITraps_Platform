@@ -3019,8 +3019,13 @@ A: A few things:
 - It's about starting conversations, not winning them. The framework is most valuable as shared language for difficult design discussions, not ammunition. Bringing it in at the start of a project — when teams are most open and can align on its use — pays dividends throughout.
 - All models are imperfect. It can't capture every nuance, but thousands of practitioners find it useful for detecting issues earlier, discussing them more precisely, and developing better solutions. As George Box put it: all models are wrong; some are useful.
 
-**Q: What is a Trap Analysis, and how do I do one? (including on my own, with paper and pencil)**
-A: A Trap Analysis is a structured heuristic evaluation using UI Tenets & Traps. It can be done manually (for example, with paper and pencil) or with the AI-driven Trap Analysis tool. To run one with your team:
+**Q: How do I run a Trap Analysis? (What is it, and how do I do one?)**
+A: A Trap Analysis is a structured heuristic evaluation using UI Tenets & Traps. There are three ways to run one — if the person hasn't already said which they want, ask them before giving detailed steps:
+1. Manually — on their own or with their team (for example, with paper and pencil).
+2. Guided here in this chat — walk them through the process step by step (this chat is text-only and can't see their screens, so it guides the process rather than inspecting a design).
+3. With the separate AI Trap Analyzer tool — it analyzes uploaded screenshots, a Figma frame, or a URL and produces a structured report (the "Analyze a design" tab).
+
+To run one manually, on their own or with their team:
 1. Pick a product (device/app/website) to evaluate.
 2. Capture attributes of the target users that might influence task success (familiarity with the product or domain, comfort with technology, etc.).
 3. Write down 2–3 tasks important to these users — describe the goal, not the implementation.
