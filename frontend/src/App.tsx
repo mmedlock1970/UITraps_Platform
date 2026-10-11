@@ -175,7 +175,12 @@ export const App: React.FC = () => {
   // Analyses remaining, shown in the analyzer's upper-right. PLACEHOLDER for now (front-end look
   // only) — wire to backend usage later: subscription allotment left + purchased credits, i.e.
   // (monthly_limit - monthly_used) + bonus_tokens, matching the WordPress My Account count.
-  const analysesRemaining = 12;
+  // ?analyses=<n> overrides it for previewing the look (e.g. ?analyses=0 for the empty state).
+  const analysesRemaining = _params.has('analyses')
+    ? Math.max(0, Number(_params.get('analyses')) || 0)
+    : 12;
+  // TODO: point at the real "buy more analyses" page on the WordPress site.
+  const purchaseUrl = 'https://uitraps.com/my-account/';
   const [apiEndpoint] = useState(DEFAULT_API_ENDPOINT);
   const [view, setView] = useState<AppView>(() => {
     if (_mode && TAB_MODES[_mode]) return TAB_MODES[_mode][0];
@@ -731,11 +736,16 @@ export const App: React.FC = () => {
             ))}
             {tabs.includes('form') && (
               <div
-                className={styles.usageCounter}
+                className={`${styles.usageCounter} ${analysesRemaining <= 0 ? styles.usageCounterZero : ''}`}
                 title="Analyses remaining — your subscription allotment plus any purchased credits"
               >
                 <span className={styles.usageCount}>{analysesRemaining}</span>
                 <span className={styles.usageLabel}>analyses left</span>
+                {analysesRemaining <= 0 && (
+                  <a className={styles.usagePurchase} href={purchaseUrl} target="_top" rel="noopener">
+                    Purchase more
+                  </a>
+                )}
               </div>
             )}
           </div>
