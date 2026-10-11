@@ -5,6 +5,7 @@ Handles WooCommerce webhook events for subscription lifecycle and token top-ups.
 Users are identified by their WordPress user ID (from JWT payload).
 """
 
+import calendar
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -27,6 +28,48 @@ def _parse_iso_utc(value: Optional[str]) -> Optional[datetime]:
         s = s[:-1] + "+00:00"
     dt = datetime.fromisoformat(s)
     return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+def _month_period_start(now: datetime, anchor_day: int) -> datetime:
+    """UTC-midnight start of the current monthly allowance period for a given anchor day-of-month.
+    Clamps the anchor to the last day of short months (e.g. day 31 -> Feb 28/29)."""
+    def at(year: int, month: int) -> datetime:
+        day = min(anchor_day, calendar.monthrange(year, month)[1])
+        return datetime(year, month, day, tzinfo=timezone.utc)
+    this_month = at(now.year, now.month)
+    if now >= this_month:
+        return this_month
+    py, pm = (now.year - 1, 12) if now.month == 1 else (now.year, now.month - 1)
+    return at(py, pm)
+
+
+def _apply_monthly_reset(session: Session, sub: UserSubscription) -> None:
+    """Reset monthly_used at the start of each monthly allowance period, for ALL plans — annual
+    included, whose renewal webhook fires only yearly. Lazy (no scheduler): called on every
+    read/consume. Purchased bonus_tokens are left untouched (they roll over)."""
+    anchor = sub.subscription_start or sub.created_at
+    if anchor is None:
+        return
+    if anchor.tzinfo is None:
+        anchor = anchor.replace(tzinfo=timezone.utc)
+    now = datetime.now(timezone.utc)
+    period_start = _month_period_start(now, anchor.day)
+    last_reset = sub.monthly_reset_at
+    if last_reset is not None and last_reset.tzinfo is None:
+        last_reset = last_reset.replace(tzinfo=timezone.utc)
+    if last_reset is None:
+        # First encounter (e.g. right after the column is added): anchor to the current period
+        # WITHOUT zeroing usage, so no spurious free reset is handed out on deploy.
+        sub.monthly_reset_at = period_start
+    elif last_reset < period_start:
+        sub.monthly_used = 0
+        sub.monthly_reset_at = period_start
+    else:
+        return
+    sub.updated_at = now
+    session.add(sub)
+    session.commit()
+    session.refresh(sub)
 
 
 def get_or_create_subscription(session: Session, user_id: str) -> UserSubscription:
@@ -58,7 +101,8 @@ def activate_subscription(
     sub.subscription_status = "active"
     sub.monthly_limit = monthly_limit
     sub.monthly_used = 0
-    sub.updated_at = datetime.now(timezone.utc)
+    sub.monthly_reset_at = datetime.now(timezone.utc)
+    sub.updated_at = sub.monthly_reset_at
 
     if subscription_start:
         sub.subscription_start = _parse_iso_utc(subscription_start)
@@ -85,7 +129,8 @@ def renew_subscription(
 
     sub.subscription_status = "active"
     sub.monthly_used = 0
-    sub.updated_at = datetime.now(timezone.utc)
+    sub.monthly_reset_at = datetime.now(timezone.utc)
+    sub.updated_at = sub.monthly_reset_at
 
     if monthly_limit is not None:
         sub.monthly_limit = monthly_limit
@@ -147,6 +192,8 @@ def check_and_consume_token(session: Session, user_id: str) -> tuple[bool, str]:
     if not sub:
         return False, "No active subscription found."
 
+    _apply_monthly_reset(session, sub)
+
     if sub.subscription_status not in ("active", "cancelled"):
         return False, "Your subscription is not active. Please renew to continue."
 
@@ -198,6 +245,8 @@ def get_usage_summary(session: Session, user_id: str) -> dict:
             "monthly_remaining": 0,
             "bonus_tokens": 0,
         }
+
+    _apply_monthly_reset(session, sub)
 
     return {
         "subscription_status": sub.subscription_status,

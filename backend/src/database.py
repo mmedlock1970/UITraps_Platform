@@ -5,12 +5,15 @@ Uses SQLModel (Pydantic + SQLAlchemy) for type-safe database operations.
 """
 
 import os
+import logging
 from datetime import datetime, timezone
 from typing import Optional
 from pathlib import Path
 
 from sqlmodel import Field, SQLModel, Session, create_engine
-from sqlalchemy import UniqueConstraint, text
+from sqlalchemy import UniqueConstraint, text, Column, DateTime
+
+logger = logging.getLogger(__name__)
 
 
 # --- Models ---
@@ -76,6 +79,12 @@ class UserSubscription(SQLModel, table=True):
     # datetime.utcnow() values are rejected ("Datetime values must have timezone information").
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    # Start of the current monthly allowance period (when monthly_used was last reset). Drives the
+    # lazy monthly reset so the allowance resets monthly for ALL plans — including annual, whose
+    # renewal webhook only fires yearly. Added after the table existed → see init_db migration.
+    monthly_reset_at: Optional[datetime] = Field(
+        default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
+    )
 
 
 # --- Analysis Report Storage ---
@@ -199,9 +208,31 @@ def check_db_connection() -> tuple[bool, Optional[str]]:
         return False, str(e)
 
 
+def _add_column_if_missing(table: str, column: str, sql_type: str) -> None:
+    """Add a column to an existing table if it isn't there yet (create_all does not ALTER).
+    Idempotent on both SQLite (local) and Postgres (Railway)."""
+    try:
+        with engine.begin() as conn:
+            if _is_sqlite:
+                existing = [row[1] for row in conn.exec_driver_sql(
+                    f"PRAGMA table_info({table})").fetchall()]
+                if column not in existing:
+                    conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {column} {sql_type}")
+            else:
+                conn.exec_driver_sql(
+                    f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {sql_type}")
+    except Exception as e:
+        logger.warning("init_db: could not add %s.%s (%s)", table, column, e)
+
+
 def init_db():
-    """Create all tables. Safe to call multiple times."""
+    """Create all tables, then apply idempotent column additions (create_all does not ALTER
+    existing tables). Safe to call multiple times."""
     SQLModel.metadata.create_all(engine)
+    _add_column_if_missing(
+        "user_subscriptions", "monthly_reset_at",
+        "TIMESTAMP" if _is_sqlite else "TIMESTAMPTZ",
+    )
 
 
 def get_session():

@@ -19,6 +19,7 @@ import { ReportViewer } from './components/ReportViewer';
 import { PastAnalyses } from './components/PastAnalyses';
 import { PastChats } from './components/PastChats';
 import { saveChat, getChat } from './api/chatApi';
+import { getUserUsage } from './api/usageApi';
 import { TaskCaptureScreen, CapturedStep } from './components/TaskCaptureScreen';
 import { saveAnalysis, StoredAnalysis, FormSnapshot } from './services/analysisHistory';
 import { ChatMessage, ReportStatistics, UsageInfo, UnifiedAskResponse, TimeEstimate, UserContext, isFigmaEstimate, isUrlEstimate, isFileEstimate, UnifiedEstimate } from './api/types';
@@ -172,13 +173,14 @@ export const App: React.FC = () => {
     return [];
   });
   const showTabs = tabs.length > 1;
-  // Analyses remaining, shown in the analyzer's upper-right. PLACEHOLDER for now (front-end look
-  // only) — wire to backend usage later: subscription allotment left + purchased credits, i.e.
-  // (monthly_limit - monthly_used) + bonus_tokens, matching the WordPress My Account count.
+  // Analyses remaining, shown in the analyzer's upper-right: subscription allotment left plus
+  // purchased credits = (monthly_limit - monthly_used) + bonus_tokens, from GET /api/user/usage —
+  // the same figure as the WordPress My Account page. null until loaded (counter hidden).
   // ?analyses=<n> overrides it for previewing the look (e.g. ?analyses=0 for the empty state).
-  const analysesRemaining = _params.has('analyses')
+  const [usageRemaining, setUsageRemaining] = useState<number | null>(null);
+  const analysesRemaining: number | null = _params.has('analyses')
     ? Math.max(0, Number(_params.get('analyses')) || 0)
-    : 12;
+    : usageRemaining;
   const purchaseUrl = 'https://staging12.uitraps.com/my-account/my-token-credits/';
   const [apiEndpoint] = useState(DEFAULT_API_ENDPOINT);
   const [view, setView] = useState<AppView>(() => {
@@ -346,6 +348,16 @@ export const App: React.FC = () => {
   });
   const effectiveToken = auth.token || (devMode ? 'dev-mode' : '');
 
+  // Load the analyses-remaining count for the upper-right counter. Skipped for the ?analyses=
+  // preview override and in dev-mode; re-fetched after each completed analysis.
+  const refreshUsage = useCallback(() => {
+    if (_params.has('analyses') || !effectiveToken || effectiveToken === 'dev-mode') return;
+    void getUserUsage({ apiEndpoint, token: effectiveToken }).then(u => {
+      if (u) setUsageRemaining(Math.max(0, (u.monthly_remaining ?? 0) + (u.bonus_tokens ?? 0)));
+    });
+  }, [apiEndpoint, effectiveToken]);
+  useEffect(() => { refreshUsage(); }, [refreshUsage]);
+
   const handleAnalysisComplete = useCallback((result: UnifiedAskResponse, fileNames: string[], files?: File[], context?: UserContext, formSnapshot?: FormSnapshot) => {
     if (result.report_html) {
       const report: ActiveReport = {
@@ -360,6 +372,7 @@ export const App: React.FC = () => {
       setReportFromHistory(false);
       setView('report');
       setChatOpen(false);
+      refreshUsage();  // an analysis consumed one — refresh the remaining count
 
       // Save to history
       saveAnalysis({
@@ -371,7 +384,7 @@ export const App: React.FC = () => {
         formSnapshot,
       });
     }
-  }, []);
+  }, [refreshUsage]);
 
   const handleRerunAnalysis = useCallback(async (chatMessages: Array<{ role: string; content: string }>) => {
     if (!activeReport?.originalFiles?.length || !activeReport?.originalContext) return;
@@ -733,7 +746,7 @@ export const App: React.FC = () => {
                 {TAB_LABELS[t]}
               </button>
             ))}
-            {tabs.includes('form') && (
+            {tabs.includes('form') && analysesRemaining !== null && (
               <div
                 className={`${styles.usageCounter} ${analysesRemaining <= 0 ? styles.usageCounterZero : ''}`}
                 title="Analyses remaining — your subscription allotment plus any purchased credits"
