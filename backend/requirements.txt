@@ -1,30 +1,35 @@
+# Pinned to known-working versions. Railway rebuilds from scratch and would otherwise pull the
+# LATEST of each package; an unpinned major bump (fastmcp 3.x -> 4.x) broke app startup, so the
+# healthcheck failed and deploys were rejected. Bump these deliberately, not by accident.
+
 # Core dependencies
-anthropic>=0.40.0
-python-dotenv>=1.0.0
+anthropic==0.76.0
+python-dotenv==1.2.1
+pydantic==2.12.5
 
 # Web API (simple deployment)
-fastapi>=0.109.0
-uvicorn[standard]>=0.27.0
-python-multipart>=0.0.6  # Required for file uploads
+fastapi==0.128.0
+uvicorn[standard]==0.40.0
+python-multipart==0.0.22   # Required for file uploads
 
 # Database (usage tracking)
-sqlmodel>=0.0.14
-psycopg2-binary>=2.9.9      # PostgreSQL driver (binary avoids needing system libs)
+sqlmodel==0.0.32
+psycopg2-binary>=2.9.9,<2.10   # PostgreSQL driver (binary avoids needing system libs)
 
 # Chat and auth
-PyJWT>=2.8.0                # JWT token verification (WordPress auth)
-slowapi>=0.1.9              # FastAPI-compatible rate limiting
+PyJWT==2.11.0              # JWT token verification (WordPress auth)
+slowapi==0.1.9            # FastAPI-compatible rate limiting
 
 # Web crawler and analysis
-playwright>=1.40.0  # For web crawler and screenshot capture
-Pillow>=10.0.0  # For screenshot compression and image processing
-requests>=2.32.0  # For Figma API integration and Google Drive downloads
+playwright==1.58.0  # For web crawler and screenshot capture
+Pillow==12.2.0  # For screenshot compression and image processing
+requests==2.32.5  # For Figma API integration and Google Drive downloads
 
 # Book manuscript processing
-pypdf[image]>=3.1.0  # PDF text and image extraction (3.1+ required for page.images API; [image] pulls in Pillow)
+pypdf[image]==6.10.2  # PDF text and image extraction (3.1+ required for page.images API; [image] pulls in Pillow)
 
 # MCP server (remote tool access for Claude Desktop, Claude Code, Cursor, etc.)
-fastmcp>=2.0.0
+fastmcp==3.2.4
 
 # Development/testing (optional)
 # pytest>=7.4.0
