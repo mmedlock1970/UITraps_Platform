@@ -16,6 +16,7 @@ export async function getUserUsage(opts: {
   try {
     const res = await fetch(`${opts.apiEndpoint}/api/user/usage`, {
       headers: { Authorization: `Bearer ${opts.token}` },
+      cache: 'no-store',  // always read the live count, never a cached response
     });
     if (!res.ok) return null;
     const data = await res.json();
