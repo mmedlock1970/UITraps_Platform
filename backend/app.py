@@ -428,6 +428,7 @@ class HealthResponse(BaseModel):
     timestamp: str
     database: Optional[str] = None       # connected | unavailable | not_configured
     database_error: Optional[str] = None
+    version: Optional[str] = None        # short git SHA of the running build
 
 
 class EstimateResponse(BaseModel):
@@ -580,6 +581,11 @@ async def root():
         "timestamp": datetime.now().isoformat()
     }
 
+# Short git SHA of the running build, injected by Railway at deploy time. Surfaced by /health so
+# you can confirm at a glance which commit is actually live (vs. a kept-alive older deployment).
+_BUILD_SHA = (os.environ.get("RAILWAY_GIT_COMMIT_SHA", "") or "unknown")[:7]
+
+
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
     """Health check for monitoring.
@@ -601,6 +607,7 @@ async def health_check():
         "timestamp": datetime.now().isoformat(),
         "database": database,
         "database_error": err,
+        "version": _BUILD_SHA,
     }
 
 class AccessCodeRequest(BaseModel):
