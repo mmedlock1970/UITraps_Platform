@@ -172,6 +172,10 @@ export const App: React.FC = () => {
     return [];
   });
   const showTabs = tabs.length > 1;
+  // Analyses remaining, shown in the analyzer's upper-right. PLACEHOLDER for now (front-end look
+  // only) — wire to backend usage later: subscription allotment left + purchased credits, i.e.
+  // (monthly_limit - monthly_used) + bonus_tokens, matching the WordPress My Account count.
+  const analysesRemaining = 12;
   const [apiEndpoint] = useState(DEFAULT_API_ENDPOINT);
   const [view, setView] = useState<AppView>(() => {
     if (_mode && TAB_MODES[_mode]) return TAB_MODES[_mode][0];
@@ -725,6 +729,15 @@ export const App: React.FC = () => {
                 {TAB_LABELS[t]}
               </button>
             ))}
+            {tabs.includes('form') && (
+              <div
+                className={styles.usageCounter}
+                title="Analyses remaining — your subscription allotment plus any purchased credits"
+              >
+                <span className={styles.usageCount}>{analysesRemaining}</span>
+                <span className={styles.usageLabel}>analyses left</span>
+              </div>
+            )}
           </div>
         )}
         {/* Separator line when there is no tab row */}

@@ -302,6 +302,32 @@
 }
 
 
+/* Analyses-remaining counter, pushed to the upper-right of the tab row. */
+.usageCounter {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 5px 12px;
+  border: 1px solid var(--uitraps-border);
+  border-radius: 999px;
+  background: var(--uitraps-bg-secondary);
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.usageCount {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--uitraps-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.usageLabel {
+  font-size: 12.5px;
+  color: var(--uitraps-text-secondary);
+}
+
 .tab {
   padding: 12px 0;
   margin-right: 28px;
