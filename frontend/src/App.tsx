@@ -179,8 +179,7 @@ export const App: React.FC = () => {
   const analysesRemaining = _params.has('analyses')
     ? Math.max(0, Number(_params.get('analyses')) || 0)
     : 12;
-  // TODO: point at the real "buy more analyses" page on the WordPress site.
-  const purchaseUrl = 'https://uitraps.com/my-account/';
+  const purchaseUrl = 'https://staging12.uitraps.com/my-account/my-token-credits/';
   const [apiEndpoint] = useState(DEFAULT_API_ENDPOINT);
   const [view, setView] = useState<AppView>(() => {
     if (_mode && TAB_MODES[_mode]) return TAB_MODES[_mode][0];
