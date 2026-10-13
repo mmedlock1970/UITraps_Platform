@@ -500,6 +500,7 @@ export const App: React.FC = () => {
     token: effectiveToken,
     onAnalysisComplete: handleAnalysisComplete,
     onStartTaskCapture: handleStartTaskCapture,
+    chatOnly: true,  // chat is Q&A only — analysis happens in the Trap Analyser tool
   });
 
   // Persist the current conversation after each completed exchange, so it shows under

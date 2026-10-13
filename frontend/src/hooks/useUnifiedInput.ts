@@ -22,6 +22,8 @@ interface UseUnifiedInputOptions {
   token: string;
   onAnalysisComplete?: (result: UnifiedAskResponse, fileNames: string[], files: File[], context: { users: string; tasks: string; format: string; contentType: ContentType }) => void;
   onStartTaskCapture?: (taskName: string) => void;
+  // Q&A-only mode: never run or offer to run an analysis; point users to the Trap Analyser tool.
+  chatOnly?: boolean;
 }
 
 type DetectedMode = 'chat' | 'analysis' | 'hybrid' | 'idle' | 'figma' | 'url' | 'pdf' | 'video';
@@ -309,7 +311,7 @@ const FILE_ACTIONS_WIDGET_CHOICES: OptionsWidgetChoice[] = [
 ];
 
 export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInputReturn {
-  const { apiEndpoint, token, onAnalysisComplete, onStartTaskCapture } = options;
+  const { apiEndpoint, token, onAnalysisComplete, onStartTaskCapture, chatOnly } = options;
 
   // Input state
   const [inputText, setInputText] = useState('');
@@ -663,6 +665,35 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
 
   const submit = useCallback(async () => {
     if (!token) return;
+
+    // ── Q&A only: the chat never runs or offers to run an analysis. ──
+    // Analysis lives in the Trap Analyser tool. Attached files aren't analyzed here (seeing &
+    // discussing them is a separate follow-up). The branches below are retained but inactive
+    // while chatOnly is set.
+    if (chatOnly) {
+      const text = inputText.trim();
+      if (files.length > 0) {
+        if (text) chat.addUserMessage(text, 'chat');
+        setInputText('');
+        setFiles([]);
+        chat.addSystemPrompt(
+          "I can't run analyses here — I'm for questions about UI Tenets & Traps. To analyze a " +
+          "design, use the **Trap Analyser** (under the AI Tools menu): upload your screenshot, " +
+          "PDF, or Figma frame there and it'll produce a full report."
+        );
+        return;
+      }
+      if (!text) return;
+      if (PAST_ANALYSES_PATTERNS.some(p => p.test(text))) {
+        chat.addUserMessage(text, 'chat');
+        setInputText('');
+        chat.addSystemPrompt("Your past analyses are saved — open **See past analyses** to view them.");
+        return;
+      }
+      setInputText('');
+      await chat.sendMessage(text);
+      return;
+    }
 
     // ── Chat-only mode: user has files attached but wants to chat, not analyze ──
     if (chatOnlyMode) {
@@ -1160,7 +1191,7 @@ export function useUnifiedInput(options: UseUnifiedInputOptions): UseUnifiedInpu
       FILE_ACTIONS_WIDGET_CHOICES
     );
   }, [
-    token, chatOnlyMode, contextGatheringPhase, detectedMode, inputText, files, detectedUrl, pendingUrl,
+    token, chatOnly, chatOnlyMode, contextGatheringPhase, detectedMode, inputText, files, detectedUrl, pendingUrl,
     users, expertise, tasks, format, chat, startEstimation, isUrlContextFlow, contextGatheredForCapture,
   ]);
 

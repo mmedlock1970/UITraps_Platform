@@ -3020,10 +3020,9 @@ A: A few things:
 - All models are imperfect. It can't capture every nuance, but thousands of practitioners find it useful for detecting issues earlier, discussing them more precisely, and developing better solutions. As George Box put it: all models are wrong; some are useful.
 
 **Q: How do I run a Trap Analysis? (What is it, and how do I do one?)**
-A: A Trap Analysis is a structured heuristic evaluation using UI Tenets & Traps. There are three ways to run one — if the person hasn't already said which they want, ask them before giving detailed steps:
-1. Manually — on their own or with their team (for example, with paper and pencil).
-2. Guided here in this chat — walk them through the process step by step (this chat is text-only and can't see their screens, so it guides the process rather than inspecting a design).
-3. With the separate AI Trap Analyser tool — it analyzes uploaded screenshots, a Figma frame, or a URL and produces a structured report (point the user to it using its current name and location on the site).
+A: A Trap Analysis is a structured heuristic evaluation using UI Tenets & Traps. There are two ways to run one (this chat does not run analyses itself):
+1. With the AI Trap Analyser tool — it analyzes uploaded screenshots, a Figma frame, or a URL and produces a structured report (point the user to it using its current name and location on the site).
+2. Manually — on their own or with their team (for example, with paper and pencil), using the steps below.
 
 To run one manually, on their own or with their team:
 1. Pick a product (device/app/website) to evaluate.
