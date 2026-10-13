@@ -391,7 +391,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*,video/*,application/pdf"
+                accept="image/png,image/jpeg,image/webp,application/pdf"
                 multiple
                 onChange={e => handleFileChange(e.target.files)}
                 style={{ display: 'none' }}
@@ -400,7 +400,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
                 <>
                   <div className={styles.uploadIcon}>↑</div>
                   <p className={styles.uploadPrimary}><span>Click to upload screenshot</span> or drag and drop</p>
-                  <p className={styles.uploadSecondary}>PNG · JPG · WEBP · PDF · Video</p>
+                  <p className={styles.uploadSecondary}>PNG · JPG · WEBP · PDF</p>
                 </>
               ) : (
                 <>

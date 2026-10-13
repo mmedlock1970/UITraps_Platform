@@ -2166,6 +2166,17 @@ async def api_chat(
         raise _friendly_api_error(e)
 
 
+def _webp_to_png(data: bytes) -> bytes:
+    """Convert WEBP image bytes to PNG so the downstream analyzer (which accepts PNG/JPEG only)
+    can use them. Claude's vision supports WEBP, but the analyzer re-encodes by file extension."""
+    import io
+    from PIL import Image
+    img = Image.open(io.BytesIO(data))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
 @app.post("/api/ask", response_model=UnifiedAskResponse)
 async def unified_ask(
     user: dict = Depends(get_current_user),
@@ -2212,6 +2223,27 @@ async def unified_ask(
         raise HTTPException(status_code=400, detail="model not available: choose Sonnet 5 or Opus 4.8.")
 
     intent = detect_intent(message, files, users, tasks, format, figma_url=figma_url, input_type=input_type)
+
+    # Validate uploaded file types BEFORE consuming a token, so a rejected upload (e.g. video, or
+    # an unsupported image format) never costs the user an analysis.
+    if files:
+        _ALLOWED_CT = {"image/png", "image/jpeg", "image/jpg", "image/webp", "application/pdf"}
+        _any_pdf = False
+        for _f in files:
+            _ct = (_f.content_type or "").lower()
+            _is_pdf = _ct == "application/pdf" or (_f.filename or "").lower().endswith(".pdf")
+            _any_pdf = _any_pdf or _is_pdf
+            if _ct not in _ALLOWED_CT and not _is_pdf:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Unsupported file type: {_f.content_type or _f.filename or 'unknown'}. "
+                           "Supported formats: PNG, JPG, WEBP, PDF.",
+                )
+        if _any_pdf and not is_pymupdf_available():
+            raise HTTPException(
+                status_code=503,
+                detail="PDF analysis is not available on this server. Please upload PNG, JPG, or WEBP images instead.",
+            )
 
     # For analysis requests, check subscription and consume a token
     # Skip in dev mode (DEV_MODE=true in .env) or for smoke-test user IDs (SMOKE_TEST_USER_IDS env var)
@@ -2493,14 +2525,19 @@ async def unified_ask(
         # Determine single vs multi image
         if len(files) == 1:
             image = files[0]
-            if image.content_type not in ["image/png", "image/jpeg", "image/jpg"]:
-                raise HTTPException(status_code=400, detail=f"Only PNG and JPEG supported. Got: {image.content_type}")
+            _ct = (image.content_type or "").lower()
+            if _ct not in ("image/png", "image/jpeg", "image/jpg", "image/webp"):
+                raise HTTPException(status_code=400, detail=f"Unsupported image type: {image.content_type}. Use PNG, JPG, or WEBP.")
 
             contents = await image.read()
             if len(contents) > 10 * 1024 * 1024:
                 raise HTTPException(status_code=400, detail="Image too large (max 10MB)")
 
-            suffix = ".png" if image.content_type == "image/png" else ".jpg"
+            if _ct == "image/webp":
+                contents = _webp_to_png(contents)  # analyzer re-encodes by extension (PNG/JPEG only)
+                suffix = ".png"
+            else:
+                suffix = ".png" if _ct == "image/png" else ".jpg"
             try:
                 logger.info(f"[/api/ask analysis] start — file={image.filename} size={len(contents)} kb_version={kb_version}")
                 with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
@@ -2565,12 +2602,17 @@ async def unified_ask(
             tmp_paths = []
             try:
                 for img in files:
-                    if img.content_type not in ["image/png", "image/jpeg", "image/jpg"]:
-                        raise HTTPException(status_code=400, detail=f"Only PNG and JPEG supported. Got: {img.content_type}")
+                    _ct = (img.content_type or "").lower()
+                    if _ct not in ("image/png", "image/jpeg", "image/jpg", "image/webp"):
+                        raise HTTPException(status_code=400, detail=f"Unsupported image type: {img.content_type}. Use PNG, JPG, or WEBP.")
                     content = await img.read()
                     if len(content) > 10 * 1024 * 1024:
                         raise HTTPException(status_code=400, detail="Image too large (max 10MB)")
-                    suffix = ".png" if img.content_type == "image/png" else ".jpg"
+                    if _ct == "image/webp":
+                        content = _webp_to_png(content)
+                        suffix = ".png"
+                    else:
+                        suffix = ".png" if _ct == "image/png" else ".jpg"
                     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
                         tmp.write(content)
                         tmp_paths.append(tmp.name)

@@ -27,6 +27,7 @@ requests==2.32.5  # For Figma API integration and Google Drive downloads
 
 # Book manuscript processing
 pypdf[image]==6.10.2  # PDF text and image extraction (3.1+ required for page.images API; [image] pulls in Pillow)
+pymupdf==1.28.2  # imported as fitz; converts uploaded PDF pages to images for analysis
 
 # MCP server (remote tool access for Claude Desktop, Claude Code, Cursor, etc.)
 fastmcp==3.2.4
