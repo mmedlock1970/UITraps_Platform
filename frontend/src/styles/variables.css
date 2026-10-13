@@ -31,6 +31,8 @@
   /* Typography — Open Sans for body copy (matches the WordPress site), Montserrat for headings */
   --uitraps-font-family: 'Open Sans', 'Montserrat', sans-serif;
   --uitraps-font-heading: 'Montserrat', 'Open Sans', sans-serif;
+  /* Matches the WordPress site's body font (Inter) — used for the page intro copy. */
+  --uitraps-font-readable: 'Inter', 'Open Sans', sans-serif;
   --uitraps-font-size-xs: 12px;
   --uitraps-font-size-sm: 14px;
   --uitraps-font-size-base: 16px;

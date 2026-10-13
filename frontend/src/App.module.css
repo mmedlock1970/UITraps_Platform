@@ -401,6 +401,7 @@
 }
 
 .chatPageSubtitle {
+  font-family: var(--uitraps-font-readable);
   font-size: 16px;
   color: var(--uitraps-text-secondary);
   max-width: 520px;
