@@ -114,6 +114,19 @@ html[data-embed] .uitraps-platform {
   height: auto !important;
 }
 
+/* Fill mode (embedded chat): override the grow-to-content rules above so the app fills the iframe
+   and scrolls the conversation internally, keeping the input pinned. The host sizes the iframe. */
+html[data-embed][data-embed-fill],
+html[data-embed][data-embed-fill] body,
+html[data-embed][data-embed-fill] #root,
+html[data-embed][data-embed-fill] .uitraps-viewport-wrapper {
+  height: 100% !important;
+  overflow: hidden !important;
+}
+html[data-embed][data-embed-fill] .uitraps-platform {
+  height: 100% !important;
+}
+
 /* Reset box-sizing for all children */
 .uitraps-analyzer *,
 .uitraps-analyzer *::before,

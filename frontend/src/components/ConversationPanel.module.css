@@ -1,5 +1,6 @@
 .panel {
   flex: 1;
+  min-height: 0;  /* allow the panel to shrink below content so it scrolls in fill mode */
   overflow-y: auto;
   /* Horizontal gutter keeps messages clear of the (iframe) scrollbar and matches the input bar. */
   padding: var(--uitraps-spacing-md) 24px;

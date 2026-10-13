@@ -294,6 +294,16 @@ export const App: React.FC = () => {
     if (isEmbedded) document.documentElement.setAttribute('data-embed', 'true');
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Chat fills its iframe and scrolls the conversation internally (input pinned) instead of growing
+  // to content — so an embedded chat uses the whole frame and the input stays visible. The Analyzer
+  // keeps its grow-and-report behavior. Requires the host to give the chat iframe a fixed tall height.
+  const fillMode = isEmbedded && (view === 'chat' || view === 'pastchats');
+  useEffect(() => {
+    if (!isEmbedded) return;
+    if (fillMode) document.documentElement.setAttribute('data-embed-fill', 'true');
+    else document.documentElement.removeAttribute('data-embed-fill');
+  }, [fillMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const sendHeightToParent = useCallback(() => {
     if (!isEmbedded) return;
     // getBoundingClientRect().height gives the true rendered height of the element
@@ -311,7 +321,8 @@ export const App: React.FC = () => {
 
   // Re-run when view changes; poll every 500ms for 20s to catch lazy-loading content
   useEffect(() => {
-    if (window.self === window.top) return;
+    // Fill mode: the chat iframe is a fixed height and scrolls internally — don't auto-resize it.
+    if (window.self === window.top || fillMode) return;
     lastSentHeightRef.current = 0; // reset so the new view always sends
     sendHeightToParent();
     let ticks = 0;
@@ -320,7 +331,7 @@ export const App: React.FC = () => {
       if (++ticks >= 40) clearInterval(interval);
     }, 500);
     return () => clearInterval(interval);
-  }, [view, sendHeightToParent]);
+  }, [view, sendHeightToParent, fillMode]);
 
   // Precise trigger: inner report iframe just finished loading and was resized
   const handleReportContentLoaded = useCallback(() => {
