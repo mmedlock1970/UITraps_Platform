@@ -1,7 +1,8 @@
 .container {
   border-top: 1px solid var(--uitraps-border);
   background: var(--uitraps-bg);
-  padding: var(--uitraps-spacing-md);
+  /* 24px sides keep the send button clear of the (iframe) scrollbar instead of being clipped. */
+  padding: var(--uitraps-spacing-md) 24px;
 }
 
 .inputRow {

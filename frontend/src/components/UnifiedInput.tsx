@@ -175,8 +175,8 @@ export const UnifiedInput: React.FC<UnifiedInputProps> = ({
               placeholder !== undefined
                 ? placeholder
                 : files.length > 0
-                  ? 'Add context for analysis, or ask a question about these files...'
-                  : 'Ask about UI traps, or drop images/video/PDF for analysis...'
+                  ? 'Ask a question about these files...'
+                  : 'Ask about UI Tenets & Traps...'
             }
             value={inputText}
             onChange={handleTextChange}
