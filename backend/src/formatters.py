@@ -3166,6 +3166,9 @@ table.scorecard{border-collapse:separate;border-spacing:0;width:100%;min-width:4
 .cov-item{display:flex;flex-direction:column;align-items:flex-start;gap:7px}
 .cov-item.assess{flex:1 1 300px;max-width:420px}
 .cov-item .cs{color:var(--ink-soft);font-size:11.5px;line-height:1.5}
+.r-rundetails{border-top:1px solid var(--hairline);background:var(--surface-sunk);padding:22px 32px 26px}
+.r-rundetails .rd-title{font-family:var(--font-sans);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);font-weight:700;margin:0 0 14px}
+.r-rundetails .r-meta{margin-top:0}
 .r-footer{border-top:1px solid var(--hairline);padding:16px 32px;font-size:11.5px;color:var(--ink-faint);font-family:var(--font-sans);letter-spacing:.03em}
 @media (max-width:720px){.card{grid-template-columns:1fr;row-gap:16px}}
 /* By-Trap report: a Trap card's main column lists the instances found of that trap. */
@@ -3583,12 +3586,15 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
     h.append("<div class='r-header'>")
     h.append("<div class='r-eyebrow'>UI Tenets &amp; Traps · Analysis Report</div>")
     h.append(f"<div class='r-title'>{design_name}</div>")
-    h.append("<div class='r-meta'>")
+    # The settings row, provenance stamp, and full-stack attestation are collected here (all their
+    # inputs are known at header-build time) but RENDERED at the foot of the report, in the
+    # "Run details" section — not in the header. See the _run_details emit after report-inner.
+    _run_details = ["<div class='r-meta'>"]
     for k, v in _meta:
-        h.append(f"<span><span class='k'>{k}</span> {v}</span>")
-    h.append("</div>")
+        _run_details.append(f"<span><span class='k'>{k}</span> {v}</span>")
+    _run_details.append("</div>")
     # Provenance stamp — the true version + shas as facts (no staleness verdict; a-simple). Copyable.
-    h.append(f"<div class='r-stamp'>KB {settings.get('kb_version', 'v2')} · {_kb_sha} · build {_build or 'unavailable'}</div>")
+    _run_details.append(f"<div class='r-stamp'>KB {settings.get('kb_version', 'v2')} · {_kb_sha} · build {_build or 'unavailable'}</div>")
     # Isolation / full-stack attestation — each item a runtime fact about what was loaded/applied
     # THIS run. v1: confirmed-clean INPUTS/paths (NOT a leak-free-output guarantee). v2: components
     # PRESENT/APPLIED (NOT a performance/optimality claim). A contradicting fact is stamped as-is.
@@ -3600,7 +3606,7 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
             ("self-serve (no v2 scaffolding)" if _selfserve
              else f"profile {_profile or 'unknown'} — NOT self-serve"),
         ]
-        h.append("<div class='r-attest'>v1.0 isolated — " + " · ".join(_att) + "</div>")
+        _run_details.append("<div class='r-attest'>v1.0 isolated — " + " · ".join(_att) + "</div>")
     else:
         _coached = not _selfserve
         _att = [
@@ -3612,7 +3618,7 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
                    else "Emergent Patterns — (no reportable pattern)")),
             ("exec-voice ✓" if _coached else "exec-voice — (self-serve, KB-only)"),
         ]
-        h.append("<div class='r-attest'>v2 full stack — " + " · ".join(_att) + "</div>")
+        _run_details.append("<div class='r-attest'>v2 full stack — " + " · ".join(_att) + "</div>")
     h.append("</div>")
 
     if settings.get("truncated"):
@@ -4033,6 +4039,12 @@ def _format_new_kb_bytrap_html(report: dict, user_context: dict, settings: dict)
         h.append("</ul></div>")
 
     h.append("</div>")  # report-inner
+    # Run details — the settings row, provenance stamp, and attestation, moved out of the header to
+    # the foot of the report (collected at header-build time into _run_details).
+    h.append("<div class='r-rundetails'>")
+    h.append("<p class='rd-title'>Run details</p>")
+    h.extend(_run_details)
+    h.append("</div>")
     h.append("<div class='r-footer'>© UI Traps LLC · Proprietary &amp; Confidential — UI Tenets &amp; Traps Framework</div>")
     h.append("</div></div>")
     h.append(_TRAP_ANCHOR_JS)   # scroll trap-anchor links within the iframe (srcDoc fragment fix)
