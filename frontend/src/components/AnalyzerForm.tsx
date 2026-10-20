@@ -845,6 +845,7 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
                   </button>
                 ))}
               </div>
+              <p className={styles.fieldHint}>Two-pass is slower but more thorough and accurate.</p>
             </div>
 
             {/* Report detail */}
