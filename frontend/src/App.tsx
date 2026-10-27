@@ -827,33 +827,7 @@ export const App: React.FC = () => {
                   </div>
                 </div>
               )}
-              {tabs.includes('form') && monthlyLeft !== null && purchasedLeft !== null && (
-                <div className={styles.usagePanelRow}>
-                  <div className={styles.usagePanel}>
-                    <span className={styles.usageHeading}>Analyses Remaining</span>
-                    <div className={styles.usageRow}>
-                      <span className={styles.usageRowText}>
-                        <span className={styles.usageRowLabel}>This month</span>
-                        <span className={styles.usageRowSub}>resets monthly</span>
-                      </span>
-                      <span className={`${styles.usageNum} ${monthlyLeft <= 0 ? styles.usageNumZero : ''}`}>{monthlyLeft}</span>
-                    </div>
-                    <div className={styles.usageRow}>
-                      <span className={styles.usageRowText}>
-                        <span className={styles.usageRowLabel}>Purchased</span>
-                        <span className={styles.usageRowSub}>never expires</span>
-                      </span>
-                      <span className={`${styles.usageNum} ${purchasedLeft <= 0 ? styles.usageNumZero : ''}`}>{purchasedLeft}</span>
-                    </div>
-                    {monthlyLeft <= 0 && purchasedLeft <= 0 && (
-                      <a className={styles.usagePurchase} href={purchaseUrl} target="_top" rel="noopener">
-                        Purchase more on your Account page →
-                      </a>
-                    )}
-                  </div>
-                </div>
-              )}
-              <AnalyzerForm key={formKey} initialValues={prefillValues} onSubmit={handleFormSubmit} disabled={isFormAnalyzing} />
+              <AnalyzerForm key={formKey} initialValues={prefillValues} onSubmit={handleFormSubmit} disabled={isFormAnalyzing} monthlyLeft={monthlyLeft} purchasedLeft={purchasedLeft} purchaseUrl={purchaseUrl} />
             </div>
           </>
         </div>

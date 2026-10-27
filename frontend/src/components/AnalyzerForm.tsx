@@ -13,6 +13,10 @@ interface AnalyzerFormProps {
   onSubmit: (payload: FormSubmitPayload) => void;
   disabled?: boolean;
   initialValues?: FormSnapshot;
+  // Analyses-remaining counters, shown in the intro header's upper-right. Null until loaded.
+  monthlyLeft?: number | null;
+  purchasedLeft?: number | null;
+  purchaseUrl?: string;
 }
 
 function platformToContentType(platform: string, productDomain: string): ContentType {
@@ -160,7 +164,7 @@ function parseTaskText(text: string): Array<{ name: string; description: string 
              .map(description => ({ name: '', description }));
 }
 
-export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled = false, initialValues }) => {
+export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled = false, initialValues, monthlyLeft, purchasedLeft, purchaseUrl }) => {
   const iv = initialValues;
 
   // Card 1 — Interface
@@ -338,13 +342,39 @@ export const AnalyzerForm: React.FC<AnalyzerFormProps> = ({ onSubmit, disabled =
     <form className={styles.form} onSubmit={handleSubmit} noValidate>
 
       <div className={styles.intro}>
-        <p className={styles.introSubtitle}>
-          Paste a screenshot or Figma frame URL and get a structured heuristic assessment.
-        </p>
-        <div className={styles.requiredNote}>
-          <span className={styles.requiredDot} />
-          Required fields
+        <div className={styles.introLead}>
+          <p className={styles.introSubtitle}>
+            Paste a screenshot or Figma frame URL and get a structured heuristic assessment.
+          </p>
+          <div className={styles.requiredNote}>
+            <span className={styles.requiredDot} />
+            Required fields
+          </div>
         </div>
+        {monthlyLeft != null && purchasedLeft != null && (
+          <div className={styles.usagePanel}>
+            <span className={styles.usageHeading}>Analyses Remaining</span>
+            <div className={styles.usageRow}>
+              <span className={styles.usageRowText}>
+                <span className={styles.usageRowLabel}>This month</span>
+                <span className={styles.usageRowSub}>resets monthly</span>
+              </span>
+              <span className={`${styles.usageNum} ${monthlyLeft <= 0 ? styles.usageNumZero : ''}`}>{monthlyLeft}</span>
+            </div>
+            <div className={styles.usageRow}>
+              <span className={styles.usageRowText}>
+                <span className={styles.usageRowLabel}>Purchased</span>
+                <span className={styles.usageRowSub}>never expires</span>
+              </span>
+              <span className={`${styles.usageNum} ${purchasedLeft <= 0 ? styles.usageNumZero : ''}`}>{purchasedLeft}</span>
+            </div>
+            {monthlyLeft <= 0 && purchasedLeft <= 0 && purchaseUrl && (
+              <a className={styles.usagePurchase} href={purchaseUrl} target="_top" rel="noopener">
+                Purchase more on your Account page →
+              </a>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Card 1: The Interface ── */}
