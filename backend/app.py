@@ -73,6 +73,7 @@ from src.subscription_service import (
     add_bonus_tokens,
     check_and_consume_token,
     get_usage_summary,
+    _parse_iso_utc,
 )
 
 # NEW: JWT auth for unified platform
@@ -2040,6 +2041,23 @@ def _allowance_for_plan(plan: Optional[str], explicit: Optional[int]) -> Optiona
     return None
 
 
+def _plan_from_dates(
+    start_iso: Optional[str], renewal_iso: Optional[str], end_iso: Optional[str]
+) -> Optional[str]:
+    """Infer the plan from the billing period the webhook already sends — no payload change needed.
+    The span from subscription_start to the next renewal (preferred) or end date is ~1 month for a
+    monthly plan and ~1 year for an annual one, so a 180-day cutoff separates them cleanly. Returns
+    'monthly' | 'annual', or None when the dates are missing/unusable (caller falls back)."""
+    start = _parse_iso_utc(start_iso)
+    finish = _parse_iso_utc(renewal_iso) or _parse_iso_utc(end_iso)
+    if not start or not finish:
+        return None
+    days = (finish - start).days
+    if days <= 0:
+        return None
+    return "annual" if days >= 180 else "monthly"
+
+
 class SubscriptionWebhookRequest(BaseModel):
     user_id: str
     event: str  # activated | renewed | cancelled | expired
@@ -2073,10 +2091,17 @@ async def webhook_subscription(payload: SubscriptionWebhookRequest, request: Req
         raise HTTPException(status_code=401, detail="Invalid webhook secret.")
 
     event = payload.event.lower()
-    # Resolve the monthly allowance from the plan name (5 monthly / 10 annual), unless an explicit
-    # monthly_limit was sent. None means "not specified" — activate falls back to MONTHLY_LIMIT,
-    # renew leaves the existing allowance unchanged.
+    # Resolve the monthly allowance (5 monthly / 10 annual): explicit monthly_limit wins, else an
+    # explicit `plan`, else infer the plan from the subscription dates WooCommerce already sends.
+    # None means "could not determine" — activate falls back to MONTHLY_LIMIT, renew leaves the
+    # existing allowance unchanged.
     _resolved_limit = _allowance_for_plan(payload.plan, payload.monthly_limit)
+    if _resolved_limit is None:
+        _derived_plan = _plan_from_dates(
+            payload.subscription_start, payload.next_renewal, payload.subscription_end
+        )
+        if _derived_plan:
+            _resolved_limit = PLAN_ALLOWANCES.get(_derived_plan)
     try:
         with Session(engine) as session:
             if event == "activated":
