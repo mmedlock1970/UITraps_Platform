@@ -380,7 +380,7 @@ class UITrapsAnalyzer:
         # Step 6: Calculate metadata
         duration = time.time() - start_time
         # Report the model actually used for pass 1 (pass1_model="haiku" routes to enrich_model).
-        _effective_model = {"opus": self.opus_model, "sonnet": self.model, "haiku": self.enrich_model}.get(pass1_model or "", self.model)
+        _effective_model = {"opus": getattr(self, "opus_model", self.model), "sonnet": self.model, "haiku": self.enrich_model}.get(pass1_model or "", self.model)
         metadata = {
             "model": _effective_model,
             "duration_seconds": round(duration, 2),
