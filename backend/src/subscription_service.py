@@ -214,8 +214,8 @@ def check_and_consume_token(session: Session, user_id: str) -> tuple[bool, str]:
         return True, "ok"
 
     return False, (
-        f"Monthly limit reached ({sub.monthly_limit} analyses). "
-        "Purchase additional tokens or wait for your subscription to renew."
+        "You're out of analyses — your monthly allowance is used up and you have no purchased "
+        "analyses left. Purchase more on your Account page, or wait for next month's reset."
     )
 
 

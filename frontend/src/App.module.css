@@ -302,52 +302,91 @@
 }
 
 
-/* Analyses-remaining counter, pushed to the upper-right of the tab row. */
-.usageCounter {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: baseline;
-  gap: 5px;
-  padding: 5px 12px;
-  border: 1px solid var(--uitraps-border);
-  border-radius: 999px;
-  background: var(--uitraps-bg-secondary);
-  white-space: nowrap;
-  line-height: 1;
+/* Analyses-remaining panel — right-aligned above the form, matching the form's 24px gutter. */
+.usagePanelRow {
+  width: 100%;
+  padding: 0 24px;
+  box-sizing: border-box;
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 16px;
 }
 
-.usageCount {
-  font-size: 15px;
+.usagePanel {
+  min-width: 204px;
+  padding: 10px 13px;
+  border: 1px solid var(--uitraps-border);
+  border-radius: 8px;
+  background: var(--uitraps-bg-secondary);
+}
+
+.usageHeading {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--uitraps-text-muted);
+  text-align: right;
+  margin-bottom: 9px;
+}
+
+.usageRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.usageRow + .usageRow {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--uitraps-border);
+}
+
+.usageRowText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.usageRowLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--uitraps-text);
+  line-height: 1.2;
+}
+
+.usageRowSub {
+  font-size: 10.5px;
+  color: var(--uitraps-text-muted);
+  line-height: 1.2;
+}
+
+.usageNum {
+  font-size: 21px;
   font-weight: 700;
   color: var(--uitraps-text);
   font-variant-numeric: tabular-nums;
-}
-
-.usageLabel {
-  font-size: 12.5px;
-  color: var(--uitraps-text-secondary);
+  line-height: 1;
 }
 
 /* Zero remaining — shift to the required-dot orange to draw attention. */
-.usageCounterZero {
-  border-color: #e05c1a;
-  background: rgba(224, 92, 26, 0.08);
-}
-
-.usageCounterZero .usageCount,
-.usageCounterZero .usageLabel {
+.usageNumZero {
   color: #e05c1a;
 }
 
 .usagePurchase {
-  margin-left: 2px;
-  padding-left: 9px;
-  border-left: 1px solid rgba(224, 92, 26, 0.35);
+  display: block;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid var(--uitraps-border);
+  text-align: right;
   color: #e05c1a;
-  font-size: 12.5px;
-  font-weight: 600;
+  font-size: 11.5px;
+  font-weight: 700;
   text-decoration: none;
-  white-space: nowrap;
+  line-height: 1.35;
 }
 
 .usagePurchase:hover {

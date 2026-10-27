@@ -173,14 +173,19 @@ export const App: React.FC = () => {
     return [];
   });
   const showTabs = tabs.length > 1;
-  // Analyses remaining, shown in the analyzer's upper-right: subscription allotment left plus
-  // purchased credits = (monthly_limit - monthly_used) + bonus_tokens, from GET /api/user/usage —
-  // the same figure as the WordPress My Account page. null until loaded (counter hidden).
-  // ?analyses=<n> overrides it for previewing the look (e.g. ?analyses=0 for the empty state).
-  const [usageRemaining, setUsageRemaining] = useState<number | null>(null);
-  const analysesRemaining: number | null = _params.has('analyses')
-    ? Math.max(0, Number(_params.get('analyses')) || 0)
-    : usageRemaining;
+  // Analyses remaining, shown in the analyzer's upper-right as two counters: this month's
+  // subscription allowance (monthly_limit - monthly_used, resets monthly) and purchased analyses
+  // (bonus_tokens, never expire), from GET /api/user/usage — the same figures as the WordPress My
+  // Account page. null until loaded (panel hidden). ?monthly=<n>&purchased=<n> override the fetched
+  // values for previewing the look (e.g. ?monthly=0&purchased=0 for the all-used-up state).
+  const [monthlyRemaining, setMonthlyRemaining] = useState<number | null>(null);
+  const [purchasedRemaining, setPurchasedRemaining] = useState<number | null>(null);
+  const monthlyLeft: number | null = _params.has('monthly')
+    ? Math.max(0, Number(_params.get('monthly')) || 0)
+    : monthlyRemaining;
+  const purchasedLeft: number | null = _params.has('purchased')
+    ? Math.max(0, Number(_params.get('purchased')) || 0)
+    : purchasedRemaining;
   const purchaseUrl = 'https://staging12.uitraps.com/my-account/my-token-credits/';
   const [apiEndpoint] = useState(DEFAULT_API_ENDPOINT);
   const [view, setView] = useState<AppView>(() => {
@@ -359,12 +364,15 @@ export const App: React.FC = () => {
   });
   const effectiveToken = auth.token || (devMode ? 'dev-mode' : '');
 
-  // Load the analyses-remaining count for the upper-right counter. Skipped for the ?analyses=
-  // preview override and in dev-mode; re-fetched after each completed analysis.
+  // Load the analyses-remaining counters for the upper-right panel. Skipped for the
+  // ?monthly=/?purchased= preview overrides and in dev-mode; re-fetched after each completed analysis.
   const refreshUsage = useCallback(() => {
-    if (_params.has('analyses') || !effectiveToken || effectiveToken === 'dev-mode') return;
+    if (_params.has('monthly') || _params.has('purchased') || !effectiveToken || effectiveToken === 'dev-mode') return;
     void getUserUsage({ apiEndpoint, token: effectiveToken }).then(u => {
-      if (u) setUsageRemaining(Math.max(0, (u.monthly_remaining ?? 0) + (u.bonus_tokens ?? 0)));
+      if (u) {
+        setMonthlyRemaining(Math.max(0, u.monthly_remaining ?? 0));
+        setPurchasedRemaining(Math.max(0, u.bonus_tokens ?? 0));
+      }
     });
   }, [apiEndpoint, effectiveToken]);
   useEffect(() => { refreshUsage(); }, [refreshUsage]);
@@ -758,20 +766,6 @@ export const App: React.FC = () => {
                 {TAB_LABELS[t]}
               </button>
             ))}
-            {tabs.includes('form') && analysesRemaining !== null && (
-              <div
-                className={`${styles.usageCounter} ${analysesRemaining <= 0 ? styles.usageCounterZero : ''}`}
-                title="Analyses remaining — your subscription allotment plus any purchased credits"
-              >
-                <span className={styles.usageCount}>{analysesRemaining}</span>
-                <span className={styles.usageLabel}>analyses left</span>
-                {analysesRemaining <= 0 && (
-                  <a className={styles.usagePurchase} href={purchaseUrl} target="_top" rel="noopener">
-                    Purchase more
-                  </a>
-                )}
-              </div>
-            )}
           </div>
         )}
         {/* Separator line when there is no tab row */}
@@ -830,6 +824,32 @@ export const App: React.FC = () => {
                 <div style={{ maxWidth: 900, margin: '0 auto 0', padding: '0 24px', width: '100%', boxSizing: 'border-box' }}>
                   <div style={{ background: '#fdecea', border: '1px solid #f5c6c6', color: '#c0392b', borderRadius: 8, padding: '12px 16px', fontSize: 13, marginBottom: 16 }}>
                     {formError}
+                  </div>
+                </div>
+              )}
+              {tabs.includes('form') && monthlyLeft !== null && purchasedLeft !== null && (
+                <div className={styles.usagePanelRow}>
+                  <div className={styles.usagePanel}>
+                    <span className={styles.usageHeading}>Analyses Remaining</span>
+                    <div className={styles.usageRow}>
+                      <span className={styles.usageRowText}>
+                        <span className={styles.usageRowLabel}>This month</span>
+                        <span className={styles.usageRowSub}>resets monthly</span>
+                      </span>
+                      <span className={`${styles.usageNum} ${monthlyLeft <= 0 ? styles.usageNumZero : ''}`}>{monthlyLeft}</span>
+                    </div>
+                    <div className={styles.usageRow}>
+                      <span className={styles.usageRowText}>
+                        <span className={styles.usageRowLabel}>Purchased</span>
+                        <span className={styles.usageRowSub}>never expires</span>
+                      </span>
+                      <span className={`${styles.usageNum} ${purchasedLeft <= 0 ? styles.usageNumZero : ''}`}>{purchasedLeft}</span>
+                    </div>
+                    {monthlyLeft <= 0 && purchasedLeft <= 0 && (
+                      <a className={styles.usagePurchase} href={purchaseUrl} target="_top" rel="noopener">
+                        Purchase more on your Account page →
+                      </a>
+                    )}
                   </div>
                 </div>
               )}

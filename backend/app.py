@@ -223,7 +223,30 @@ def _save_report_db(user_id: str, result: dict, analysis_type: str,
     if not user_id:
         return
     try:
-        stats = result.get("statistics")
+        stats = dict(result.get("statistics") or {})
+        # Persist run details (model, cost, tokens, duration) next to the issue counts so
+        # per-customer activity reports can read them from SQL (statistics->'run_details'),
+        # not only from the rendered report HTML. Best-effort: absent keys are simply omitted.
+        meta = result.get("metadata") or {}
+        usage = meta.get("usage") or {}
+        _tok_total = sum(
+            v for v in (usage.get("input"), usage.get("output"),
+                        usage.get("cache_read"), usage.get("cache_creation"))
+            if isinstance(v, (int, float))
+        ) or meta.get("total_tokens")
+        _run_details = {
+            "model": meta.get("model"),
+            "estimated_cost": meta.get("estimated_cost") or meta.get("total_estimated_cost"),
+            "duration_seconds": meta.get("duration_seconds") or meta.get("total_duration_seconds"),
+            "mode": meta.get("mode"),
+            "tokens_input": usage.get("input"),
+            "tokens_output": usage.get("output"),
+            "tokens_cache_read": usage.get("cache_read"),
+            "tokens_total": _tok_total,
+        }
+        _run_details = {k: v for k, v in _run_details.items() if v is not None}
+        if _run_details:
+            stats["run_details"] = _run_details
         report = AnalysisReport(
             user_id=user_id,
             analysis_type=analysis_type,
@@ -2001,10 +2024,27 @@ def _verify_webhook_secret(request: Request) -> bool:
     return request.headers.get("X-Webhook-Secret", "") == WEBHOOK_SECRET
 
 
+# Monthly analysis allowance by subscription plan. The backend owns these numbers so the business
+# rule lives in one place — WooCommerce sends the plan NAME, not the count. An explicit monthly_limit
+# in the webhook still wins; if neither plan nor monthly_limit is given, falls back to MONTHLY_LIMIT.
+PLAN_ALLOWANCES = {"monthly": 5, "annual": 10}
+
+
+def _allowance_for_plan(plan: Optional[str], explicit: Optional[int]) -> Optional[int]:
+    """Resolve the monthly allowance: an explicit monthly_limit wins, else map the plan name,
+    else None (the caller decides the fallback)."""
+    if explicit is not None:
+        return explicit
+    if plan:
+        return PLAN_ALLOWANCES.get(plan.strip().lower())
+    return None
+
+
 class SubscriptionWebhookRequest(BaseModel):
     user_id: str
     event: str  # activated | renewed | cancelled | expired
-    monthly_limit: Optional[int] = None
+    plan: Optional[str] = None       # "monthly" | "annual" — backend maps to the allowance (5 / 10)
+    monthly_limit: Optional[int] = None  # explicit override; wins over `plan` when both are sent
     subscription_start: Optional[str] = None
     subscription_end: Optional[str] = None
     next_renewal: Optional[str] = None
@@ -2033,12 +2073,16 @@ async def webhook_subscription(payload: SubscriptionWebhookRequest, request: Req
         raise HTTPException(status_code=401, detail="Invalid webhook secret.")
 
     event = payload.event.lower()
+    # Resolve the monthly allowance from the plan name (5 monthly / 10 annual), unless an explicit
+    # monthly_limit was sent. None means "not specified" — activate falls back to MONTHLY_LIMIT,
+    # renew leaves the existing allowance unchanged.
+    _resolved_limit = _allowance_for_plan(payload.plan, payload.monthly_limit)
     try:
         with Session(engine) as session:
             if event == "activated":
                 result = activate_subscription(
                     session, payload.user_id,
-                    monthly_limit=payload.monthly_limit or MONTHLY_LIMIT,
+                    monthly_limit=_resolved_limit if _resolved_limit is not None else MONTHLY_LIMIT,
                     subscription_start=payload.subscription_start,
                     subscription_end=payload.subscription_end,
                     next_renewal=payload.next_renewal,
@@ -2046,7 +2090,7 @@ async def webhook_subscription(payload: SubscriptionWebhookRequest, request: Req
             elif event == "renewed":
                 result = renew_subscription(
                     session, payload.user_id,
-                    monthly_limit=payload.monthly_limit,
+                    monthly_limit=_resolved_limit,
                     next_renewal=payload.next_renewal,
                     subscription_end=payload.subscription_end,
                 )
